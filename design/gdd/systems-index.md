@@ -48,12 +48,12 @@
 | 27 | 剧情系统（章节推进） | 叙事 (Narrative) | Vertical Slice | 未开始 | core-gameplay-design.md | 探索系统、境界系统 |
 | 28 | 对话系统 | 叙事 (Narrative) | Vertical Slice | 未开始 | — | 剧情系统 |
 | 29 | 结局分支系统 | 叙事 (Narrative) | Full Vision | 未开始 | core-gameplay-design.md | 剧情系统 |
-| 30 | 战斗UI系统 | UI | MVP | 未开始 | — | 战斗系统 |
-| 31 | 探索UI系统（地图） | UI | MVP | 未开始 | — | 探索系统 |
-| 32 | 卡组编辑UI | UI | MVP | 未开始 | — | 卡组编辑系统 |
-| 33 | HUD系统 | UI | MVP | 未开始 | — | 所有系统 |
-| 34 | 主菜单与设置 | UI | MVP | 未开始 | — | 游戏状态管理器 |
-| 35 | 音频管理系统 | 音频 (Audio) | MVP | 未开始 | — | 事件系统 |
+| 30 | 战斗UI系统 | UI | MVP | 已设计 | combat-ui-system.md | 战斗系统 |
+| 31 | 探索UI系统（地图） | UI | MVP | 已设计 | exploration-ui-system.md | 探索系统 |
+| 32 | 卡组编辑UI | UI | MVP | 已设计 | deck-editing-ui-system.md | 卡组编辑系统 |
+| 33 | HUD系统 | UI | MVP | 已设计 | hud-system.md | 所有系统 |
+| 34 | 主菜单与设置 | UI | MVP | 已设计 | main-menu-system.md | 游戏状态管理器 |
+| 35 | 音频管理系统 | 音频 (Audio) | MVP | 已设计 | audio-system.md | 事件系统 |
 | 36 | 成就系统 | 元 (Meta) | Full Vision | 未开始 | — | 存档系统 |
 
 ---
