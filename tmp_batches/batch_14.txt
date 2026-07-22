@@ -1,0 +1,15 @@
+CCGS Skill Testing Framework/skills/utility/qa-plan.md
+CCGS Skill Testing Framework/skills/utility/regression-suite.md
+CCGS Skill Testing Framework/skills/utility/release-checklist.md
+CCGS Skill Testing Framework/skills/utility/reverse-document.md
+CCGS Skill Testing Framework/skills/utility/setup-engine.md
+CCGS Skill Testing Framework/skills/utility/skill-improve.md
+CCGS Skill Testing Framework/skills/utility/skill-test.md
+CCGS Skill Testing Framework/skills/utility/smoke-check.md
+CCGS Skill Testing Framework/skills/utility/soak-test.md
+CCGS Skill Testing Framework/skills/utility/start.md
+CCGS Skill Testing Framework/skills/utility/test-helpers.md
+CCGS Skill Testing Framework/skills/utility/test-setup.md
+CCGS Skill Testing Framework/templates/agent-test-spec.md
+CCGS Skill Testing Framework/templates/skill-test-spec.md
+src/CLAUDE.md

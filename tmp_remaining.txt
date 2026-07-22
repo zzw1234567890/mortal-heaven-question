@@ -1,0 +1,329 @@
+COUNT:328
+CLAUDE.md
+.claude/agent-memory/lead-programmer/MEMORY.md
+.claude/agents/accessibility-specialist.md
+.claude/agents/ai-programmer.md
+.claude/agents/analytics-engineer.md
+.claude/agents/art-director.md
+.claude/agents/audio-director.md
+.claude/agents/community-manager.md
+.claude/agents/creative-director.md
+.claude/agents/devops-engineer.md
+.claude/agents/economy-designer.md
+.claude/agents/engine-programmer.md
+.claude/agents/game-designer.md
+.claude/agents/gameplay-programmer.md
+.claude/agents/godot-csharp-specialist.md
+.claude/agents/godot-gdextension-specialist.md
+.claude/agents/godot-gdscript-specialist.md
+.claude/agents/godot-shader-specialist.md
+.claude/agents/godot-specialist.md
+.claude/agents/lead-programmer.md
+.claude/agents/level-designer.md
+.claude/agents/live-ops-designer.md
+.claude/agents/localization-lead.md
+.claude/agents/narrative-director.md
+.claude/agents/network-programmer.md
+.claude/agents/performance-analyst.md
+.claude/agents/producer.md
+.claude/agents/prototyper.md
+.claude/agents/qa-lead.md
+.claude/agents/qa-tester.md
+.claude/agents/release-manager.md
+.claude/agents/security-engineer.md
+.claude/agents/sound-designer.md
+.claude/agents/systems-designer.md
+.claude/agents/technical-artist.md
+.claude/agents/technical-director.md
+.claude/agents/tools-programmer.md
+.claude/agents/ue-blueprint-specialist.md
+.claude/agents/ue-gas-specialist.md
+.claude/agents/ue-replication-specialist.md
+.claude/agents/ue-umg-specialist.md
+.claude/agents/ui-programmer.md
+.claude/agents/unity-addressables-specialist.md
+.claude/agents/unity-dots-specialist.md
+.claude/agents/unity-shader-specialist.md
+.claude/agents/unity-specialist.md
+.claude/agents/unity-ui-specialist.md
+.claude/agents/unreal-specialist.md
+.claude/agents/ux-designer.md
+.claude/agents/world-builder.md
+.claude/agents/writer.md
+.claude/docs/CLAUDE-local-template.md
+.claude/docs/agent-coordination-map.md
+.claude/docs/agent-roster.md
+.claude/docs/coding-standards.md
+.claude/docs/context-management.md
+.claude/docs/coordination-rules.md
+.claude/docs/director-gates.md
+.claude/docs/directory-structure.md
+.claude/docs/hooks-reference.md
+.claude/docs/hooks-reference/hook-input-schemas.md
+.claude/docs/hooks-reference/post-merge-asset-validation.md
+.claude/docs/hooks-reference/post-sprint-retrospective.md
+.claude/docs/hooks-reference/pre-commit-code-quality.md
+.claude/docs/hooks-reference/pre-commit-design-check.md
+.claude/docs/hooks-reference/pre-push-test-gate.md
+.claude/docs/quick-start.md
+.claude/docs/review-workflow.md
+.claude/docs/rules-reference.md
+.claude/docs/settings-local-template.md
+.claude/docs/setup-requirements.md
+.claude/docs/skills-reference.md
+.claude/docs/technical-preferences.md
+.claude/docs/templates/accessibility-requirements.md
+.claude/docs/templates/architecture-decision-record.md
+.claude/docs/templates/architecture-doc-from-code.md
+.claude/docs/templates/architecture-traceability.md
+.claude/docs/templates/art-bible.md
+.claude/docs/templates/changelog-template.md
+.claude/docs/templates/collaborative-protocols/design-agent-protocol.md
+.claude/docs/templates/collaborative-protocols/implementation-agent-protocol.md
+.claude/docs/templates/collaborative-protocols/leadership-agent-protocol.md
+.claude/docs/templates/concept-doc-from-prototype.md
+.claude/docs/templates/design-doc-from-implementation.md
+.claude/docs/templates/difficulty-curve.md
+.claude/docs/templates/economy-model.md
+.claude/docs/templates/faction-design.md
+.claude/docs/templates/game-concept.md
+.claude/docs/templates/game-design-document.md
+.claude/docs/templates/game-pillars.md
+.claude/docs/templates/hud-design.md
+.claude/docs/templates/incident-response.md
+.claude/docs/templates/interaction-pattern-library.md
+.claude/docs/templates/level-design-document.md
+.claude/docs/templates/milestone-definition.md
+.claude/docs/templates/narrative-character-sheet.md
+.claude/docs/templates/pitch-document.md
+.claude/docs/templates/player-journey.md
+.claude/docs/templates/post-mortem.md
+.claude/docs/templates/project-stage-report.md
+.claude/docs/templates/prototype-report.md
+.claude/docs/templates/release-checklist-template.md
+.claude/docs/templates/release-notes.md
+.claude/docs/templates/risk-register-entry.md
+.claude/docs/templates/skill-test-spec.md
+.claude/docs/templates/sound-bible.md
+.claude/docs/templates/sprint-plan.md
+.claude/docs/templates/systems-index.md
+.claude/docs/templates/technical-design-document.md
+.claude/docs/templates/test-evidence.md
+.claude/docs/templates/test-plan.md
+.claude/docs/templates/ux-spec.md
+.claude/docs/templates/vertical-slice-report.md
+.claude/rules/ai-code.md
+.claude/rules/data-files.md
+.claude/rules/design-docs.md
+.claude/rules/engine-code.md
+.claude/rules/gameplay-code.md
+.claude/rules/narrative.md
+.claude/rules/network-code.md
+.claude/rules/prototype-code.md
+.claude/rules/shader-code.md
+.claude/rules/test-standards.md
+.claude/rules/ui-code.md
+.claude/skills/adopt/SKILL.md
+.claude/skills/architecture-decision/SKILL.md
+.claude/skills/architecture-review/SKILL.md
+.claude/skills/art-bible/SKILL.md
+.claude/skills/asset-audit/SKILL.md
+.claude/skills/asset-spec/SKILL.md
+.claude/skills/balance-check/SKILL.md
+.claude/skills/brainstorm/SKILL.md
+.claude/skills/bug-report/SKILL.md
+.claude/skills/bug-triage/SKILL.md
+.claude/skills/changelog/SKILL.md
+.claude/skills/code-review/SKILL.md
+.claude/skills/consistency-check/SKILL.md
+.claude/skills/content-audit/SKILL.md
+.claude/skills/create-architecture/SKILL.md
+.claude/skills/create-control-manifest/SKILL.md
+.claude/skills/create-epics/SKILL.md
+.claude/skills/create-stories/SKILL.md
+.claude/skills/day-one-patch/SKILL.md
+.claude/skills/design-review/SKILL.md
+.claude/skills/design-system/SKILL.md
+.claude/skills/dev-story/SKILL.md
+.claude/skills/estimate/SKILL.md
+.claude/skills/gate-check/SKILL.md
+.claude/skills/help/SKILL.md
+.claude/skills/hotfix/SKILL.md
+.claude/skills/launch-checklist/SKILL.md
+.claude/skills/localize/SKILL.md
+.claude/skills/map-systems/SKILL.md
+.claude/skills/milestone-review/SKILL.md
+.claude/skills/onboard/SKILL.md
+.claude/skills/patch-notes/SKILL.md
+.claude/skills/perf-profile/SKILL.md
+.claude/skills/playtest-report/SKILL.md
+.claude/skills/project-stage-detect/SKILL.md
+.claude/skills/propagate-design-change/SKILL.md
+.claude/skills/prototype/SKILL.md
+.claude/skills/qa-plan/SKILL.md
+.claude/skills/quick-design/SKILL.md
+.claude/skills/regression-suite/SKILL.md
+.claude/skills/release-checklist/SKILL.md
+.claude/skills/retrospective/SKILL.md
+.claude/skills/reverse-document/SKILL.md
+.claude/skills/review-all-gdds/SKILL.md
+.claude/skills/scope-check/SKILL.md
+.claude/skills/security-audit/SKILL.md
+.claude/skills/setup-engine/SKILL.md
+.claude/skills/skill-improve/SKILL.md
+.claude/skills/skill-test/SKILL.md
+.claude/skills/smoke-check/SKILL.md
+.claude/skills/soak-test/SKILL.md
+.claude/skills/sprint-plan/SKILL.md
+.claude/skills/sprint-status/SKILL.md
+.claude/skills/start/SKILL.md
+.claude/skills/story-done/SKILL.md
+.claude/skills/story-readiness/SKILL.md
+.claude/skills/team-audio/SKILL.md
+.claude/skills/team-combat/SKILL.md
+.claude/skills/team-level/SKILL.md
+.claude/skills/team-live-ops/SKILL.md
+.claude/skills/team-narrative/SKILL.md
+.claude/skills/team-polish/SKILL.md
+.claude/skills/team-qa/SKILL.md
+.claude/skills/team-release/SKILL.md
+.claude/skills/team-ui/SKILL.md
+.claude/skills/tech-debt/SKILL.md
+.claude/skills/test-evidence-review/SKILL.md
+.claude/skills/test-flakiness/SKILL.md
+.claude/skills/test-helpers/SKILL.md
+.claude/skills/test-setup/SKILL.md
+.claude/skills/ux-design/SKILL.md
+.claude/skills/ux-review/SKILL.md
+.claude/skills/vertical-slice/SKILL.md
+.github/ISSUE_TEMPLATE/bug_report.md
+.github/ISSUE_TEMPLATE/feature_request.md
+.github/PULL_REQUEST_TEMPLATE.md
+CCGS Skill Testing Framework/CLAUDE.md
+CCGS Skill Testing Framework/README.md
+CCGS Skill Testing Framework/agents/directors/art-director.md
+CCGS Skill Testing Framework/agents/directors/creative-director.md
+CCGS Skill Testing Framework/agents/directors/producer.md
+CCGS Skill Testing Framework/agents/directors/technical-director.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-csharp-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-gdextension-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-gdscript-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-shader-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-addressables-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-dots-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-shader-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-ui-specialist.md
+CCGS Skill Testing Framework/agents/engine/unreal/ue-blueprint-specialist.md
+CCGS Skill Testing Framework/agents/engine/unreal/ue-gas-specialist.md
+CCGS Skill Testing Framework/agents/engine/unreal/ue-replication-specialist.md
+CCGS Skill Testing Framework/agents/engine/unreal/ue-umg-specialist.md
+CCGS Skill Testing Framework/agents/engine/unreal/unreal-specialist.md
+CCGS Skill Testing Framework/agents/leads/audio-director.md
+CCGS Skill Testing Framework/agents/leads/game-designer.md
+CCGS Skill Testing Framework/agents/leads/lead-programmer.md
+CCGS Skill Testing Framework/agents/leads/level-designer.md
+CCGS Skill Testing Framework/agents/leads/narrative-director.md
+CCGS Skill Testing Framework/agents/leads/qa-lead.md
+CCGS Skill Testing Framework/agents/leads/systems-designer.md
+CCGS Skill Testing Framework/agents/operations/analytics-engineer.md
+CCGS Skill Testing Framework/agents/operations/community-manager.md
+CCGS Skill Testing Framework/agents/operations/devops-engineer.md
+CCGS Skill Testing Framework/agents/operations/economy-designer.md
+CCGS Skill Testing Framework/agents/operations/live-ops-designer.md
+CCGS Skill Testing Framework/agents/operations/localization-lead.md
+CCGS Skill Testing Framework/agents/operations/release-manager.md
+CCGS Skill Testing Framework/agents/qa/accessibility-specialist.md
+CCGS Skill Testing Framework/agents/qa/qa-tester.md
+CCGS Skill Testing Framework/agents/qa/security-engineer.md
+CCGS Skill Testing Framework/agents/specialists/ai-programmer.md
+CCGS Skill Testing Framework/agents/specialists/engine-programmer.md
+CCGS Skill Testing Framework/agents/specialists/gameplay-programmer.md
+CCGS Skill Testing Framework/agents/specialists/network-programmer.md
+CCGS Skill Testing Framework/agents/specialists/performance-analyst.md
+CCGS Skill Testing Framework/agents/specialists/prototyper.md
+CCGS Skill Testing Framework/agents/specialists/sound-designer.md
+CCGS Skill Testing Framework/agents/specialists/technical-artist.md
+CCGS Skill Testing Framework/agents/specialists/tools-programmer.md
+CCGS Skill Testing Framework/agents/specialists/ui-programmer.md
+CCGS Skill Testing Framework/agents/specialists/ux-designer.md
+CCGS Skill Testing Framework/agents/specialists/world-builder.md
+CCGS Skill Testing Framework/agents/specialists/writer.md
+CCGS Skill Testing Framework/quality-rubric.md
+CCGS Skill Testing Framework/skills/analysis/asset-audit.md
+CCGS Skill Testing Framework/skills/analysis/balance-check.md
+CCGS Skill Testing Framework/skills/analysis/code-review.md
+CCGS Skill Testing Framework/skills/analysis/consistency-check.md
+CCGS Skill Testing Framework/skills/analysis/content-audit.md
+CCGS Skill Testing Framework/skills/analysis/estimate.md
+CCGS Skill Testing Framework/skills/analysis/perf-profile.md
+CCGS Skill Testing Framework/skills/analysis/scope-check.md
+CCGS Skill Testing Framework/skills/analysis/security-audit.md
+CCGS Skill Testing Framework/skills/analysis/tech-debt.md
+CCGS Skill Testing Framework/skills/analysis/test-evidence-review.md
+CCGS Skill Testing Framework/skills/analysis/test-flakiness.md
+CCGS Skill Testing Framework/skills/authoring/architecture-decision.md
+CCGS Skill Testing Framework/skills/authoring/art-bible.md
+CCGS Skill Testing Framework/skills/authoring/create-architecture.md
+CCGS Skill Testing Framework/skills/authoring/design-system.md
+CCGS Skill Testing Framework/skills/authoring/quick-design.md
+CCGS Skill Testing Framework/skills/authoring/ux-design.md
+CCGS Skill Testing Framework/skills/authoring/ux-review.md
+CCGS Skill Testing Framework/skills/gate/gate-check.md
+CCGS Skill Testing Framework/skills/pipeline/create-control-manifest.md
+CCGS Skill Testing Framework/skills/pipeline/create-epics.md
+CCGS Skill Testing Framework/skills/pipeline/create-stories.md
+CCGS Skill Testing Framework/skills/pipeline/dev-story.md
+CCGS Skill Testing Framework/skills/pipeline/map-systems.md
+CCGS Skill Testing Framework/skills/pipeline/propagate-design-change.md
+CCGS Skill Testing Framework/skills/readiness/story-done.md
+CCGS Skill Testing Framework/skills/readiness/story-readiness.md
+CCGS Skill Testing Framework/skills/review/architecture-review.md
+CCGS Skill Testing Framework/skills/review/design-review.md
+CCGS Skill Testing Framework/skills/review/review-all-gdds.md
+CCGS Skill Testing Framework/skills/sprint/changelog.md
+CCGS Skill Testing Framework/skills/sprint/milestone-review.md
+CCGS Skill Testing Framework/skills/sprint/patch-notes.md
+CCGS Skill Testing Framework/skills/sprint/retrospective.md
+CCGS Skill Testing Framework/skills/sprint/sprint-plan.md
+CCGS Skill Testing Framework/skills/sprint/sprint-status.md
+CCGS Skill Testing Framework/skills/team/team-audio.md
+CCGS Skill Testing Framework/skills/team/team-combat.md
+CCGS Skill Testing Framework/skills/team/team-level.md
+CCGS Skill Testing Framework/skills/team/team-live-ops.md
+CCGS Skill Testing Framework/skills/team/team-narrative.md
+CCGS Skill Testing Framework/skills/team/team-polish.md
+CCGS Skill Testing Framework/skills/team/team-qa.md
+CCGS Skill Testing Framework/skills/team/team-release.md
+CCGS Skill Testing Framework/skills/team/team-ui.md
+CCGS Skill Testing Framework/skills/utility/adopt.md
+CCGS Skill Testing Framework/skills/utility/asset-spec.md
+CCGS Skill Testing Framework/skills/utility/brainstorm.md
+CCGS Skill Testing Framework/skills/utility/bug-report.md
+CCGS Skill Testing Framework/skills/utility/bug-triage.md
+CCGS Skill Testing Framework/skills/utility/day-one-patch.md
+CCGS Skill Testing Framework/skills/utility/help.md
+CCGS Skill Testing Framework/skills/utility/hotfix.md
+CCGS Skill Testing Framework/skills/utility/launch-checklist.md
+CCGS Skill Testing Framework/skills/utility/localize.md
+CCGS Skill Testing Framework/skills/utility/onboard.md
+CCGS Skill Testing Framework/skills/utility/playtest-report.md
+CCGS Skill Testing Framework/skills/utility/project-stage-detect.md
+CCGS Skill Testing Framework/skills/utility/prototype.md
+CCGS Skill Testing Framework/skills/utility/qa-plan.md
+CCGS Skill Testing Framework/skills/utility/regression-suite.md
+CCGS Skill Testing Framework/skills/utility/release-checklist.md
+CCGS Skill Testing Framework/skills/utility/reverse-document.md
+CCGS Skill Testing Framework/skills/utility/setup-engine.md
+CCGS Skill Testing Framework/skills/utility/skill-improve.md
+CCGS Skill Testing Framework/skills/utility/skill-test.md
+CCGS Skill Testing Framework/skills/utility/smoke-check.md
+CCGS Skill Testing Framework/skills/utility/soak-test.md
+CCGS Skill Testing Framework/skills/utility/start.md
+CCGS Skill Testing Framework/skills/utility/test-helpers.md
+CCGS Skill Testing Framework/skills/utility/test-setup.md
+CCGS Skill Testing Framework/templates/agent-test-spec.md
+CCGS Skill Testing Framework/templates/skill-test-spec.md
+design/CLAUDE.md
+src/CLAUDE.md

@@ -1,0 +1,24 @@
+.claude/skills/test-helpers/SKILL.md
+.claude/skills/test-setup/SKILL.md
+.claude/skills/ux-design/SKILL.md
+.claude/skills/ux-review/SKILL.md
+.claude/skills/vertical-slice/SKILL.md
+.github/ISSUE_TEMPLATE/bug_report.md
+.github/ISSUE_TEMPLATE/feature_request.md
+.github/PULL_REQUEST_TEMPLATE.md
+CCGS Skill Testing Framework/CLAUDE.md
+CCGS Skill Testing Framework/README.md
+CCGS Skill Testing Framework/agents/directors/art-director.md
+CCGS Skill Testing Framework/agents/directors/creative-director.md
+CCGS Skill Testing Framework/agents/directors/producer.md
+CCGS Skill Testing Framework/agents/directors/technical-director.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-csharp-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-gdextension-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-gdscript-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-shader-specialist.md
+CCGS Skill Testing Framework/agents/engine/godot/godot-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-addressables-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-dots-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-shader-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-specialist.md
+CCGS Skill Testing Framework/agents/engine/unity/unity-ui-specialist.md
