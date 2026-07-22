@@ -5,9 +5,9 @@
 
 ## 当前任务
 
-- **任务**：设计开局身份选择系统 (Identity Selection System) GDD
+- **任务**：设计探索系统 (Exploration System) GDD
 - **状态**：✅ 已完成
-- **文件**：`design/gdd/identity-selection-system.md`
+- **文件**：`design/gdd/exploration-system.md`
 
 ## 已完成章节
 
@@ -23,11 +23,12 @@
 
 ## 已修改文件
 
-- `design/gdd/identity-selection-system.md` — 新 GDD（已设计）
-- `design/gdd/systems-index.md` — 系统 24 更新为「已设计」
-- `design/gdd/deck-editing-system.md` — 战利品改为混合三选一（含灵石选项）
+- `design/gdd/exploration-system.md` — 新 GDD（已设计）
+- `design/gdd/resource-system.md` — 新 GDD（已设计）
+- `design/gdd/systems-index.md` — 系统 #4/17/19 更新为「已设计」
 
 ## 待办
 
-- 设计下一个系统（建议：存档/读档系统 #2，依赖 GSM✅）
-- 或设计 AI 系统 #14（MVP，无未设计的前置依赖）
+- 下一个 MVP 系统：**#30 战斗UI系统**（前置：战斗系统✅）
+- 或 #31 探索UI系统（前置：探索系统✅）
+- 或 #32 卡组编辑UI（前置：卡组编辑系统✅）
