@@ -1,102 +1,60 @@
 # 活跃会话状态
 
 > **会话 ID**：2026-07-23
-> **上次更新**：2026-07-23
+> **上次更新**：2026-07-23（design-review 批量修订会话结束）
 
-## ✅ 去IP化完成
+## 批量设计审查 — 2026-07-23
 
-全部 41 个 GDD 文件中《凡人修仙传》原著 IP 引用已清除。零残留。
+### 成果摘要
 
-### 已创建/修改的世界观文件
-- `design/world/world-bible.md` — 完整原创世界观圣经
-- `design/world/name-mapping.md` — 110+ 条旧→新名称映射
+全部 3 个跨审查阻塞项已清除：
+- **B1**（卡组上限三重定义冲突）→ GSM 移除全局常量，引用 realm-system.md §2
+- **B2**（地图名称不一致）→ exploration-system.md 同步为 西域古林/西域边境
+- **B3**（阵亡暂挂 vs 绑定永久移除不兼容）→ 作用域拆分双向文档化
 
-### 所有 26 个含 IP 的 GDD 文件已全部更新
-- Wave 1: game-pillars.md, game-concept.md, systems-index.md ✅
-- Wave 2: story-system.md, ending-branch-system.md ✅
-- Wave 3: identity-selection-system.md, card-system-design.md ✅
-- Wave 4: 其余 19 个文件 ✅
-- 审查报告: 3 个 review 文件 ✅
-- 交叉审查: gdd-cross-review-2026-07-23.md ✅
+8 条一致性警告已解决：W-C1 至 W-C4、W-C9
 
-### 最终验证
-- `凡人修仙传` / `掌天问道` — 零残留 ✅
-- 所有原著角色名、功法名、宗门名、地名、物品名 — 零残留 ✅
+系统索引进度：29/36 已设计 (81%)，7 个待修订
 
-## 下一步建议
-- `/consistency-check` — 验证跨文档一致性（名称替换后的）
-- `creative-director` — 审查世界圣经的内部一致性
-- 更新 `systems-index.md` 中的系统描述（如有未覆盖的系统）
+### 已审查及已批准
 
-## 本轮变更摘要
+| # | 系统 | 原状态 | 裁决 |
+|---|------|--------|------|
+| 1 | 游戏状态管理器 | 需要修订 | 需要修订 → 5 个阻塞项已解决 |
+| 15 | 状态效果系统 | 需要修订 | 需要修订 → 2 个阻塞项已解决 |
+| 4 | 探索系统 | 需要修订 | 已批准（B2 已修复） |
+| 11 | 功法/法宝绑定系统 | 需要修订 | 已批准（B3 已验证） |
+| 17 | 境界系统 | 需要修订 | 需要修订 → 3 个阻塞项已解决 |
+| 7 | 卡牌系统 | 需要修订 | 已批准（音频审计 5 项已解决） |
 
-### binding-system.md — 同名卡叠加机制（2026-07-23）
-- 用户需求：同名功法卡可绑定同角色多次，效果乘法叠加，共享一个绑定位
-- 关键设计决策：
-  - stack_multiplier 默认 1.5（可配置 1.2-2.0），本命乘法独立
-  - stack_limit 由卡牌模板定义（强力3张，弱效4-5张）
-  - 叠加不消耗额外绑定位——stack_count 递增，slot_index 不变
-  - 本命判定仅首次绑定触发，后续叠加沿用已锁定的 multiplier
-  - 阵亡处理同步更新：绑定卡洗回牌库（对齐card-system.md §D.4）
-- 9处变更：数据结构、绑定流程、覆盖流程、阵亡处理、本命交互、公式、边界、调优、AC（新增5条）
+### 仍待修订（6 个 GDD）
 
-### card-system.md — 数据模型同步
-- 功法卡/法宝卡各新增 stack_limit 和 stack_multiplier 字段
-- §F 同名多张卡：追加叠加机制说明+交叉引用
+| # | 系统 | 类别 | 优先级 |
+|---|------|------|--------|
+| 20 | 资源系统 | 经济 | MVP |
+| 22 | 炼丹炼器系统 | 经济 | Vertical Slice |
+| 26 | 轮回天赋系统 | 成长 | Vertical Slice |
+| 30 | 战斗UI系统 | UI | MVP |
+| 35 | 音频管理系统 | 音频 | MVP |
+| 36 | 成就系统 | 元 | Full Vision |
 
-### card-effect-engine.md — 堆叠规则同步
-- stacking_rule 枚举新增「乘法叠加」
-- §6 效果堆叠规则表：同名叠同角色→乘法叠加
-- §3 完全重写：同名效果叠加公式（含变量表）
-- AC重写：取最高值→乘法叠加
+### 跨会话变更的文件
 
-## 下一步建议
-- `/design-review binding-system` — 审查修订后的绑定系统
-- `/consistency-check` — 验证三文档间同名叠加规则一致性
-- `/design-review card-effect-engine` — 审查修订后的效果引擎
-- `/review-all-gdds` — 全局设计理论审查
-- `/gate-check pre-production` — 验证预生产准备条件
+- `design/gdd/game-state-manager.md` — B1 修复 + 5 个信号 + 初始化合约
+- `design/gdd/status-system.md` — B3 修复 + 8 个建议项
+- `design/gdd/exploration-system.md` — B2 地图名称修复
+- `design/gdd/binding-system.md` — B3 验证通过（已审查）
+- `design/gdd/realm-system.md` — 3 个阻塞项 + 6 个建议项
+- `design/gdd/card-system.md` — 音频审计已解决（已审查）
+- `design/gdd/action-point-system.md` — 交叉引用（W-C4）
+- `design/gdd/cost-system.md` — 交叉引用（W-C4）
+- `design/gdd/systems-index.md` — 6 个状态更新
+- `design/gdd/gdd-cross-review-2026-07-23.md` — 裁决更新为通过
+- `design/gdd/reviews/` — 新的审查日志（6 个文件）
 
-## 本轮变更摘要
+### 下一步建议
 
-### card-effect-engine.md — 审查与重大修订（2026-07-23）
-- 7 位专家并行审查（game-designer, systems-designer, qa-lead, ai-programmer, godot-gdscript-specialist, gameplay-programmer, creative-director）
-- 11 个阻塞项 + 10 个建议项 → 全部已修复
-- 关键修复：
-  - 战斗阶段 8→7 同步（移除布阵阶段，对齐 combat-system.md）
-  - 新增效果类型：延迟效果、条件即时效果、替代/修改效果
-  - 新增 5 个 AI 评估 API（evaluate_effect, simulate_chain 等）
-  - 新增 PRD 伪随机分布 + 怜悯计时器 策略
-  - 「先发」标记：让玩家控制结算优先级
-  - 所有公式舍入→`floor()`；本命乘数→逐源独立计算
-  - 20 条参数化验收标准（覆盖全部效果类型+边界情况）
-  - 效果数据模式三件套（InstantEffect, PersistentEffect, TriggeredEffect）
-
-### 新创建
-- `design/gdd/status-system.md` — 状态效果系统GDD（36号系统）
-- `design/gdd/reviews/card-effect-engine-review-log.md` — 审查追溯日志
-
-### 索引更新
-- `design/gddsystems-index.md`：
-  - 新增 #15 状态效果系统 (Core / MVP / status-system.md)
-  - #8 卡片效果引擎状态标记为"设计中"（In Review）
-  - #14 AI系统依赖更名为"卡片效果解析引擎"
-  - 总数：37 系统 (原36 + 新增1)
-
-### card-system.md — 音频设计对抗性审查（2026-07-23）
-- audio-director 完成审查：审查结论 MAJOR REVISION
-- 审查报告：`design/gdd/reviews/card-system-audio-audit-2026-07-23.md`
-- 5 个阻塞项（R1-R5）：稀有度出牌音梯度缺失、阵法音不一致、成长维度无声、框架B叙事音未对齐、白蓝紫掉落音缺失
-- 6 个建议项（R6-R11）：卡组管理音、获得上下文差异、音频技术规范等
-
-## 下一步建议
-- `/design-review card-system` — 审查修复后的卡牌系统（建议将音频审查报告作为输入）
-- `/design-review card-effect-engine` — 重新审查修订后的效果引擎
-- `/consistency-check` — 验证新状态系统与效果引擎之间的 GDD 数值一致性
-- `/design-review status-system` — 审查新创建的状态效果系统
-- `/gate-check pre-production` — 验证预生产准备条件
-- `/review-all-gdds` — 全局设计理论审查（建议在进入架构阶段前执行）
-- `/map-systems` — 系统依赖图生成
-
-<!-- CONSISTENCY-CHECK: 2026-07-23 | GDDs checked: 36 | Conflicts found: 6 | All fixed | Report appended to dos/consistency-failures.md -->
-<!-- DSIGN-REVIEW: 2026-07-23 | card-effect-engine | 7 specialists | Verdict: MAJOR REVIISON → All blockers resolved | Review log: design/gdd/reviews/ccard-effect-engine-review-log.md -->
+- `/design-review tribulation-system` — 渡劫突破系统（W-D5：渡劫无风险）
+- `/design-review resource-system` — 资源系统（W-D4：灵石万能溶剂、W-C5：初始灵石）
+- `/consistency-check` — 验证 6 个已修订 GDD 之间的一致性
+- `/review-all-gdds` — 重新评估设计理论警告（D1-D10）

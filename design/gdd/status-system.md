@@ -3,7 +3,7 @@
 > **状态 (Status)**：设计中 (In Design)
 > **作者 (Author)**：Claude Code + 用户
 > **最后更新 (Last Updated)**：2026-07-23
-> **最后验证 (Last Verified)**：—
+> **最后验证 (Last Verified)**：2026-07-23（设计审查 / design-review）
 > **实现的支柱 (Implements Pillar)**：支柱1「自由组牌，策略为王」—— 状态效果的确定性是策略可信的基础
 
 ## 概述 (Overview)
@@ -48,11 +48,18 @@ StatusEffect {
   current_stacks: int            # 当前层数（≥1）
   source_card_id: String         # 来源卡牌的 template_id
   source_card_instance_id: String # 来源卡牌的 instance_id（用于精确追溯）
-  priority: int                  # 同机结算时的优先级（默认 0，越大越先结算）
+  priority: int                  # 同机结算时状态触发效果在效果引擎队列中的子优先级（默认 0，越大越先结算）
+                                  # 嵌入规则：效果引擎结算顺序（主动出牌→先发→普通己方→敌方→instance_id）是主排序；
+                                  # 当两个状态触发的效果位于效果引擎同一层级时，priority 作为次级决胜键（高于 card_instance_id）。
+                                  # 详见 card-effect-engine.md §3「效果结算顺序规则」
   icon_path: String              # UI 图标资源路径
   is_hidden: bool                # true = 不显示在角色头顶（用于内部标记状态）
   is_expired: bool               # 运行时标记：已到期待移除
-  metadata: Dictionary           # 扩展数据（如 {"damage_type": "fire", "trigger_count": 0}）
+  metadata: Dictionary           # 扩展数据。标准键：
+                                  #   "damage_type": String — 元素属性（"fire"/"ice"/"thunder"/"poison"/"dark"），用于属性免疫判定
+                                  #   "trigger_count": int — 条件触发效果的累计触发次数（运行时由效果引擎维护）
+                                  #   "stat_affected": String — 受影响的属性名（如 "ATK", "DEF"），用于 get_accumulated_value 过滤
+                                  # 非标准键允许但不应依赖——下游系统读取前需 has() 守卫
 }
 ```
 
@@ -85,9 +92,12 @@ StatusEffect {
 每个己方回合的**阶段0（准备阶段）**执行以下流程：
 
 ```
+# 阶段0 开始时执行倒计时
 for each 角色 in 全场角色:
+  if 角色.active_statuses.is_empty():        # 性能优化：跳过无状态的角色
+    continue
   for each status in 角色.active_statuses:
-    if status.duration > 0:
+    if status.duration > 0:                  # duration=-1 永久状态不递减（跳过内层循环）
       status.duration -= 1
       if status.duration == 0:
         status.is_expired = true
@@ -124,7 +134,8 @@ can_apply(target, status_template) → bool:
 # ---- 写入接口 ----
 
 apply_status(target_id: String, template: StatusTemplate) → ApplyResult
-  # 施加状态到目标。返回 {applied, status_id, reason}。
+  # 施加状态到目标。
+  # ApplyResult = {applied: bool, status_id: String, reason: String}
   # reason: "new" | "refreshed" | "stacked" | "immune" | "max_stacks"
 
 remove_status(status_id: String) → bool
@@ -137,10 +148,15 @@ clear_all_statuses(target_id: String) → int
   # 清除目标身上所有非永久状态（如丹药复活后清debuff）
 
 suspend_statuses_by_source(source_card_instance_id: String) → [String]
-  # 暂挂来源卡牌的所有状态效果（角色阵亡时使用），返回被暂挂的状态ID列表
+  # 暂挂来源卡牌的所有状态效果（角色离场/阵亡时使用），返回被暂挂的状态ID列表
+  # ⚠ 作用域限制：仅处理非绑定来源的状态（敌方debuff、丹药buff、卡牌效果等）。
+  #    绑定来源的效果由 binding-system.md 独立处理（永久移除，不可恢复）。
+  #    见 binding-system.md §7「角色阵亡与涅槃丹复活」。
 
 restore_statuses(status_ids: [String]) → int
   # 恢复暂挂的状态（角色复活时使用），返回恢复数量
+  # ⚠ 作用域限制：仅恢复非绑定来源的暂挂状态。绑定来源的状态在阵亡时已被永久移除，不可恢复。
+  #    涅槃丹复活后角色为空载状态（见 binding-system.md §7）。
 
 # ---- 读取接口 ----
 
@@ -159,12 +175,16 @@ get_accumulated_value(target_id: String, stat_name: String) → float
 
 #### 7. 信号广播
 
+状态系统维护自己的 Godot 信号总线（独立于 GSM 的信号系统——状态事件数量多、频率高，通过专用通道避免 GSM 信号表膨胀）。以下信号由状态系统 Autoload 单例直接发射：
+
 | 事件 | 触发时机 | 载荷 |
 |------|---------|------|
 | `status_applied` | 状态成功施加到目标 | `{target_id, status_id, template_id, stacks, reason}` |
-| `status_removed` | 状态被移除（自然过期/手动移除） | `{target_id, status_id, template_id, reason}` |
+| `status_removed` | 状态被移除（自然过期/手动移除/溢出驱逐） | `{target_id, status_id, template_id, reason}` |
 | `status_updated` | 状态的层数/数值/持续时间变更 | `{target_id, status_id, changes: {stacks, value, duration}}` |
 | `status_immunity_blocked` | 施加被免疫阻挡 | `{target_id, template_id, immunity_type}` |
+
+**路由规则：** 战斗 UI 系统（角色头顶图标）和 HUD 系统（tooltip 详情）直接订阅状态系统信号。GSM 不转发这些信号——但状态导致的属性变更最终会通过 `batch_updated`（战斗结算时）或属性查询接口反映到 GSM 数据层。
 
 #### 8. 属性修正的累计计算
 
@@ -177,7 +197,8 @@ get_accumulated_value(target_id, "ATK") → float:
     # 独立 和 叠加上限 类型
     if status.type == 增益 or 减益:
       if status affects "ATK":
-        total += status.value × status.current_stacks
+        if not status.is_hidden:     # 隐藏状态不计入可见属性（对齐 §2 公式）
+          total += status.value × status.current_stacks
   return total
 ```
 
@@ -244,7 +265,7 @@ apply_result = {
 
 - **同名状态的不同来源**：两个不同的卡牌产生相同的 `template_id = "poison_3"` → 视为同名，按叠加规则处理。来源卡牌ID仅用于追溯和 `remove_statuses_by_source`
 - **最大层数溢出**：层数已达 `max_stacks` → 施加返回 `MAX_STACKS` 拒绝结果，不刷新持续时间，不消耗施加来源
-- **角色阵亡时的状态处理**：角色阵亡 → 调用 `suspend_statuses_by_source()` 暂挂该角色身上所有由阵亡相关绑定产生的状态。来自阵亡角色施加给其他角色的状态不受影响。丹药复活后调用 `restore_statuses()` 恢复
+- **角色阵亡时的状态处理**：角色阵亡 → 对于**非绑定来源的状态**（如敌方施加的debuff、丹药卡产生的buff），调用 `suspend_statuses_by_source()` 暂挂，涅槃丹复活后可通过 `restore_statuses()` 恢复。**绑定来源的状态**（功法/法宝绑定产生的效果）由 binding-system.md §7 独立处理：永久移除，不可恢复。来自阵亡角色施加给其他角色的状态不受影响。
 - **永久状态（duration = -1）与移除**：永久状态不被倒计时自动移除，但可被 `remove_status` / `clear_all_statuses` 手动移除。"直接移除状态"的卡牌效果可以移除永久状态
 - **清除效果的范围**：`clear_all_statuses(target)` 移除所有 `duration ≠ -1` 的状态。永久状态不受影响（除非效果明确指定"包括永久状态"）
 - **状态在结算中途被移除**：如果状态A在阶段0触发效果 → 该效果施加了状态B → 状态B在当前阶段0不参与倒计时（同回合施加的状态不从当前回合开始计时）
@@ -252,7 +273,10 @@ apply_result = {
 - **免疫的多层检查顺序**：类型免疫（减益免疫）→ 模板免疫（冰冻免疫）→ 属性免疫（火系免疫）。第一层通过即拒绝，短路求值
 - **移除不存在的状态**：`remove_status(nonexistent_id)` 返回 false，日志 DEBUG 级别，不报错
 - **暂挂状态在暂挂期间来源卡牌被移除**：暂挂状态的 `source_card_instance_id` 引用保持，恢复时如果来源卡牌仍在游戏中 → 正常恢复；如果来源卡牌已不可用 → 状态自动移除，日志 WARN
+- **角色在暂挂期间永久死亡**：角色阵亡后状态进入暂挂（suspend），若在暂挂期间角色永久死亡（无法复活——如涅槃丹耗尽）→ 所有该角色的暂挂状态被销毁（不触发 status_removed 事件——无目标可通知）。日志 DEBUG 级别记录销毁数量。此清理防止暂挂状态泄漏积累。注：渡劫失败中的角色阵亡走标准死亡规则（标记不可用但可复活），不是永久死亡
 - **多层叠加状态的部分移除**：如果状态有3层，效果"移除1层" → `current_stacks` 减1。层数归0 → 状态完全移除。如果效果"完全移除此状态" → 无视层数直接移除
+- **状态溢出驱逐**：当角色活跃状态数达到 `max_active_statuses_per_character`（调优参数，默认 20）时，新状态施加前自动驱逐最旧的非永久状态。最旧判定规则：按 `applied_turn` 升序（先施加的先驱逐）；若多个状态在同一回合施加 → 按 `id` 字典序决胜。永久状态（duration=-1）和隐藏状态（is_hidden=true）不受驱逐影响。被驱逐的状态触发 `status_removed` 事件（reason="overflow"）
+- **remove_statuses_by_source 零匹配**：`remove_statuses_by_source(target_id, source_card_instance_id)` 在指定来源未产生任何状态时返回 0——这不是错误，不记录日志。调用方通过返回值判断是否有状态被移除
 
 ---
 
@@ -269,7 +293,7 @@ apply_result = {
 |----------|---------|------|
 | **卡牌效果引擎** | 硬依赖 | 效果解析后通过状态系统接口施加/移除状态 |
 | **战斗系统** | 硬依赖 | 阶段0 触发倒计时；战斗结束时清理所有状态 |
-| **绑定系统** | 软依赖 | 角色阵亡时暂挂/恢复绑定相关状态 |
+| **绑定系统** | 软依赖 | 角色阵亡时绑定来源的状态由绑定系统独立处理（永久移除），状态系统仅处理非绑定来源的状态暂挂/恢复。见 binding-system.md §7 |
 | **AI系统** | 软依赖 | 查询目标身上的状态以评估技能价值 |
 | **战斗UI系统** | 软依赖 | 订阅状态变更信号更新角色头顶图标 |
 | **HUD系统** | 软依赖 | 显示角色状态的详细tooltip信息 |
@@ -312,7 +336,7 @@ apply_result = {
 |---|------|------|------------|
 | 1 | 状态系统在 Godot 中的实现形态——自定 `RefCounted` 类 vs Resource？GDT 建议运行时使用 RefCunted + 强类型类（见 card-effect-egnine 审查） | 实现架构 | 架构阶段 |
 | 2 | 叠加上限的 N 值由谁定义？卡牌模板中的 `effect_value` 还是状态模板数据表中的 `max_stacks`？初步建议：状态模板数据表 | 数据管线 | 卡牌数据设计时 |
-| 3 | 隐藏状态（is_hiden=true）是否应该完全不影响 `get_accumulated_value`？还是仅不显示但计入数值？ | 内部逻辑标记 | 效果引擎设计时 |
+| 3 | ~~隐藏状态（is_hidden=true）是否应该完全不影响 `get_accumulated_value`？还是仅不显示但计入数值？~~ **✅ 已解决 (2026-07-23)**：`is_hidden=true` 的状态不计入 `get_accumulated_value`——§2 公式已明确排除（`and not status.is_hidden`）。隐藏状态仅内部使用，不影响任何属性计算。 | 内部逻辑标记 | — |
 
 ---
 

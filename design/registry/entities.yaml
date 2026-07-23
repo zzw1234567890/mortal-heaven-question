@@ -112,6 +112,9 @@ formulas:
     source: design/gdd/game-state-manager.md
     referenced_by:
       - design/gdd/game-state-manager.md
+      - design/gdd/cultivation-system.md
+      - design/gdd/realm-system.md
+      - design/gdd/tribulation-system.md
     variables:
       - realm_level
       - BASE_MAX
@@ -119,19 +122,22 @@ formulas:
     expression: "BASE_MAX × 1.5^(realm_level - 1)"
     notes: "修为上限。BASE_MAX=1000。realm_level: 1=炼气, 2=筑基, 3=金丹, 4=元婴, 5=化神"
     added: 2026-07-22
-    revised: ""
+    revised: 2026-07-23  # updated referenced_by
   - name: max_action_points
     status: active
     source: design/gdd/action-point-system.md
     referenced_by:
       - design/gdd/action-point-system.md
+      - design/gdd/realm-system.md
+      - design/gdd/achievement-system.md
+      - design/gdd/game-state-manager.md
     variables:
       - realm_level
     output_range: [5, 13]  # was: [5, 11] before 2026-07-23 (化神期未纳入)
     expression: "3 + 2 × realm_level"
     notes: "行动力上限。realm_level: 1=炼气→5, 2=筑基→7, 3=金丹→9, 4=元婴→11, 5=化神→13"
     added: 2026-07-22
-    revised: ""
+    revised: 2026-07-23  # updated referenced_by
 
 # Example:
 #

@@ -121,7 +121,7 @@ gain_cultivation(amount, source):
 渡劫成功后：
 - 新境界的 `max_cultivation` 更新
 - `current_cultivation` 不变（保留当前值）——如突破前800/1000，突破后800/1500
-- `overflow_pool` 不变——等下次突破后再转化
+- `overflow_pool` → 立即触发溢出结算（见 §7「溢出属性丹自动发放」）
 
 #### 7. 溢出属性丹自动发放
 

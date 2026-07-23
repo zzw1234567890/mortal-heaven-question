@@ -2,8 +2,8 @@
 
 > **状态 (Status)**：设计中 (In Design)
 > **作者 (Author)**：Claude Code + 用户
-> **最后更新 (Last Updated)**：2026-07-22
-> **最后验证 (Last Verified)**：—
+> **最后更新 (Last Updated)**：2026-07-23
+> **最后验证 (Last Verified)**：2026-07-23（设计审查 / design-review）
 > **实现的支柱 (Implements Pillar)**：支柱2「苟道成长，步步为营」
 
 ## 概述
@@ -46,7 +46,11 @@
 
 #### 2. 境界属性表（跨系统引用核心）
 
-境界系统维护一张全局属性表，所有其他系统通过 `get_realm_property(L, key)` 接口查询：
+境界系统维护一张全局属性表，所有其他系统通过 `get_realm_property(L, key)` 接口查询。
+
+> **权威来源声明**：此表是 `action_points` 和 `cost_per_turn` 的唯一权威来源。
+> `action-point-system.md` 和 `cost-system.md` 中出现的境界-数值映射是对本表的**引用**，不得独立定义。
+> 若出现差异，以此表为准。此声明解决了跨审查警告 W-C4（三处重复定义）。
 
 ```
 realm_table = {
@@ -182,8 +186,7 @@ realm_up(当前L):
 
 **进入规则：**
 - 玩家只能进入**境界要求 ≤ 当前境界**的地图（低境界地图可回访，高境界地图锁死）
-- 每张地图有 `max_allowed_realm`（最高允许境界）——玩家的境界如果高于此值，会被压制到该地图的最高允许境界
-- 压制效果：战斗中玩家的费用上限、上场人数、基础速度等境界属性按压制后的境界计算
+- 每张地图有 `max_allowed_realm`（最高允许境界）——玩家的境界如果高于此值，战斗中进攻属性（费用上限、基础速度）会按地图上限压制，但防御/战术属性（上场人数、行动力上限）保留玩家实际境界值。完整柔性压制公式见 §公式 5「地图境界压制」及 exploration-system.md §公式 2
 - 压制不影响已获得的卡牌、天赋、灵石——只影响战中境界属性
 - 越阶渡劫时突破后立即解锁新地图
 
@@ -246,7 +249,8 @@ realm_up(当前L):
 
 **回旧地图的奖励调整：**
 - 回旧地图（境界被压制）时，卡牌掉落按当前实际 card_pool_tier 的下一档计算（回退但差距不大）
-- 灵石奖励按地图基础值 + 境界差额的加成
+- 灵石奖励按 `realm_gap_penalty(player_L, map_max_L)` 乘法惩罚——差距越大，灵石收益越低（最低保留 10%）。完整公式见 resource-system.md §公式 7
+- 灵材奖励同样受此惩罚影响（与灵石一致）
 - 修为奖励按地图基础值计算（不因境界高而减少）
 
 #### 7. 境界显示
@@ -336,7 +340,7 @@ get_realm_property(4, "card_pool_tier") → 4
 ### 2. 修为上限（继承自 GSM，本系统确认）
 
 ```
-max_cultivation(L) = floor(BASE_MAX × 1.5^(L - 1))
+max_cultivation(L) = ceil(BASE_MAX × 1.5^(L - 1))
 BASE_MAX = 1000
 ```
 
@@ -374,19 +378,22 @@ base_speed(L) = L
 ### 5. 地图境界压制
 
 ```
-map_effective_realm(player_L, map_max_L) → int:
-  return min(player_L, map_max_L)
+map_effective_realm(player_L, map_max_L) → {offensive_L, defensive_L}:
+  # 柔性压制模型——仅压制进攻属性，保留防御/战术属性
+  # 完整公式和设计意图见 exploration-system.md §公式 2「地图有效境界（柔性压制公式）」
+  if player_L <= map_max_L:
+    return {offensive_L: player_L, defensive_L: player_L}  # 无压制
+  return {
+    offensive_L: map_max_L,   # 费用上限、基础速度 → 压制到地图上限
+    defensive_L: player_L,    # 上场人数、行动力上限 → 保留玩家实际境界
+  }
 ```
 
-进入地图后，战斗中所有境界相关属性（费用上限、上场人数、基础速度等）以 `map_effective_realm` 为准，而非玩家原始境界。
+进入地图后，战斗中的境界相关属性按以下规则计算：
+- **进攻属性**（费用上限、基础速度）：以 `offensive_L`（= min(player_L, map_max_L)）为准
+- **防御/战术属性**（上场人数、行动力上限）：以 `defensive_L`（= player_L）为准
 
-| 变量 | 类型 | 范围 | 描述 |
-|------|------|------|------|
-| player_L | int | [1, 5] | 玩家实际境界层级 |
-| map_max_L | int | [1, 5] | 地图最高允许境界 |
-| 返回值 | int | [1, 5] | 战斗中使用的有效境界 |
-
-**示例：** 金丹期（L=3）回青云剑宗（map_max_L=1）→ 有效 L=1，战斗中2费、上场2人
+此柔性压制模型由 exploration-system.md 定义（作为探索阶段的主责系统），境界系统提供 `offensive_L` 和 `defensive_L` 的参考实现。两个文件中的公式语义必须一致——若出现差异，以 exploration-system.md 为准。
 
 ### 6. 卡牌掉落池稀有度权重
 
@@ -424,6 +431,8 @@ roll = random(0, total)
 - **玩家在跌落前已经去过碎星群岛地图**：不允许——苍玄古战场是碎星群岛的前置地图，玩家必须在跌落前走完苍玄剧情线才能解锁碎星群岛入口
 - **跌落前已获得的高境界卡牌是否保留**：保留——境界跌落只影响境界属性，不影响已获得的卡牌、灵石、天赋
 - **跌落前阵亡的角色**：标准规则——角色阵亡标记不可用，不受境界跌落影响
+- **max_deploy = 0 的防御值**：当境界被压制到 max_deploy 低于当前上场角色数时（如金丹期 L=3 被压制到炼气 max_deploy=2，但玩家仍有 4 个存活角色），多余角色进入「待命」状态（不参与战斗但不出场）——而非强制移除。边界触发条件极罕见（需跌落 + 特定境界差距），但需有安全兜底
+- **全部角色不可用时的商店进入**：允许——商店节点（及事件/回复节点）不检查角色可用性。玩家可购买角色卡或复活丹药来重建阵容。此规则由 exploration-system.md 定义（§边界情况），境界系统作为 max_deploy 的提供方，不拦截此场景
 
 ## 依赖关系
 
@@ -493,7 +502,7 @@ roll = random(0, total)
 - **GIVEN** get_rarity_weights(3)，**WHEN** 检查输出，**THEN** {白:15, 蓝:30, 紫:35, 金:18, 暗金:2}
 - **GIVEN** 突破成功，**WHEN** 检查境界，**THEN** realm_level+=1，cultivation 保留，max_cultivation 更新
 - **GIVEN** 突破到金丹期，**WHEN** 进入探索，**THEN** 金丹期系列地图全部解锁（万古殿、西域古林、西域边境）
-- **GIVEN** 金丹期回到青云剑宗，**WHEN** 进入，**THEN** 允许进入且境界被压制到炼气（2费、上场2人）
+- **GIVEN** 金丹期回到青云剑宗，**WHEN** 进入，**THEN** 允许进入且进攻属性（费用上限、基础速度）压制为炼气，防御/战术属性（上场人数、行动力上限）保留金丹期
 - **GIVEN** 金丹期回到青云剑宗，**WHEN** 战斗中，**THEN** 境界属性按 map_effective_realm=1 计算
 - **GIVEN** 金丹期进入筑基期地图（苍玄正道盟），**WHEN** 战斗中，**THEN** 境界属性按 map_effective_realm=2 计算
 - **GIVEN** 玩家在苍玄古战场触发剧情事件，**WHEN** 结算，**THEN** realm_level=1，cultivation=0，进入炼气·落难状态
