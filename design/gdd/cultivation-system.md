@@ -68,6 +68,7 @@ max_cultivation(realm_level) = BASE_MAX × 1.5^(realm_level - 1)
 | 筑基 | 2 | 1500 |
 | 金丹 | 3 | 2250 |
 | 元婴 | 4 | 3375 |
+| 化神 | 5 | 5063 |
 
 #### 3. 修为溢出转化
 

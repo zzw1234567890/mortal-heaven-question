@@ -350,8 +350,8 @@ scaled_stat(base, player_realm, enemy_realm):
 
 | 变量 | 类型 | 范围 | 描述 |
 |------|------|------|------|
-| player_realm | int | [1,4] | 玩家当前境界 |
-| enemy_realm | int | [1,4] | 敌人模板基准境界 |
+| player_realm | int | [1,5] | 玩家当前境界 |
+| enemy_realm | int | [1,5] | 敌人模板基准境界 |
 | scale | float | [1.0, 1.9] | 缩系数（玩家高2级时最大×1.6，高3级×1.9） |
 
 ## 边界情况
