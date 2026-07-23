@@ -5,9 +5,38 @@
 
 ## 当前任务
 
-- **任务**：card-effect-engine.md 审查修复 — 已完成 ✅
-- **状态**：37/37 系统 GDD 全部完成，效果引擎重大修订已应用
-- **新增系统**：#15 状态效果系统（status-system.md）— 作为卡片效果引擎的方案B依赖
+- **任务**：binding-system.md 同名叠加机制修订 — 已完成 ✅
+- **状态**：37/37 系统 GDD 全部完成，绑定系统新增同名卡乘法叠加机制
+- **涉及文件**：binding-system.md（主修订）、card-system.md（数据模型+边界情况）、card-effect-engine.md（堆叠规则+AC）
+
+## 本轮变更摘要
+
+### binding-system.md — 同名卡叠加机制（2026-07-23）
+- 用户需求：同名功法卡可绑定同角色多次，效果乘法叠加，共享一个绑定位
+- 关键设计决策：
+  - stack_multiplier 默认 1.5（可配置 1.2-2.0），本命乘法独立
+  - stack_limit 由卡牌模板定义（强力3张，弱效4-5张）
+  - 叠加不消耗额外绑定位——stack_count 递增，slot_index 不变
+  - 本命判定仅首次绑定触发，后续叠加沿用已锁定的 multiplier
+  - 阵亡处理同步更新：绑定卡洗回牌库（对齐card-system.md §D.4）
+- 9处变更：数据结构、绑定流程、覆盖流程、阵亡处理、本命交互、公式、边界、调优、AC（新增5条）
+
+### card-system.md — 数据模型同步
+- 功法卡/法宝卡各新增 stack_limit 和 stack_multiplier 字段
+- §F 同名多张卡：追加叠加机制说明+交叉引用
+
+### card-effect-engine.md — 堆叠规则同步
+- stacking_rule 枚举新增「乘法叠加」
+- §6 效果堆叠规则表：同名叠同角色→乘法叠加
+- §3 完全重写：同名效果叠加公式（含变量表）
+- AC重写：取最高值→乘法叠加
+
+## 下一步建议
+- `/design-review binding-system` — 审查修订后的绑定系统
+- `/consistency-check` — 验证三文档间同名叠加规则一致性
+- `/design-review card-effect-engine` — 审查修订后的效果引擎
+- `/review-all-gdds` — 全局设计理论审查
+- `/gate-check pre-production` — 验证预生产准备条件
 
 ## 本轮变更摘要
 

@@ -25,7 +25,7 @@
 | 4 | 探索系统 | 玩法 (Gameplay) | MVP | 已设计 | exploration-system.md | 事件系统、行动力系统 |
 | 5 | 行动力系统 | 核心 (Core) | MVP | 已设计 | action-point-system.md | 游戏状态管理器 |
 | 6 | 战斗系统（回合制流程） | 玩法 (Gameplay) | MVP | 已设计 | combat-system.md | 卡牌系统、费用系统、AI系统 |
-| 7 | 卡牌系统（数据/收藏） | 玩法 (Gameplay) | MVP | 需修订 (Needs Revision) | card-system.md | 游戏状态管理器 |
+| 7 | 卡牌系统（数据/收藏） | 玩法 (Gameplay) | MVP | 已设计 (Revised) | card-system.md | 游戏状态管理器 |
 | 8 | 卡牌效果解析引擎 | 玩法 (Gameplay) | MVP | 设计中 | card-effect-engine.md | 卡牌系统、绑定系统、状态效果系统 |
 | 9 | 费用系统 | 玩法 (Gameplay) | MVP | 已设计 | cost-system.md | 战斗系统 |
 | 10 | 角色上场与阵位系统 | 玩法 (Gameplay) | MVP | 已设计 | deployment-system.md | 战斗系统、卡牌系统 |
@@ -42,7 +42,7 @@
 | 21 | 卡组编辑系统 | 玩法 (Gameplay) | MVP | 已设计 | deck-editing-system.md | 卡牌系统 |
 | 22 | 炼丹炼器系统 | 经济 (Economy) | Vertical Slice | 已设计 | alchemy-crafting-system.md | 资源系统、卡牌系统 |
 | 23 | 法宝铭刻系统 | 经济 (Economy) | Vertical Slice | 已设计 | inscription-system.md | 炼丹炼器系统 |
-| 24 | 开局身份选择系统 | 玩法 (Gameplay) | MVP | 已设计 | identity-selection-system.md | 游戏状态管理器、卡牌系统 |
+| 24 | 开局身份选择系统 | 玩法 (Gameplay) | MVP | 已设计 (Approved) | identity-selection-system.md | 游戏状态管理器、卡牌系统 |
 | 25 | 流派系统 | 元 (Meta) | MVP | 已设计 | school-system.md | 阵营系统、卡牌系统 |
 | 26 | 轮回天赋系统 | 成长 (Progression) | Vertical Slice | 已设计 | reincarnation-talent-system.md | 存档系统 |
 | 27 | 剧情系统（章节推进） | 叙事 (Narrative) | Vertical Slice | 已设计 | story-system.md | 探索系统、境界系统 |

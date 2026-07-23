@@ -123,7 +123,7 @@ PersistentEffect {
   duration: int                   # 回合数；-1=永久
   trigger_condition: TriggerSpec|null  # 触发条件（如"回合开始时"）
   trigger_effect: EffectSpec|null      # 触发后执行的效果
-  stacking_rule: Enum[独立, 刷新, 叠加上限]
+  stacking_rule: Enum[独立, 刷新, 叠加上限, 乘法叠加]
   max_stacks: int                 # stacking_rule=叠加上限 时有效
   cooldown: int                   # 法宝冷却（0=无冷却）
   binding_multiplier: float        # 1.0（普通）或 1.5（本命），绑定时预计算锁定
@@ -171,11 +171,12 @@ TriggeredEffect {
 | 效果类型 | 堆叠规则 |
 |---------|---------|
 | 同名功法绑定不同角色 | 可叠加，每角色独立计算（按 `card_template_id` 判断同名） |
-| 同名功法绑定同角色 | 效果不可叠加，取最高值（比较绑定实例的 `effect_value × binding_multiplier`） |
-| 同名法宝绑定不同角色 | 可叠加 |
+| 同名功法绑定同角色 | 乘法叠加——`effective_value = base × native_multiplier × (stack_multiplier ^ (stack_count-1))`，上限由 `cardTemplate.stack_limit` 决定（详见 binding-system.md §10「同名卡叠加规则」） |
+| 同名法宝绑定不同角色 | 可叠加，每角色独立计算 |
+| 同名法宝绑定同角色 | 乘法叠加——同功法叠加规则（共享一个绑定位，stack_count 递增） |
 | 同名buff/debuff | 不可叠加，刷新持续时间（取 `max(旧, 新)`，见 status-system.md） |
 | 不同模板的同功能效果 | 可叠加（加法叠加） |
-| 本命加成（×1.5） | 逐源独乘——每个绑定的 base_value 分别乘以自己的 multiplier，再加总。不与其它加成互扰 |
+| 本命加成（×1.5） | 逐源独乘——每个绑定的 base_value 分别乘以自己的 multiplier，再加总。叠加乘法独立于本命乘法——两者乘法结合 |
 
 **模板 vs 实例区分**：「同名」始终指 `card_template_id` 相同——两张同模板的不同副本属于「同名」。同一张卡牌的同一实例不可能被绑定两次（由绑定系统通过 `card_instance_id` 唯一性保证）。效果引擎在堆叠判断时以 `card_template_id` 为键。
 
@@ -316,14 +317,25 @@ stacked_total = sum(effective_i for all sources i)
 
 **示例**：角色基础ATK=5。绑定青元剑诀（本命，base=+4 → 4×1.5=6），绑定长春功（普通，base=+3 → 3×1.0=3）。最终ATK = 5 + 6 + 3 = 14。
 
-### 3. 同名效果去重
+### 3. 同名效果叠加公式
+
+同名功法/法宝绑定到同一角色时，效果乘法叠加（详见 `binding-system.md` §3「同名叠加公式」）：
 
 ```
-stacked = max(duplicate_sources)
-  # 比较的是每个实例的 effective_value（base_value × binding_multiplier）
-  # ——即升级后、乘数计算后的实例值。
-  # 如果两个同名实例的 effective_value 相等，优先保留先绑定的那个。
+effective_value = floor(base_value × native_multiplier × (stack_multiplier ^ (stack_count - 1)))
 ```
+
+| 变量 | 类型 | 范围 | 描述 |
+|------|------|------|------|
+| base_value | int | 按卡牌定义 | 效果基准数值（来自卡牌模板） |
+| native_multiplier | float | 1.0 或 1.5 | 本命加成乘数（仅首次绑定时判定并锁定） |
+| stack_multiplier | float | 1.2-2.0，默认 1.5 | 每层叠加的乘法系数（由卡牌模板定义） |
+| stack_count | int | 1 到 stack_limit | 当前叠加张数（1=无叠加） |
+
+**关键规则：**
+- 叠加乘法独立于本命乘法——两者乘法结合，顺序无关
+- stack_count=1 时公式退化为 `base_value × native_multiplier`
+- 不同模板的同功能效果之间仍为加法叠加（各模板独立计算上述乘法后相加）
 
 ### 4. 效果叠加溢出（无硬上限）
 
@@ -417,10 +429,10 @@ stacked = sum(all_sources)  # 无上限，由数值平衡约束
 
 - **GIVEN** 角色绑定功法A（base=+4, 本命 multiplier=1.5）和功法B（base=+3, 普通 multiplier=1.0），
   **WHEN** 计算累计ATK加成，**THEN** = `flor(4×1.5) + flor(3×1.0) = 6 + 3 = 9`
-- **GIVEN** 角色已绑定"铁布衫"（ATK+2），**WHEN** 再次绑定同名卡牌但数值更高（ATK+5），
-  **THEN** 同名功法只取最高值，最终ATK加成保持+5
+- **GIVEN** 角色已绑定"铁布衫"（ATK+2，stack_count=1），**WHEN** 再次绑定同名卡牌（ATK+2）叠加上去，**THEN** stack_count=2，效果乘法叠加：ATK加成 = floor(2 × 1.5) = 3（stack_multiplier=1.5）。两卡共享同一绑定位
+- **GIVEN** 角色已绑定"铁布衫"且 stack_count 已达 stack_limit（如3），**WHEN** 再打出同名卡牌，**THEN** 目标角色灰色不可选中，提示"同名叠加已达上限"
 - **GIVEN** 己方角色A和角色B各自绑定同名功法"铁布衫"（ATK+2），
-  **WHEN** 查询两个角色的ATK加成，**THEN** 各角色独立获得+2（不同角色可叠和）
+  **WHEN** 查询两个角色的ATK加成，**THEN** 各角色独立获得+2并各自独立控制 stack_count（不同角色可叠和）
 
 ### 状态效果交互
 

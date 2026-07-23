@@ -93,7 +93,7 @@ EnemyTemplate {
 Boss「墨居仁（夺舍）」技能池（阶段1）：
   ① 夺命爪（weight=35, cooldown=0）—— 造成 ATK×1.5 伤害
   ② 噬魂术（weight=25, cooldown=2）—— 吸血，伤害的50%转为自身回复
-  ③ 鬼影步（weight=20, cooldown=3）—— 闪避下次攻击
+  ③ 鬼影步（weight=20, cooldown=3）—— 获得「影盾」效果，完全格挡下次攻击
   ④ 夺舍预备（weight=20, cooldown=0）—— 叠加夺舍层数
 
 Boss「墨居仁（夺舍）」技能池（阶段2, HP<50%）：
