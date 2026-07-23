@@ -3,11 +3,30 @@
 > **会话 ID**：2026-07-23
 > **上次更新**：2026-07-23
 
-## 当前任务
+## ✅ 去IP化完成
 
-- **任务**：binding-system.md 同名叠加机制修订 — 已完成 ✅
-- **状态**：37/37 系统 GDD 全部完成，绑定系统新增同名卡乘法叠加机制
-- **涉及文件**：binding-system.md（主修订）、card-system.md（数据模型+边界情况）、card-effect-engine.md（堆叠规则+AC）
+全部 41 个 GDD 文件中《凡人修仙传》原著 IP 引用已清除。零残留。
+
+### 已创建/修改的世界观文件
+- `design/world/world-bible.md` — 完整原创世界观圣经
+- `design/world/name-mapping.md` — 110+ 条旧→新名称映射
+
+### 所有 26 个含 IP 的 GDD 文件已全部更新
+- Wave 1: game-pillars.md, game-concept.md, systems-index.md ✅
+- Wave 2: story-system.md, ending-branch-system.md ✅
+- Wave 3: identity-selection-system.md, card-system-design.md ✅
+- Wave 4: 其余 19 个文件 ✅
+- 审查报告: 3 个 review 文件 ✅
+- 交叉审查: gdd-cross-review-2026-07-23.md ✅
+
+### 最终验证
+- `凡人修仙传` / `掌天问道` — 零残留 ✅
+- 所有原著角色名、功法名、宗门名、地名、物品名 — 零残留 ✅
+
+## 下一步建议
+- `/consistency-check` — 验证跨文档一致性（名称替换后的）
+- `creative-director` — 审查世界圣经的内部一致性
+- 更新 `systems-index.md` 中的系统描述（如有未覆盖的系统）
 
 ## 本轮变更摘要
 

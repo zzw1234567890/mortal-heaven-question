@@ -1,4 +1,4 @@
-# 系统索引 (Systems Index)：凡人修仙传：掌天问道
+# 系统索引 (Systems Index)：仙途问道
 
 > **状态 (Status)**：草稿 (Draft)
 > **创建日期 (Created)**：2026-07-21
@@ -9,9 +9,9 @@
 
 ## 概述 (Overview)
 
-《凡人修仙传：掌天问道》是一款Roguelike卡牌对战游戏，核心循环为：**新档开局→地图探索→触发事件/战斗→获得资源/卡牌→养成强化→渡劫突破→开启新地图→挑战最终BOSS**。
+《仙途问道》是一款Roguelike卡牌对战游戏，核心循环为：**新档开局→地图探索→触发事件/战斗→获得资源/卡牌→养成强化→渡劫突破→开启新地图→挑战最终BOSS**。
 
-游戏系统覆盖五大循环阶段（开局、探索、战斗、养成、渡劫突破），包含222张卡牌的卡牌系统、5种流派方向、5大境界（炼气→筑基→金丹→元婴→化神）以及跟随原著的章节式剧情。
+游戏系统覆盖五大循环阶段（开局、探索、战斗、养成、渡劫突破），包含222张卡牌的卡牌系统、5种流派方向、5大境界（炼气→筑基→金丹→元婴→化神）以及原创世界观下的章节式剧情。
 
 ---
 
@@ -26,10 +26,10 @@
 | 5 | 行动力系统 | 核心 (Core) | MVP | 已设计 | action-point-system.md | 游戏状态管理器 |
 | 6 | 战斗系统（回合制流程） | 玩法 (Gameplay) | MVP | 已设计 | combat-system.md | 卡牌系统、费用系统、AI系统 |
 | 7 | 卡牌系统（数据/收藏） | 玩法 (Gameplay) | MVP | 已设计 (Revised) | card-system.md | 游戏状态管理器 |
-| 8 | 卡牌效果解析引擎 | 玩法 (Gameplay) | MVP | 设计中 | card-effect-engine.md | 卡牌系统、绑定系统、状态效果系统 |
+| 8 | 卡牌效果解析引擎 | 玩法 (Gameplay) | MVP | 已设计 | card-effect-engine.md | 卡牌系统、绑定系统、状态效果系统 |
 | 9 | 费用系统 | 玩法 (Gameplay) | MVP | 已设计 | cost-system.md | 战斗系统 |
 | 10 | 角色上场与阵位系统 | 玩法 (Gameplay) | MVP | 已设计 | deployment-system.md | 战斗系统、卡牌系统 |
-| 11 | 功法/法宝绑定系统 | 玩法 (Gameplay) | MVP | 已设计 | binding-system.md | 战斗系统、卡牌系统 |
+| 11 | 功法/法宝绑定系统 | 玩法 (Gameplay) | MVP | 已设计 (Approved) | binding-system.md | 战斗系统、卡牌系统 |
 | 12 | 阵法系统 | 玩法 (Gameplay) | MVP | 已设计 | formation-system.md | 战斗系统、阵营系统 |
 | 13 | 阵营系统 | 玩法 (Gameplay) | MVP | 已设计 | faction-system.md | 卡牌系统 |
 | 14 | AI系统（敌方AI） | 玩法 (Gameplay) | MVP | 已设计 | ai-system.md | 战斗系统、卡牌效果解析引擎 |

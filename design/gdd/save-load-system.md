@@ -63,7 +63,7 @@ user://saves/
     "player_name": "凡人001",
     "realm": "筑基",
     "chapter": 2,
-    "map_name": "乱星海·外海",
+    "map_name": "碎星外环",
     "deck_size": 32
   },
   "game_state": { ... }                  # GSM.serialize() 输出

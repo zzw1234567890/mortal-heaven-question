@@ -113,7 +113,7 @@ Achievement {
 | `ach_cards_50` | 初涉卡道 | 全局图鉴中收录 50 种不同卡牌 | 铜 | — |
 | `ach_cards_100` | 百卡争鸣 | 全局图鉴中收录 100 种不同卡牌 | 银 | — |
 | `ach_cards_200` | 万法归藏 | 全局图鉴中收录 200 种不同卡牌 | 金 | — |
-| `ach_cards_all` | 掌天问道 | 全局图鉴中收录全部 222 张卡牌 | 金 | — |
+| `ach_cards_all` | 仙途问道 | 全局图鉴中收录全部 222 张卡牌 | 金 | — |
 | `ach_first_dark_gold` | 暗金初现 | 首次获得暗金品质卡牌 | 银 | — |
 | `ach_dark_gold_5` | 五行暗金 | 全局图鉴中拥有 5 张不同暗金卡牌 | 金 | — |
 | `ach_ling_shi_10000` | 富甲一方 | 单局游戏中灵石持有量达到 10000 | 银 | — |
@@ -125,7 +125,7 @@ Achievement {
 
 | ID | 名称 | 条件 | 稀有度 | 隐藏 |
 |----|------|------|:------:|:----:|
-| `ach_all_maps_ch1` | 七玄门全境 | 第 1 章的全部 4 张地图均至少通关 1 次（跨局累计） | 铜 | — |
+| `ach_all_maps_ch1` | 青云剑宗全境 | 第 1 章的全部 4 张地图均至少通关 1 次（跨局累计） | 铜 | — |
 | `ach_all_maps_all` | 踏遍九州 | 全部 18 张地图均至少通关 1 次（跨局累计） | 金 | — |
 | `ach_secret_room` | 别有洞天 | 首次发现隐藏房间（探索地图上的隐藏节点） | 银 | ✅ |
 | `ach_event_100` | 阅历丰富 | 累计触发 100 个事件（跨局累计） | 银 | — |
@@ -138,12 +138,12 @@ Achievement {
 
 | ID | 名称 | 条件 | 稀有度 | 隐藏 |
 |----|------|------|:------:|:----:|
-| `ach_chapter_1_clear` | 七玄门风云 | 首次通关第 1 章 | 铜 | — |
-| `ach_chapter_3_clear` | 天南纷争 | 首次通关第 3 章 | 银 | — |
-| `ach_chapter_5_clear` | 灵界征途 | 首次通关第 5 章（即首次通关游戏） | 金 | — |
+| `ach_chapter_1_clear` | 青云入世 | 首次通关第 1 章 | 铜 | — |
+| `ach_chapter_3_clear` | 苍玄之争 | 首次通关第 3 章 | 银 | — |
+| `ach_chapter_5_clear` | 归墟探索 | 首次通关第 5 章（即首次通关游戏） | 金 | — |
 | `ach_ending_ascension` | 飞升仙界 | 解锁「飞升仙界」结局线（任意变体） | 银 | — |
-| `ach_ending_guardian` | 灵界守护 | 解锁「留在灵界」结局线（任意变体） | 银 | — |
-| `ach_ending_return` | 归乡之人 | 解锁「回归天南」结局线（任意变体） | 银 | — |
+| `ach_ending_guardian` | 归墟守护 | 解锁「留在归墟」结局线（任意变体） | 银 | — |
+| `ach_ending_return` | 归乡之人 | 解锁「归隐东域」结局线（任意变体） | 银 | — |
 | `ach_all_endings` | 超凡入圣 | 解锁全部 6 个结局 | 金 | — |
 | `ach_story_flag_30` | 因果交织 | 单局游戏中收集 30 个 story_flag（全收集） | 银 | ✅ |
 
@@ -154,7 +154,7 @@ Achievement {
 | `ach_school_win_zhengdao` | 正道砥柱 | 使用正道发育流通关（主力卡组中正道阵营卡≥60%） | 银 | — |
 | `ach_school_win_modao` | 魔道至尊 | 使用魔道快攻流通关（主力卡组中魔道阵营卡≥60%） | 银 | — |
 | `ach_school_win_hybrid` | 正邪兼修 | 使用正邪混合流通关（正道+魔道阵营卡各≥25%） | 银 | — |
-| `ach_school_win_spirit` | 真灵之主 | 使用灵界真灵流通关（主力卡组中灵界阵营卡≥60%） | 银 | — |
+| `ach_school_win_spirit` | 真灵之主 | 使用归墟真灵流通关（主力卡组中归墟阵营卡≥60%） | 银 | — |
 | `ach_school_win_alchemy` | 百艺宗师 | 使用百艺炼丹流通关（本局完成≥5次炼丹/炼器操作+丹药/法宝卡≥30%） | 银 | — |
 | `ach_all_schools` | 万法归宗 | 全部 5 种流派各通关 1 次 | 金 | — |
 | `ach_identity_win_3` | 三生万物 | 使用 3 种不同开局身份各通关 1 次 | 银 | — |
@@ -168,7 +168,7 @@ Achievement {
 | `ach_no_talent_win` | 凡人之躯 | 不激活任何轮回天赋的情况下通关 | 金 | ✅ |
 | `ach_no_shop` | 自给自足 | 一局游戏中从未在商店购买任何物品 | 银 | ✅ |
 | `ach_no_death` | 不死不灭 | 一局游戏中角色从未阵亡（所有角色从开局存活到通关） | 金 | — |
-| `ach_realm_1_boss` | 以凡弑仙 | 以炼气期击败第 1 章的章末 BOSS（墨居仁·夺舍形态）——即不修炼到筑基直接挑战 | 金 | ✅ |
+| `ach_realm_1_boss` | 以凡弑仙 | 以炼气期击败第 1 章的章末 BOSS（墨渊·夺舍形态）——即不修炼到筑基直接挑战 | 金 | ✅ |
 | `ach_win_rate_100` | 百战百胜 | 通关的一局中胜率 100%（所有战斗均胜利，无逃跑/撤退/战败后读档） | 金 | — |
 
 #### 4. 成就触发机制
@@ -591,7 +591,7 @@ update_progress(ach_id, event_data):
 - **GIVEN** 玩家删除存档槽位，**WHEN** 检查成就列表，**THEN** 所有成就保持原状（成就数据在 progression.dat 中，不受存档删除影响）
 - **GIVEN** progression.dat 损坏且无备份，**WHEN** 启动游戏，**THEN** 成就数据归零（全部未解锁）——日志记录此事件
 - **GIVEN** 玩家查看成就列表，**WHEN** 查看分类标签「战斗」，**THEN** 仅显示战斗类别 12 个成就（已解锁置顶，按解锁日期倒序）
-- **GIVEN** 玩家以炼气期挑战并击败第 1 章 BOSS（realm_level=1 且 boss_defeated=墨居仁），**WHEN** BOSS 死亡+境界条件满足，**THEN** `ach_realm_1_boss` 解锁
+- **GIVEN** 玩家以炼气期挑战并击败第 1 章 BOSS（realm_level=1 且 boss_defeated=墨渊），**WHEN** BOSS 死亡+境界条件满足，**THEN** `ach_realm_1_boss` 解锁
 - **GIVEN** 玩家禁用全部轮回天赋后通关，**WHEN** game_victory+已激活天赋列表为空，**THEN** `ach_no_talent_win` 解锁
 - **GIVEN** 玩家在 2 小时内通关（现实时间 playtime_seconds ≤ 7200），**WHEN** game_victory 触发，**THEN** `ach_speed_run` 解锁
 - **GIVEN** 成就总数 62，**WHEN** 检查稀有度分布，**THEN** 铜≈12、银≈30、金≈20（±2 可接受）

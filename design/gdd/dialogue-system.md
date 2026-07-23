@@ -21,8 +21,8 @@
 | 情感 | 触发场景 |
 |------|---------|
 | **文字的节奏感** | 对话逐字浮现、关键句停顿半秒——「打字机效果让每句话都有分量」 |
-| **角色活过来了** | 韩立说话时左侧是韩立的头像、厉飞雨插话时头像切换——「能想象他们在说话」 |
-| **选择有代价** | 三个选项，其中一个灰色不可选——「因为上一章我拒绝了墨居仁，这个选项消失了」 |
+| **角色活过来了** | 林渊说话时左侧是林渊的头像、苏剑鸣插话时头像切换——「能想象他们在说话」 |
+| **选择有代价** | 三个选项，其中一个灰色不可选——「因为上一章我拒绝了墨渊，这个选项消失了」 |
 | **不被打断的流畅** | 战斗后来一段2句话的NPC吐槽——「哈，这群废物连我一剑都接不住」——看完继续走 |
 | **快速略过的自由** | 重玩时按住跳过键——所有对话3秒过完——「剧情我看过了，直接进入策略」 |
 | **世界记得我** | 同一个NPC，上次见面说我「炼气小辈」，这次说「筑基道友」——条件文本让世界有反应 |
@@ -39,9 +39,9 @@
 
 ```
 DialogueNode {
-  id: String                          # 节点ID（如 "ch1_mo_juren_01"）
-  speaker: String                     # 说话者ID（如 "mo_juren"、"narrator"）
-  speaker_display: String             # 说话者显示名（如 "墨居仁"、"旁白"）
+  id: String                          # 节点ID（如 "ch1_mo_yuan_01"）
+  speaker: String                     # 说话者ID（如 "mo_yuan"、"narrator"）
+  speaker_display: String             # 说话者显示名（如 "墨渊"、"旁白"）
   text: String                        # 对话文本（单条，建议≤80字）
   expression: String|null             # 说话者表情（如 "neutral", "angry", "smile", "hurt"）
   conditions: Condition[]|null        # 该节点是否可见的条件列表
@@ -73,7 +73,7 @@ DialogueTree {
   trigger_type: Enum [story, event, bark, shop, camp, chapter_intro, chapter_end]
   nodes: Dictionary<String, DialogueNode>  # {node_id: DialogueNode}
   start_node: String                  # 入口节点ID
-  end_action: String|null             # 对话结束后执行的动作（如 "start_battle:mo_juren_boss"）
+  end_action: String|null             # 对话结束后执行的动作（如 "start_battle:mo_yuan_boss"）
   allow_skip: bool                    # 是否允许整段跳过（默认true）
   max_display_ms: int                 # 最长自动播放时间（0=不自动，由玩家点击推进）
 }
@@ -83,11 +83,11 @@ DialogueTree {
 
 | 类型 | 触发场景 | 节点数 | 选择 | 可跳过 | 示例 |
 |------|---------|:-----:|:----:|:-----:|------|
-| **story（剧情对话）** | 章节必经事件、关键剧情节点 | 3~8 | 有 | 整段可跳 | 「墨居仁夺舍前与韩立的对话」 |
+| **story（剧情对话）** | 章节必经事件、关键剧情节点 | 3~8 | 有 | 整段可跳 | 「墨渊夺舍前与林渊的对话」 |
 | **event（事件对话）** | 探索事件触发 | 1~4 | 2~4选1 | 整段可跳 | 「坊市老板：『道友要买点什么？』」 |
-| **chapter_intro（章节引子）** | 每章开始时 | 2~4 | 无 | 可跳过 | 「第一话：七玄门风云——引子文本」 |
-| **chapter_end（章末结局）** | 章末BOSS战后 | 3~5 | 2~3选1 | 不可跳 | 「面对墨居仁的残魂，你的选择…」 |
-| **bark（短对话）** | 商店/NPC路过/战斗后/营寨 | 1 | 无 | 自动消失 | 「韩立：『这瓶丹药……品质不错』」 |
+| **chapter_intro（章节引子）** | 每章开始时 | 2~4 | 无 | 可跳过 | 「第一话：青云入世——引子文本」 |
+| **chapter_end（章末结局）** | 章末BOSS战后 | 3~5 | 2~3选1 | 不可跳 | 「面对墨渊的残魂，你的选择…」 |
+| **bark（短对话）** | 商店/NPC路过/战斗后/营寨 | 1 | 无 | 自动消失 | 「林渊：『这瓶丹药……品质不错』」 |
 | **shop（商店对话）** | 进入商店 | 1~2 | 无 | 可跳过 | 「坊市掌柜：『道友请随意挑选』」 |
 
 **各类对话播放模式：**
@@ -157,7 +157,7 @@ evaluate_single(cond, gsm_state) → bool:
 | 元素 | 条件不满足时的行为 |
 |------|------------------|
 | 对话节点（node） | 跳过该节点，直接进入下一个满足条件的节点 |
-| 对话选项（choice） | **灰色显示+简短提示**（如「需要：拒绝墨居仁条件」），而非完全隐藏 |
+| 对话选项（choice） | **灰色显示+简短提示**（如「需要：拒绝墨渊条件」），而非完全隐藏 |
 
 > **设计理由**：事件系统的选择是完全隐藏不满足条件的选项（因为事件是「你能做什么」），但对话系统的选择是灰色显示+原因提示（因为对话是「世界在对你反应」——灰色的选项告诉玩家「如果你做了不同选择，这里会不一样」，增强选择的重玩动力）。
 
@@ -225,21 +225,21 @@ DialogueNode "shop_greet_01":
 
 ```
 NPCProfile {
-  speaker_id: String          # 内部ID（如 "han_li"、"mo_juren"）
-  display_name: String        # 显示名（如 "韩立"、"墨居仁"）
+  speaker_id: String          # 内部ID（如 "lin_yuan"、"mo_yuan"）
+  display_name: String        # 显示名（如 "林渊"、"墨渊"）
   default_portrait: String    # 默认头像资源路径
   expressions: {              # 表情变体
-    "neutral": "res://assets/portraits/han_li_neutral.png",
-    "angry": "res://assets/portraits/han_li_angry.png",
-    "smile": "res://assets/portraits/han_li_smile.png",
-    "hurt": "res://assets/portraits/han_li_hurt.png"
+    "neutral": "res://assets/portraits/lin_yuan_neutral.png",
+    "angry": "res://assets/portraits/lin_yuan_angry.png",
+    "smile": "res://assets/portraits/lin_yuan_smile.png",
+    "hurt": "res://assets/portraits/lin_yuan_hurt.png"
   }
   faction: String|null        # 所属阵营
   first_appearance_chapter: int  # 首次出场章节
 }
 ```
 
-**旁白（narrator）** 是一个特殊的说话者ID——无头像，文本以斜体居中显示，用于叙境描写（如「一个月后……」「天南古战场，血流成河……」「你感到一股不知名的力量在暗中注视着你……」）。
+**旁白（narrator）** 是一个特殊的说话者ID——无头像，文本以斜体居中显示，用于叙境描写（如「一个月后……」「苍玄古战场，血流成河……」「你感到一股不知名的力量在暗中注视着你……」）。
 
 #### 7. 对话触发点
 
@@ -256,7 +256,7 @@ NPCProfile {
 | **营寨·炼丹/炼器** | bark | 炼丹炼器系统→对话系统 | 角色配置的 `craft_bark` |
 | **营寨·卡组编辑** | bark | 卡组编辑系统→对话系统 | 角色配置的 `deck_edit_bark` |
 
-**bark池机制**：每个角色有一个 bark 池（如 `han_li_barks = ["这瓶丹药品质不错。", "还差点火候…", "再来一次。"]`），触发时从池中随机抽取（同一局中不重复，池耗尽后重置）。
+**bark池机制**：每个角色有一个 bark 池（如 `lin_yuan_barks = ["这瓶丹药品质不错。", "还差点火候…", "再来一次。"]`），触发时从池中随机抽取（同一局中不重复，池耗尽后重置）。
 
 #### 8. 对话状态管理
 
@@ -284,14 +284,14 @@ execute_outcomes(outcomes):
 
 ```
 assets/dialogue/
-├── ch1_qixuan/
-│   ├── ch1_intro.json              # 第1章引子
-│   ├── ch1_mo_juren_confront.json  # 墨居仁对峙
-│   ├── ch1_ending.json             # 第1章结局分支
-│   └── ch1_events.json             # 第1章事件对话集合
-├── ch2_luanxinghai/
+├── ch1_qingyun/
+│   ├── ch1_intro.json                  # 第1章引子
+│   ├── ch1_mo_yuan_confront.json       # 墨渊对峙
+│   ├── ch1_ending.json                 # 第1章结局分支
+│   └── ch1_events.json                 # 第1章事件对话集合
+├── ch2_suixing/
 │   ├── ch2_intro.json
-│   ├── ch2_zhanchang.json          # 正魔大战
+│   ├── ch2_zhanchang.json              # 正魔大战
 │   ├── ch2_ending.json
 │   └── ch2_events.json
 ├── ...
@@ -492,7 +492,7 @@ estimate_typing_duration(text, speed=40) → float:
 
 ### 音频需求
 - 打字机逐字：轻柔的"笔画声"或"键盘敲击声"（可关闭）
-- 说话者出现：角色专属短音效（韩立=沉稳低音、厉飞雨=轻快中音、南宫婉=清脆高音等）
+- 说话者出现：角色专属短音效（林渊=沉稳低音、苏剑鸣=轻快中音、月清霜=清脆高音等）
 - 对话选项出现：「叮」的轻微提示音
 - 选项确认：沉稳的确认音
 - bark弹出：轻快的"气泡声"
@@ -539,7 +539,7 @@ estimate_typing_duration(text, speed=40) → float:
 | # | 问题 | 影响 | 建议解决时间 |
 |---|------|------|------------|
 | 1 | 对话文本的总量预估——每章多少条对话？当前估算：5章×(1段引子+1段结局+4~6段剧情对话+8~12段事件对话)≈16~22段对话树×5章=80~110段对话树。需要确认写作资源 | 内容预算 | 预生产阶段确认写作资源 |
-| 2 | NPC角色表的设计——哪些角色有专属肖像和表情？当前建议核心角色（韩立、厉飞雨、墨居仁、南宫婉等~12人）有4表情头像，次要角色用通用头像 | 美术预算 | 美术圣经阶段确定 |
+| 2 | NPC角色表的设计——哪些角色有专属肖像和表情？当前建议核心角色（林渊、苏剑鸣、墨渊、月清霜等~12人）有4表情头像，次要角色用通用头像 | 美术预算 | 美术圣经阶段确定 |
 | 3 | 对话文本是否需要本地化？当前文本量~100段对话树×平均5句=500条文本，加上bark池~100条，共~600条。英文本地化工作量中等 | 国际化 | 如有海外发行计划则需在预生产中规划 |
 | 4 | 是否需要「对话日志」功能（查看历史对话）？当前设计在"对话历史"UI中包含此功能 | 用户体验 | 已包含在UI需求中 |
 | 5 | 打字机音效是否需要为不同角色使用不同音色？当前设计使用统一的打字机音效。差异化音色会增加音频资产但增强角色个性 | 音频预算 | 音频设计时确定 |
