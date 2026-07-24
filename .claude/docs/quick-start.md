@@ -21,11 +21,11 @@
   - `technical-director`——架构与技术决策
   - `producer`——进度安排、协调与风险管理
 
-- **第 2 层（Sonnet）**：部门主管（Department Leads）——负责各自领域
+- **第 2 层（deepseek-v4-pro）**：部门主管（Department Leads）——负责各自领域
   - `game-designer`、`lead-programmer`、`art-director`、`audio-director`、
     `narrative-director`、`qa-lead`、`release-manager`、`localization-lead`
 
-- **第 3 层（Sonnet/Haiku）**：专家（Specialists）——在各自领域内执行
+- **第 3 层（deepseek-v4-pro/deepseek-v4-pro）**：专家（Specialists）——在各自领域内执行
   - 设计师、程序员、美术师、编剧、测试员、工程师
 
 ### 2. 为任务选择合适的代理

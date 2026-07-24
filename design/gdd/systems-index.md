@@ -178,3 +178,35 @@
      探索UI → HUD
      卡组编辑UI
 ```
+
+---
+
+## 系统映射附录（2026-07-24）
+
+> 来源：`systems-mapping-2026-07-24.md` — 在 36 个 GDD 全部获批后运行的系统映射。
+> 本附录整合了影响架构规划的关键发现。完整分析请参见来源文档。
+
+### story_flags 所有权（已解决）
+
+`narrative.story_flags` 的运行时写入者歧义已解决：
+- **事件系统** = 唯一运行时写入者（`set_flag` Outcome 类型）
+- **剧情系统** = 通过事件系统的 `advance_chapter()` 委托写入
+- **对话系统** = 通过 `DialogueOutcome.set_flag → EventSystem.set_flag()` 委托写入
+- **结局分支系统** = 只读（在通关时读取标记，不写入）
+- 已修改：event-system.md、story-system.md、dialogue-system.md、ending-branch-system.md
+
+### 缺失的横切系统（已记录）
+
+| 系统 | 职责 | 规范位置 |
+|--------|--------------|----------------|
+| 输入管理器 | 输入锁的单一仲裁者；在投递前查询 `GSM.session.input_locks` | systems-mapping-2026-07-24.md 附录 B |
+| 场景管理器 | 场景转换编排者；场景树变更的唯一调用者 | systems-mapping-2026-07-24.md 附录 C |
+| 存档模式版本控制 | 跨版本的向前兼容迁移链 | systems-mapping-2026-07-24.md 附录 D |
+
+这些将在 `/create-architecture` 中提升为完整的 ADR 条目。目前，精简的架构概述足够作为开工条件。
+
+### 集成热点（前 3 名）
+
+1. **游戏状态管理器**（扇出 35）— 在任何消费者之前设计 API
+2. **战斗系统**（12×8）— 在实现之前锁定 7 阶段模型
+3. **卡牌效果引擎**（8×7）— 为每个效果类型定义每个系统接触的读写契约

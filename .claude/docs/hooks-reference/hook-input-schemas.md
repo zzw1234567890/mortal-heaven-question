@@ -94,7 +94,7 @@
 ```json
 {
   "agent_name": "game-designer",
-  "model": "sonnet",
+  "model": "deepseek-v4-pro",
   "description": "Design the combat healing mechanic"
 }
 ```

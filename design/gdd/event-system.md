@@ -194,7 +194,7 @@ Outcome 类型的具体执行映射：
 | remove_card | 从收藏和当前卡组移除卡牌 | ✅ |
 | heal | 治疗队伍（战斗相关，战斗中生效） | 战斗系统 |
 | damage | 伤害队伍（事件中的战斗陷阱） | 战斗系统 |
-| set_flag | GSM.set("narrative.story_flags.{flag}", true) | ✅ |
+| set_flag | GSM.set("narrative.story_flags.{flag}", true) | ✅ — **story_flags 的唯一运行时写入者。剧情系统和对话系统通过触发事件来间接设置标记，不直接写入。** |
 | gain_talent | 临时/永久解锁天赋 | GSM.progression |
 | trigger_battle | 加载战斗场景 | 探索系统 |
 | advance_chapter | 推动剧情章节 | GSM.narrative |

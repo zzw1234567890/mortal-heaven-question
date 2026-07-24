@@ -421,7 +421,7 @@
 
 ## Tier 1 —— 艺术总监关口 (Art Director Gates)
 
-代理 (Agent)：`art-director` | 模型层级 (Model tier)：Sonnet | 领域 (Domain)：视觉身份、艺术圣经、视觉生产就绪度
+代理 (Agent)：`art-director` | 模型层级 (Model tier)：deepseek-v4-pro | 领域 (Domain)：视觉身份、艺术圣经、视觉生产就绪度
 
 ---
 

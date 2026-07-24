@@ -198,7 +198,7 @@ advance_chapter():
      - 结局分支已选择
   ② 如果满足：
      a. 将当前章节ID推入 completed_chapters
-     b. 设置章节结局对应的 story_flags
+     b. 通过事件系统设置章节结局对应的 story_flags（事件系统是 story_flags 的唯一运行时写入者；见 event-system.md §Outcome 类型 set_flag）
      c. 解锁新地图列表
      d. 广播 chapter_completed 信号
      e. 如果有下一章 → 自动设置 current_chapter = next_chapter_id
@@ -257,7 +257,7 @@ advance_chapter():
 **剧情事件与普通事件的区别：**
 - 剧情事件有固定的叙事文本（原著引用/致敬）
 - 剧情事件有 `story_flag` 前置条件（某些对话选项需要特定 flag 才出现）
-- 剧情事件可能改变 `story_flags`（写入新的 flag）
+- 剧情事件通过事件系统的 `set_flag` Outcome 类型间接改变 `story_flags`（事件系统是唯一运行时写入者）
 - 剧情事件不可重复触发（每局一次）
 
 #### 7. 章节末结局分支
@@ -363,7 +363,7 @@ advance_chapter():
 
 | 系统 | 数据流入（本系统→目标） | 数据流出（目标→本系统） |
 |------|----------------------|---------------------|
-| **游戏状态管理器** | 写入 `narrative.current_chapter`、`narrative.story_flags`、`narrative.completed_chapters` | 读取当前叙事状态；`chapter_completed` 信号广播 |
+| **游戏状态管理器** | 写入 `narrative.current_chapter`、`narrative.completed_chapters`；story_flags 通过事件系统间接写入（见 §story_flags 所有权规则） | 读取当前叙事状态；`chapter_completed` 信号广播 |
 | **境界系统** | 章节完成时触发境界依赖事件（如第2章苍玄古战场的境界跌落） | 当前境界（章节入口条件验证） |
 | **探索系统** | 当前章节对应的地图解锁列表 | 玩家进入的地图ID（用于触发地图上的剧情事件） |
 | **事件系统** | 必经事件的触发与完成检测；章节结局分支的执行 | 事件完成事件；`set_flag` / `advance_chapter` 指令 |

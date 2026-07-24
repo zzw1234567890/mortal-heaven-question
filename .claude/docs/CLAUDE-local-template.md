@@ -9,7 +9,7 @@
 
 ## 模型偏好 (Model Preferences)
 - 复杂设计任务偏好使用 Opus
-- 快速查询和简单编辑使用 Haiku
+- 快速查询和简单编辑使用 deepseek-v4-pro
 
 ## 工作流偏好 (Workflow Preferences)
 - 代码变更后始终运行测试

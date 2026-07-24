@@ -291,7 +291,7 @@ generate_epilogue(ending_id, story_flags, chapter_path):
 | 职责 | 剧情系统（章节层） | 结局系统（全局层） |
 |------|-----------------|------------------|
 | 定义每章末的2~3选1 | ✅ | — |
-| 章节选择写入 story_flags | ✅ | — |
+| 章节选择写入 story_flags（通过事件系统） | ✅ | — |
 | 聚合 story_flags 判定全局结局 | — | ✅ |
 | 展示尾声叙事 | — | ✅ |
 | 管理结局图鉴 | — | ✅ |
@@ -328,7 +328,7 @@ generate_epilogue(ending_id, story_flags, chapter_path):
 
 | 系统 | 数据流入（本系统→目标） | 数据流出（目标→本系统） |
 |------|----------------------|---------------------|
-| **游戏状态管理器** | 写入 `progression.endings_unlocked`、`progression.ending_statistics` | 读取 `narrative.story_flags`、`narrative.completed_chapters`、`player.identity_id`、`player.realm_level` |
+| **游戏状态管理器** | 写入 `progression.endings_unlocked`、`progression.ending_statistics` | 读取 `narrative.story_flags`（只读——事件系统是唯一运行时写入者）、`narrative.completed_chapters`、`player.identity_id`、`player.realm_level` |
 | **剧情系统** | — | 第5章结局选择（`ch5_ending_chosen`）；story_flags 聚合数据 |
 | **轮回天赋系统** | 结局图鉴数据（用于关联成就） | 累计轮回次数、累计通关次数（用于变体判定） |
 | **UI系统** | 结局展示序列数据、结局图鉴数据 | 通关展示流程的UI渲染 |

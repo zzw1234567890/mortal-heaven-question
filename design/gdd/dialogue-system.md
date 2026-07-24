@@ -260,14 +260,16 @@ NPCProfile {
 
 #### 8. 对话状态管理
 
-对话系统在 GSM 中不维护独立的数据域。对话的**副作用**（story_flags 变更、资源变更、章节推进）直接写入对应的GSM域。
+对话系统在 GSM 中不维护独立的数据域。对话的**副作用**（story_flags 变更、资源变更、章节推进）通过对应的系统间接写入 GSM。
+
+> **story_flags 所有权规则**：事件系统是 `story_flags` 的唯一运行时写入者（见 event-system.md §Outcome 类型 set_flag）。对话系统的 `set_flag` outcome 不直接写入 `GSM.narrative.story_flags`——它触发事件系统来执行写入。这确保了所有 story_flag 的变更都经过单一入口点，便于调试和审计。
 
 ```
-# 对话结束后可能写入GSM的动作
+# 对话结束后执行的动作
 execute_outcomes(outcomes):
   for outcome in outcomes:
     match outcome.type:
-      set_flag:         GSM.narrative.story_flags[outcome.target] = outcome.value
+      set_flag:         事件系统.set_flag(outcome.target, outcome.value)  # 委托给事件系统
       add_resource:     GSM.player.resources[outcome.target] += outcome.value
       add_card:         GSM.collection.owned_cards.append(outcome.value)
       trigger_battle:   战斗系统加载战斗
@@ -346,9 +348,9 @@ assets/dialogue/
 
 | 系统 | 数据流入（本系统→目标） | 数据流出（目标→本系统） |
 |------|----------------------|---------------------|
-| **游戏状态管理器** | 对话 outcomes 写入 story_flags、resources、collection、relations | 读取所有条件判定所需的状态（identity、realm、story_flags、faction、card_owned 等） |
+| **游戏状态管理器** | 对话 outcomes 写入 resources、collection、relations；story_flags 通过事件系统间接写入（见 §故事标记所有权规则） | 读取所有条件判定所需的状态（identity、realm、story_flags、faction、card_owned 等） |
 | **剧情系统** | 章节引子/结局对话的结果写入 story_flags | 对话树ID（来自章节模板）；对话触发指令 |
-| **事件系统** | 事件对话的结果写入资源/卡牌/story_flags | 对话树ID（来自事件模板）；事件对话触发指令 |
+| **事件系统** | 事件对话的结果写入资源/卡牌；story_flags 通过事件系统的 `set_flag` Outcome 类型写入（事件系统是唯一运行时写入者） | 对话树ID（来自事件模板）；事件对话触发指令 |
 | **音频系统** | 播放角色发声、打字机音效、叙事BGM切换 | — |
 | **战斗系统** | trigger_battle outcome | 战斗结果（用于 combat_result 条件判定） |
 | **商店系统** | — | 商店问候对话ID |
