@@ -1,181 +1,344 @@
-# Architecture Decision Registry
+# 架构注册表
 #
-# PURPOSE: Single source of truth for key architectural stances that all ADRs
-# must agree on. Skills check this before writing new ADRs to detect conflicts
-# at authoring time — before stories are created against contradictory decisions.
+# 此文件跟踪所有 ADR 确立的架构立场：状态所有权、接口契约、
+# 禁止模式以及 API 决策。每个立场由其来源 ADR 拥有。
 #
-# RULES:
-#   - Register a stance when it constrains how OTHER systems must be built.
-#     An internal implementation detail that affects only one ADR does not need
-#     to be registered.
-#   - Never delete entries — set status: superseded_by: ADR-NNNN instead.
-#   - When a stance changes: update the entry, set revised: to today's date,
-#     add a comment with the old value, and run /architecture-review to check
-#     what ADRs are now invalidated.
-#   - adr: is the authoritative source. All other ADRs that depend on this
-#     stance list themselves in referenced_by.
-#
-# WRITTEN BY: /architecture-decision (Phase 5 — after ADR is approved)
-# READ BY:    /architecture-decision (Step 2 — before authoring begins)
-#             /architecture-review (Phase 4 — cross-ADR conflict baseline)
-#             /create-stories (to embed architectural constraints in stories)
-#             /dev-story (to check implementation against accepted stances)
-#
-# SEARCH PATTERNS (for skills using Grep):
-#   All state owners:       Grep pattern="^  - state:" path="docs/registry/architecture.yaml"
-#   Who owns player_health: Grep pattern="state: player_health"
-#   All signal contracts:   Grep pattern="pattern: signal"
-#   Budget for combat:      Grep pattern="system: combat"
-#   All forbidden patterns: Grep pattern="^  - pattern:" (forbidden_patterns section)
-#   Superseded entries:     Grep pattern="status: superseded"
+# 规则：
+#   - 绝不修改现有条目——追加新条目或通过 superseded_by 废弃旧条目
+#   - 每个条目必须引用其来源 ADR
+#   - referenced_by 在 ADR 引用该立场时追加
 
 version: 1
-last_updated: ""
+last_updated: "2026-07-24"
 
-# ─── STATE OWNERSHIP ─────────────────────────────────────────────────────────
-# Who is the authoritative owner of each piece of shared game state.
-# Conflicts: two ADRs claiming to own the same state = data race / authority bug.
-#
-# Register state when it is READ or WRITTEN by more than one system.
-# Internal-only state (never accessed by another system) does not need to be registered.
-#
-# Required fields: state, owner_system, adr, interface, referenced_by[], added
-# interface: how other systems access this state (read-only property, method call,
-#   signal, shared resource, etc.) — this is the contract other ADRs depend on.
+state_ownership:
+  - entity: GameState（根）
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "运行时单一数据源。所有 35 个消费者通过三层 API 访问——绝不直接修改属性。"
+    status: active
 
-state_ownership: []
+  - entity: player.* 域（realm, cultivation, resources, talents, identity_id）
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "通过原子操作写入：add_cultivation(), spend_resource(), change_realm()"
+    status: active
 
-# Example:
-#
-# state_ownership:
-#   - state: player_health
-#     status: active           # active | superseded_by: ADR-NNNN
-#     owner_system: health-system
-#     adr: docs/architecture/adr-0001-health-system.md
-#     interface: "HealthComponent.current_health (read-only float, range 0–max_health)"
-#     write_access: health-system-only   # only owner can write; others read
-#     referenced_by:
-#       - docs/architecture/adr-0001-health-system.md
-#       - docs/architecture/adr-0003-combat-system.md   # reads to apply damage
-#       - docs/architecture/adr-0007-ui-system.md       # reads to display HUD
-#     added: 2026-03-26
-#     revised: ""
+  - entity: collection.owned_cards
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "通过 add_card_to_collection() 写入。在校验跳过模式下运行直到 CardSystem 就绪。"
+    status: active
 
+  - entity: deck.* 域（character_slots, current_deck, presets）
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "由 DeckEditingSystem 通过 GSM API 写入"
+    status: active
 
-# ─── INTERFACE CONTRACTS ──────────────────────────────────────────────────────
-# How systems are required to communicate with each other.
-# Conflicts: one ADR expects signal, another expects direct call = integration bug.
-#
-# Register a contract when the communication pattern between two systems is
-# explicitly decided in an ADR and other systems must follow the same pattern.
-#
-# pattern options: signal | direct_call | event_bus | shared_resource | rpc | none
+  - entity: battle.* 域（运行时，不持久化）
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "由 CombatSystem 通过 battle_start() / battle_end() 编排。非战斗时为 null。"
+    status: active
 
-interfaces: []
+  - entity: exploration.* 域（map_id, node_position, action_points, map_state）
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "由 ExplorationSystem 通过 GSM API 写入"
+    status: active
 
-# Example:
-#
-# interfaces:
-#   - contract: damage_delivery
-#     status: active
-#     pattern: signal          # how the producer notifies consumers
-#     producer: combat-system
-#     consumers:
-#       - health-system        # receives damage_dealt signal, applies to health
-#       - ui-system            # receives damage_dealt signal, shows damage number
-#       - audio-system         # receives damage_dealt signal, plays SFX
-#     adr: docs/architecture/adr-0003-combat-system.md
-#     signal_signature: "damage_dealt(amount: float, target: Node, is_crit: bool)"
-#     referenced_by:
-#       - docs/architecture/adr-0003-combat-system.md
-#       - docs/architecture/adr-0001-health-system.md
-#     added: 2026-03-26
-#     revised: ""
+  - entity: narrative.* 域（current_chapter, story_flags）
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001, ADR-0004]
+    note: "story_flags 由 EventSystem 独占写入（ADR-0004——通过 GSM.set_narrative_flag()）。剧情/对话/效果引擎通过 EventSystem.set_flag() 委托写入，不直接操作此域。"
+    status: active
 
+  - entity: progression.* 域（跨局元进度）
+    owner: game-state-manager（运行时），save-load-system（持久化）
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "运行时在 GSM 中；写入到 progression.dat 由 SaveLoadSystem 处理"
+    status: active
 
-# ─── PERFORMANCE BUDGETS ──────────────────────────────────────────────────────
-# Frame time allocations per system, against a defined total frame budget.
-# Conflicts: allocations that sum to more than the total budget = unshippable.
-#
-# Register a budget when an ADR explicitly claims a frame time allocation.
-# The registry lets /architecture-review verify the total doesn't exceed the target.
+  - entity: session.* 域（current_scene, ui_state, input_locks）
+    owner: game-state-manager
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "不持久化。current_scene 由 SceneManager 写入。input_locks 由 InputManager 写入。"
+    status: active
 
-performance_budgets: []
+  - entity: CardSystem.templates（模板注册表）
+    owner: card-system
+    adr: ADR-0002
+    referenced_by: [ADR-0002]
+    note: "Dictionary[StringName, CardTemplate]——222 个只读模板。由 CardSystem._ready() 异步加载填充。在 templates_loaded 信号之前不可用。"
+    status: active
 
-# Example:
-#
-# performance_budgets:
-#   - target_fps: 60
-#     total_frame_budget_ms: 16.6
-#     platform: PC             # PC | Console | Mobile | All
-#     adr: docs/architecture/adr-0000-performance-targets.md
-#     added: 2026-03-26
-#     revised: ""
-#
-#   - system: combat
-#     status: active
-#     budget_ms: 2.0
-#     adr: docs/architecture/adr-0003-combat-system.md
-#     notes: "Includes physics queries, hitbox evaluation, and damage calculation"
-#     referenced_by:
-#       - docs/architecture/adr-0003-combat-system.md
-#     added: 2026-03-26
-#     revised: ""
+  - entity: GSM.collection.owned_cards（实例收藏）
+    owner: game-state-manager
+    adr: ADR-0002
+    referenced_by: [ADR-0001, ADR-0002]
+    note: "Array[Dictionary]——CardInstance 序列化后的数据。由 CardSystem.serialize_instance() 生成，通过 GSM.add_card_to_collection() 写入。GSM 不持有 CardInstance 对象引用。"
+    status: active
 
+  - entity: SaveLoadSystem 存档文件（save.json / meta.json / progression.dat / pre_battle.json）
+    owner: save-load-system
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "保存在 user://saves/{type}/{id}.json。SaveLoadSystem 是唯一写入者——所有系统通过 GSM 间接触发持久化，不直接写文件。"
+    status: active
 
-# ─── API DECISIONS ───────────────────────────────────────────────────────────
-# Which engine APIs are chosen for which purpose across the project.
-# Conflicts: two ADRs using different APIs for the same purpose = inconsistent
-# implementation that breaks when one system expects the other's API.
-#
-# Register an API decision when the choice is non-obvious and other ADRs might
-# make a different choice for the same purpose without knowing this was decided.
+  - entity: SaveLoadSystem.progression（跨局元进度持久化）
+    owner: save-load-system
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "独立 progression.dat 文件。SaveLoadSystem 内部被动响应 GSM.progression_updated 信号自动写入——特性系统不直接调用 save_progression()。"
+    status: active
 
-api_decisions: []
+  - entity: EventSystem.templates（事件模板注册表）
+    owner: event-system
+    adr: ADR-0004
+    referenced_by: [ADR-0004]
+    note: "Dictionary[StringName, EventTemplate]——60-100 个只读 .tres Resource。由 EventSystem._ready() 同步加载。模板运行时不修改——EventInstance (RefCounted) 存储 template_id + 选项索引，不持有 Resource 引用。"
+    status: active
 
-# Example:
-#
-# api_decisions:
-#   - purpose: physics_raycast
-#     status: active
-#     api: PhysicsServer3D.space_get_direct_state()
-#     not: RayCast3D node     # explicitly banned for this purpose
-#     adr: docs/architecture/adr-0002-physics-architecture.md
-#     reason: "Direct server calls avoid per-frame node overhead; 3× faster in profiling"
-#     referenced_by:
-#       - docs/architecture/adr-0002-physics-architecture.md
-#       - docs/architecture/adr-0003-combat-system.md
-#     added: 2026-03-26
-#     revised: ""
+interfaces:
+  - contract: "GSM 第一层：直接属性读取"
+    signature: "GSM.player.*, GSM.collection.*, GSM.deck.*, GSM.exploration.*, GSM.narrative.*, GSM.session.*"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "O(1) 字典访问。无信号开销。每帧读取安全。"
+    status: active
 
+  - contract: "GSM 第二层：原子写入操作"
+    signature: "apply_battle_rewards(lingshi, cultivation, cards) → void"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "原子多重写入——全部成功或全部失败。发射 batch_updated。"
+    status: active
 
-# ─── FORBIDDEN PATTERNS ──────────────────────────────────────────────────────
-# Architecture anti-patterns explicitly banned by accepted ADRs.
-# When writing a new ADR, check this list — if the proposed approach matches
-# a forbidden pattern, it must be reworked before the ADR can be Accepted.
-#
-# Register a pattern when an ADR explicitly bans it AND other ADRs might
-# unknowingly use it (i.e., it's a tempting but wrong approach for this project).
+  - contract: "GSM 第二层：原子写入操作"
+    signature: "change_realm(new_level) → void"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "设置 realm_guard，批量更新 8 个消费者字段，发射 realm_changed。"
+    status: active
 
-forbidden_patterns: []
+  - contract: "GSM 第二层：原子写入操作"
+    signature: "add_resource(type, amount) → bool"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "失败返回 false。成功发射 resource_changed。"
+    status: active
 
-# Example:
-#
-# forbidden_patterns:
-#   - pattern: autoload_singleton_coupling
-#     status: active
-#     description: "Systems must not directly reference Autoload singletons by name.
-#       Use dependency injection or signals instead."
-#     why: "Tight coupling to Autoloads makes systems untestable in isolation and
-#       creates hidden dependencies that break when Autoload load order changes."
-#     adr: docs/architecture/adr-0001-health-system.md
-#     added: 2026-03-26
-#
-#   - pattern: direct_cross_system_state_write
-#     status: active
-#     description: "A system must never write to state owned by another system.
-#       Use signals or method calls on the owner instead."
-#     why: "Direct state writes create race conditions and break the state
-#       ownership model. The owning system must be the sole writer."
-#     adr: docs/architecture/adr-0000-architecture-principles.md
-#     added: 2026-03-26
+  - contract: "GSM 第三层：信号"
+    signature: "batch_updated(changes: Dictionary)"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "展平合并字典——{ 'player.resources.ling_shi': {old, new}, ... }"
+    status: active
+
+  - contract: "GSM 第三层：信号"
+    signature: "realm_changed(old_level: int, new_level: int)"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "仅在 change_realm() 成功时发射（8 个字段全部更新后）"
+    status: active
+
+  - contract: "GSM 第三层：信号"
+    signature: "gsm_initialized()"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "GSM._ready() 完成后发射。在此信号前任何系统不得写入 GSM。"
+    status: active
+
+  - contract: "GSM 序列化"
+    signature: "GSM.serialize() → Dictionary / GSM.deserialize(Dictionary) → bool"
+    adr: ADR-0001
+    referenced_by: [ADR-0001, ADR-0003]
+    note: "battle 和 session 域从序列化输出中排除。"
+    status: active
+
+  - contract: "SaveLoadSystem 存档写入"
+    signature: "save_game(slot_type: SaveSlotType, slot_id: int, data: Dictionary, meta: Dictionary) → SaveResult"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "data 必须仅含 JSON 兼容类型（GSM.serialize() 输出满足）。原子写入：.tmp → rename → .bak 清理。防重入：_is_writing 标志。"
+    status: active
+
+  - contract: "SaveLoadSystem 存档读取"
+    signature: "load_game(slot_type: SaveSlotType, slot_id: int) → Dictionary"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "返回 {'result': LoadResult, 'data': Dictionary}。强制 JSON.new().parse() 检查 Error——禁止 parse_string()。成功后调用方须调用 CardSystem.reconstitute_instances()。"
+    status: active
+
+  - contract: "SaveLoadSystem 读档后 CardInstance 重构"
+    signature: "CardSystem.reconstitute_instances(owned_cards_dicts: Array[Dictionary]) → Array[CardInstance]"
+    adr: ADR-0003
+    referenced_by: [ADR-0002, ADR-0003]
+    note: "load_game() 成功后由调用方（主菜单/场景管理器）执行——将 GSM 中的序列化字典重构为 CardInstance 对象数组（ADR-0002 模型 A 契约）。"
+    status: active
+
+  - contract: "SaveLoadSystem 跨局元进度读取"
+    signature: "load_progression() → Dictionary"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "文件不存在 → 返回默认值。写入由 SaveLoadSystem 内部通过 GSM.progression_updated 信号被动触发——不暴露 save_progression() 公共 API。"
+    status: active
+
+  - contract: "SaveLoadSystem 信号"
+    signature: "save_completed(slot_type, slot_id, success) / load_completed(success) / save_corrupted(slot_type, slot_id, reason) / progression_saved(success)"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "save_completed——UI 提示；load_completed——触发场景切换或错误弹窗；save_corrupted——存档损坏 UI；progression_saved——静默日志（可选监听）。"
+    status: active
+
+  - contract: "CardSystem 模板查询"
+    signature: "CardSystem.get_template(id: StringName) → CardTemplate"
+    adr: ADR-0002
+    referenced_by: [ADR-0002]
+    note: "O(1) 字典查询。模板只读——不得修改返回的 Resource 字段。"
+    status: active
+
+  - contract: "CardSystem 实例工厂"
+    signature: "CardSystem.create_instance(template_id: StringName) → CardInstance"
+    adr: ADR-0002
+    referenced_by: [ADR-0002]
+    note: "创建 CardInstance 并调用 GSM.allocate_card_id() 分配唯一 ID。调用前 assert(template_id in templates)。"
+    status: active
+
+  - contract: "CardSystem 实例序列化"
+    signature: "CardSystem.serialize_instance(CardInstance) → Dictionary / deserialize_instance(Dictionary) → CardInstance"
+    adr: ADR-0002
+    referenced_by: [ADR-0002]
+    note: "模型 A（数据容器）——GSM 持有序列化字典，CardSystem 管理对象生命周期。存档时只存 template_id，不存完整模板。"
+    status: active
+
+  - contract: "GSM 卡牌收藏 API"
+    signature: "GSM.allocate_card_id() → int / GSM.add_card_to_collection(Dictionary) → void / GSM.remove_card_from_collection(int) → bool"
+    adr: ADR-0002
+    referenced_by: [ADR-0001, ADR-0002]
+    note: "allocate_card_id 单调递增，不可收回。add_card_to_collection 在校验启用前拒绝写入。remove_card_from_collection 按 ID 删除。"
+    status: active
+
+  - contract: "GSM narrative flag 写入"
+    signature: "GSM.set_narrative_flag(flag: StringName, value: Variant) → void"
+    adr: ADR-0004
+    referenced_by: [ADR-0001, ADR-0004]
+    note: "story_flags 的唯一运行时写入入口。仅 EventSystem 调用——剧情/对话/效果引擎通过 EventSystem.set_flag() 委托。值无变化时不发射信号。值变更后发射 batch_updated。"
+    status: active
+
+  - contract: "EventSystem ADD_CARD 信号委托"
+    signature: "card_reward_requested(template_id: StringName)"
+    adr: ADR-0004
+    referenced_by: [ADR-0002, ADR-0004]
+    note: "EventSystem（Foundation#5）不直接调用 CardSystem（Core）——通过此信号委托。CardSystem 监听并执行 create_instance() → serialize_instance() → GSM.add_card_to_collection()。保持 Foundation 层原则 #3 合规。"
+    status: active
+
+  - contract: "EventSystem 事件生命周期信号"
+    signature: "event_triggered(event_id) / event_resolved(event_id, option_idx, outcomes) / chain_triggered(from, to) / chain_ended(final_id) / templates_loaded(count)"
+    adr: ADR-0004
+    referenced_by: [ADR-0004]
+    note: "event_triggered → UI 弹出事件面板；event_resolved → SaveLoad 判定自动存档 + 探索系统恢复控制；chain_triggered → UI 替换面板内容；chain_ended → 探索系统恢复地图控制；templates_loaded → CardSystem 检查事件可用性。"
+    status: active
+
+forbidden_patterns:
+  - pattern: "绕过 GSM 直接写入游戏状态"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "所有状态变更必须通过 GSM 第二层原子方法进行。绝不直接修改 GSM 内部字典。"
+    status: active
+
+  - pattern: "从信号处理器内部写回 GSM（递归写入）"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "信号处理器是只读的消费者——绝不从处理器内调用 GSM 写入方法。GSM 会检测到并记录警告。"
+    status: active
+
+  - pattern: "在 _process() 中写入 GSM"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "写入仅在事件响应中进行（按键/结算/章节推进）。绝不在热路径循环中。"
+    status: active
+
+  - pattern: "多线程锁（mutex/semaphore）"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "GDScript 是单线程的。GSM 使用语义 guard（'realm_guard'）而非多线程原语。术语特选以避免混淆。"
+    status: active
+
+  - pattern: "运行时写入 CardTemplate Resource"
+    adr: ADR-0002
+    referenced_by: [ADR-0002]
+    note: "CardTemplate（Resource）的 @export 字段为只读。所有运行时可变状态必须在 CardInstance（RefCounted）上管理。违反此规则会污染所有共享该模板的实例。"
+    status: active
+
+  - pattern: "绕过 _atomic_write 直接使用 FileAccess 写入存档"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "所有存档文件写入必须通过 SaveLoadSystem._atomic_write()——绝不直接调用 FileAccess.store_* 写入 user://saves/。原子 rename 策略和 store_string() 返回 bool 检查仅在此方法中集中处理。"
+    status: active
+
+  - pattern: "使用 JSON.parse_string() 解析存档"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "parse_string() 对合法 null 值和解析错误均返回 null——无法区分。必须使用 JSON.new().parse() 并检查 Error 返回值。"
+    status: active
+
+  - pattern: "通过 GSM.set() 直接写入 narrative.story_flags"
+    adr: ADR-0004
+    referenced_by: [ADR-0001, ADR-0004]
+    note: "story_flags 的唯一写入路径是 EventSystem.set_flag() → GSM.set_narrative_flag()。剧情/对话/效果引擎绝不直接使用 GSM.set() 或直接操作 GSM.narrative.story_flags 字典。"
+    status: active
+
+  - pattern: "EventInstance 持有 Resource 引用"
+    adr: ADR-0004
+    referenced_by: [ADR-0004]
+    note: "EventInstance (RefCounted) 仅存储 template_id + 选项索引——不持有 EventOption/EventOutcome Resource 引用。运行时通过 EventSystem.get_template(id) 查询选项数据。与 ADR-0002 的 Template/Instance 分离模式一致。"
+    status: active
+
+api_decisions:
+  - decision: "面向寄存器的热路径读取"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "直接属性访问 → O(1) 字典查找，而非通过序列化中间层的方法调用。每帧 <0.1ms。"
+    status: active
+
+  - decision: "用于多重写入的原子操作而非逐个操作"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "apply_battle_rewards() 在一次调用中写入 3+ 个字段——无部分更新。"
+    status: active
+
+  - decision: "信号去重——同帧内同一路径多次写入仅发射一次信号"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "UI 接收最终值，而非中间状态。"
+    status: active
+
+  - decision: "schema_version（整数）为唯一迁移驱动字段——version（字符串）仅用于面向用户展示"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "存档容器同时包含两个字段：schema_version 驱动迁移链（递增整数），version 仅在存档列表 UI 显示（不参与任何 if 判断）。消除双重定义混淆。"
+    status: active
+
+  - decision: "Progression 信号驱动被动保存——特性系统不直接调用 SaveLoadSystem"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "SaveLoadSystem 监听 GSM.progression_updated 信号自动写入 progression.dat——特性系统仅通过 GSM 写入 progression 数据。符合 Foundation 层原则 #3。"
+    status: active
+
+  - decision: "存档「存档模式版本控制」模块合并入 SaveLoadSystem 内部"
+    adr: ADR-0003
+    referenced_by: [ADR-0003]
+    note: "迁移链和版本管理作为 SaveLoadSystem 内部职责——减少 1 个 Foundation 层 Autoload，简化初始化顺序。"
+    status: active
