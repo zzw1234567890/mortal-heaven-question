@@ -19,32 +19,32 @@
 
 | # | 系统名称 | 类别 | 优先级 | 状态 | 设计文档 | 依赖项 |
 |---|-------------|----------|----------|--------|------------|------------|
-| 1 | 游戏状态管理器 | 核心 (Core) | MVP | 已设计 | game-state-manager.md | — |
+| 1 | 游戏状态管理器 | 核心 (Core) | MVP | 已设计 (Approved) | game-state-manager.md | — |
 | 2 | 存档/读档系统 | 核心 (Core) | MVP | 已设计 | save-load-system.md | 游戏状态管理器 |
 | 3 | 事件系统 | 核心 (Core) | MVP | 已设计 | event-system.md | — |
-| 4 | 探索系统 | 玩法 (Gameplay) | MVP | 已设计 | exploration-system.md | 事件系统、行动力系统 |
+| 4 | 探索系统 | 玩法 (Gameplay) | MVP | 已设计 (Approved) | exploration-system.md | 事件系统、行动力系统 |
 | 5 | 行动力系统 | 核心 (Core) | MVP | 已设计 | action-point-system.md | 游戏状态管理器 |
 | 6 | 战斗系统（回合制流程） | 玩法 (Gameplay) | MVP | 已设计 | combat-system.md | 卡牌系统、费用系统、AI系统 |
-| 7 | 卡牌系统（数据/收藏） | 玩法 (Gameplay) | MVP | 已设计 | card-system.md | 游戏状态管理器 |
-| 8 | 卡牌效果解析引擎 | 玩法 (Gameplay) | MVP | 已设计 | card-effect-engine.md | 卡牌系统、绑定系统、状态效果系统 |
+| 7 | 卡牌系统（数据/收藏） | 玩法 (Gameplay) | MVP | 已设计 (Approved) | card-system.md | 游戏状态管理器 |
+| 8 | 卡牌效果解析引擎 | 玩法 (Gameplay) | MVP | 已设计 (Approved) | card-effect-engine.md | 卡牌系统、绑定系统、状态效果系统 |
 | 9 | 费用系统 | 玩法 (Gameplay) | MVP | 已设计 | cost-system.md | 战斗系统 |
 | 10 | 角色上场与阵位系统 | 玩法 (Gameplay) | MVP | 已设计 | deployment-system.md | 战斗系统、卡牌系统 |
-| 11 | 功法/法宝绑定系统 | 玩法 (Gameplay) | MVP | 已设计 | binding-system.md | 战斗系统、卡牌系统 |
-| 12 | 阵法系统 | 玩法 (Gameplay) | MVP | 已设计 | formation-system.md | 战斗系统、阵营系统 |
+| 11 | 功法/法宝绑定系统 | 玩法 (Gameplay) | MVP | 已设计 (Approved) | binding-system.md | 战斗系统、卡牌系统 |
+| 12 | 阵法系统 | 玩法 (Gameplay) | MVP | 已设计 (Approved) | formation-system.md | 战斗系统、阵营系统 |
 | 13 | 阵营系统 | 玩法 (Gameplay) | MVP | 已设计 | faction-system.md | 卡牌系统 |
 | 14 | AI系统（敌方AI） | 玩法 (Gameplay) | MVP | 已设计 | ai-system.md | 战斗系统、卡牌效果解析引擎 |
-| 15 | 状态效果系统 | 核心 (Core) | MVP | 已设计 | status-system.md | 游戏状态管理器 |
+| 15 | 状态效果系统 | 核心 (Core) | MVP | 已设计 (Approved) | status-system.md | 游戏状态管理器 |
 | 16 | 修为养成系统 | 成长 (Progression) | MVP | 已设计 | cultivation-system.md | 游戏状态管理器 |
-| 17 | 境界系统 | 成长 (Progression) | MVP | 已设计 | realm-system.md | 修为养成系统 |
+| 17 | 境界系统 | 成长 (Progression) | MVP | 已设计 (Approved) | realm-system.md | 修为养成系统 |
 | 18 | 境界压制规则 | 玩法 (Gameplay) | MVP | 已设计 | realm-system.md（压制系数由境界系统定义） | 境界系统、战斗系统 |
-| 19 | 渡劫突破系统 | 成长 (Progression) | MVP | 已设计 | tribulation-system.md | 境界系统、战斗系统 |
-| 20 | 资源系统（灵石/灵材） | 经济 (Economy) | MVP | 已设计 | resource-system.md | 卡牌系统、探索系统 |
+| 19 | 渡劫突破系统 | 成长 (Progression) | MVP | 已设计 (Approved) | tribulation-system.md | 境界系统、战斗系统 |
+| 20 | 资源系统（灵石/灵材） | 经济 (Economy) | MVP | 已设计 (Approved) | resource-system.md | 卡牌系统、探索系统 |
 | 21 | 卡组编辑系统 | 玩法 (Gameplay) | MVP | 已设计 | deck-editing-system.md | 卡牌系统 |
-| 22 | 炼丹炼器系统 | 经济 (Economy) | Vertical Slice | 已设计 | alchemy-crafting-system.md | 资源系统、卡牌系统 |
-| 23 | 法宝铭刻系统 | 经济 (Economy) | Vertical Slice | 已设计 | inscription-system.md | 炼丹炼器系统 |
-| 24 | 开局身份选择系统 | 玩法 (Gameplay) | MVP | 已设计 | identity-selection-system.md | 游戏状态管理器、卡牌系统 |
+| 22 | 炼丹炼器系统 | 经济 (Economy) | Vertical Slice | 已设计 (Approved) | alchemy-crafting-system.md | 资源系统、卡牌系统 |
+| 23 | 法宝铭刻系统 | 经济 (Economy) | Vertical Slice | 已设计 (Approved) | inscription-system.md | 炼丹炼器系统 |
+| 24 | 开局身份选择系统 | 玩法 (Gameplay) | MVP | 已设计 (Approved) | identity-selection-system.md | 游戏状态管理器、卡牌系统 |
 | 25 | 流派系统 | 元 (Meta) | MVP | 已设计 | school-system.md | 阵营系统、卡牌系统 |
-| 26 | 轮回天赋系统 | 成长 (Progression) | Vertical Slice | 需要修订 | reincarnation-talent-system.md | 存档系统 |
+| 26 | 轮回天赋系统 | 成长 (Progression) | Vertical Slice | 已设计 (Approved) | reincarnation-talent-system.md | 存档系统 |
 | 27 | 剧情系统（章节推进） | 叙事 (Narrative) | Vertical Slice | 已设计 | story-system.md | 探索系统、境界系统 |
 | 28 | 对话系统 | 叙事 (Narrative) | Vertical Slice | 已设计 | dialogue-system.md | 剧情系统 |
 | 29 | 结局分支系统 | 叙事 (Narrative) | Full Vision | 已设计 | ending-branch-system.md | 剧情系统 |
@@ -54,7 +54,7 @@
 | 33 | HUD系统 | UI | MVP | 已设计 | hud-system.md | 所有系统 |
 | 34 | 主菜单与设置 | UI | MVP | 已设计 | main-menu-system.md | 游戏状态管理器 |
 | 35 | 音频管理系统 | 音频 (Audio) | MVP | 已设计 (Approved) | audio-system.md | 事件系统、游戏状态管理器、战斗系统、探索系统、UI系统、渡劫突破系统、设置系统 |
-| 36 | 成就系统 | 元 (Meta) | Full Vision | 需要修订 | achievement-system.md | 存档系统 |
+| 36 | 成就系统 | 元 (Meta) | Full Vision | 已设计 (Approved) | achievement-system.md | 存档系统 |
 
 ---
 

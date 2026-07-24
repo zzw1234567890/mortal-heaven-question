@@ -2,7 +2,7 @@
 
 > **状态 (Status)**：设计中 (In Design)
 > **作者 (Author)**：Claude Code + 用户
-> **最后更新 (Last Updated)**：2026-07-23
+> **最后更新 (Last Updated)**：2026-07-24
 > **最后验证 (Last Verified)**：—
 > **实现的支柱 (Implements Pillar)**：支柱1「自由组牌，策略为王」+ 支柱2「苟道成长，步步为营」+ 支柱3「机缘巧合，意外之喜」
 
@@ -12,9 +12,9 @@
 
 成就系统是游戏的跨局元进度追踪与奖励机制——它不直接影响单局游戏的战力，而是为玩家提供**长期目标、探索引导和精通证明**。系统监听游戏内 60+ 个可触发事件（首次达到某境界、首次击杀某 BOSS、收集里程碑、结局解锁等），在条件满足时解锁对应成就，并写入 `progression.dat` 的 `achievements` 域永久保存。
 
-对玩家来说，成就系统是「我在这款游戏里做过什么」的完整记录。它不是强制任务清单——玩家可以完全忽略成就系统而正常游玩——但那些看到「已解锁 3/60」时会感到探索欲被点燃的成就者型玩家，会自然追着成就去尝试游戏的每一个角落。成就系统将游戏深度转化为可量化的收集目标。
+对玩家来说，成就系统是「我在这款游戏里做过什么」的完整记录。它不是强制任务清单——玩家可以完全忽略成就系统而正常游玩——但那些看到「已解锁 3/62」时会感到探索欲被点燃的成就者型玩家，会自然追着成就去尝试游戏的每一个角落。成就系统将游戏深度转化为可量化的收集目标。
 
-成就设计遵循两个原则：(1) **成就引导发现，而非强制 grind**——任何需要纯粹重复劳动才能解锁的成就不超过 5 个；(2) **成就是探索的副产物，而非终点**——正常游玩即可自然解锁 70% 的成就，剩下的 30% 为深度玩家提供挑战。
+成就设计遵循两个原则：(1) **成就引导发现，而非强制 grind**——任何需要纯粹重复劳动才能解锁的成就不超过 8 个；(2) **成就是探索的副产物，而非终点**——正常游玩即可自然解锁 70% 的成就，剩下的 30% 为深度玩家提供挑战。
 
 ## 玩家幻想
 
@@ -22,7 +22,7 @@
 |------|---------|
 | **发现的惊喜** | 完成一次普通战斗后突然弹出成就——「咦，这也算成就？」——原来「同时拥有5种异常状态」是个隐藏成就 |
 | **精通的自豪** | 查看成就列表——「越阶渡劫」「全结局解锁」「全流派精通」三个金框并排——这是实力的勋章 |
-| **收集的满足** | 成就进度条从 45/60 涨到 46/60——还差 14 个，看看缺哪些……「无伤击败章末BOSS」还没做——下一局试试 |
+| **收集的满足** | 成就进度条从 45/62 涨到 46/62——还差 16 个，看看缺哪些……「枯木逢春」还没做——下一局试试 |
 | **挑战的刺激** | 看到「一回合击杀 BOSS」（隐藏成就，0.3% 解锁率）——「这个可能吗？让我想想怎么构筑……」 |
 | **回忆的锚点** | 翻看已解锁成就的解锁日期——「2026-08-15 第一次通关」「2026-09-01 全卡牌收集」——每个成就都是一段游戏记忆 |
 | **社交的谈资** | （未来如果有 Steam）成就展示在个人资料页——「全结局解锁」的稀有度框（金色边框）是硬核玩家的身份标识 |
@@ -42,7 +42,7 @@ Achievement {
   description: String       # 解锁条件描述（如 "首次突破到筑基期"）
   icon: String              # 图标资源路径
   category: Enum            # 分类：combat / progression / collection / exploration / narrative / challenge / mastery
-  tier: Enum                # 稀有度：bronze / silver / gold / hidden
+  tier: Enum                # 稀有度：bronze / silver / gold（隐藏由 hidden_until_unlocked 独立控制）
   unlock_condition: {       # 解锁条件（由事件系统评估）
     event: String           # 触发事件名
     threshold: int          # 阈值（可选；如累计次数/数量达到此值）
@@ -83,7 +83,7 @@ Achievement {
 | `ach_elite_slayer` | 精英屠夫 | 累计击杀 200 个精英敌人 | 金 | — |
 | `ach_first_boss_kill` | 弑师 | 首次击杀章末 BOSS（任意章节） | 铜 | — |
 | `ach_all_bosses` | 八荒荡魔 | 击杀全部 5 个章末 BOSS（跨局累计，不要求同一局） | 金 | — |
-| `ach_no_damage_boss` | 毫发无伤 | 无伤击败任意章末 BOSS（全局 HP 未减少） | 金 | ✅ |
+| `ach_no_damage_boss` | 枯木逢春 | 无伤击败任意章末 BOSS（全局 HP 净损失为 0——受伤但被治疗回满仍算无伤） | 金 | ✅ |
 | `ach_one_turn_kill` | 一击灭敌 | 在 1 回合内击杀任意 BOSS | 金 | ✅ |
 | `ach_status_stack_5` | 五毒俱全 | 单个敌人身上同时拥有 5+ 种不同异常状态 | 银 | ✅ |
 | `ach_overkill_100` | 伤害溢出 | 单次攻击造成超过 100 点溢出伤害（敌方 HP < 实际伤害×0.3） | 银 | — |
@@ -102,7 +102,7 @@ Achievement {
 | `ach_first_tribulation` | 天劫降临 | 首次完成渡劫突破 | 铜 | — |
 | `ach_transcend_tribulation` | 越阶渡劫 | 在修为未满 80% 时成功渡劫（境界压制下获胜） | 金 | ✅ |
 | `ach_tribulation_no_hp_loss` | 天劫无伤 | 渡劫战中 HP 从未低于 50% | 银 | — |
-| `ach_cultivation_overflow` | 修为如海 | 单局游戏中修为溢出转化为属性丹 ≥5 次 | 银 | — |
+| `ach_cultivation_overflow` | 修为如海 | 跨局累计修为溢出转化为属性丹 ≥10 次 | 银 | — |
 | `ach_action_points_max` | 行遍天下 | 单局游戏中行动力上限达到最大值（化神期=13） | 铜 | — |
 | `ach_reincarnation_10` | 轮回百转 | 累计轮回 10 次（即完成 10 局游戏） | 银 | — |
 
@@ -116,7 +116,7 @@ Achievement {
 | `ach_cards_all` | 仙途问道 | 全局图鉴中收录全部 222 张卡牌 | 金 | — |
 | `ach_first_dark_gold` | 暗金初现 | 首次获得暗金品质卡牌 | 银 | — |
 | `ach_dark_gold_5` | 五行暗金 | 全局图鉴中拥有 5 张不同暗金卡牌 | 金 | — |
-| `ach_ling_shi_10000` | 富甲一方 | 单局游戏中灵石持有量达到 10000 | 银 | — |
+| `ach_ling_shi_10000` | 富甲一方 | 单局游戏中灵石累计消费 ≥5000 | 银 | — |
 | `ach_alchemy_50` | 丹道宗师 | 累计完成 50 次炼丹（跨局累计） | 银 | — |
 | `ach_craft_50` | 炼器宗师 | 累计完成 50 次炼器（跨局累计） | 银 | — |
 | `ach_inscription_20` | 铭文大师 | 累计完成 20 次法宝铭刻（跨局累计） | 银 | — |
@@ -145,7 +145,7 @@ Achievement {
 | `ach_ending_guardian` | 归墟守护 | 解锁「留在归墟」结局线（任意变体） | 银 | — |
 | `ach_ending_return` | 归乡之人 | 解锁「归隐东域」结局线（任意变体） | 银 | — |
 | `ach_all_endings` | 超凡入圣 | 解锁全部 6 个结局 | 金 | — |
-| `ach_story_flag_30` | 因果交织 | 单局游戏中收集 30 个 story_flag（全收集） | 银 | ✅ |
+| `ach_story_flag_30` | 因果交织 | 跨局累计收集 25 个不同 story_flag | 金 | ✅ |
 
 ##### 3.6 精通成就 (Mastery) —— 8 个
 
@@ -153,23 +153,23 @@ Achievement {
 |----|------|------|:------:|:----:|
 | `ach_school_win_zhengdao` | 正道砥柱 | 使用正道发育流通关（主力卡组中正道阵营卡≥60%） | 银 | — |
 | `ach_school_win_modao` | 魔道至尊 | 使用魔道快攻流通关（主力卡组中魔道阵营卡≥60%） | 银 | — |
-| `ach_school_win_hybrid` | 正邪兼修 | 使用正邪混合流通关（正道+魔道阵营卡各≥25%） | 银 | — |
+| `ach_school_win_hybrid` | 正邪兼修 | 使用正邪混合流通关（由流派系统的正邪混合流判定决定，不自行计算流派比例） | 银 | — |
 | `ach_school_win_spirit` | 真灵之主 | 使用归墟真灵流通关（主力卡组中归墟阵营卡≥60%） | 银 | — |
 | `ach_school_win_alchemy` | 百艺宗师 | 使用百艺炼丹流通关（本局完成≥5次炼丹/炼器操作+丹药/法宝卡≥30%） | 银 | — |
 | `ach_all_schools` | 万法归宗 | 全部 5 种流派各通关 1 次 | 金 | — |
 | `ach_identity_win_3` | 三生万物 | 使用 3 种不同开局身份各通关 1 次 | 银 | — |
-| `ach_deck_minimal` | 极简之道 | 使用不超过 20 张卡牌的卡组通关（不含角色卡） | 金 | ✅ |
+| `ach_deck_minimal` | 极简之道 | 使用不超过 25 张卡牌的卡组通关（不含角色卡） | 金 | ✅ |
 
 ##### 3.7 挑战成就 (Challenge) —— 6 个
 
 | ID | 名称 | 条件 | 稀有度 | 隐藏 |
 |----|------|------|:------:|:----:|
-| `ach_speed_run` | 元婴速通 | 在 2 小时内通关（现实时间） | 金 | ✅ |
-| `ach_no_talent_win` | 凡人之躯 | 不激活任何轮回天赋的情况下通关 | 金 | ✅ |
+| `ach_speed_run` | 元婴速通 | 在 2 小时内通关（游戏内计时，不含暂停/菜单/加载时间） | 金 | — |
+| `ach_no_talent_win` | 凡人之躯 | 不激活任何轮回天赋的情况下通关 | 金 | — |
 | `ach_no_shop` | 自给自足 | 一局游戏中从未在商店购买任何物品 | 银 | ✅ |
 | `ach_no_death` | 不死不灭 | 一局游戏中角色从未阵亡（所有角色从开局存活到通关） | 金 | — |
 | `ach_realm_1_boss` | 以凡弑仙 | 以炼气期击败第 1 章的章末 BOSS（墨渊·夺舍形态）——即不修炼到筑基直接挑战 | 金 | ✅ |
-| `ach_win_rate_100` | 百战百胜 | 通关的一局中胜率 100%（所有战斗均胜利，无逃跑/撤退/战败后读档） | 金 | — |
+| `ach_win_rate_100` | 百战百胜 | 通关的一局中胜率 100%（所有可避免的战斗均胜利，无逃跑/撤退/战败后读档；剧情强制事件如第2章正魔大战·剧情杀不计入战败统计） | 金 | — |
 
 #### 4. 成就触发机制
 
@@ -189,6 +189,7 @@ func _ready():
   GSM.connect("chapter_completed", _on_chapter_completed)
   GSM.connect("ending_unlocked", _on_ending_unlocked)
   GSM.connect("map_cleared", _on_map_cleared)
+  GSM.connect("node_visited", _on_node_visited)
   GSM.connect("event_triggered", _on_event_triggered)
   GSM.connect("craft_completed", _on_craft_completed)
   GSM.connect("alchemy_completed", _on_alchemy_completed)
@@ -196,7 +197,8 @@ func _ready():
   GSM.connect("ling_shi_changed", _on_ling_shi_changed)
   GSM.connect("cultivation_changed", _on_cultivation_changed)
   GSM.connect("formation_triggered", _on_formation_triggered)
-  # ... 等其他信号
+  GSM.connect("battle_ended", _on_battle_ended)
+  GSM.connect("status_applied", _on_status_applied)
 ```
 
 ##### 4.2 条件评估器
@@ -398,7 +400,8 @@ func sync_steam_achievement(ach_id: String):
 |------|----------------------|---------------------|
 | **游戏状态管理器** | 写入 `progression.achievements`（解锁状态+进度） | GSM 信号总线（15+ 信号订阅）；读取 `progression` 域 |
 | **存档系统** | 成就数据作为 progression.dat 的一部分持久化 | progression.dat 的读写接口 |
-| **战斗系统** | — | `boss_defeated`、`elite_defeated`、`battle_ended`（含 no_damage、one_turn_kill 等元数据） |
+| **战斗系统** | — | `boss_defeated`、`elite_defeated`、`battle_ended` 信号（含战斗元数据：no_damage、one_turn_kill 等） |
+| **状态效果系统** | — | `status_applied` 信号（用于检测敌人身上异常状态数量） |
 | **境界系统** | — | `realm_upgraded` 信号 |
 | **渡劫突破系统** | — | `tribulation_completed` 信号（含是否越阶、HP 状态） |
 | **卡牌系统** | — | `card_obtained` 信号（含稀有度）；全局图鉴查询接口 |
@@ -421,25 +424,17 @@ func sync_steam_achievement(ach_id: String):
 
 ## 公式
 
-### 1. 成就稀有度分配
+### 1. 成就稀有度分配原则
 
-```
-assign_tier(achievement) → Tier:
-  难度分数 = 0
-  
-  if 涉及跨局累计且阈值 >= 100: 难度分数 += 2
-  if 涉及通关: 难度分数 += 1
-  if 涉及限制条件（无伤/速通/禁用天赋）: 难度分数 += 2
-  if 需要特定构筑或身份: 难度分数 += 1
-  
-  match 难度分数:
-    0 → bronze   # 首次完成某操作、低阈值累计
-    1,2 → silver # 中等难度累计、通关相关
-    3+ → gold     # 高阈值累计、限制条件、全收集
-  
-  # 隐藏标记独立于稀有度——任何稀有度的成就都可以是隐藏的
-  if 设计意图是「惊喜发现」而非「目标追求」: hidden = true
-```
+成就稀有度采用**手工标注**（非算法生成），基于以下设计原则综合判断：
+
+| 稀有度 | 设计原则 | 典型条件 |
+|--------|---------|---------|
+| **铜 (bronze)** | 自然获取——首次完成某操作或低门槛里程碑 | 首次击杀精英/BOSS、首次渡劫、首次触发阵法 |
+| **银 (silver)** | 中等投入——需要跨局累计或一定技巧 | 累计50次操作、收集50-100张卡牌、通关特定章节 |
+| **金 (gold)** | 高投入——需要全收集、极限限制条件或深度掌握 | 全结局、全流派、速通、无伤、禁用天赋 |
+
+隐藏标记独立于稀有度——任何稀有度的成就都可以是隐藏的。隐藏成就适用于「惊喜发现」场景（如 `ach_status_stack_5`、`ach_secret_room`），而非「有志挑战」场景（如速通、禁用天赋——这些应收为可见以激励尝试）。
 
 ### 2. 成就点数计算
 
@@ -452,12 +447,12 @@ calculate_points(tier, is_hidden) → int:
 
 | 稀有度 | 基础点数 | 隐藏加成 | 最高点数 | 成就数量 |
 |--------|:------:|:------:|:------:|:------:|
-| 铜 (bronze) | 5 | +10 | 15 | ~12 |
-| 银 (silver) | 15 | +10 | 25 | ~30 |
-| 金 (gold) | 30 | +10 | 40 | ~20 |
+| 铜 (bronze) | 5 | +10 | 15 | 11 |
+| 银 (silver) | 15 | +10 | 25 | 32 |
+| 金 (gold) | 30 | +10 | 40 | 19 |
 | **总计** | — | — | — | **62** |
 
-预计成就总点数：12×5 + 30×15 + 20×30 + (隐藏加成 9×10) = 60 + 450 + 600 + 90 = **~1,200 点**
+预计成就总点数：11×5 + 32×15 + 19×30 + (隐藏加成 12×10) = 55 + 480 + 570 + 120 = **1,230 点**
 
 ### 3. 成就完成度
 
@@ -504,10 +499,12 @@ update_progress(ach_id, event_data):
 - **同一成就同时被多个信号触发（竞态）**：成就解锁加锁（`unlock_in_progress` 标志位），防止重复解锁。第一次 unlock_achievement() 写入后，后续同一成就的触发被锁拦截
 - **满成就玩家在新版本新增成就后**：新增成就自动加入成就列表，未解锁状态。已解锁成就不受影响。总成就数从 62 变为 62+N
 - **成就中的「通关」定义**：以 `game_victory` 信号为准（即结局展示完成并进入轮回结算），而非第 5 章 BOSS 击败瞬间
-- **「无伤击败 BOSS」如何判定**：战斗中 `player.total_hp_lost == 0`（全局 HP 未减少，不是每个角色未受伤——角色可以在战斗中受伤只要被治疗回满，总 HP 损失仍为 0）。但如果角色阵亡过（即使被复活），`total_hp_lost` 非 0
+- **「无伤击败 BOSS」如何判定**：战斗中 `player.total_hp_lost == 0`（全局 HP 净损失为 0——角色可以在战斗中受伤只要被治疗回满，净 HP 损失仍为 0。这与成就名称「枯木逢春」一致——象征恢复力而非完美无伤）。但如果角色阵亡过（即使被复活），`total_hp_lost` 非 0
 - **「一回合击杀 BOSS」判定**：从战斗开始到 BOSS HP 归零，`turn_count == 1`。如果 BOSS 有多阶段（形态切换），只要所有阶段在同一回合内完成即可
 - **「使用 X 流派通关」的卡组判定**：`主力卡组中该流派卡牌数量 / 总卡牌数量 ≥ 60%`（仅计功法/法宝/法术卡，不含角色卡）。判定时机：通关时检查最终卡组
 - **成就通知语言**：成就名称和描述使用当前语言设置。如果语言中途切换，已解锁成就的显示语言不回溯更新（保持解锁时的语言快照——简化实现）
+- **「百战百胜」成就与剧情强制事件**：第 2 章「正魔大战」剧情杀等标记为 `scripted_defeat=true` 的强制事件不计入战败统计。成就仅统计玩家可避免的战斗——剧情杀是叙事工具，非玩家失误
+- **灵石消费成就的累计范围**：`ach_ling_shi_10000` 统计单局中所有灵石支出（商店购买、删牌费用、炼丹炼器材料购买等）。饰品/消耗品直接购买亦计入
 
 ## 依赖关系
 
@@ -516,6 +513,7 @@ update_progress(ach_id, event_data):
 | **游戏状态管理器** | 硬依赖 | progression.achievements 域读写；GSM 信号总线订阅 |
 | **存档系统** | 硬依赖 | progression.dat 的持久化（成就数据在此文件中） |
 | **战斗系统** | 硬依赖 | 战斗相关信号（Boss/精英击杀、战斗结束元数据） |
+| **状态效果系统** | 硬依赖 | status_applied 信号（ach_status_stack_5 检测 5+ 异常状态） |
 | **境界系统** | 软依赖 | realm_upgraded 信号（成长成就） |
 | **渡劫突破系统** | 软依赖 | tribulation_completed 信号 |
 | **卡牌系统** | 硬依赖 | card_obtained 信号；全局图鉴查询（收集成就） |
@@ -535,8 +533,8 @@ update_progress(ach_id, event_data):
 | 参数 | 默认值 | 安全范围 | 过低影响 | 过高影响 |
 |------|:-----:|:--------:|---------|---------|
 | 成就总数 | 62 | 40~80 | 成就太少缺少收集动力 | 成就太多稀释价值感 |
-| 铜/银/金比例 | ~12/30/20 | 可调整 | 铜太多=初期满足感过高；金太多=缺乏挑战梯度 | — |
-| 隐藏成就数量 | 9 | 5~15 | 惊喜太少 | 太多「?? ?」让玩家困惑 |
+| 铜/银/金比例 | 11/32/19 | 可调整 | 铜太少=初期无成就感；金太多=缺乏挑战梯度 | — |
+| 隐藏成就数量 | 12 | 5~15 | 惊喜太少 | 太多「?? ?」让玩家困惑 |
 | 跨局累计成就数量 | ~25 | 15~35 | 单局没有积累感 | 累计太多=新玩家看不到进度 |
 | 成就通知持续时间 | 4s | 2~6s | 来不及看清内容 | 遮挡游戏太久 |
 | 战斗中通知延后 | true | — | — | — |
@@ -572,29 +570,35 @@ update_progress(ach_id, event_data):
 
 ## 验收标准
 
-- **GIVEN** 玩家首次突破到筑基期，**WHEN** 境界升级信号触发，**THEN** `ach_first_realm_break` 立即解锁并弹出通知
-- **GIVEN** 玩家在战斗中首次击杀精英敌人，**WHEN** 战斗结算完成，**THEN** `ach_first_elite_kill` 在战斗结算后弹出通知（非战斗中）
-- **GIVEN** 累计击杀精英敌人到达 50 个，**WHEN** `ach_elite_hunter` 的 progress.current 达到 50，**THEN** 成就解锁
-- **GIVEN** 累计击杀精英敌人从 50 继续累积，**WHEN** 达到 200，**THEN** `ach_elite_slayer` 解锁
+- **GIVEN** 玩家首次突破到筑基期，**WHEN** realm_upgraded 信号携带 new_realm="筑基期"，**THEN** `ach_first_realm_break` 标记为已解锁（unlocked_at 写入当前时间戳），通知加入弹出队列
+- **GIVEN** 玩家在战斗中首次击杀精英敌人，**WHEN** battle_ended 信号触发且本场累计 elite_kills >= 1（首次），**THEN** `ach_first_elite_kill` 解锁，通知延后到战斗结算完成后弹出
+- **GIVEN** 跨局精英敌人累计击杀数达到 50，**WHEN** 第 50 个精英击杀完成，**THEN** `ach_elite_hunter` 解锁
+- **GIVEN** 跨局精英敌人累计击杀数达到 200，**WHEN** 第 200 个精英击杀完成，**THEN** `ach_elite_slayer` 解锁
 - **GIVEN** 玩家首次获得暗金卡牌，**WHEN** card_obtained 信号携带 rarity=dark_gold，**THEN** `ach_first_dark_gold` 解锁
-- **GIVEN** 全局图鉴中拥有 5 张不同暗金卡牌，**WHEN** 第 5 张暗金卡入库，**THEN** `ach_dark_gold_5` 解锁
-- **GIVEN** 玩家首次通关第 5 章（game_victory 信号触发），**WHEN** 结局展示完成，**THEN** `ach_chapter_5_clear` 解锁
-- **GIVEN** 玩家已解锁 5 个结局，**WHEN** 第 6 个结局解锁（ending_unlocked 信号），**THEN** `ach_all_endings` 解锁
-- **GIVEN** 玩家使用魔道快攻流卡组（魔道阵营卡≥60%）通关，**WHEN** game_victory 触发+流派检测通过，**THEN** `ach_school_win_modao` 解锁
-- **GIVEN** 玩家全部 5 种流派各通关 1 次（跨局累计），**WHEN** 第 5 种流派的通关成就解锁，**THEN** `ach_all_schools` 解锁
-- **GIVEN** 玩家一局内灵石持有量达到 10000，**WHEN** ling_shi_changed 信号携带 current=10000+，**THEN** `ach_ling_shi_10000` 在当前局内解锁
-- **GIVEN** 玩家无伤击败章末 BOSS（total_hp_lost=0），**WHEN** boss_defeated 信号+战斗元数据确认无伤，**THEN** `ach_no_damage_boss` 解锁
-- **GIVEN** 玩家在 1 回合内击杀 BOSS（turn_count=1），**WHEN** boss_defeated 信号+战斗元数据确认，**THEN** `ach_one_turn_kill` 解锁
+- **GIVEN** 全局图鉴中拥有 5 张不同暗金卡牌，**WHEN** 不同暗金卡牌数从 4 变为 5，**THEN** `ach_dark_gold_5` 解锁
+- **GIVEN** 玩家首次通关第 5 章，**WHEN** game_victory 信号触发且 chapter_id="5" 且为首次通关，**THEN** `ach_chapter_5_clear` 解锁
+- **GIVEN** 玩家已解锁 5 个不同结局，**WHEN** ending_unlocked 信号触发后已解锁结局总数达到 6，**THEN** `ach_all_endings` 解锁
+- **GIVEN** 玩家使用魔道快攻流卡组通关，**WHEN** game_victory 触发且最终卡组中魔道阵营卡占比 ≥60%（仅计功法/法宝/法术卡），**THEN** `ach_school_win_modao` 解锁
+- **GIVEN** 玩家全部 5 种流派各通关 1 次（跨局累计），**WHEN** game_victory 触发后已解锁的流派通关成就集合包含全部 5 种流派 ID，**THEN** `ach_all_schools` 解锁
+- **GIVEN** 玩家一局内灵石累计消费达到 5000，**WHEN** ling_shi_spent 累计值 >= 5000，**THEN** `ach_ling_shi_10000` 在当前局内解锁
+- **GIVEN** 玩家无伤击败章末 BOSS（total_hp_lost=0），**WHEN** boss_defeated 信号触发且战斗元数据 total_hp_lost==0，**THEN** `ach_no_damage_boss` 解锁
+- **GIVEN** 玩家在 1 回合内击杀 BOSS，**WHEN** boss_defeated 信号触发且战斗元数据 turn_count==1，**THEN** `ach_one_turn_kill` 解锁
 - **GIVEN** 玩家同时触发 3 个成就，**WHEN** 通知依次弹出，**THEN** 3 个通知各间隔 0.5s 出现，不堆叠
-- **GIVEN** 战斗中满足成就条件，**WHEN** 战斗进行中，**THEN** 不弹出通知——延后到战斗结算完成后弹出
-- **GIVEN** 未解锁的隐藏成就，**WHEN** 在成就列表中查看，**THEN** 显示暗色剪影+「???」+（如有进度条则显示进度条但不显示目标名称）
+- **GIVEN** 战斗中满足成就条件，**WHEN** battle_in_progress 状态为 true，**THEN** 解锁通知加入 pending 队列（不在屏幕上渲染）；WHEN battle_ended 信号触发，**THEN** pending 队列释放并渲染通知
+- **GIVEN** 未解锁的隐藏成就，**WHEN** 在成就列表中查看，**THEN** 显示暗色剪影+「???」；隐藏成就的进度条亦隐藏（仅显示「?? ?」不显示数字），避免泄露累计型属性
 - **GIVEN** 玩家删除存档槽位，**WHEN** 检查成就列表，**THEN** 所有成就保持原状（成就数据在 progression.dat 中，不受存档删除影响）
-- **GIVEN** progression.dat 损坏且无备份，**WHEN** 启动游戏，**THEN** 成就数据归零（全部未解锁）——日志记录此事件
-- **GIVEN** 玩家查看成就列表，**WHEN** 查看分类标签「战斗」，**THEN** 仅显示战斗类别 12 个成就（已解锁置顶，按解锁日期倒序）
-- **GIVEN** 玩家以炼气期挑战并击败第 1 章 BOSS（realm_level=1 且 boss_defeated=墨渊），**WHEN** BOSS 死亡+境界条件满足，**THEN** `ach_realm_1_boss` 解锁
-- **GIVEN** 玩家禁用全部轮回天赋后通关，**WHEN** game_victory+已激活天赋列表为空，**THEN** `ach_no_talent_win` 解锁
-- **GIVEN** 玩家在 2 小时内通关（现实时间 playtime_seconds ≤ 7200），**WHEN** game_victory 触发，**THEN** `ach_speed_run` 解锁
-- **GIVEN** 成就总数 62，**WHEN** 检查稀有度分布，**THEN** 铜≈12、银≈30、金≈20（±2 可接受）
+- **GIVEN** progression.dat 损坏且无备份，**WHEN** 启动游戏，**THEN** achievements 域初始化为空（所有 62 个成就 status=locked, progress=0），并在 error.log 中记录 "ACHIEVEMENT_RESET" 事件
+- **GIVEN** 玩家查看成就列表，**WHEN** 选择 category="combat" 分类标签，**THEN** 仅显示 category="combat" 的成就（已解锁按 unlocked_at 倒序置顶，未解锁按 id 升序追加）
+- **GIVEN** 玩家以炼气期挑战并击败第 1 章 BOSS（realm_level=1），**WHEN** boss_defeated 信号触发且玩家 realm_level==1 且 boss 为第 1 章章末 BOSS，**THEN** `ach_realm_1_boss` 解锁
+- **GIVEN** 玩家当前轮回天赋激活数为 0，**WHEN** game_victory 触发，**THEN** `ach_no_talent_win` 解锁
+- **GIVEN** 本局累计游戏时间（playtime_seconds，不含暂停/菜单/加载时间）<= 7200，**WHEN** game_victory 触发，**THEN** `ach_speed_run` 解锁
+- **GIVEN** 玩家跨局累计收集 25 个不同 story_flag，**WHEN** story_flag_collected 触发后 unique_flag_count 达到 25，**THEN** `ach_story_flag_30` 解锁
+- **GIVEN** 玩家跨局累计修为溢出达到 10 次，**WHEN** cultivation_overflow 信号触发后 total_overflow_count 达到 10，**THEN** `ach_cultivation_overflow` 解锁
+- **GIVEN** 已解锁 `ach_first_elite_kill` 且 `ach_elite_hunter` progress=23，**WHEN** 重启游戏，**THEN** `ach_first_elite_kill` 保持已解锁状态 AND `ach_elite_hunter` progress=23
+- **GIVEN** 6 个成就同时解锁，**WHEN** 通知队列处理，**THEN** 前 5 个依次弹出 AND 第 6 个触发合并通知「+1 个成就」（合并通知可点击展开查看完整列表）
+- **GIVEN** 单局成就 `ach_ling_shi_10000` 在第 N 局灵石消费达到 4000（未达 5000），**WHEN** 开始第 N+1 局新游戏，**THEN** `ach_ling_shi_10000` 的单局进度重置为 0（跨局累计成就的 progress 保持不变）
+- **GIVEN** v1.0 中玩家已解锁 32/62 成就，**WHEN** 升级到 v1.1（新增 3 个成就），**THEN** 成就列表显示 32/65，新增成就均为未解锁状态
+- **GIVEN** 成就系统初始化完成，**WHEN** 统计 ACHIEVEMENTS 注册表，**THEN** 注册表包含恰好 62 个条目；铜色 tier_count=11，银色 tier_count=32，金色 tier_count=19
 
 ## 待解决问题
 
