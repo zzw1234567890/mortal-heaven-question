@@ -1,4 +1,4 @@
-# ADR-0006：场景管理器 — 唯一场景转换仲裁者 + 5 阶段管线
+# ADR-0005：场景管理器 — 唯一场景转换仲裁者 + 5 阶段管线
 
 ## 状态
 Proposed
@@ -21,7 +21,7 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——`session.current_scene` 写入 + `scene_changed` 信号发射）、ADR-0005（InputManager——`push_lock(TRANSITION)` / `pop_lock(TRANSITION)` / `clear_locks()`）、ADR-0003（SaveLoad——转场前 `auto_save()` 触发；存档 `meta` 容器需新增 `current_scene` + `current_scene_id` 字段以支持读档恢复） |
+| **依赖** | ADR-0001（GSM——`session.current_scene` 写入 + `scene_changed` 信号发射）、ADR-0004（InputManager——`push_lock(TRANSITION)` / `pop_lock(TRANSITION)` / `clear_locks()`）、ADR-0002（SaveLoad——转场前 `auto_save()` 触发；存档 `meta` 容器需新增 `current_scene` + `current_scene_id` 字段以支持读档恢复） |
 | **启用** | 所有场景依赖转换的系统（战斗系统→场景加载、探索系统→主菜单返回、存档/读档→场景恢复） |
 | **阻塞** | 战斗 Epic（战斗场景的加载和退出）、探索 Epic（探索场景与主菜单/事件场景之间的导航）、叙事 Epic（剧情/对话场景切换）、读档 Epic（读档后场景恢复） |
 | **排序说明** | Foundation 层第 5 个 ADR（architecture.md §必需的 ADR #5）。Autoload 初始化顺序 #3：`GSM → InputManager → **SceneManager** → SaveLoad → EventSystem`。SceneManager 在 InputManager 之后初始化——转场锁依赖 InputManager。在 SaveLoad 之前初始化——读档恢复依赖 SceneManager 的场景跳转能力 |
@@ -42,8 +42,8 @@ Proposed
 ### 约束
 
 - 必须作为 Godot Autoload 运行——在任何场景加载之前存在且在场景变更后留存
-- 必须与 InputManager（ADR-0005）协作——转场期间锁全部输入，新场景就绪后解锁
-- 必须与 SaveLoad（ADR-0003）协作——转场前触发自动存档
+- 必须与 InputManager（ADR-0004）协作——转场期间锁全部输入，新场景就绪后解锁
+- 必须与 SaveLoad（ADR-0002）协作——转场前触发自动存档
 - 必须与 GSM（ADR-0001）协作——通过 GSM 写入 `current_scene` 并发射 `scene_changed` 信号
 - Godot 的 `change_scene_to_file()` 是异步的——调用立即返回，新场景在下一帧才就绪。SceneManager 必须追踪"转场进行中"状态
 - 加载画面必须是独立场景（防止旧场景状态泄漏到新场景）
@@ -271,7 +271,7 @@ InputManager.pop_lock(&"scene_manager")
   # 新场景就绪后恢复输入
 
 # SceneManager 不直接调用 clear_locks()——
-# InputManager 独立通过 tree_changed 信号自动清理（ADR-0005）
+# InputManager 独立通过 tree_changed 信号自动清理（ADR-0004）
 # SceneManager 的转换锁推入和弹出遵循正常的 push/pop 生命周期
 
 ## 约束和禁止
@@ -334,7 +334,7 @@ InputManager.pop_lock(&"scene_manager")
 
 - **加载画面场景加载失败**：如果 `loading_screen.tscn` 损坏或缺失，`change_scene_to_file()` 报错，`_transitioning` 保持 `true`——永久死锁。缓解措施：`change_scene_to_file()` 返回错误时 `_transitioning = false` 并强制 `pop_lock(&"scene_manager")`——恢复到当前场景的可用状态
 - **`await` 中断导致锁泄漏**：如果 Phase 3 的 `await tree_changed` 在加载画面场景切到目标场景之间被异常中断（Godot 内部错误），`pop_lock` 不会执行。缓解措施：Phase 3 用标志位 `_phase3_in_progress` + `tree_changed` 双重保底。Phase 4 检测到 `tree_changed` 但 `_phase3_in_progress` 仍为 true 时执行清理
-- **读档恢复时场景定位**：ADR-0001 的 `GSM.serialize()` 排除 `session` 域——`current_scene` 不在存档的 `game_state` 中。解决方案：存档系统在 `meta` 容器中存储 `current_scene`（字符串路径）和 `current_scene_id`（int 枚举值）——由 ADR-0003 的存档容器格式承接。读档流程：主菜单 → `SaveLoad.load()` → 从 `meta` 提取 `current_scene_id` → `SceneManager.request_scene_change(MAIN_MENU, meta.current_scene_id, GAME_TO_MENU)`。路径无法解析时回退到 `MAIN_MENU`。此字段不属于 `game_state` 的一部分（不和游戏逻辑状态一同序列化），而是存档元信息——与 ADR-0001 的"session 域不持久化"原则一致
+- **读档恢复时场景定位**：ADR-0001 的 `GSM.serialize()` 排除 `session` 域——`current_scene` 不在存档的 `game_state` 中。解决方案：存档系统在 `meta` 容器中存储 `current_scene`（字符串路径）和 `current_scene_id`（int 枚举值）——由 ADR-0002 的存档容器格式承接。读档流程：主菜单 → `SaveLoad.load()` → 从 `meta` 提取 `current_scene_id` → `SceneManager.request_scene_change(MAIN_MENU, meta.current_scene_id, GAME_TO_MENU)`。路径无法解析时回退到 `MAIN_MENU`。此字段不属于 `game_state` 的一部分（不和游戏逻辑状态一同序列化），而是存档元信息——与 ADR-0001 的"session 域不持久化"原则一致
 - **D3D12 渲染器白闪/黑闪**：Godot 4.6 在 Windows 上默认使用 D3D12 渲染器。`change_scene_to_file()` 释放旧场景并实例化新场景时，D3D12 需要刷新并重新分配渲染目标——可能产生单帧白闪或黑闪，破坏平滑转场体验。缓解措施：loading_screen.tscn 的根节点必须为全屏 `ColorRect`（纯黑色或深色），确保渲染器级闪烁被遮挡。目标场景的第一个 Control 节点应在 `_ready()` 中以全屏不透明 ColorRect 开始，然后在 `_process()` 首帧淡出——双重保护
 
 ## 解决的 GDD 需求
@@ -377,6 +377,6 @@ InputManager.pop_lock(&"scene_manager")
 ## 相关决策
 
 - ADR-0001（游戏状态管理器——`session.current_scene` 域 + `scene_changed` 信号）
-- ADR-0005（输入管理器——`push_lock(TRANSITION)` / `pop_lock()` / `tree_changed` 自动清理）
-- ADR-0003（存档/读档——`auto_save()` 在 Phase 2 触发；读档恢复通过 SceneManager 跳转场景）
-- ADR-0004（事件系统——事件触发战斗/商店等场景转换时通过 SceneManager 请求）
+- ADR-0004（输入管理器——`push_lock(TRANSITION)` / `pop_lock()` / `tree_changed` 自动清理）
+- ADR-0002（存档/读档——`auto_save()` 在 Phase 2 触发；读档恢复通过 SceneManager 跳转场景）
+- ADR-0003（事件系统——事件触发战斗/商店等场景转换时通过 SceneManager 请求）

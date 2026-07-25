@@ -1,4 +1,4 @@
-# ADR-0004：事件系统 — story_flags 唯一写入者 + Resource 模板 + 信号委托
+# ADR-0003：事件系统 — story_flags 唯一写入者 + Resource 模板 + 信号委托
 
 ## 状态
 Proposed
@@ -21,8 +21,8 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——`narrative.*` 域包含 `story_flags`；需新增第二层原子方法 `set_narrative_flag(flag, value) → void` 供 EventSystem 调用；条件判定通过 GSM 第一层 `player.*` / `collection.*` 读取；结果执行通过 GSM 第二层 `add_resource()`、`add_cultivation()` 等原子方法）；ADR-0002（卡牌系统——`ADD_CARD` 结果通过信号委托给 CardSystem，由 CardSystem 执行 `create_instance()` + `serialize_instance()` + `GSM.add_card_to_collection()` 完整流程。委托信号：`card_reward_requested(template_id: StringName)`）；ADR-0003（存档/读档——`story_flags` 作为 `narrative.*` 域的一部分随存档持久化；`set_narrative_flag()` 发射信号后 SaveLoadSystem 判定是否需要自动存档） |
-| **关联的 ADR** | ADR-0006（探索系统——探索节点类型→事件模板 ID 分配；事件触发时机由探索系统管理）；ADR-0007（战斗系统——`trigger_battle` Outcome → 加载战斗场景）；ADR-0008（卡牌效果引擎——`SET_FLAG` 效果类型委托 EventSystem.set_flag()，参见下文「Outcome 类型词汇表权威来源」） |
+| **依赖** | ADR-0001（GSM——`narrative.*` 域包含 `story_flags`；需新增第二层原子方法 `set_narrative_flag(flag, value) → void` 供 EventSystem 调用；条件判定通过 GSM 第一层 `player.*` / `collection.*` 读取；结果执行通过 GSM 第二层 `add_resource()`、`add_cultivation()` 等原子方法）；ADR-0006（卡牌系统——`ADD_CARD` 结果通过信号委托给 CardSystem，由 CardSystem 执行 `create_instance()` + `serialize_instance()` + `GSM.add_card_to_collection()` 完整流程。委托信号：`card_reward_requested(template_id: StringName)`）；ADR-0002（存档/读档——`story_flags` 作为 `narrative.*` 域的一部分随存档持久化；`set_narrative_flag()` 发射信号后 SaveLoadSystem 判定是否需要自动存档） |
+| **关联的 ADR** | ADR-0014（探索系统——探索节点类型→事件模板 ID 分配；事件触发时机由探索系统管理）；ADR-0008（战斗系统——`trigger_battle` Outcome → 加载战斗场景）；ADR-0009（卡牌效果引擎——`SET_FLAG` 效果类型委托 EventSystem.set_flag()，参见下文「Outcome 类型词汇表权威来源」） |
 | **阻塞** | 探索 Epic（事件节点在地图上的分配和触发需要事件系统 API）、叙事 Epic（剧情系统/对话系统/结局系统均依赖 story_flags 的读写契约）、卡牌效果 Epic（效果引擎的 `SET_FLAG` 效果类型需委托 EventSystem 写入） |
 | **排序说明** | Foundation 层第 5 个 ADR（最后一个 Foundation 层 ADR）。Autoload 初始化顺序 #5：`GSM → InputManager → SceneManager → SaveLoad → EventSystem`。EventSystem 在 GSM 和 SaveLoad 就绪后才可实用——GSM 提供条件读取 + 结果写入，SaveLoad 提供 story_flags 持久化。**Foundation 层原则 #3 合规**：EventSystem 不直接依赖任何 Core/Feature 层系统（CardSystem 委托通过信号解耦——见下文 §ADD_CARD 信号委托） |
 
@@ -36,7 +36,7 @@ Proposed
 
 1. **story_flags 写入权**：`architecture.md` §事件系统 已确立 EventSystem 是 `story_flags` 的**唯一运行时写入者**——剧情系统、对话系统和卡牌效果引擎通过委托写入。这需要在 ADR-0001 中新增专门的 GSM 第二层原子方法 `set_narrative_flag()`，而非使用通用的 `GSM.set()`（通用 set 违反 ADR-0001 的禁止模式）。
 
-2. **Foundation 层原则 #3 合规——ADD_CARD 执行路径**：EventSystem 是 Foundation 层 Autoload（#5），CardSystem 是 Core 层 Autoload。ADD_CARD 结果需要 `CardSystem.create_instance()` + `serialize_instance()` 才能正确调用 `GSM.add_card_to_collection()`（ADR-0002 模型 A 契约）。如果 EventSystem 直接调用 CardSystem，则违反"Foundation 层不依赖任何游戏系统"的原则。
+2. **Foundation 层原则 #3 合规——ADD_CARD 执行路径**：EventSystem 是 Foundation 层 Autoload（#5），CardSystem 是 Core 层 Autoload。ADD_CARD 结果需要 `CardSystem.create_instance()` + `serialize_instance()` 才能正确调用 `GSM.add_card_to_collection()`（ADR-0006 模型 A 契约）。如果 EventSystem 直接调用 CardSystem，则违反"Foundation 层不依赖任何游戏系统"的原则。
 
 3. **事件模板的数据格式与 Inspector 编辑体验**：模板包含条件表达式和结果列表——需要类型安全的数据结构。Godot Resource（`.tres`）提供 Inspector 可视化编辑和 `enum` 下拉菜单，但 `Variant` 类型的 `@export` 字段在 Inspector 中无法编辑——需要替代方案。
 
@@ -209,7 +209,7 @@ class_name EventTemplate extends Resource
 
 ```gdscript
 ## 运行时事件实例——结算后销毁
-## ⚠️ 不持有 Resource 引用（避免与 ADR-0002 相同的共享 Resource 陷阱）
+## ⚠️ 不持有 Resource 引用（避免与 ADR-0006 相同的共享 Resource 陷阱）
 ## 仅存储 template_id + 选项索引列表
 class_name EventInstance extends RefCounted
 var template_id: StringName
@@ -287,7 +287,7 @@ func apply_outcomes(instance: EventInstance) -> void:
                 # ⚠️ 信号委托——不直接调用 CardSystem（Foundation 原则 #3）
                 card_reward_requested.emit(oc["target"])        # emit template_id
             OutcomeType.REMOVE_CARD:
-                GSM.remove_card_from_collection(oc["value"])    # ADR-0002
+                GSM.remove_card_from_collection(oc["value"])    # ADR-0006
             OutcomeType.SET_FLAG:
                 set_flag(oc["target"], oc["value_str"])         # 内部→GSM 第二层
             OutcomeType.RESTORE_AP:
@@ -362,13 +362,13 @@ EventSystem.apply_outcomes() 检测到 OutcomeType.ADD_CARD
 CardSystem._on_card_reward_requested(template_id: StringName)
   ├→ inst = create_instance(template_id)    # 分配 GSM 卡牌 ID
   ├→ dict = serialize_instance(inst)        # 转为序列化字典
-  └→ GSM.add_card_to_collection(dict)       # 写入 GSM（ADR-0002 模型 A）
+  └→ GSM.add_card_to_collection(dict)       # 写入 GSM（ADR-0006 模型 A）
        └→ GSM 发射 card_collection_changed → UI 刷新
 ```
 
 **信号委托的边界条件：**
 - CardSystem 未初始化（模板未加载完成）→ `card_reward_requested` 信号无人监听 → 卡牌静默丢失。缓解：CardSystem 在 `_ready()` 中连接信号时检查其 `templates_loaded` 标志。EventSystem 在事件触发前检查 `CardSystem.templates_loaded`。
-- 模板 ID 无效 → `create_instance()` 中 `assert(template_id in templates)` 触发（ADR-0002 契约）→ 开发构建中崩溃，发布构建中记录错误
+- 模板 ID 无效 → `create_instance()` 中 `assert(template_id in templates)` 触发（ADR-0006 契约）→ 开发构建中崩溃，发布构建中记录错误
 
 #### GSM 第二层新增方法（需在 ADR-0001 中补充）
 
@@ -520,7 +520,7 @@ func _check_chain_cycle(instance: EventInstance, next_id: StringName) -> bool:
 - **Inspector 可编辑**：所有 `@export` 字段使用 Inspector 原生支持的类型（enum/String/int/float/bool）——不使用 `Variant`
 - **min/max 无歧义**：`use_range: bool` 显式标志区分"精确值"和"随机范围"——0 值不再引起歧义
 - **story_flags 写入路径合规**：通过新增 GSM 第二层方法 `set_narrative_flag()`——不违反 ADR-0001 的禁止模式（通用 `set()`）
-- **Resource 共享安全**：EventInstance 不持有 Resource 引用——仅存储 template_id 和选项索引。与 ADR-0002 的 Template/Instance 分离模式一致
+- **Resource 共享安全**：EventInstance 不持有 Resource 引用——仅存储 template_id 和选项索引。与 ADR-0006 的 Template/Instance 分离模式一致
 - **信号契约完整**：7 个公开信号覆盖所有事件生命周期——SaveLoad 通过 `event_resolved` 判定自动存档，探索系统通过 `chain_ended` 恢复控制
 - **Outcome 枚举为权威来源**：为 ADR-0009（卡牌效果引擎）提供统一的 12 种类型词汇表（OQ-05 解决方案）
 - **连锁安全**：MAX_CHAIN_DEPTH=3 硬限制 + visited_ids 循环检测 + 非静默日志
@@ -530,7 +530,7 @@ func _check_chain_cycle(instance: EventInstance, next_id: StringName) -> bool:
 - **`.tres` 文件碎片化**：60-100 个单独文件 vs 单个 JSON——Git 管理略显不便
 - **`String` 值运行时解析**：`value_str` 和 `value_int` 的正确使用依赖策划在 Inspector 中填入正确的字段——填错字段（如在 ADD_CULTIVATION 的 value_str 填数字）不会在编辑时被检测
 - **嵌套 Resource 编辑体验**：4 层嵌套（Template→Option→Condition/Outcome）在 Inspector 中可能需要大量滚动（缓解：`@export_group` 组织字段）
-- **需同步更新 ADR-0001**：新增 `set_narrative_flag()` 方法——在接受 ADR-0004 之前必须补充到 ADR-0001 的第二层 API
+- **需同步更新 ADR-0001**：新增 `set_narrative_flag()` 方法——在接受 ADR-0003 之前必须补充到 ADR-0001 的第二层 API
 
 ### 风险
 - **`card_reward_requested` 信号无人监听**：CardSystem 未连接信号 → 卡牌奖励静默丢失。缓解：EventSystem 在 `trigger_event()` 前检查 `CardSystem.templates_loaded`——如果模板未加载完成则拒绝触发含 ADD_CARD 的事件。CardSystem 在其 `_ready()` 中连接 `card_reward_requested`
@@ -608,8 +608,8 @@ assets/events/
 
 ## 相关决策
 - ADR-0001（GSM——需新增 `set_narrative_flag()`；条件判定通过第一层；结果执行通过第二层 `add_resource()`/`add_cultivation()`）
-- ADR-0002（卡牌数据模型——ADD_CARD 通过 `card_reward_requested` 信号委托给 CardSystem）
-- ADR-0003（存档/读档——story_flags 持久化；`event_resolved` 触发自动存档）
-- ADR-0006（探索系统——事件节点分配 + 调用 EventSystem.trigger_event()）
-- ADR-0007（战斗系统——trigger_battle Outcome 加载战斗场景）
-- ADR-0008（卡牌效果引擎——SET_FLAG 效果 → 委托 EventSystem.set_flag()；OutcomeType 枚举为共享词汇表权威来源）
+- ADR-0006（卡牌数据模型——ADD_CARD 通过 `card_reward_requested` 信号委托给 CardSystem）
+- ADR-0002（存档/读档——story_flags 持久化；`event_resolved` 触发自动存档）
+- ADR-0014（探索系统——事件节点分配 + 调用 EventSystem.trigger_event()）
+- ADR-0008（战斗系统——trigger_battle Outcome 加载战斗场景）
+- ADR-0009（卡牌效果引擎——SET_FLAG 效果 → 委托 EventSystem.set_flag()；OutcomeType 枚举为共享词汇表权威来源）

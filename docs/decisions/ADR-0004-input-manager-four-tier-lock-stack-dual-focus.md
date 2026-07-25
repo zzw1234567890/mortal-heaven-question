@@ -1,4 +1,4 @@
-# ADR-0005：输入管理器 — 四级锁栈 + 双焦点独立判定
+# ADR-0004：输入管理器 — 四级锁栈 + 双焦点独立判定
 
 ## 状态
 Proposed
@@ -270,7 +270,7 @@ func clear_locks(source: StringName = "") -> void:
 ## 内部——将锁栈写入 GSM session 域
 ## ⚠️ 类型细化说明：ADR-0001 声明 session.input_locks 为 Array[int]，
 ##    本 ADR 将其细化为 Array[Dictionary]——每个字典包含 {type, source, device_mask}。
-##    这是 ADR 之间正常的契约细化——ADR-0001 定义总体形状，ADR-0005 定义精确负载。
+##    这是 ADR 之间正常的契约细化——ADR-0001 定义总体形状，ADR-0004 定义精确负载。
 func _sync_to_gsm() -> void:
     var serialized: Array[Dictionary] = []
     for entry in _lock_stack:

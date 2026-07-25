@@ -2,18 +2,19 @@
 
 ## 文档状态
 
-- **版本 (Version)**：1.0
-- **最后更新 (Last Updated)**：2026-07-24
+- **版本 (Version)**：1.1
+- **最后更新 (Last Updated)**：2026-07-25
 - **引擎 (Engine)**：Godot 4.6
 - **覆盖的 GDD (GDDs Covered)**：36 个系统（见 design/gdd/systems-index.md）
-- **引用的 ADR (ADRs Referenced)**：尚无——所有 ADR 待创建（见 §Required ADRs）
-- **技术总监签署 (TD Sign-Off)**：2026-07-24 — APPROVED WITH CONDITIONS（5 个 CONCERNS 将在对应 ADR 中处理）
-- **主程序员可行性 (LP Feasibility)**：FEASIBLE with 5 CONCERNS（无 BLOCKING 项）
+- **引用的 ADR (ADRs Referenced)**：14 个（ADR-0001 至 ADR-0014，全部 Proposed）
+- **最近架构审查**：2026-07-25 — 裁决 CONCERNS（见 `docs/architecture/architecture-review-2026-07-25.md`）
+- **技术总监签署 (TD Sign-Off)**：2026-07-24 — APPROVED WITH CONDITIONS（5 个 CONCERNS 全部已通过对应 ADR 解决 ✅）
+- **主程序员可行性 (LP Feasibility)**：FEASIBLE — 所有 5 个 CONCERNS 已解决
   - C1：境界系统层归属 → 已通过 ADR-0010 迁移至 CORE 层 ✅
-  - C2：初始化序列与架构原则 #3 矛盾 → ADR Milestone 中解决
-  - C3：效果栈结算顺序未指定 → ADR-0009 中规定
-  - C4：信号粒度未定义 → ADR-0007 中规定
-  - C5：`Outcome` 类型可能重复 → 跨 ADR 统一
+  - C2：初始化序列与架构原则 #3 矛盾 → ADR-0007 信号委托 + ADR-0004 ADD_CARD 信号解耦 ✅
+  - C3：效果栈结算顺序未指定 → ADR-0009 ResolutionStack 5 级优先级 ✅
+  - C4：信号粒度未定义 → ADR-0007 三分类信号体系 ✅
+  - C5：`Outcome` 类型可能重复 → ADR-0009 扩展 ADR-0004 OutcomeType 枚举（非复制）✅
 
 ---
 
@@ -36,14 +37,14 @@
 │  PRESENTATION 层 (6 系统)              ⚠️ UI ×5 HIGH (4.6)   │
 │  战斗UI / 探索UI / 卡组编辑UI / HUD / 主菜单 / 音频          │
 ├──────────────────────────────────────────────────────────────┤
-│  FEATURE 层 (22 系统)                                        │
+│  FEATURE 层 (21 系统)                                        │
 │  战斗 / 卡牌效果引擎 / 上场阵位 / 绑定 / 阵法 / 阵营 /       │
-│  AI / 探索 / 修为养成 / 境界 / 渡劫 / 资源 / 卡组编辑 /      │
+│  AI / 探索 / 修为养成 / 渡劫 / 资源 / 卡组编辑 /              │
 │  炼丹 / 铭刻 / 开局身份 / 流派 / 轮回天赋 / 成就 /           │
 │  剧情 / 对话 / 结局分支                                      │
 ├──────────────────────────────────────────────────────────────┤
-│  CORE 层 (4 系统)                                            │
-│  卡牌系统 / 费用系统 / 行动力系统 / 状态效果系统              │
+│  CORE 层 (5 系统)                                            │
+│  卡牌系统 / 费用系统 / 行动力系统 / 状态效果系统 / 境界系统  │
 ├──────────────────────────────────────────────────────────────┤
 │  FOUNDATION 层 (6 系统)                                      │
 │  游戏状态管理器 / 存档读档 / 事件系统 /                       │
@@ -75,7 +76,8 @@
 | **卡牌系统** | `CardTemplate`、`CardInstance` 运行时集合 | `get_card(id)` / `get_collection()` | 游戏状态管理器 | `Resource` (模板)、`JSON` |
 | **费用系统** | 每回合费用值 | `get_current_cost()` / `spend(n)` / `reset_for_turn()` | 境界系统 | — |
 | **行动力系统** | `action_points` 值 | `get_ap()` / `spend_ap(n)` / `restore_ap(n)` | 游戏状态管理器、境界系统 | — |
-| **状态效果系统** | 所有 `StatusEffect` 实例 | `apply(config)` / `remove(id)` / `get_active(target)` / `tick_all()` | 卡牌效果引擎 | `Object` (实例管理) |
+| **境界系统** | `RealmTable` 属性表、压制系数、稀有度权重表 | `get_realm_property(level, key)` / `realm_penalty()` / `get_rarity_weights()` | GSM、战斗/上场/卡牌/卡组/探索/修为/渡劫/AI/UI 共 13+ 系统 | `Dictionary` (const 编译时常量) |
+| **状态效果系统** | 所有 `StatusEffect` 实例 | `apply_status()` / `remove_status()` / `get_active(target)` / `tick_all()` | 卡牌效果引擎 | `Object` (实例管理) |
 
 ### FEATURE 层
 
@@ -281,7 +283,7 @@ pop_lock(source: StringName)
   # 锁变更通过 GSM.set_input_locks() → batch_updated 信号传播
   # 取代原来的 input_lock_changed 专用信号
 
-输入分发路径（Godot 4.6 事件派发顺序):
+输入分发路径（Godot 4.6 事件派发顺序）:
   GAMEPLAY 键盘 → Input Map 动作轮询 (_process 中 is_action_just_pressed)
   UI_NAV 快捷键 → _input()（GUI 派发前拦截）
   鼠标交互      → _gui_input() / _input_event()
@@ -312,7 +314,9 @@ pop_lock(source: StringName)
 
 ## ADR 审计
 
-**现有 ADR**：无。所有 50 个技术需求 (TR) 无 ADR 覆盖——0 覆盖，50 缺口。
+**现有 ADR**：14 个（ADR-0001 至 ADR-0014）。覆盖 Foundation 层 5 个（GSM、存档、事件、输入、场景）、Core 层 4 个（卡牌、信号通信、境界、状态效果）、Feature 层 4 个（战斗、卡牌效果引擎、绑定、探索）、Meta 层 1 个（跨局元进度）。全部处于 **Proposed** 状态——Foundation 层 ADR 需推进到 Accepted 后方可进入实现阶段。
+
+完整覆盖矩阵见 `docs/architecture/architecture-review-2026-07-25.md`。
 
 ---
 
@@ -320,32 +324,34 @@ pop_lock(source: StringName)
 
 ### 编码前必须创建 (Foundation — BLOCKING)
 
-| # | ADR | 覆盖 TR | 引擎风险 |
-|---|-----|---------|---------|
-| 1 | 游戏状态管理器: Autoload 单例 + 三层 API | TR-gsm-001→003 | — |
-| 2 | 存档/读档: JSON 格式 + schema_version + 迁移链 | TR-save-001→003, TR-migrate-001,002 | MEDIUM (FileAccess) |
-| 3 | 事件系统: story_flags 唯一运行时写入者 | TR-event-001→003 | — |
-| 4 | 输入管理器: 四级锁栈 + 双焦点 | TR-input-001,002 | HIGH (4.6) |
-| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — |
-| 6 | 卡牌数据模型: Template/Instance 分离 | TR-card-001,002 | — |
-| 7 | 信号驱动通信: GSM 信号 vs 直接调用 | TR-gsm-002, TR-hud-001 (横切) | — |
+| # | ADR | 覆盖 TR | 引擎风险 | 状态 |
+|---|-----|---------|---------|------|
+| 1 | 游戏状态管理器: Autoload 单例 + 三层 API | TR-gsm-001→003 | — | ✅ Proposed |
+| 2 | 存档/读档: JSON 格式 + schema_version + 迁移链 | TR-save-001→003 | MEDIUM (FileAccess) | ✅ Proposed |
+| 3 | 事件系统: story_flags 唯一运行时写入者 | TR-event-001→003 | — | ✅ Proposed |
+| 4 | 输入管理器: 四级锁栈 + 双焦点 | TR-input-001,002 | HIGH (4.6) | ✅ Proposed |
+| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — | ✅ Proposed |
+| 6 | 卡牌数据模型: Template/Instance 分离 | TR-card-001,002 | HIGH (load_threaded) | ✅ Proposed |
+| 7 | 信号驱动通信: GSM 信号 vs 直接调用 | TR-signal-001,002 (横切) | — | ✅ Proposed |
 
 ### 在相关系统构建前应拥有
 
-| # | ADR | 覆盖 TR | 引擎风险 |
-|---|-----|---------|---------|
-| 8 | 战斗系统: 7 阶段状态机 + 阶段验证 | TR-combat-001→003 | — |
-| 9 | 卡牌效果引擎: 效果栈 + 递归上限 + PRD | TR-effect-001→003 | HIGH (4.5 GDScript) |
-| 10 | 境界系统: 属性表 + 原子变更 | TR-realm-001→003 | — |
-| 11 | 状态效果生命周期: 叠加 + 免疫 + 倒计时 | TR-status-001,002 | — |
+| # | ADR | 覆盖 TR | 引擎风险 | 状态 |
+|---|-----|---------|---------|------|
+| 8 | 战斗系统: 7 阶段状态机 + 阶段验证 | TR-combat-001→003 | — | ✅ Proposed |
+| 9 | 卡牌效果引擎: 效果栈 + 递归上限 + PRD | TR-effect-001→003 | HIGH (4.5 GDScript) | ✅ Proposed |
+| 10 | 境界系统: 属性表 + 原子变更 | TR-realm-001→003 | LOW | ✅ Proposed |
+| 11 | 状态效果生命周期: 叠加 + 免疫 + 倒计时 | TR-status-001,002 | LOW | ✅ Proposed |
 
 ### 可推迟到实现阶段
 
-| # | ADR | 覆盖 TR |
-|---|-----|---------|
-| 12 | 跨局元进度: progression.dat 独立存储 | TR-save-003, TR-reincarnate-002 |
-| 13 | 绑定系统: 角色阵亡=绑卡永久失去 | TR-bind-001 |
-| 14 | 探索系统: 随机种子地图生成 | TR-explore-001 |
+| # | ADR | 覆盖 TR | 状态 |
+|---|-----|---------|------|
+| 12 | 跨局元进度: progression.dat 独立存储 | TR-progression-001,002 | ✅ Proposed |
+| 13 | 绑定系统: 角色阵亡=绑卡洗回牌库 | TR-binding-001,002 | ✅ Proposed |
+| 14 | 探索系统: 随机种子地图生成 + DAG | TR-explore-001→003 | ✅ Proposed |
+
+### 仍需创建的 ADR（下一批优先级）
 
 ---
 
@@ -353,7 +359,7 @@ pop_lock(source: StringName)
 
 1. **GSM 是真理的单一来源**——所有游戏状态通过 GSM API 访问。没有系统持有一份拷贝。没有系统绕过 GSM 直接修改另一个系统的数据。
 
-   > **例外（ADR-0011）**：战斗中活跃状态实例由 StatusEffectSystem Autoload 内部管理（`_instances` / `_by_target` 注册表）——不通过 GSM 实时存储。原因：状态叠加/倒计时/免疫检查是战斗热路径（每帧 O(1) 查询需求 + RefCounted 对象引用而非序列化 Dictionary）。战斗结束时 StatusEffectSystem 通过 `serialize_all() → Array[Dictionary]` 导出状态快照至 GSM 用于存档。
+   > **例外（ADR-0011、ADR-0013）**：战斗中活跃状态实例由 StatusEffectSystem Autoload 内部管理（`_instances` / `_by_target` 注册表）——不通过 GSM 实时存储。战斗中绑定数据由 BindingManager Autoload 内部管理（`_bindings` / `_by_character` / `_card_to_character` 注册表）——不通过 GSM 实时存储。原因：状态叠加/倒计时/免疫检查和绑定槽位查找是战斗热路径（每帧 O(1) 查询需求 + RefCounted 对象引用而非序列化 Dictionary）。战斗结束时通过 `serialize_all() → Array[Dictionary]` 导出状态快照和绑定快照至 GSM 用于存档。
 
 2. **信号用于通知，不是用于逻辑**——信号是只读的 UI 刷新钩子。游戏逻辑通过原子 GSM 操作完成，在信号发出前数据已一致。
 

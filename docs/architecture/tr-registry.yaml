@@ -24,33 +24,292 @@
 #
 # STATUS VALUES: active | deprecated | superseded-by: TR-[system]-NNN
 
-version: 1
-last_updated: ""
+version: 2
+last_updated: "2026-07-25"
 
-requirements: []
+requirements:
+  # === Foundation Layer ===
 
-# --- EXAMPLE ENTRIES (remove when first real entries are added) ---
-#
-# - id: TR-combat-001
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Player takes damage from enemies based on attack power minus defence"
-#   created: 2026-03-10
-#   revised: ""
-#   status: active
-#
-# - id: TR-combat-002
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Combo window timing is 0.4 seconds between hits"
-#   created: 2026-03-10
-#   revised: "2026-04-01"
-#   status: active
-#
-# - id: TR-combat-003
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Old damage formula using raw stats"
-#   created: 2026-03-10
-#   revised: ""
-#   status: superseded-by: TR-combat-001
+  - id: TR-gsm-001
+    system: game-state-manager
+    gdd: design/gdd/game-state-manager.md
+    requirement: "GSM 为运行时单一数据源，通过 Autoload 常驻内存"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0001
+
+  - id: TR-gsm-002
+    system: game-state-manager
+    gdd: design/gdd/game-state-manager.md
+    requirement: "读写接口规范：通用 get(path)、批量设置、类型安全读取"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0001
+
+  - id: TR-gsm-003
+    system: game-state-manager
+    gdd: design/gdd/game-state-manager.md
+    requirement: "信号广播机制：13 个命名事件，同帧去重，batch_updated 用于批量变更"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0001
+
+  - id: TR-save-001
+    system: save-load
+    gdd: design/gdd/save-load-system.md
+    requirement: "4 种存档类型（自动/手动/快照/元进度）"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0003
+
+  - id: TR-save-002
+    system: save-load
+    gdd: design/gdd/save-load-system.md
+    requirement: "版本化存档格式：schema_version 驱动迁移链"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0003
+
+  - id: TR-save-003
+    system: save-load
+    gdd: design/gdd/save-load-system.md
+    requirement: "写入原子性：.tmp + rename 双写策略"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0003
+
+  - id: TR-event-001
+    system: event
+    gdd: design/gdd/event-system.md
+    requirement: "6 种事件类型 + 60-100 个事件模板的条件分支和结果数据"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0004
+
+  - id: TR-event-002
+    system: event
+    gdd: design/gdd/event-system.md
+    requirement: "story_flags 唯一运行时写入者 + 委托写入契约"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0004
+
+  - id: TR-event-003
+    system: event
+    gdd: design/gdd/event-system.md
+    requirement: "概率结果结算——chance + [min, max] 随机值范围"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0004
+
+  - id: TR-input-001
+    system: input
+    gdd: design/gdd/systems-mapping-2026-07-24.md
+    requirement: "输入锁的单一仲裁者；在投递前查询 GSM.session.input_locks"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0005
+
+  - id: TR-input-002
+    system: input
+    gdd: design/gdd/systems-mapping-2026-07-24.md
+    requirement: "四级锁栈 (dialogue=0, animation=1, modal=2, transition=3) + 4.6 双焦点独立判定"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0005
+
+  - id: TR-scene-001
+    system: scene
+    gdd: design/gdd/systems-mapping-2026-07-24.md
+    requirement: "场景转换编排者；场景树变更的唯一调用者"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0006
+
+  - id: TR-scene-002
+    system: scene
+    gdd: design/gdd/systems-mapping-2026-07-24.md
+    requirement: "5 阶段转换管线——转场前自动存档+锁定输入+加载画面+转场后信号+解锁"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0006
+
+  # === Core Layer ===
+
+  - id: TR-card-001
+    system: card
+    gdd: design/gdd/card-system.md
+    requirement: "卡牌数据模型——Template/Instance 分离的两层架构"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0002
+
+  - id: TR-card-002
+    system: card
+    gdd: design/gdd/card-system.md
+    requirement: "222 个模板文件的异步加载策略——防止启动卡顿"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0002
+
+  - id: TR-signal-001
+    system: signal-communication
+    gdd: design/gdd/game-state-manager.md
+    requirement: "统一的信号分类法——GSM 状态信号 vs 系统特定信号 vs Godot 内置信号"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0007
+
+  - id: TR-signal-002
+    system: signal-communication
+    gdd: design/gdd/game-state-manager.md
+    requirement: "信号 vs 直接调用的决策矩阵——信号用于通知，不是用于逻辑"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0007
+
+  - id: TR-realm-001
+    system: realm
+    gdd: design/gdd/realm-system.md
+    requirement: "5 级境界 × 15+ 项属性表——所有其他系统通过查询接口访问"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0010
+
+  - id: TR-realm-002
+    system: realm
+    gdd: design/gdd/realm-system.md
+    requirement: "境界压制规则——delta=1 压制 20%、delta>=2 压制 50%"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0010
+
+  - id: TR-realm-003
+    system: realm
+    gdd: design/gdd/realm-system.md
+    requirement: "境界提升流程——突破成功后 realm_up() 协调多方状态变更"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0010
+
+  - id: TR-status-001
+    system: status-effect
+    gdd: design/gdd/status-system.md
+    requirement: "状态效果生命周期——8 个阶段的施加/合并/跟踪/倒计时/触发/暂挂/恢复/移除管线"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0011
+
+  - id: TR-status-002
+    system: status-effect
+    gdd: design/gdd/status-system.md
+    requirement: "3 种叠加规则（独立/刷新/叠加上限）+ 免疫多级检查 + 20 个活跃状态上限"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0011
+
+  # === Feature Layer ===
+
+  - id: TR-combat-001
+    system: combat
+    gdd: design/gdd/combat-system.md
+    requirement: "7 阶段回合流程（准备→抽牌→出牌→攻击声明→攻击结算→敌方行动→结束）"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0008
+
+  - id: TR-combat-002
+    system: combat
+    gdd: design/gdd/combat-system.md
+    requirement: "9 个子系统的编排顺序——阶段内子系统调用顺序影响结算一致性"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0008
+
+  - id: TR-combat-003
+    system: combat
+    gdd: design/gdd/combat-system.md
+    requirement: "战斗生命周期——battle_start() 初始化 battle.* 域 + battle_end() 清理 + 发射奖励"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0008
+
+  - id: TR-effect-001
+    system: card-effect-engine
+    gdd: design/gdd/card-effect-engine.md
+    requirement: "4 种效果类型（即时/持续/触发式/替代）覆盖 222 张卡牌"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0009
+
+  - id: TR-effect-002
+    system: card-effect-engine
+    gdd: design/gdd/card-effect-engine.md
+    requirement: "栈式结算引擎——5 级优先级 + 中分辨率插入队列 + LIFO 出栈"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0009
+
+  - id: TR-effect-003
+    system: card-effect-engine
+    gdd: design/gdd/card-effect-engine.md
+    requirement: "触发链管理——深度 10 层 + 循环检测 + PRD 伪随机分布"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0009
+
+  - id: TR-progression-001
+    system: meta-progression
+    gdd: design/gdd/achievement-system.md
+    requirement: "跨局元进度——成就/天赋/图鉴/结局/统计的跨局持久化"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0012
+
+  - id: TR-progression-002
+    system: meta-progression
+    gdd: design/gdd/reincarnation-talent-system.md
+    requirement: "轮回天赋——20 个天赋节点的解锁状态、轮回点余额、槽位装备"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0012
+
+  - id: TR-binding-001
+    system: binding
+    gdd: design/gdd/binding-system.md
+    requirement: "功法/法宝绑定——BindingManager 全局注册表 + BindingRecord 数据结构"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0013
+
+  - id: TR-binding-002
+    system: binding
+    gdd: design/gdd/binding-system.md
+    requirement: "绑定生命周期——绑定/覆盖/叠加/暂挂/恢复/阵亡洗回的全流程"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0013
+
+  - id: TR-explore-001
+    system: exploration
+    gdd: design/gdd/exploration-system.md
+    requirement: "程序化 DAG 生成——加权随机分配 + 后处理约束强制执行（≥2 独立路径）"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0014
+
+  - id: TR-explore-002
+    system: exploration
+    gdd: design/gdd/exploration-system.md
+    requirement: "节点导航——移动验证（可达性、行动力、回退检测）→ 消耗行动力 → 触发节点交互"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0014
+
+  - id: TR-explore-003
+    system: exploration
+    gdd: design/gdd/exploration-system.md
+    requirement: "地图经济模型——重入传送费 + 境界差额惩罚 + 永久免费地图安全阀"
+    created: 2026-07-25
+    status: active
+    covered_by: ADR-0014

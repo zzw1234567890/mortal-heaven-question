@@ -1,4 +1,4 @@
-# ADR-0003：存档/读档系统 — JSON 格式 + 迁移链 + 原子写入
+# ADR-0002：存档/读档系统 — JSON 格式 + 迁移链 + 原子写入
 
 ## 状态
 Proposed
@@ -21,10 +21,10 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——`serialize() → Dictionary`、`deserialize(Dictionary) → bool`；battle 和 session 域排除规则；`gsm_initialized` 信号保证初始化顺序）；ADR-0002（CardSystem——读档后需调用 `CardSystem.reconstitute_instances()` 将序列化字典重构为 CardInstance 对象） |
-| **关联的 ADR** | ADR-0004（事件系统——story_flags 持久化到存档中）、ADR-0005（输入管理器——input_locks 不持久化，属于 session 域）、ADR-0006（场景管理器——存档恢复后通过 `request_scene_change` 切换场景）、ADR-0010（境界系统——境界数据通过 GSM 序列化持久化）、ADR-0012（跨局元进度——`progression.dat` 独立存储） |
+| **依赖** | ADR-0001（GSM——`serialize() → Dictionary`、`deserialize(Dictionary) → bool`；battle 和 session 域排除规则；`gsm_initialized` 信号保证初始化顺序）；ADR-0006（CardSystem——读档后需调用 `CardSystem.reconstitute_instances()` 将序列化字典重构为 CardInstance 对象） |
+| **关联的 ADR** | ADR-0003（事件系统——story_flags 持久化到存档中）、ADR-0004（输入管理器——input_locks 不持久化，属于 session 域）、ADR-0005（场景管理器——存档恢复后通过 `request_scene_change` 切换场景）、ADR-0010（境界系统——境界数据通过 GSM 序列化持久化）、ADR-0012（跨局元进度——`progression.dat` 独立存储） |
 | **阻塞** | **所有需要持久化进度的史诗**（战斗 Epic、探索 Epic、卡组编辑 Epic、修为养成 Epic、轮回天赋 Epic、成就 Epic）——在这些系统可以端到端测试前必须接受本 ADR |
-| **排序说明** | Foundation 层第二个 ADR（在 ADR-0001 之后）。必须在任何需要存档功能的系统编码前被接受。SaveLoadSystem 在 Autoload 初始化顺序中位于第 4 位（GSM → InputManager → SceneManager → SaveLoad → EventSystem）。**关联的 ADR**（ADR-0004~0012）在 ADR 编号上排在 SaveLoad 之后，但它们不在运行时依赖 SaveLoad——SaveLoad 通过 GSM 的信号被动响应，不主动调用关联 ADR 的模块 |
+| **排序说明** | Foundation 层第二个 ADR（在 ADR-0001 之后）。必须在任何需要存档功能的系统编码前被接受。SaveLoadSystem 在 Autoload 初始化顺序中位于第 4 位（GSM → InputManager → SceneManager → SaveLoad → EventSystem）。**关联的 ADR**（ADR-0003~0012）在 ADR 编号上排在 SaveLoad 之后，但它们不在运行时依赖 SaveLoad——SaveLoad 通过 GSM 的信号被动响应，不主动调用关联 ADR 的模块 |
 
 ## 上下文
 
@@ -61,8 +61,8 @@ Godot 4.4 引入了关键变更：`FileAccess.store_*` 系列方法从返回 `vo
 - 完整性校验：JSON 解析前先校验结构（`JSON.new().parse()` 检查 `Error` 返回值），辅以 `"complete": true` 标记作为纵深防御
 - 自动存档防抖：同场景 10 秒间隔，跨场景立即保存
 - 战斗快照生命周期：战斗开始写入 → 战斗胜利/撤退删除 → 战败可选"读档重来"
-- 读档后 CardSystem 实例重构：`GSM.deserialize()` 成功后调用 `CardSystem.reconstitute_instances()`（ADR-0002 契约）
-- Progression 信号驱动自动保存：SaveLoadSystem 监听 GSM 的 `progression_updated` 信号自动触发保存（不暴露为公共 API 由特性系统直接调用）
+- 读档后 CardSystem 实例重构：`GSM.deserialize()` 成功后调用 `CardSystem.reconstitute_instances()`（ADR-0006 契约）
+- Progression 信号驱动自动保存：SaveLoadSystem 监听 ProgressionSystem 的 `progression_updated` 信号自动触发保存（不暴露为公共 API 由特性系统直接调用）
 
 ## 决策
 
@@ -159,11 +159,11 @@ Godot 4.4 引入了关键变更：`FileAccess.store_*` 系列方法从返回 `vo
 │  │   GSM.scene_changed.connect(_on_autosave_trigger)       │        │
 │  │   GSM.battle_ended.connect(_on_battle_ended)            │        │
 │  │   GSM.battle_started.connect(_on_battle_started_snapshot)│       │
-│  │   GSM.progression_updated.connect(_on_progression_changed)│      │
+│  │   ProgressionSystem.progression_updated.connect(_on_progression_changed)│      │
 │  │                                                        │        │
 │  │ _on_progression_changed(_key, _value):                  │        │
 │  │   # 被动响应——不暴露 save_progression() 公共 API        │        │
-│  │   _write_progression(GSM.progression)                   │        │
+│  │   _write_progression(ProgressionSystem)                   │        │
 │  └───────────────────────────────────────────────────────┘        │
 └──────────────────────────────────────────────────────────────────┘
          │                              │
@@ -261,7 +261,7 @@ load_game(slot_type, slot_id):
   4. GSM.deserialize(data["game_state"]) → 逐域恢复游戏状态
   5. GSM.deserialize() 失败 → 返回 DESERIALIZE_ERROR
   6. ⚠️ CardSystem.reconstitute_instances(data["game_state"]["collection"]["owned_cards"])
-     → 将 GSM 中的 Array[Dictionary] 重构为 Array[CardInstance] 对象（ADR-0002 契约）
+     → 将 GSM 中的 Array[Dictionary] 重构为 Array[CardInstance] 对象（ADR-0006 契约）
   7. 发射 load_completed(true) 信号
   8. 返回 {"result": SUCCESS, "data": data}
 ```
@@ -405,7 +405,7 @@ func _ready():
     # 战斗快照
     GSM.battle_started.connect(_on_battle_started_snapshot)
     # Progression 被动保存——特性系统只通过 GSM 写入，不直接调用 SaveLoadSystem
-    GSM.progression_updated.connect(_on_progression_changed)
+    ProgressionSystem.progression_updated.connect(_on_progression_changed)
 
 func _on_autosave_trigger(_old_scene: String, _new_scene: String):
     if _can_autosave():
@@ -521,9 +521,10 @@ func _on_progression_changed(_key: String, _value: Variant):
   - `load_game()` 成功后 `CardSystem.reconstitute_instances()` 被调用——验证 CardInstance 对象已重构
 
 ## 相关决策
-- ADR-0001（GSM——提供 `serialize()`/`deserialize()` 接口，battle 和 session 域排除规则，`progression_updated` 信号）
-- ADR-0002（卡牌数据模型——`CardSystem.reconstitute_instances()` 读档后重构 CardInstance 对象的契约）
-- ADR-0004（事件系统——`story_flags` 通过 GSM 持久化，由存档系统写入磁盘）
-- ADR-0005（输入管理器——`session.input_locks` 不持久化，属于 session 域）
-- ADR-0006（场景管理器——存档恢复后通过 `request_scene_change` 切换场景）
+- ADR-0001（GSM——提供 `serialize()`/`deserialize()` 接口，battle 和 session 域排除规则）
+- ADR-0012（跨局元进度——`progression_updated` 信号源已变更为 ProgressionSystem，本 ADR 的 GSM 信号驱动写入模式更新为 ProgressionSystem 信号驱动）
+- ADR-0006（卡牌数据模型——`CardSystem.reconstitute_instances()` 读档后重构 CardInstance 对象的契约）
+- ADR-0003（事件系统——`story_flags` 通过 GSM 持久化，由存档系统写入磁盘）
+- ADR-0004（输入管理器——`session.input_locks` 不持久化，属于 session 域）
+- ADR-0005（场景管理器——存档恢复后通过 `request_scene_change` 切换场景）
 - ADR-0012（跨局元进度——`progression.dat` 独立存储，本 ADR 的 GSM 信号驱动写入是其 Foundation 层支撑）

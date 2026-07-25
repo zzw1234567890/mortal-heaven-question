@@ -1,4 +1,4 @@
-# ADR-0002：卡牌数据模型 — Template/Instance 分离 + Resource 序列化
+# ADR-0006：卡牌数据模型 — Template/Instance 分离 + Resource 序列化
 
 ## 状态
 Proposed
@@ -22,9 +22,9 @@ Proposed
 | 字段 | 值 |
 |-------|-------|
 | **依赖** | ADR-0001（GSM——CardInstance 的 ID 由 GSM 分配；GSM 通过 `collection.owned_cards` 持有实例；CardSystem 调用 `GSM.enable_validation(db)` 在模板加载完成后启用卡牌校验） |
-| **启用** | ADR-0006（卡牌效果引擎——消费 CardTemplate 的效果定义）、ADR-0008（战斗系统——读取角色属性、费用查询）、ADR-0011（状态效果系统——消费模板的状态效果配置）、ADR-0003（事件系统——story_flags 触发卡牌获得/失去） |
+| **启用** | ADR-0009（卡牌效果引擎——消费 CardTemplate 的效果定义）、ADR-0008（战斗系统——读取角色属性、费用查询）、ADR-0011（状态效果系统——消费模板的状态效果配置）、ADR-0003（事件系统——story_flags 触发卡牌获得/失去） |
 | **阻塞** | 所有涉及卡牌数据的史诗（战斗 Epic、卡组编辑 Epic、绑定 Epic、阵法 Epic、炼丹/铭刻 Epic、AI Epic）——在这些系统可以编码前必须接受本 ADR |
-| **排序说明** | 在 ADR-0001 之后、ADR-0006（卡牌效果引擎）之前被接受。Core 层第一个 ADR（CardSystem 在 architecture.md 层映射中属于 CORE 层，在 Foundation 层 GSM 就绪后构建） |
+| **排序说明** | 在 ADR-0001 之后、ADR-0009（卡牌效果引擎）之前被接受。Core 层第一个 ADR（CardSystem 在 architecture.md 层映射中属于 CORE 层，在 Foundation 层 GSM 就绪后构建） |
 
 > **跨 ADR 契约说明**：本 ADR 依赖 ADR-0001 中的两个 API——`GSM.allocate_card_id() → int` 和 `GSM.add_card_to_collection(inst_dict: Dictionary) → void`。这两个 API 目前**未在 ADR-0001 中显式列出**——在接受本 ADR 之前需补充到 ADR-0001 的第二层原子操作中。详见下文「GSM 集成合约」。
 
@@ -434,6 +434,6 @@ card_name = template.name                              # String
 
 ## 相关决策
 - ADR-0001（游戏状态管理器）——CardInstance ID 分配、收藏持有、校验启用
-- ADR-0006（卡牌效果引擎）——消费 CardTemplate 的 effect_type/effect_value
+- ADR-0009（卡牌效果引擎）——消费 CardTemplate 的 effect_type/effect_value
 - ADR-0008（战斗系统）——消费角色卡模板的 base_hp/base_attack
 - ADR-0003（事件系统）——事件触发卡牌获得/失去时调用 CardSystem

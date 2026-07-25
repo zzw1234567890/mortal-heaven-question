@@ -22,7 +22,7 @@ Proposed
 | 字段 | 值 |
 |-------|-------|
 | **依赖** | None |
-| **启用** | ADR-0002（存档/读档）、ADR-0003（事件系统）、ADR-0004（输入管理器）、ADR-0005（场景管理器）、ADR-0006（卡牌数据模型）、ADR-0007（信号通信）、ADR-0008（战斗系统）、ADR-0009（卡牌效果引擎）——以及所有后续 ADR |
+| **启用** | ADR-0002（存档/读档）、ADR-0003（事件系统）、ADR-0004（输入管理器）、ADR-0005（场景管理器）、ADR-0006（卡牌数据模型）、ADR-0007（信号通信）、ADR-0008（战斗系统）、ADR-0009（卡牌效果引擎）——以及所有后续 ADR<br>**取代声明**：`progression.*` 域所有权已由 ADR-0012 取代——GSM 不再持有跨局元进度数据（成就、天赋、图鉴、结局、统计）。详见 ADR-0012 §"与 ADR-0001 的冲突解决" |
 | **阻塞** | **所有史诗**——在 GSM API 被接受之前无法开始 Foundation 层实现 |
 | **排序说明** | 必须在所有其他 ADR 之前被接受。必须在任何代码被编写之前被接受 |
 
@@ -282,3 +282,4 @@ GSM.gsm_initialized()  # 一旦 GSM._ready() 完成即发射
 - ADR-0002（存档/读档：JSON + 模式版本 + 迁移链）——消费 `GSM.serialize()` / `GSM.deserialize()`
 - ADR-0006（卡牌数据模型：Template/Instance 分离）——消费 `GSM.add_card_to_collection()` 并在启动时调用 `enable_validation()`
 - ADR-0007（信号驱动通信：粒度 + 变更掩码）——细化信号粒度（`player_changed` 变更掩码 vs 每次属性一个信号）
+- ADR-0012（跨局元进度系统）——**取代 `progression.*` 域的所有权**；`progression_updated` 信号源从 GSM 变更为 ProgressionSystem

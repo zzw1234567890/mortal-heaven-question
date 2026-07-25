@@ -98,3 +98,14 @@ Task: ADR-0011 — complete ✅
 4. **tick_all() 递减不发射 status_updated** — 仅批量 remove_expired 发射 status_removed
 5. **GSM 例外**：战斗中状态数据由 StatusEffectSystem 管理，仅战斗结束时导出快照至 GSM
 6. **Autoload #8**（完整链 11 个：GSM→Input→Scene→SaveLoad→Event→Card→Cost→StatusEffect→Combat→CardEffect→Realm）
+
+---
+
+## 会话摘录 — /architecture-review 2026-07-25
+- 裁决：CONCERNS
+- 需求：35 TR-ID 注册（14 个 ADR 覆盖 14 个核心系统）
+- 新注册的 TR-ID：35（TR-gsm-001~003, TR-save-001~003, TR-event-001~003, TR-input-001~002, TR-scene-001~002, TR-card-001~002, TR-signal-001~002, TR-realm-001~003, TR-status-001~002, TR-combat-001~003, TR-effect-001~003, TR-progression-001~002, TR-binding-001~002, TR-explore-001~003）
+- GDD 修订标志：无
+- 主要 ADR 缺口：22 个系统尚无 ADR（费用、上场阵位、阵法、阵营、AI 等 — top priority）
+- 关键跨 ADR 冲突：ADR-0002~0006 内部编号与文件名不一致（需修正内部编号以匹配文件名——文件名为权威来源）
+- 报告：docs/architecture/architecture-review-2026-07-25.md

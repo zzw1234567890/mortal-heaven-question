@@ -21,7 +21,7 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM 三层 API——信号分类中的 GSM 状态信号以此为基础）、ADR-0004（EventSystem 信号委托模式——本 ADR 将其推广为通用原则）、ADR-0005（InputManager——通过 GSM 传播锁状态而非自有信号——本 ADR 将其确立为标准模式） |
+| **依赖** | ADR-0001（GSM 三层 API——信号分类中的 GSM 状态信号以此为基础）、ADR-0003（EventSystem 信号委托模式——本 ADR 将其推广为通用原则）、ADR-0004（InputManager——通过 GSM 传播锁状态而非自有信号——本 ADR 将其确立为标准模式） |
 | **启用** | 所有 Foundation 层之后创建的 ADR（ADR-0008+ 战斗系统、ADR-0009 卡牌效果引擎等——信号设计决策矩阵指导其 API 设计） |
 | **阻塞** | 战斗 Epic（战斗系统 7 阶段状态机需定义哪些转换发射信号 vs 直接调用）、卡牌效果 Epic（效果引擎的信号粒度决策）、UI Epic（HUD 订阅策略） |
 | **排序说明** | Foundation 层最后一个 ADR（#7）。在 Foundation 层所有模块 ADR 之后、Core/Feature 层 ADR 开始之前被接受。本 ADR 不给现有 ADR 增加新需求——它编纂现有 ADR 中已使用的模式 |
@@ -30,15 +30,15 @@ Proposed
 
 ### 问题陈述
 
-项目已有 5 个 Foundation 层 ADR（GSM、CardSystem、SaveLoad、EventSystem、InputManager、SceneManager），各自定义了信号模式：
+项目已有 5 个 Foundation 层 ADR（GSM、SaveLoad、EventSystem、InputManager、SceneManager），各自定义了信号模式：
 
 | ADR | 定义的信号 | 特点 |
 |-----|-----------|------|
 | ADR-0001 (GSM) | `batch_updated`、`player_changed`、`realm_changed`、`resource_changed`、`gsm_initialized` | 数据变更广播——多消费者、消费者未知 |
-| ADR-0003 (SaveLoad) | `save_completed`、`load_started`、`load_completed`、`save_corrupted`、`progression_saved` | 操作结果通知——存档/读档生命周期 |
-| ADR-0004 (EventSystem) | `event_triggered`、`event_resolved`、`chain_triggered`、`chain_ended`、`card_reward_requested`、`templates_loaded`、`flag_changed` | 事件动作通知 + 信号委托（`card_reward_requested`） |
-| ADR-0005 (InputManager) | 无自有信号——通过 GSM `batch_updated` 传播锁状态 | 复用 GSM 信号体系 |
-| ADR-0006 (SceneManager) | `pre_transition`、`post_transition` | 生命周期钩子——2 个确定消费者 |
+| ADR-0002 (SaveLoad) | `save_completed`、`load_started`、`load_completed`、`save_corrupted`、`progression_saved` | 操作结果通知——存档/读档生命周期 |
+| ADR-0003 (EventSystem) | `event_triggered`、`event_resolved`、`chain_triggered`、`chain_ended`、`card_reward_requested`、`templates_loaded`、`flag_changed` | 事件动作通知 + 信号委托（`card_reward_requested`） |
+| ADR-0004 (InputManager) | 无自有信号——通过 GSM `batch_updated` 传播锁状态 | 复用 GSM 信号体系 |
+| ADR-0005 (SceneManager) | `pre_transition`、`post_transition` | 生命周期钩子——2 个确定消费者 |
 
 在没有统一规范的情况下，以下问题将在实现阶段反复出现：
 
@@ -46,7 +46,7 @@ Proposed
 2. **信号命名不统一**：现有信号使用 snake_case 过去式（`event_resolved`）、现在式（`pre_transition`）和描述性名称（`card_reward_requested`）三种风格——没有统一的时态规则
 3. **信号链深度无上限**：A 的处理函数发射信号 B → B 的处理器发射信号 C → ... 无限递归无法检测
 4. **载荷格式不统一**：GSM 的 `batch_updated` 使用 `{path: {old, new}}` 展平字典格式，EventSystem 的 `event_resolved` 传递 `(event_id, option_idx, outcomes)` 元组——没有何时用哪种格式的指导
-5. **禁止模式分散在各 ADR**：递归写入（ADR-0001）、绕过 GSM（ADR-0001）、Fire-and-forget 无人监听（ADR-0004）——没有汇总的禁止模式清单
+5. **禁止模式分散在各 ADR**：递归写入（ADR-0001）、绕过 GSM（ADR-0001）、Fire-and-forget 无人监听（ADR-0003）——没有汇总的禁止模式清单
 
 `architecture.md` §架构原则 #2 已声明"信号用于通知，不是用于逻辑"，但未细化到可执行层面。本 ADR 将其编纂为具体规则。
 
