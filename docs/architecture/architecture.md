@@ -9,7 +9,7 @@
 - **引用的 ADR (ADRs Referenced)**：尚无——所有 ADR 待创建（见 §Required ADRs）
 - **技术总监签署 (TD Sign-Off)**：2026-07-24 — APPROVED WITH CONDITIONS（5 个 CONCERNS 将在对应 ADR 中处理）
 - **主程序员可行性 (LP Feasibility)**：FEASIBLE with 5 CONCERNS（无 BLOCKING 项）
-  - C1：境界系统层归属不一致 → ADR-0010 中解决
+  - C1：境界系统层归属 → 已通过 ADR-0010 迁移至 CORE 层 ✅
   - C2：初始化序列与架构原则 #3 矛盾 → ADR Milestone 中解决
   - C3：效果栈结算顺序未指定 → ADR-0009 中规定
   - C4：信号粒度未定义 → ADR-0007 中规定
@@ -247,9 +247,17 @@ advance_phase() → bool  # 每阶段结束检查前置条件，失败则报告�
 
 ### 卡牌效果引擎
 
-- 效果类型注册：`register_effect(type, handler: Callable, config = {})` (4.5 可变参数)
-- 效果栈：串行出栈，最大递归深度 16
-- PRD 伪随机：每次失败提高下次成功概率，短序列内接近标示概率
+> **完整 API 规范见 `docs/decisions/ADR-0009-card-effect-engine-resource-refcounted-model.md`**
+> 以下为架构摘要——签名可能已细化。以 ADR-0009 为准。
+
+- 双层对象模型：EffectTemplate (Resource, `.tres`) + EffectInstance (RefCounted, 运行时) — 4 种子类：InstantEffect / PersistentEffect / TriggeredEffect / ReplacementEffect
+- 栈式结算引擎：ResolutionStack — LIFO 出栈 + 中分辨率插入队列 + 5 级优先级排序
+- 效果触发链硬限制：深度 10 层 + `Dictionary[int, bool]` 循环检测（GDScript 4.x 无 `Set` 类型）
+- PRD 伪随机：5% 步进 + 怜悯保护 + `RandomNumberGenerator` 独立实例
+- AI 评估接口：`evaluate_effect()` / `simulate_chain()` — `GameStateSnapshot` 不可变快照
+- 信号路由（ADR-0007 Cat 2b）：`effect_registered` / `effect_removed` / `effect_suspended` / `effect_restored` / `stack_overflow_warning`
+- OutcomeType 枚举：扩展 ADR-0003（EventSystem）—— +5 种效果专属类型（APPLY_STATUS, MODIFY_STAT, TRIGGER_CHAIN, ACTIVATE_FORMATION, MODIFY_COST）
+- Feature 层 Autoload #10：`GSM(1) → InputManager(2) → SceneManager(3) → SaveLoad(4) → EventSystem(5) → CardSystem(6) → CostSystem(7) → StatusEffectSystem(8) → CombatSystem(9) → CardEffectEngine(10)`
 
 ### 输入管理器 ⚠️ 4.6 HIGH
 
@@ -318,7 +326,7 @@ pop_lock(source: StringName)
 | 2 | 存档/读档: JSON 格式 + schema_version + 迁移链 | TR-save-001→003, TR-migrate-001,002 | MEDIUM (FileAccess) |
 | 3 | 事件系统: story_flags 唯一运行时写入者 | TR-event-001→003 | — |
 | 4 | 输入管理器: 四级锁栈 + 双焦点 | TR-input-001,002 | HIGH (4.6) |
-| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — | ✅ ADR-0006 |
+| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — |
 | 6 | 卡牌数据模型: Template/Instance 分离 | TR-card-001,002 | — |
 | 7 | 信号驱动通信: GSM 信号 vs 直接调用 | TR-gsm-002, TR-hud-001 (横切) | — |
 
@@ -344,6 +352,8 @@ pop_lock(source: StringName)
 ## 架构原则
 
 1. **GSM 是真理的单一来源**——所有游戏状态通过 GSM API 访问。没有系统持有一份拷贝。没有系统绕过 GSM 直接修改另一个系统的数据。
+
+   > **例外（ADR-0011）**：战斗中活跃状态实例由 StatusEffectSystem Autoload 内部管理（`_instances` / `_by_target` 注册表）——不通过 GSM 实时存储。原因：状态叠加/倒计时/免疫检查是战斗热路径（每帧 O(1) 查询需求 + RefCounted 对象引用而非序列化 Dictionary）。战斗结束时 StatusEffectSystem 通过 `serialize_all() → Array[Dictionary]` 导出状态快照至 GSM 用于存档。
 
 2. **信号用于通知，不是用于逻辑**——信号是只读的 UI 刷新钩子。游戏逻辑通过原子 GSM 操作完成，在信号发出前数据已一致。
 

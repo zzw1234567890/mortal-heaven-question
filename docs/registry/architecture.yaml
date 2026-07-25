@@ -9,7 +9,7 @@
 #   - referenced_by 在 ADR 引用该立场时追加
 
 version: 1
-last_updated: "2026-07-24"
+last_updated: "2026-07-25（ADR-0013 追加）"
 
 state_ownership:
   - entity: GameState（根）
@@ -66,6 +66,48 @@ state_ownership:
     adr: ADR-0001
     referenced_by: [ADR-0001]
     note: "运行时在 GSM 中；写入到 progression.dat 由 SaveLoadSystem 处理"
+    status: superseded_by: ADR-0012
+
+  - entity: ProgressionSystem._achievements（成就域）
+    owner: progression-system
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "Dictionary[String, AchievementState]——62 个成就的解锁状态、进度追踪和 unlock_at 时间戳。AchievementSystem 通过 ProgressionSystem.unlock_achievement() / update_achievement_progress() 写入。"
+    status: active
+
+  - entity: ProgressionSystem._talents（天赋域）
+    owner: progression-system
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "Dictionary[String, TalentState]——20 个轮回天赋节点解锁状态、轮回点余额（累计 333 点）、每局槽位装备配置。ReincarnationSystem 通过 purchase_talent() / grant_talent() 写入。"
+    status: active
+
+  - entity: ProgressionSystem._card_gallery（卡牌图鉴域）
+    owner: progression-system
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "Dictionary[String, bool]——222 张卡牌的全局发现状态（跨局累计去重）。CardSystem 在首次获得卡牌时调用 mark_card_discovered() 写入。"
+    status: active
+
+  - entity: ProgressionSystem._endings（结局图鉴域）
+    owner: progression-system
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "Dictionary[String, Dictionary]——6 个结局的解锁状态、章节选择路径和历史数据。EndingBranchSystem 通过 unlock_ending() 写入——内置 total_completions 递增。"
+    status: active
+
+  - entity: ProgressionSystem._statistics（统计域）
+    owner: progression-system
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "Dictionary[String, int]——跨局累计游戏统计（total_battles、total_victories、highest_damage 等）。CombatSystem 在 battle_ended 后调用 increment_stat()/set_stat() 写入。单局统计→永久统计提升在 game_victory 序列中执行。"
+    status: active
+
+  - entity: ProgressionSystem._meta（元信息域）
+    owner: progression-system
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "Dictionary[String, Variant]——跨局元信息（highest_realm_ever、total_reincarnations、total_playtime_seconds、total_completions）。仅特定 key 可通过 set_meta() 写入。"
     status: active
 
   - entity: session.* 域（current_scene, ui_state, input_locks）
@@ -345,10 +387,11 @@ api_decisions:
     note: "存档容器同时包含两个字段：schema_version 驱动迁移链（递增整数），version 仅在存档列表 UI 显示（不参与任何 if 判断）。消除双重定义混淆。"
     status: active
 
-  - decision: "Progression 信号驱动被动保存——特性系统不直接调用 SaveLoadSystem"
+  按 ADR-0012。
+- decision: "Progression 信号驱动被动保存——特性系统不直接调用 SaveLoadSystem"
     adr: ADR-0003
-    referenced_by: [ADR-0003]
-    note: "SaveLoadSystem 监听 GSM.progression_updated 信号自动写入 progression.dat——特性系统仅通过 GSM 写入 progression 数据。符合 Foundation 层原则 #3。"
+    referenced_by: [ADR-0003, ADR-0012]
+    note: "SaveLoadSystem 监听 ProgressionSystem.progression_updated 信号自动写入 progression.dat——特性系统通过 ProgressionSystem API 写入 progression 数据（原为 GSM.progression_updated——信号源随 ADR-0012 所有权迁移变更）。符合 Foundation 层原则 #3。"
     status: active
 
   - decision: "存档「存档模式版本控制」模块合并入 SaveLoadSystem 内部"
@@ -458,6 +501,66 @@ forbidden_patterns:
     note: "SceneManager 是这两个 session 字段的唯一写入者（架构层面委托例外）。其他系统消费 scene_changed 信号即可——不得直接赋值。"
     status: active
 
+  - pattern: "运行时写入 EffectTemplate Resource"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "EffectTemplate（Resource）的 @export 字段为只读——策划在 Inspector 中编辑。所有运行时可变状态必须在 EffectInstance（RefCounted）上管理。违反此规则会污染所有共享该模板的效果实例。与 ADR-0006 禁止写入 CardTemplate 模式一致。"
+    status: active
+
+  - pattern: "效果引擎直接调用 GSM 写入方法"
+    adr: ADR-0009
+    referenced_by: [ADR-0001, ADR-0009]
+    note: "效果引擎不调用任何 GSM 写入——效果结果通过子系统接口间接写入（StatusSystem.apply_status()、CombatSystem.damage_target()、EventSystem.set_flag()）。效果引擎仅通过 GSM 第一层只读访问。"
+    status: active
+
+  - pattern: "绕过 ResolutionStack 直接结算效果"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "所有卡牌效果结算必须通过 CardEffectEngine.resolve_phase_effects() → ResolutionStack 栈式引擎。不得在效果触发回调中直接调用 _resolve()——这会绕过优先级排序、触发链深度检查和循环检测。"
+    status: active
+
+  - pattern: "效果引擎中触发链深度超过 10 层不截断"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "触发链硬限制 10 层——第 11 层必须截断 + WARN 日志。访问 visited_card_ids 字典必须使用 `if id in dict:` 检查——避免使用可能绕过检查的自定义方法。"
+    status: active
+
+  - pattern: "直接写入 RealmSystem.realm_table 或 RealmSystem.DROP_POOL_WEIGHTS 内容"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "GDScript const 不冻结嵌套 Dictionary 内容——运行时直接赋值不会报错但会破坏数据完整性。所有读取必须通过 get_realm_property() / get_rarity_weights()。团队约定 + GUT 冒烟测试双重保护。"
+    status: active
+
+  - pattern: "绕过 RealmSystem.realm_up() 直接调用 GSM.change_realm() 升级境界"
+    adr: ADR-0010
+    referenced_by: [ADR-0001, ADR-0010]
+    note: "境界升级必须通过 RealmSystem.realm_up() 编排器——它原子化协调 GSM 写入 + realm_upgraded 信号（→ 溢出结算/地图解锁/掉落池扩展）。直接调用 GSM.change_realm() 跳过这些协调步骤，导致子系统状态不一致。"
+    status: active
+
+  - pattern: "运行时写入 StatusTemplate Resource 或绕过 get_status_template() 直接操作 _templates 内容"
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "StatusTemplate（Resource）的 @export 字段为只读——策划在 Inspector 中编辑。所有运行时可变状态必须在 StatusInstance（RefCounted）上管理。GDScript const Dictionary 不冻结嵌套内容——所有读取必须通过 get_status_template() 只读访问器。与 ADR-0002（CardTemplate）/ ADR-0009（EffectTemplate）禁止模式一致。"
+    status: active
+
+  - pattern: "在 tick_all() 的 duration 递减循环中逐次发射 status_updated 信号"
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "Phase 0 倒计时期间每次 duration 递减不发射 status_updated——递减不是用户可见事件。仅批量 remove_expired_statuses() 对每个被移除的状态发射 status_removed。status_updated 仅在层数变化/数值重算/非倒计时来源的持续时间变更时发射。违反此规则会导致每帧 48 次不必要的信号发射。"
+    status: active
+
+  - pattern: "绑定数据在战斗期间存储在 GSM 中"
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "战斗期间所有绑定数据由 BindingManager 内部注册表管理——绝不存储在 GSM.battle.bindings 中。热路径查询直接在 BindingManager 内部 Dictionary 完成。GSM 仅在战斗结束时通过 BindingManager.serialize_all() 接收序列化快照。与 ADR-0011 StatusEffectSystem 的 GSM 例外模式一致。"
+    status: active
+
+  - pattern: "不通过 BindingManager API 直接访问 CardEffectEngine 管理绑定效果生命周期"
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "绑定卡的效果注册/移除/暂挂/恢复必须通过 BindingManager 的公共 API 间接触发——绝不绕过 BindingManager 直接调用 CardEffectEngine.register_persistent_effect/remove_effects_by_source/suspend/restore。BindingManager 负责 '何时' 触发效果变更 + 保持三索引同步；CardEffectEngine 负责 '如何' 管理效果实例。"
+    status: active
+
 api_decisions:
   - decision: "GAMEPLAY 键盘输入使用 Input Map 动作轮询"
     adr: ADR-0005
@@ -476,3 +579,286 @@ api_decisions:
     referenced_by: [ADR-0005]
     note: "InputManager 连接 SceneTree.tree_changed 信号自动清除锁栈。确保 SceneManager 重构时不泄漏锁。"
     status: active
+
+  - decision: "三分类信号体系——Cat 1 GSM 状态信号 / Cat 2 系统特定信号（2a 生命周期/2b 动作通知/2c 委托）/ Cat 3 Godot 内置信号"
+    adr: ADR-0007
+    referenced_by: [ADR-0007]
+    note: "信号设计决策矩阵的权威来源——信号 vs 直接调用的选择标准。信号命名 snake_case 过去式（pre/post 配对例外）。信号链深度硬限制 4 层。"
+    status: active
+
+  - contract: "CardEffectEngine Cat 2b 信号"
+    signature: "effect_registered({card_instance_id, effect_ids, target_id}) / effect_removed({card_instance_id, effect_ids, target_id, reason}) / effect_suspended({card_instance_id, effect_ids, reason}) / effect_restored({card_instance_id, effect_ids}) / stack_overflow_warning({root_card_id, depth, chain})"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "Cat 2b 系统信号——CombatUI 订阅前 4 个以更新角色图标；DebugOverlay 订阅 stack_overflow_warning。效果引擎不发射 Cat 1 信号——状态变更通过 StatusSystem→GSM 传播。"
+    status: active
+
+  - contract: "CardEffectEngine AI 评估接口"
+    signature: "evaluate_effect(card_id, target_id, snapshot) → EffectEvaluation / simulate_chain(card_id, target_id, snapshot, max_depth) → ChainPreview / create_evaluation_snapshot() → GameStateSnapshot"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "干跑评估——在不可变 GameStateSnapshot 上执行纯计算。evaluate_effect() 单次 <100μs。AI 回合总评估 ~30ms（跨帧分摊）。"
+    status: active
+
+  - contract: "CardEffectEngine PRD 确定性"
+    signature: "PRDEngine.next_random(card_instance_id, p_base) → bool / PRDEngine.reset_prng_seed(seed)"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "独立 RandomNumberGenerator 实例——按 card_instance_id 独立追踪 P_current。种子来自 GSM.meta.seed。测试模式：GsM.meta.prng_override_seed。5% 步进 + 怜悯保护（ceil(1/P_base) 次失败后强制触发）。"
+    status: active
+
+  - contract: "CardEffectEngine 模板查询"
+    signature: "CardEffectEngine.get_template(template_id: StringName) → EffectTemplate"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "O(1) 字典查询。EffectTemplate（Resource）只读——不得修改返回的 Resource 字段。"
+    status: active
+
+  - contract: "CardEffectEngine CombatSystem 集成"
+    signature: "resolve_phase_effects(phase: CombatPhase) → void"
+    adr: ADR-0009
+    referenced_by: [ADR-0008, ADR-0009]
+    note: "由 CombatSystem 在 advance_phase() 中直接调用（编排器→子系统）。Phase 0/1/2/3/4/5/6。引擎不订阅 CombatSystem 信号。采集该阶段触发的所有效果 → ResolutionStack → LIFO 出栈结算。"
+    status: active
+
+  - decision: "Resource（EffectTemplate）+ RefCounted（EffectInstance）双层对象模型——模板/实例分离"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "EffectTemplate（Resource, .tres）只读——策划在 Inspector 中编辑。EffectInstance（RefCounted）运行时轻量级实例——不持有 Resource 引用，防止共享引用污染。4 个子类：InstantEffect / PersistentEffect / TriggeredEffect / ReplacementEffect。"
+    status: active
+
+  - decision: "栈式结算引擎——ResolutionStack LIFO 出栈 + 中分辨率插入队列"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "5 级优先级主排序（主动出牌 > 先发己方 > 普通己方 > 敌方 > instance_id）+ priority 次级决胜。新触发的效果按优先级重新插入队列（非追加）。触发的效果链深度硬限制 10 层 + Dictionary 循环检测（GDScript 无 Set 类型）。"
+    status: active
+
+  - decision: "PRD 伪随机分布——5% 步进 + 怜悯保护 + 按 card_instance_id 独立追踪"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "PRDEngine 持有独立 RandomNumberGenerator 实例——不共享全局 RNG 状态。种子来自 GSM.meta.seed——同种子+同操作序列=确定性结果（支持重播/回归测试）。"
+    status: active
+
+  - decision: "AI 干跑评估接口——GameStateSnapshot 不可变快照 + evaluate_effect / simulate_chain"
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "evaluate_effect() 单次 <100μs 纯计算。模拟触发链不修改游戏状态。AI 回合总评估 ~30ms（跨帧分摊）。快照不含动画/UI/音效——仅含机制数据。"
+    status: active
+
+  - decision: "OutcomeType 枚举扩展——在 ADR-0003 的 12 种基础上新增 5 种效果专属类型"
+    adr: ADR-0009
+    referenced_by: [ADR-0003, ADR-0009]
+    note: "APPLY_STATUS / MODIFY_STAT / TRIGGER_CHAIN / ACTIVATE_FORMATION / MODIFY_COST——共享词汇表。效果引擎扩展（非复制）ADR-0003 的枚举——解决 architecture.md OQ-05。"
+    status: active
+
+  - decision: "7 阶段战斗状态机——PREPARATION→DRAW→PLAY→ATTACK_DECLARATION→ATTACK_RESOLUTION→ENEMY_TURN→END"
+    adr: ADR-0008
+    referenced_by: [ADR-0008]
+    note: "CombatSystem 为 battle.* 域独占运行时写入者（ADR-0001 架构委托例外——通过 GSM._set_battle_phase/ _increment_battle_turn / _set_battle_active 第二层方法写入）。5 个 Cat 2b 信号（通过 _emit_signal_safe 路由）+ 9 个子系统直接方法调用编排。"
+    status: active
+
+  - contract: "RealmSystem 属性查询"
+    signature: "RealmSystem.get_realm_property(level: int, key: StringName) → Variant"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "13+ 消费者系统的唯一境界属性查询入口。O(1) 字典查询。无效 key/level 返回 null + push_warning。所有属性值来自 const realm_table 编译时常量。"
+    status: active
+
+  - contract: "RealmSystem 当前境界便捷查询"
+    signature: "RealmSystem.get_current_property(key: StringName) → Variant"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "内部从 GSM.player.realm_level 读取当前境界然后调用 get_realm_property()。内置 GSM 就绪守卫（is_instance_valid + GSM.player != null）。UI/HUD 主要使用者。"
+    status: active
+
+  - contract: "RealmSystem 稀有度权重查询"
+    signature: "RealmSystem.get_rarity_weights(pool_tier: int) → Dictionary"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "返回 {white: int, blue: int, purple: int, gold: int, darkgold: int}。CardSystem 在战利品生成时调用。数据源为 const DROP_POOL_WEIGHTS 编译时常量。"
+    status: active
+
+  - contract: "RealmSystem 境界压制计算"
+    signature: "RealmSystem.realm_penalty(attacker_lv: int, defender_lv: int) → float"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "纯计算——delta=0 → 1.0, delta=1 → 0.8, delta>=2 → 0.5。CombatSystem 在伤害结算时调用。< 0.001ms 执行。"
+    status: active
+
+  - contract: "RealmSystem 地图境界压制"
+    signature: "RealmSystem.map_effective_realm(player_lv: int, map_max_lv: int) → Dictionary"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "返回 {offensive_lv: int, defensive_lv: int}——柔性压制模型。offensive_lv=min(player_lv, map_max_lv)（费用上限、基础速度）；defensive_lv=player_lv（上场人数、行动力上限）。ExplorationSystem 在地图进入时调用。"
+    status: active
+
+  - contract: "RealmSystem 突破编排"
+    signature: "RealmSystem.realm_up(current_level: int) → void"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "仅在渡劫突破成功后由 TribulationSystem 调用。编排：GSM.change_realm(new_level) + realm_upgraded 信号发射 → CultivationSystem/TribulationSystem/ExplorationSystem/CardSystem 监听并执行各自结算。不直接调用任何子系统的内部方法。"
+    status: active
+
+  - contract: "RealmSystem 突破信号"
+    signature: "signal realm_upgraded(old_level: int, new_level: int)"
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "Cat 2b 动作通知信号——单一事件通知（无 pre/post 配对）。realm_up() 成功后发射。CultivationSystem → 溢出池结算；TribulationSystem → 回满行动力；ExplorationSystem → 解锁新地图；CardSystem → 扩展掉落池。与 Cat 1 的 realm_changed 语义不同——realm_upgraded 仅在突破流程完成后触发。"
+    status: active
+
+  - contract: "StatusEffectSystem 状态施加"
+    signature: "apply_status(target_id: int, template_id: StringName, source_card_instance_id: int, overrides: Dictionary = {}) → ApplyResult"
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "ApplyResult = {applied: bool, status_id: int, reason: String}。reason: 'new' | 'refreshed' | 'stacked' | 'new_independent' | 'immune' | 'max_stacks' | 'overflow_blocked' | 'unknown_template'。内部执行模板查找→免疫检查→溢出预检查→同名查找→叠加判定→实例注册。"
+    status: active
+
+  - contract: "StatusEffectSystem 状态倒计时编排"
+    signature: "tick_all(field_characters: Array) → void"
+    adr: ADR-0011
+    referenced_by: [ADR-0008, ADR-0011]
+    note: "由 CombatSystem 在 Phase 0 直接调用——编排器→子系统模式。递减所有 duration>0 的状态（永久状态 duration=-1 不递减）→ 标记 is_expired → 延迟移除过期状态。递减不发射 status_updated；仅批量 remove_expired 发射 status_removed。"
+    status: active
+
+  - contract: "StatusEffectSystem 属性累计修正查询"
+    signature: "get_accumulated_value(target_id: int, stat_name: String) → float"
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "遍历目标所有活跃状态（排除 is_expired/is_hidden）→ value × current_stacks 加法累加。CombatSystem 在伤害计算时调用；CombatUI 在更新 ATK/DEF 显示时调用。< 0.01ms 执行。不通过 GSM 信号传播——消费者主动查询。"
+    status: active
+
+  - contract: "StatusEffectSystem Cat 2b 信号"
+    signature: "signal status_applied/status_removed/status_updated/status_immunity_blocked"
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "Cat 2b 系统信号——通过 ADR-0007 _emit_signal_safe 包装器发射。status_applied → CombatUI 创建图标 + Audio 施加音效；status_removed → CombatUI 销毁图标+淡出动画；status_updated → CombatUI 数字跳变（不含每帧递减——仅在层数/数值/非倒计时 duration 变更时发射）；status_immunity_blocked → CombatUI '免疫'弹出。信号链深度 ≤2 层。"
+    status: active
+
+  - entity: CardEffectEngine._active_effects + CardEffectEngine._effect_by_id
+    owner: card-effect-engine
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "Dictionary[int, Array[EffectInstance]] + Dictionary[int, EffectInstance]——运行时效果实例注册表（不持久化）。key=card_instance_id 按来源卡追溯所有活跃效果；key=effect_instance_id 用于 remove/suspend O(1) 查找。战斗阶段结束时 ResolutionStack 必须为空。"
+    status: active
+
+  - entity: CardEffectEngine.effect_templates（模板注册表）
+    owner: card-effect-engine
+    adr: ADR-0009
+    referenced_by: [ADR-0009]
+    note: "Dictionary[StringName, EffectTemplate]——222 个只读 EffectTemplate Resource（.tres）。由 CardEffectEngine._ready() 同步加载填充。在 effect_templates_loaded 信号之前不可用。"
+    status: active
+
+  - entity: RealmSystem.realm_table（境界属性表）
+    owner: realm-system
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "const Dictionary[int, Dictionary]——5 级境界 × 15+ 项属性的编译时常量。所有消费者系统通过 get_realm_property() 只读查询——禁止直接写入表内容（GDScript const 不冻结嵌套内容，由团队约定 + GUT 冒烟测试保护）。"
+    status: active
+
+  - entity: RealmSystem.DROP_POOL_WEIGHTS（掉落池权重表）
+    owner: realm-system
+    adr: ADR-0010
+    referenced_by: [ADR-0010]
+    note: "const Dictionary[int, Dictionary]——pool_tier → {white, blue, purple, gold, darkgold} 稀有度权重映射。CardSystem 通过 get_rarity_weights() 查询。编译时常量，禁止直接写入。"
+    status: active
+
+  - entity: StatusEffectSystem._instances + StatusEffectSystem._by_target（运行时状态注册表）
+    owner: status-effect-system
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "Dictionary[int, StatusInstance] + Dictionary[int, Array[int]]——运行时活跃状态实例的权威注册表（不持久化）。key=status_id 全局唯一递增索引；key=target_id 角色级 O(1) 查询。战斗期间不通过 GSM 存储——战斗结束时通过 serialize_all() 导出快照至 GSM。"
+    status: active
+
+  - entity: StatusEffectSystem._templates（状态模板注册表）
+    owner: status-effect-system
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "Dictionary[StringName, StatusTemplate]——50-80 个只读 StatusTemplate Resource（.tres）。由 StatusEffectSystem._ready() 同步加载填充。通过 get_status_template() 只读访问器封装——防止运行时意外修改 const Dictionary 内容（GDScript const 不冻结嵌套内容，由团队约定 + GUT 冒烟测试保护）。"
+    status: active
+
+  - entity: StatusEffectSystem._suspended（暂挂状态注册表）
+    owner: status-effect-system
+    adr: ADR-0011
+    referenced_by: [ADR-0011]
+    note: "Dictionary[int, Array[Dictionary]]——key=阵亡角色 ID，value=被暂挂状态的序列化快照列表（非绑定来源的状态）。角色复活时通过 restore_statuses() 反序列化重建；角色永久死亡时清理防止泄漏。"
+    status: active
+
+  - entity: BindingManager._bindings + BindingManager._by_character + BindingManager._card_to_character（运行时绑定注册表）
+    owner: binding-manager
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "Dictionary[int, BindingRecord] + Dictionary[int, Array[int]] + Dictionary[int, int]——战斗期间活跃绑定实例的权威注册表（不持久化）。key=binding_id 全局唯一递增索引；key=character_id O(1) 角色绑定查询；key=card_instance_id O(1) 反向查询。三索引在 _register_binding()/_unregister_binding() 中原子同步更新。战斗期间不通过 GSM 存储——战斗结束时通过 serialize_all() 导出快照至 GSM.battle.bindings。遵循 ADR-0011 的 GSM 例外先例模式。"
+    status: active
+
+  - entity: BindingManager._slot_limits（绑定位上限缓存）
+    owner: binding-manager
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "Dictionary[StringName, int]——战斗开始时从 RealmSystem.get_realm_property() 缓存的当前境界绑定位上限（'gongfa_slots'/'fabao_slots'）。战斗期间境界变更不可行（当前设计）——若未来支持，需添加 realm_changed 信号监听刷新缓存。"
+    status: active
+
+interfaces:
+  - contract: "GSM 第一层：直接属性读取"
+    signature: "GSM.player.*, GSM.collection.*, GSM.deck.*, GSM.exploration.*, GSM.narrative.*, GSM.session.*"
+    adr: ADR-0001
+    referenced_by: [ADR-0001]
+    note: "O(1) 字典访问。无信号开销。每帧读取安全。"
+    status: active
+
+  - contract: "ProgressionSystem API——成就域"
+    signature: "ProgressionSystem.unlock_achievement(id) → {success, reason} / get_achievement(id) → Dictionary / get_achievements(category) → Array / update_achievement_progress(id, increment) → void"
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "失败原因：'already_unlocked' | 'unknown_id'。progress 达到 target 时自动调用 unlock_achievement()。"
+    status: active
+
+  - contract: "ProgressionSystem API——天赋域"
+    signature: "ProgressionSystem.get_talent_points() → int / add_talent_points(amount) → void / purchase_talent(id) → {success, reason} / grant_talent(id) → {success, reason} / get_talent_tree_state() → Dictionary / set_equipped_talents(ids) → {success, reason} / get_active_slot_count() → int"
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "purchase_talent 失败原因：'insufficient_points' | 'prerequisite_locked' | 'already_unlocked' | 'condition_not_met'。grant_talent 不扣除点数——用于 EventSystem GAIN_TALENT Outcome（ADR-0004 迁移目标）。active_slots = 5 + floor(unlocked/4)。"
+    status: active
+
+  - contract: "ProgressionSystem API——图鉴/结局/统计/元信息域"
+    signature: "mark_card_discovered(id) → void / unlock_ending(id, path, identity, realm) → {success, reason} / increment_stat(key, amount) → void / set_stat(key, value) → void / serialize() → Dictionary / deserialize(data) → bool"
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "unlock_ending 原子递增 total_completions 内置——调用方无需额外操作。increment_stat 幂等去重。set_stat 仅当 value > 当前值时写入。serialize/deserialize 由 SaveLoadSystem 调用——替代 GSM.serialize() 用于 progression.dat I/O。"
+    status: active
+
+  - contract: "ProgressionSystem 信号总线"
+    signature: "signal progression_initialized() / progression_updated(domain, key, old_val, new_val) / achievement_unlocked(ach_id) / talent_purchased(id, points_remaining) / card_discovered(card_id, total) / ending_unlocked(ending_id, total)"
+    adr: ADR-0012
+    referenced_by: [ADR-0012]
+    note: "progression_updated → SaveLoadSystem._atomic_write（同步信号发射+50ms 帧尖峰——通过 batch_update_begin/end 去重）。Cat 2b 信号（achievement_unlocked/talent_purchased/card_discovered/ending_unlocked）→ UI 节点响应。SaveLoadSystem 原监听 GSM.progression_updated——迁移至 ProgressionSystem.progression_updated。"
+    status: active
+
+  - contract: "BindingManager 绑定操作 API"
+    signature: "bind_card(card_instance_id, template_id, character_id, slot_type) → BindResult / stack_card(card_instance_id, template_id, character_id) → StackResult / overwrite_binding(card_instance_id, template_id, character_id, slot_index) → BindResult / remove_all_bindings(character_id) → Array[Dictionary] / can_bind(character_id, slot_type, template_id) → CanBindResult"
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "BindResult = {success, binding_id, reason}——reason: 'bound'|'slot_full'|'invalid_character'|'card_already_bound'。StackResult = {stacked, stack_count, reason}。CanBindResult = {can_bind, can_stack, must_overwrite, slot_index, reason}。remove_all_bindings 返回序列化数据供 CardSystem 洗回牌库。"
+    status: active
+
+  - contract: "BindingManager 查询 API"
+    signature: "get_bindings_by_character(character_id) → Array[BindingRecord] / get_binding_ids_by_character(character_id) → Array[int] / get_binding(binding_id) → BindingRecord / get_character_by_card(card_instance_id) → int / get_accumulated_bonus(character_id, stat_name) → float / get_binding_context(card_instance_id) → {native_multiplier, stack_count, effective_multiplier}"
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "get_binding_ids_by_character() 零分配热路径查询（CombatUI 每帧调用）。get_bindings_by_character() 每次分配新 Array——非热路径使用。get_binding_context() 由 CardEffectEngine 在效果结算时调用——返回预计算的 multiplier 乘积避免引擎中重复计算。"
+    status: active
+
+  - contract: "BindingManager 生命周期 API"
+    signature: "suspend_bindings(character_id) → void / restore_bindings(character_id) → void / serialize_all() → Dictionary / deserialize_all(data: Dictionary) → void"
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "suspend_bindings → CardEffectEngine.suspend_effects_by_source() + BindingRecord.is_suspended=true。restore_bindings → 验证 card_instance_id 存在性→ CardEffectEngine.restore_effects_by_source()。角色离场/上场时 CombatSystem 调用顺序：先 BindingManager.suspend/restore → 后 StatusEffectSystem.suspend/restore（绑定效果可能依赖状态修正值）。deserialize_all 采用尽力而为策略——逐条验证 card_instance_id，失败跳过+WARN。"
+    status: active
+
+  - contract: "BindingManager Cat 2b 信号总线"
+    signature: "signal binding_applied(binding_id, card_instance_id, template_id, character_id, slot_type, is_native) / binding_removed(binding_id, card_instance_id, character_id, reason) / binding_overwritten(old_binding_id, new_binding_id, character_id, slot_index) / binding_stacked(binding_id, template_id, character_id, new_stack_count) / binding_suspended(character_id, binding_ids) / binding_restored(character_id, binding_ids) / native_activated(binding_id, template_id, character_id)"
+    adr: ADR-0013
+    referenced_by: [ADR-0013]
+    note: "Cat 2b 系统信号——通过 ADR-0007 _emit_signal_safe 包装器路由。binding_applied → CombatUI 创建图标 + Audio 绑定音效；binding_removed → CombatUI 销毁图标+动画；binding_stacked → CombatUI '+1层' 文字特效+徽章更新；native_activated → CombatUI ★ 金色星标亮起 + Audio 金色共鸣音。信号链深度 ≤2 层。"
+    status: active
+
+forbidden_patterns:
