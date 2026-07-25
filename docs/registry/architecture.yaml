@@ -71,8 +71,22 @@ state_ownership:
   - entity: session.* 域（current_scene, ui_state, input_locks）
     owner: game-state-manager
     adr: ADR-0001
-    referenced_by: [ADR-0001]
-    note: "不持久化。current_scene 由 SceneManager 写入。input_locks 由 InputManager 写入。"
+    referenced_by: [ADR-0001, ADR-0006]
+    note: "不持久化。current_scene 和 scene_id 由 SceneManager（ADR-0006）独占写入——架构层面委托例外。input_locks 由 InputManager 写入。"
+    status: active
+
+  - entity: SceneManager._transitioning（转换门控标志）
+    owner: scene-manager
+    adr: ADR-0006
+    referenced_by: [ADR-0006]
+    note: "bool——转场进行中的唯一判定源。非 GSM 管理——SceneManager 本地状态。任何系统在 request_scene_change() 调用前通过此标志检查并发转换。"
+    status: active
+
+  - entity: SceneManager._current_scene_id + SCENE_PATHS（场景注册表）
+    owner: scene-manager
+    adr: ADR-0006
+    referenced_by: [ADR-0006]
+    note: "SceneID 枚举 + const Dictionary[SceneID, String]——所有场景路径的编译时真理来源。新增场景需在此注册表中添加条目。"
     status: active
 
   - entity: CardSystem.templates（模板注册表）
@@ -341,4 +355,124 @@ api_decisions:
     adr: ADR-0003
     referenced_by: [ADR-0003]
     note: "迁移链和版本管理作为 SaveLoadSystem 内部职责——减少 1 个 Foundation 层 Autoload，简化初始化顺序。"
+    status: active
+
+  - decision: "EventSystem 通过信号委托给 CardSystem——Foundation 层不依赖 Core 层"
+    adr: ADR-0004
+    referenced_by: [ADR-0004]
+    note: "ADD_CARD Outcome 发射 card_reward_requested 信号（fire-and-forget）。CardSystem 监听并执行 create_instance() → serialize_instance() → GSM.add_card_to_collection()。EventSystem 不直接调用 CardSystem API。"
+    status: active
+
+  - decision: "OutcomeType 枚举为事件系统+卡牌效果引擎共享词汇表的权威来源"
+    adr: ADR-0004
+    referenced_by: [ADR-0004]
+    note: "12 种 OutcomeType 枚举由 ADR-0004 首次定义。ADR-0009（卡牌效果引擎）必须扩展（非复制）此枚举——解决 architecture.md OQ-05。"
+    status: active
+
+  - decision: "EventSystem._ready() 同步加载事件模板（<150ms）"
+    adr: ADR-0004
+    referenced_by: [ADR-0004]
+    note: "60-100 个 .tres 文件的同步加载在主线程阻塞 <150ms——在启动画面与主菜单之间执行。若增长到 200+ 模板则切换到 load_threaded_request() 异步模式。"
+    status: active
+
+  - entity: InputManager._lock_stack
+    owner: input-manager
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "Array[LockEntry]——LockEntry = {type: LockType, source: StringName, device_mask: int}。运行时由 InputManager 管理；GSM.session.input_locks 持有序列化副本。"
+    status: active
+
+interfaces:
+  - contract: "GSM set_input_locks"
+    signature: "GSM.set_input_locks(data: Array[Dictionary]) → void"
+    adr: ADR-0005
+    referenced_by: [ADR-0001, ADR-0005]
+    note: "session.input_locks 的唯一写入入口——仅 InputManager 调用。写入后发射 batch_updated 信号。"
+    status: active
+
+  - contract: "InputManager push_lock"
+    signature: "push_lock(type: LockType, source: StringName, device_mask: int = DEVICE_ALL) → void"
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "推入锁栈——同一 source 重复 push 检测并警告。device_mask 位掩码。"
+    status: active
+
+  - contract: "InputManager pop_lock"
+    signature: "pop_lock(source: StringName) → void"
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "按 source 从栈中移除锁（LIFO 搜索）。source 不存在时记录警告。"
+    status: active
+
+  - contract: "InputManager is_input_allowed"
+    signature: "is_input_allowed(action_type: ActionType, device: DeviceType) → bool"
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "每帧被 UI 系统调用多次——必须 O(1)。device 独立判定（4.6 双焦点）。ActionType.ANY 始终返回 true。"
+    status: active
+
+  - contract: "SceneManager request_scene_change"
+    signature: "request_scene_change(from: SceneID, to: SceneID, type: TransitionType) → bool"
+    adr: ADR-0006
+    referenced_by: [ADR-0006]
+    note: "游戏所有场景转换的唯一入口——任何系统不得直接调用 get_tree().change_scene_to_file()。返回 false = 转换被拒绝（正在转场中或无效场景ID）。"
+    status: active
+
+  - contract: "SceneManager pre_transition / post_transition 信号"
+    signature: "pre_transition(from, to, type) / post_transition(from, to)"
+    adr: ADR-0006
+    referenced_by: [ADR-0006]
+    note: "pre_transition → 音频系统查表执行 BGM 过渡矩阵；post_transition → 新场景初始化（在 target._ready() 之后、第一个 _process() 之前发射）。"
+    status: active
+
+  - contract: "SceneManager GSM 集成"
+    signature: "GSM.session.current_scene（String） + GSM.session.scene_id（int）"
+    adr: ADR-0006
+    referenced_by: [ADR-0001, ADR-0006]
+    note: "SceneManager 为唯一写入者——架构层面委托例外。通过 GSM batch_updated({"session.current_scene": {old, new}}) 传播 scene_changed 语义。"
+    status: active
+
+  - contract: "SceneManager InputManager 集成"
+    signature: "push_lock(LockType.TRANSITION, &\"scene_manager\") / pop_lock(&\"scene_manager\")"
+    adr: ADR-0006
+    referenced_by: [ADR-0005, ADR-0006]
+    note: "Phase 2 push TRANSITION 锁（阻止所有输入）；Phase 4 pop（新场景就绪后恢复）。SceneManager 不直接调用 clear_locks()——由 InputManager 的 tree_changed 自动清理机制独立运作。"
+    status: active
+
+forbidden_patterns:
+  - pattern: "LockType.keys() not valid GDScript enum API"
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "LockType.keys() 不是有效的 GDScript 枚举 API。正确方法：LockType.find_key(type)。"
+    status: active
+
+  - pattern: "绕过 SceneManager 直接调用 get_tree().change_scene_to_file()"
+    adr: ADR-0006
+    referenced_by: [ADR-0006]
+    note: "所有场景转换必须通过 SceneManager.request_scene_change()。任何系统直接调用 get_tree().change_scene_to_file() 绕过输入锁定、自动存档和加载画面——所有 pre/post 钩子均被跳过。"
+    status: active
+
+  - pattern: "非 SceneManager 写入 GSM.session.current_scene 或 GSM.session.scene_id"
+    adr: ADR-0006
+    referenced_by: [ADR-0001, ADR-0006]
+    note: "SceneManager 是这两个 session 字段的唯一写入者（架构层面委托例外）。其他系统消费 scene_changed 信号即可——不得直接赋值。"
+    status: active
+
+api_decisions:
+  - decision: "GAMEPLAY 键盘输入使用 Input Map 动作轮询"
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "Input.is_action_just_pressed() 在 _process() 中轮询——不受 GUI 焦点影响。"
+    status: active
+
+  - decision: "锁变更通过 GSM batch_updated 信号传播"
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "GSM.set_input_locks() → batch_updated——避免专用信号与 GSM 信号系统重复。"
+    status: active
+
+  - decision: "SceneManager 非锁清除的唯一依赖——tree_changed 自动清理"
+    adr: ADR-0005
+    referenced_by: [ADR-0005]
+    note: "InputManager 连接 SceneTree.tree_changed 信号自动清除锁栈。确保 SceneManager 重构时不泄漏锁。"
     status: active

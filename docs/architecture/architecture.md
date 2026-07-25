@@ -253,6 +253,9 @@ advance_phase() → bool  # 每阶段结束检查前置条件，失败则报告�
 
 ### 输入管理器 ⚠️ 4.6 HIGH
 
+> **完整 API 规范见 `docs/decisions/ADR-0005-input-manager-four-tier-lock-stack-dual-focus.md`**
+> 以下为架构摘要——签名可能已细化。以 ADR-0005 为准。
+
 ```
 四级锁栈 (严格度递增):
   dialogue  = 0    # 阻拦 GAMEPLAY，允许 DIALOGUE + UI_NAV
@@ -260,17 +263,35 @@ advance_phase() → bool  # 每阶段结束检查前置条件，失败则报告�
   modal     = 2    # 阻拦非该弹窗的所有输入
   transition = 3   # 阻拦所有输入
 
-is_input_allowed(action_type: ANY|UI_NAV|GAMEPLAY|DIALOGUE) → bool
-push_lock(type) / pop_lock(type)
-信号: input_lock_changed(lock_type, is_locked)
+is_input_allowed(action_type: ActionType, device: DeviceType) → bool
+  # ActionType: ANY | UI_NAV | DIALOGUE | GAMEPLAY
+  # DeviceType: MOUSE | KEYBOARD | GAMEPAD（位掩码可组合）
+  # ⚠️ 4.6 双焦点独立判定——鼠标和键盘分别检查
+
+push_lock(type: LockType, source: StringName, device_mask: int = DEVICE_ALL)
+pop_lock(source: StringName)
+  # 锁变更通过 GSM.set_input_locks() → batch_updated 信号传播
+  # 取代原来的 input_lock_changed 专用信号
+
+输入分发路径（Godot 4.6 事件派发顺序):
+  GAMEPLAY 键盘 → Input Map 动作轮询 (_process 中 is_action_just_pressed)
+  UI_NAV 快捷键 → _input()（GUI 派发前拦截）
+  鼠标交互      → _gui_input() / _input_event()
 ```
 
 ### 事件系统 — story_flags 所有权
 
-- **事件系统** = 唯一运行时写入者（`set_flag` 方法）
-- **剧情系统** = 通过 `advance_chapter()` 委托事件系统写入
+- **EventSystem** = 唯一运行时写入者（通过 `GSM.set_narrative_flag()` —— ADR-0001 第二层新增方法）
+- **剧情系统** = 通过 `EventSystem.set_flag()` 委托写入
 - **对话系统** = `DialogueOutcome.set_flag → EventSystem.set_flag()` 委托
-- **结局分支系统** = 只读（聚合标记，不写入）
+- **卡牌效果引擎** = `SET_FLAG 效果类型 → EventSystem.set_flag()` 委托
+- **结局分支系统** = 只读（`EventSystem.get_flag()`）
+
+### ADD_CARD 结果执行 — Foundation 层信号委托
+
+- **EventSystem**（Foundation #5）→ 发射 `card_reward_requested(template_id)` 信号（fire-and-forget）
+- **CardSystem**（Core 层）→ 监听信号 → `create_instance()` + `serialize_instance()` + `GSM.add_card_to_collection()`
+- 此信号委托保持 Foundation 层原则 #3 合规——EventSystem 不直接依赖 Core 层系统
 
 ### 存档模式版本控制
 
@@ -297,7 +318,7 @@ push_lock(type) / pop_lock(type)
 | 2 | 存档/读档: JSON 格式 + schema_version + 迁移链 | TR-save-001→003, TR-migrate-001,002 | MEDIUM (FileAccess) |
 | 3 | 事件系统: story_flags 唯一运行时写入者 | TR-event-001→003 | — |
 | 4 | 输入管理器: 四级锁栈 + 双焦点 | TR-input-001,002 | HIGH (4.6) |
-| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — |
+| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — | ✅ ADR-0006 |
 | 6 | 卡牌数据模型: Template/Instance 分离 | TR-card-001,002 | — |
 | 7 | 信号驱动通信: GSM 信号 vs 直接调用 | TR-gsm-002, TR-hud-001 (横切) | — |
 

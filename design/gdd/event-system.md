@@ -186,20 +186,22 @@ select_event(candidates, realm_level):
 
 Outcome 类型的具体执行映射：
 
-| Outcome 类型 | 执行操作 | 通过GSM |
+| Outcome 类型 | 执行操作 | 执行路径 |
 |-------------|---------|---------|
-| add_resource | spend_resource 的反向：GSM.set("player.resources.{target}", new_value) | ✅ |
-| add_cultivation | GSM.add_cultivation(value) | ✅ |
-| add_card | GSM.add_card_to_collection(card_id) | ✅ |
-| remove_card | 从收藏和当前卡组移除卡牌 | ✅ |
+| add_resource | GSM.add_resource(target, value) | ✅ GSM 第二层原子方法 |
+| add_cultivation | GSM.add_cultivation(value) | ✅ GSM 第二层原子方法 |
+| add_card | card_reward_requested 信号 → CardSystem.create_instance() + serialize_instance() + GSM.add_card_to_collection() | ✅ 信号委托（ADR-0004——Foundation 层不直接依赖 Core 层） |
+| remove_card | GSM.remove_card_from_collection(card_instance_id) | ✅ GSM 第二层原子方法 |
 | heal | 治疗队伍（战斗相关，战斗中生效） | 战斗系统 |
 | damage | 伤害队伍（事件中的战斗陷阱） | 战斗系统 |
-| set_flag | GSM.set("narrative.story_flags.{flag}", true) | ✅ — **story_flags 的唯一运行时写入者。剧情系统和对话系统通过触发事件来间接设置标记，不直接写入。** |
-| gain_talent | 临时/永久解锁天赋 | GSM.progression |
+| set_flag | EventSystem.set_flag(target, value) → GSM.set_narrative_flag() | ✅ **story_flags 的唯一运行时写入入口**（ADR-0004）。剧情系统和对话系统通过 EventSystem.set_flag() 委托写入，不直接操作 GSM.narrative.story_flags |
+| gain_talent | GSM.progression.unlock_talent() | ✅ GSM progression 域 |
 | trigger_battle | 加载战斗场景 | 探索系统 |
-| advance_chapter | 推动剧情章节 | GSM.narrative |
-| restore_ap | GSM.set("exploration.action_points", min(current+value, max)) | ✅ |
+| advance_chapter | GSM.narrative.advance_chapter() | ✅ GSM narrative 域 |
+| restore_ap | GSM.restore_action_points(value) | ✅ GSM 第二层原子方法 |
 | nothing | 无效果（仅叙事文本） | — |
+
+> **ADR-0004 变更摘要**：`add_card` 结果通过 `card_reward_requested` 信号委托给 CardSystem（保持 Foundation 层原则 #3 合规）——非直接调用 CardSystem API。`set_flag` 通过新增的 GSM 第二层方法 `set_narrative_flag()` 写入——非通用的 `GSM.set()`。详见 `docs/decisions/ADR-0004-event-system-story-flags-owner-resource-templates.md`。
 
 #### 9. 斜月三星洞——隐藏奇遇（特殊规则）
 

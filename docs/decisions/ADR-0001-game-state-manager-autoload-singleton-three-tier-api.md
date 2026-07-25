@@ -111,6 +111,14 @@ GSM.set_narrative_flag(flag: StringName, value: Variant) → void
   # 值变更后发射 batch_updated({"narrative.story_flags.{flag}": {old, new}})
   # 定义于 ADR-0004（事件系统）——此处记录以供 API 完整性
   # ⚠️ 剧情/对话/效果引擎不得直接调用——它们通过 EventSystem.set_flag() 委托写入
+
+GSM.set_input_locks(data: Array[Dictionary]) → void
+  # session.input_locks 的唯一写入入口——仅 InputManager 调用
+  # 写入 GSM.session.input_locks = data
+  # 值无变化时不发射信号；值变更后发射 batch_updated({"session.input_locks": {old, new}})
+  # 定义于 ADR-0005（输入管理器）——此处记录以供 API 完整性
+  # 注意：session.* 域为瞬态数据（不持久化到存档）——此方法仍遵循"通过 GSM 第二层写入"规则，
+  #       以保证 batch_updated 信号的一致性并防止静默写入绕过信号系统
 ```
 
 "guard"一词特意使用而非"lock"，以避免与多线程原语混淆——GDScript 是单线程的，guard 是语义屏障。
