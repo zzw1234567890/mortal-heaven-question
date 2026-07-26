@@ -1,7 +1,7 @@
 # ADR-0005：场景管理器 — 唯一场景转换仲裁者 + 5 阶段管线
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-24
@@ -72,7 +72,7 @@ Phase 1 — VALIDATE
 Phase 2 — PRE-TRANSITION
   ├─ _transitioning = true
   ├─ InputManager.push_lock(LockType.TRANSITION, &"scene_manager")  # 阻止所有输入
-  ├─ SaveLoad.auto_save()  # 触发异步自动存档（fire-and-forget）
+  ├─ SaveLoad.auto_save()  # 触发自动存档——同步写入磁盘（预计 30-100ms），加载画面在此期间显示
   └─ _transition_type = type  # 传递给加载画面
      → 发射 pre_transition(from, to, type)  # 音频系统/UI 系统监听
 
@@ -84,8 +84,9 @@ Phase 3 — LOAD → CHANGE
 
 Phase 4 — POST-LOAD
   ├─ await tree_changed（目标场景就绪）
-  ├─ ⚠️ 防御：assert get_tree().current_scene.scene_file_path == SCENE_PATHS[to]
-  │     # tree_changed 可能被非场景切换的树变更提前触发——此断言确保场景确实变了
+  ├─ ⚠️ 防御：if get_tree().current_scene.scene_file_path != SCENE_PATHS[to]:
+  │     # tree_changed 可能被非场景切换的树变更提前触发——使用 if 而非 assert
+  │     # 以确保在发布构建（release）中也执行此防御逻辑
   │     # 失败时：记录错误，_transitioning = false，pop_lock，返回——不执行后续步骤
   ├─ GSM.session.current_scene = SCENE_PATHS[to]
   ├─ GSM.session.scene_id = to

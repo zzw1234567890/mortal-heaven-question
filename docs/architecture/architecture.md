@@ -2,7 +2,7 @@
 
 ## 文档状态
 
-- **版本 (Version)**：1.3
+- **版本 (Version)**：1.4
 - **最后更新 (Last Updated)**：2026-07-25
 - **引擎 (Engine)**：Godot 4.6
 - **覆盖的 GDD (GDDs Covered)**：36 个系统（见 design/gdd/systems-index.md）
@@ -316,7 +316,7 @@ pop_lock(source: StringName)
 
 ## ADR 审计
 
-**现有 ADR**：29 个（ADR-0001 至 ADR-0029）。覆盖 Foundation 层 5 个（GSM、存档、事件、输入、场景）、Core 层 9 个（卡牌、信号通信、境界、状态效果、费用、阵营、资源、卡牌效果引擎、流派）、Feature 层 12 个（战斗、绑定、探索、上场阵位、AI、修为养成、渡劫、卡组编辑、开局身份、阵法、剧情、炼丹炼器）、叙事层 2 个（对话、结局分支——均非 Autoload）、Meta 层 1 个（跨局元进度）。全部处于 **Proposed** 状态——Foundation 层 ADR 需推进到 Accepted 后方可进入实现阶段。
+**现有 ADR**：30 个（ADR-0001 至 ADR-0030）。Foundation 层 5 个（GSM、存档、事件、输入、场景）为 **Accepted** ✅；Core 层 9 个（卡牌、信号通信、境界、状态效果、费用、阵营、资源、卡牌效果引擎、流派）、Feature 层 12 个（战斗、绑定、探索、上场阵位、AI、修为养成、渡劫、卡组编辑、开局身份、阵法、剧情、炼丹炼器）、叙事层 2 个（对话、结局分支——均非 Autoload）、Meta 层 1 个（跨局元进度）、经济层 1 个（法宝铭刻——非 Autoload）全部处于 **Proposed** 状态。
 
 **Autoload 链**：25 个（超出 Godot 20 软上限 ⚠️）。ADR-0027（对话）、ADR-0028（炼丹炼器）、ADR-0029（结局分支）均采用 RefCounted 轻量模式——零 Autoload 扩容。
 

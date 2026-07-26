@@ -447,6 +447,13 @@ func _enter_phase(phase: CombatPhase) -> void:
             # 3. 等待玩家操作——不自动推进
             #    confirm_end_turn() 由 UI 按钮触发
 
+        CombatPhase.ATTACK_DECLARATION:
+            # 玩家主动阶段——需要选择攻击目标（GAMEPLAY 输入）
+            InputManager.pop_lock(&"combat_system")
+            # ⚠️ 必须显式 pop ANIMATION 锁——Phase 2 PLAY 的 _exit_phase 推入了 ANIMATION 锁
+            # 攻击声明是玩家交互阶段，需要解锁 GAMEPLAY 以支持目标选择
+            _attack_declaration_timeout = 0.0
+
         # ... (其他阶段类似)
 
 ## 阶段出口——清理当前阶段状态
@@ -456,6 +463,11 @@ func _exit_phase(phase: CombatPhase) -> void:
             # 锁定 gameplay 输入（防止玩家在结算期间操作）
             InputManager.push_lock(LockType.ANIMATION, &"combat_system")
             _player_confirmed_end = false
+        CombatPhase.ATTACK_DECLARATION:
+            _attack_target_queue.clear()
+            # 重新推入 ANIMATION 锁——攻击声明结束后进入自动结算阶段
+            InputManager.push_lock(LockType.ANIMATION, &"combat_system")
+            _player_attack_confirmed = false
         CombatPhase.ATTACK_RESOLUTION:
             _attack_queue.clear()
         CombatPhase.END:

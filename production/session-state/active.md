@@ -1,35 +1,31 @@
 # 活跃会话状态
 
 > **会话 ID**：2026-07-25
-> **上次更新**：2026-07-25（第三批 ADR 3 个 + architecture.md v1.3 同步完成）
+> **上次更新**：2026-07-26（Foundation 层 ADR Accepted + architecture.md v1.4 同步）
 
 ## 本会话成果
 
-### 三批 ADR 全部完成（共 15 个）
+### Foundation 层 ADR 全部 Accepted ✅
 
-| 批次 | ADR | 系统 | 层 | Autoload # |
-|------|-----|------|-----|-----------|
-| 1 | 0015 | 费用系统 (CostSystem) | Core | #7 |
-| 1 | 0016 | 上场阵位系统 (DeploymentSystem) | Feature | #17 |
-| 1 | 0017 | AI 系统 (AISystem) | Feature | #18 |
-| 1 | 0018 | 阵营系统 (FactionSystem) | Core | #15 |
-| 1 | 0019 | 资源系统 (ResourceSystem) | Core | #16 |
-| 2 | 0025 | 流派系统 (SchoolSystem) | Core | #19 |
-| 2 | 0020 | 修炼养成系统 (CultivationSystem) | Feature | #20 |
-| 2 | 0022 | 开局身份系统 (IdentitySelectionSystem) | Feature | #21 |
-| 2 | 0023 | 卡组编辑系统 (DeckEditingSystem) | Feature | #22 |
-| 2 | 0024 | 阵法系统 (FormationSystem) | Feature | #23 |
-| 2 | 0021 | 渡劫突破系统 (TribulationSystem) | Feature | #24 |
-| 2 | 0026 | 剧情系统 (StorySystem) | Feature | #25 |
-| 3 | 0027 | 对话系统 (DialogueSystem) | Narrative | **零 Autoload** |
-| 3 | 0028 | 炼丹炼器系统 (AlchemyCraftingSystem) | Economy | **零 Autoload** |
-| 3 | 0029 | 结局分支系统 (EndingBranchSystem) | Narrative | **零 Autoload** |
+| ADR | 系统 | 审查结果 | 修复项 | 最终状态 |
+|-----|------|:--:|:--:|:--:|
+| ADR-0001 | GSM 三层 API | 7 HIGH | 交叉引用 ×3、缺 6 章节、GDD 路径 | **Accepted** |
+| ADR-0002 | 存档/读档 | 3 HIGH | meta + current_scene、event_resolved 连接 | **Accepted** |
+| ADR-0003 | 事件系统 | ✅ PASS | 仅 ADR-0001 L112 引用修正 | **Accepted** |
+| ADR-0004 | 输入管理器 | 3 CONCERNS | 白名单语义修正、MODAL 覆盖机制 | **Accepted** |
+| ADR-0005 | 场景管理器 | ✅ PASS | assert→if、注释修正 | **Accepted** |
 
-### 跨 ADR 一致性修复
+### 法宝铭刻 ADR 创建 ✅
 
-1. **第一批**：Autoload #14 冲突 → #17/#18；全链统一 18 个；architecture.md v1.0→v1.1
-2. **第二批**：#19 七路冲突 → 按依赖链分配 #19~#25；流派 Feature→Core 迁移；architecture.md v1.1→v1.2
-3. **第三批**：零 Autoload 扩容——对话（RefCounted 服务类）、炼丹炼器（class_name 工具类）、结局分支（嵌入 StorySystem）；architecture.md v1.2→v1.3
+| ADR | 系统 | 模式 | 状态 |
+|-----|------|------|:--:|
+| ADR-0030 | 法宝铭刻系统 | RefCounted + class_name（零 Autoload） | **Proposed** |
+
+### 跨 ADR 修复
+
+- ADR-0008 战斗系统 Phase 3 ATTACK_DECLARATION 锁冲突修复（pop/push ANIMATION）
+- architecture.md ADR-0005→ADR-0004 输入管理器编号引用修正
+- architecture.md v1.3→v1.4：30 ADR + Foundation Accepted 标注
 
 ## Autoload 全链（25 个）
 
@@ -71,34 +67,35 @@
 
 <!-- STATUS -->
 Epic: Architecture Foundation
-Feature: ADR 全批次（0015~0029）
-Task: architecture.md v1.3 同步 — complete ✅
+Feature: Foundation ADR Accepted + ADR-0030 创建
+Task: architecture.md v1.4 同步 — complete ✅
 <!-- /STATUS -->
 
 ## 关键架构决策
 
-1. **ADR 覆盖 29/36 GDD 系统**：剩余 7 个为 UI 层（6 个）+ 法宝铭刻（1 个）——编码阶段直接决策
-2. **Autoload 链 25 个**：超出 Godot 20 软上限 ⚠️——第三批全部采用 RefCounted 阻止进一步膨胀
-3. **RefCounted 轻量模式确立**：对话/炼丹炼器/结局分支三系统论证了"非 Autoload 架构"的可行性——为未来系统（法宝铭刻等）提供先例
+1. **ADR 覆盖 30/36 GDD 系统**：剩余 6 个为 UI 层（6 个）——编码阶段直接决策。法宝铭刻已由 ADR-0030 覆盖
+2. **Autoload 链 25 个**：超出 Godot 20 软上限 ⚠️——第三批后新增系统（对话/炼丹炼器/结局分支/法宝铭刻）全部采用 RefCounted 阻止进一步膨胀
+3. **Foundation 层 5 个 ADR 全部 Accepted ✅**：编码阶段可开始实现 Foundation 系统
 4. **Core 层"静态数据表三剑客"**：RealmSystem(#11) + FactionSystem(#15) + SchoolSystem(#19)——均采用 const Dictionary + 纯查询接口
 5. **GSM 例外清单四条目**：StatusEffectSystem + BindingManager + DeploymentSystem + FormationSystem——战斗热路径内部管理 + 战斗结束 GSM 快照
+6. **ADR-0001 第二层原子方法**：24 个方法（8 个明确签名 + 3 个图表中存在 + 12 个其他 ADR 定义 + 1 个最终状态变更）——需汇总回 ADR-0001（见遗留问题 #3）
 
 ## ADR 总数统计
 
-| 层 | 数量 | Autoload | 非 Autoload |
-|-----|------|:--:|:--:|
-| Foundation | 5 | 5 | 0 |
-| Core | 9 | 8 | 0 |
-| Feature | 11 | 11 | 0 |
-| Meta | 1 | 1 | 0 |
-| Narrative | 2 | 0 | 2 |
-| Economy | 1 | 0 | 1 |
-| **总计** | **29** | **25** | **3** |
+| 层 | 数量 | Autoload | 非 Autoload | Accepted |
+|-----|------|:--:|:--:|:--:|
+| Foundation | 5 | 5 | 0 | 5 ✅ |
+| Core | 9 | 8 | 0 | 0 |
+| Feature | 11 | 11 | 0 | 0 |
+| Meta | 1 | 1 | 0 | 0 |
+| Narrative | 2 | 0 | 2 | 0 |
+| Economy | 2 | 0 | 2 | 0 |
+| **总计** | **30** | **25** | **4** | **5** |
 
 ## 已知遗留问题
 
 1. **行数超标**：多个 ADR 超出 ≤250 行目标
 2. **ADR-0015 双重信号路径**：cost_changed (Cat 2b) + batch_updated (Cat 1)
-3. **GSM 第二层方法碎片化**：多家 ADR 各自定义 GSM 原子方法——需汇总回 ADR-0001
+3. **GSM 第二层方法碎片化**：24 个原子方法分布在 ADR-0001（8+3）、ADR-0014（6）、ADR-0020/0021（1）、ADR-0022（1）、ADR-0026（5）——需汇总回 ADR-0001
 4. **Autoload 25 超 20 软上限**：已在所有相关 ADR 中明确记录风险
-5. **法宝铭刻系统无 ADR**：与炼丹炼器紧密关联——编码前应决策
+5. **Core/Feature/Narrative/Economy/Meta 层 ADR 仍为 Proposed**：25 个非 Foundation 层 ADR 等待实现前审查

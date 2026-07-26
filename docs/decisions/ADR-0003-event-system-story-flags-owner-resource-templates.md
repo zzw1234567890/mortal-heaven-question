@@ -1,7 +1,7 @@
 # ADR-0003：事件系统 — story_flags 唯一写入者 + Resource 模板 + 信号委托
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-24

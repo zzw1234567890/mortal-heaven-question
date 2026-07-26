@@ -1,7 +1,7 @@
 # ADR-0001：游戏状态管理器 — Autoload 单例 + 三层 API
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-24
@@ -127,13 +127,54 @@ GSM.set_narrative_flag(flag: StringName, value: Variant) → void
   # 定义于 ADR-0003（事件系统）——此处记录以供 API 完整性
   # ⚠️ 剧情/对话/效果引擎不得直接调用——它们通过 EventSystem.set_flag() 委托写入
 
-GSM.set_input_locks(data: Array[Dictionary]) → void
-  # session.input_locks 的唯一写入入口——仅 InputManager 调用
-  # 写入 GSM.session.input_locks = data
-  # 值无变化时不发射信号；值变更后发射 batch_updated({"session.input_locks": {old, new}})
-  # 定义于 ADR-0005（输入管理器）——此处记录以供 API 完整性
-  # 注意：session.* 域为瞬态数据（不持久化到存档）——此方法仍遵循"通过 GSM 第二层写入"规则，
-  #       以保证 batch_updated 信号的一致性并防止静默写入绕过信号系统
+GSM.add_cultivation(amount: float, source: String = "") → void
+  # 修为写入的唯一入口——仅 CultivationSystem 调用
+  # 写入 GSM.player.cultivation += amount，同时维护溢出池
+  # 溢出时设置 player.cultivation_full = true
+  # 发射 batch_updated({"player.cultivation": {old, new}, "player.cultivation_full": ...})
+  # 定义于 ADR-0020（修为养成系统）——此处记录以供 API 完整性
+
+GSM.spend_resource(type: StringName, amount: int) → bool
+  # 资源消耗的统一入口——ResourceSystem 消费
+  # 返回 false 当 type 不存在或余额不足
+  # 成功 → 发射 batch_updated({"player.resources.{type}": {old, new}})
+  # 定义于 ADR-0019（资源系统）——此处记录以供 API 完整性
+
+GSM.battle_start(config: Dictionary) → void
+  # 战斗开始时创建 battle.* 域——仅 CombatSystem 调用
+  # 写入 battle.current_cost、battle.player_field、battle.enemy_field 等
+  # 定义于 ADR-0008（战斗系统）——此处记录以供 API 完整性
+
+GSM.battle_end(result: Dictionary) → void
+  # 战斗结束时清理 battle.* 域并触发战后结算——仅 CombatSystem 调用
+  # 定义于 ADR-0008（战斗系统）——此处记录以供 API 完整性
+
+## 探索导航状态（ADR-0014 探索系统定义）
+GSM.set_exploration_map(map_id: StringName) → void
+GSM.set_exploration_position(layer: int, idx: int) → void
+GSM.add_visited_node(node_id: int) → void
+GSM.set_exploration_ap(current: int, max_ap: int) → void
+GSM.update_exploration_map_state(changes: Dictionary) → void
+GSM.clear_exploration_navigation() → void
+  # 探索导航 6 个方法——仅 ExplorationSystem 调用
+  # 详见 ADR-0014 §"GSM 第二层原子方法"
+
+GSM.apply_cultivation_change(delta: int) → void
+  # 修为变更统一入口——CultivationSystem/TribulationSystem 调用
+  # 定义于 ADR-0020（修为养成）和 ADR-0021（渡劫突破）
+
+GSM.set_talent(talent_id: StringName, magnitude: int) → void
+  # 天赋写入——仅 IdentitySelectionSystem 在开局选择时调用
+  # 定义于 ADR-0022（开局身份系统）
+
+## 剧情进度（ADR-0026 剧情系统定义）
+GSM.set_current_chapter(chapter_id: StringName) → void
+GSM.add_required_event_completion(event_id: StringName) → void
+GSM.set_narrative_boss_unlocked(value: bool) → void
+GSM.set_narrative_boss_defeated(value: bool) → void
+GSM.add_completed_chapter(chapter_id: StringName) → void
+  # 剧情 5 个方法——仅 StorySystem 调用
+  # 详见 ADR-0026 §"GSM 第二层原子方法"
 ```
 
 "guard"一词特意使用而非"lock"，以避免与多线程原语混淆——GDScript 是单线程的，guard 是语义屏障。
