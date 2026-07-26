@@ -1,7 +1,7 @@
 # 活跃会话状态
 
 > **会话 ID**：2026-07-25
-> **上次更新**：2026-07-26（Feature 层 ADR-0008/0009 Accepted + architecture.md v1.7 同步）
+> **上次更新**：2026-07-26（主菜单 UX 规范完成）
 
 ## 本会话成果
 
@@ -85,10 +85,31 @@
 | 结局分支系统 | EndingEvaluator 纯函数工具类嵌入 StorySystem | ADR-0029 |
 
 <!-- STATUS -->
-Epic: Architecture Review
-Feature: 全部 ADR 审查完成 ✅ (30 个)
-Task: 🎉 全部 30 个 ADR Accepted ✅ ——架构审查完成
+Epic: Card System Assets
+Feature: 卡牌系统全部 6 种类型资产规范完成
+Task: 200 个资产规范已写入 6 个规范文件
 <!-- /STATUS -->
+
+## 最近活动
+
+- 2026-07-26：全部卡牌资产规范完成——5 个新规范文件写入：
+  - `design/assets/specs/card-system-techniques-assets.md`——52 张功法卡运功图（ASSET-016~063）
+  - `design/assets/specs/card-system-artifacts-assets.md`——48 张法宝卡器物图（ASSET-064~108）
+  - `design/assets/specs/card-system-pills-assets.md`——24 张丹药卡丹丸图（ASSET-109~133）
+  - `design/assets/specs/card-system-talismans-assets.md`——30 张符箓卡符文图（ASSET-134~163）
+  - `design/assets/specs/card-system-formations-assets.md`——16 张阵法卡阵盘图（ASSET-164~179）
+  - `design/assets/asset-manifest.md`——更新——200/200 资产已规范
+  - 6 个并行代理全部因 Haiku API 503 失败——所有规范由主会话以 Solo 模式直接编写
+
+- 2026-07-26：补全卡牌图片规范——三个文件修改：
+  - `ADR-0006` L91：CardTemplate 新增 `illustration_path: String` 字段
+  - `art-bible.md` L1482-L1722：新增第 5.X 部分「卡牌插画类型规范」——6 种卡牌类型 × 185 张 LOD-1 插画规格，含角色(15)/功法(52)/法宝(48)/丹药(24)/符箓(30)/阵法(16) 的视觉语法、构图规则、色彩预算、外包标准
+  - `card-system-design.md` L309：新增插画规范引用注释
+- 2026-07-26：完成美术圣经第 7/8/9 部分的撰写并写入 `design/art/art-bible.md`
+  - 第 7 部分「UI/HUD 视觉方向」：排版系统(4 字体+7 字号层级)、图标系统(5 类别 + 3 状态)、4 屏幕 ASCII 布局图(战斗/探索/卡组编辑/主菜单)、5 种动画规范、4.6 双焦点视觉策略、语义色使用预算(≤12 处)
+  - 第 8 部分「资产标准」：文件格式与命名约定(完整目录结构)、LOD 金字塔内存估算(~119MB 纹理峰值)、Godot 导入预设(可直接复制)、绘制调用预算(≤200)、色彩管理与墨阶校准(7 级)、外包 8 项验收清单
+  - 第 9 部分「参考方向」：5 个参考(汪达与巨像/上美影水墨动画/Slay the Spire/胧村正/Sable)——每个含「汲取」+「明确避免」双向约束 + 参考可区分性测试
+- 美术圣经已完整：9 部分 + 卡牌插画类型规范(5.X) = 2,889 行。状态已更新为「全部完成」
 
 ## 关键架构决策
 

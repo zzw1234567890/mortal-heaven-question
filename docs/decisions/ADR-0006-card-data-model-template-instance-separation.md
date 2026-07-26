@@ -86,6 +86,10 @@ extends Resource
 ## 背景叙述文本
 @export var flavor_text: String
 
+## 插画资源路径（如 "res://assets/cards/illustrations/character/char_lin_yuan.png"）
+## 每张卡牌模板关联其专属插画。空字符串表示暂无插画——运行时使用类型默认占位图。
+@export var illustration_path: String = ""
+
 # --- 类型专属字段（按 type 条件可空）---
 
 ## 角色卡：基础属性
@@ -412,6 +416,7 @@ card_name = template.name                              # String
 | card-system.md | OQ-04——222 个模板文件的异步加载策略 | 确立 ResourceLoader.load_threaded_request() 分批加载，每帧 10 个，主线程无阻塞 |
 | card-system.md | §依赖——与 GSM 的接口需求 | 确立 GSM.allocate_card_id() 用于 ID 分配；GSM.enable_validation(db) 模板加载后启用校验 |
 | card-system-design.md | 222 张卡牌涵盖 52 角色 + 52 功法 + 48 法宝 + 16 阵法 + 24 丹药 + 30 符箓 | 每张卡在 `assets/cards/templates/` 中对应一个 .tres 文件；CardType 枚举定义 6 种类型 |
+| art-bible.md | §卡牌插画类型规范——每张卡牌必须有其名称相符的专属插画，6 种类型各有不同的视觉语法 | CardTemplate 新增 `illustration_path: String` 字段——每张模板关联到 `assets/cards/illustrations/[type]/[card_id].png`。插画属于模板层（非实例层），同类卡的不同实例共用同一插画。空字符串=运行时使用类型默认占位图 |
 | architecture.md | TR-card-001, TR-card-002 | 直接解决——本 ADR 是主架构文档中标记的 ADR-0006（卡牌数据模型） |
 | architecture.md | OQ-04——模板异步加载，防止启动卡顿 | ResourceLoader.load_threaded_request() 分批加载策略——每帧 10 个，不阻塞主线程 |
 
