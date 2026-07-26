@@ -2,11 +2,11 @@
 
 ## 文档状态
 
-- **版本 (Version)**：1.1
+- **版本 (Version)**：1.3
 - **最后更新 (Last Updated)**：2026-07-25
 - **引擎 (Engine)**：Godot 4.6
 - **覆盖的 GDD (GDDs Covered)**：36 个系统（见 design/gdd/systems-index.md）
-- **引用的 ADR (ADRs Referenced)**：14 个（ADR-0001 至 ADR-0014，全部 Proposed）
+- **引用的 ADR (ADRs Referenced)**：29 个（ADR-0001 至 ADR-0029，全部 Proposed）
 - **最近架构审查**：2026-07-25 — 裁决 CONCERNS（见 `docs/architecture/architecture-review-2026-07-25.md`）
 - **技术总监签署 (TD Sign-Off)**：2026-07-24 — APPROVED WITH CONDITIONS（5 个 CONCERNS 全部已通过对应 ADR 解决 ✅）
 - **主程序员可行性 (LP Feasibility)**：FEASIBLE — 所有 5 个 CONCERNS 已解决
@@ -37,14 +37,15 @@
 │  PRESENTATION 层 (6 系统)              ⚠️ UI ×5 HIGH (4.6)   │
 │  战斗UI / 探索UI / 卡组编辑UI / HUD / 主菜单 / 音频          │
 ├──────────────────────────────────────────────────────────────┤
-│  FEATURE 层 (21 系统)                                        │
-│  战斗 / 卡牌效果引擎 / 上场阵位 / 绑定 / 阵法 / 阵营 /       │
-│  AI / 探索 / 修为养成 / 渡劫 / 资源 / 卡组编辑 /              │
-│  炼丹 / 铭刻 / 开局身份 / 流派 / 轮回天赋 / 成就 /           │
-│  剧情 / 对话 / 结局分支                                      │
+│  FEATURE 层 (18 系统)                                        │
+│  战斗 / 卡牌效果引擎 / 上场阵位 / 绑定 / 阵法 /                │
+│  AI / 探索 / 修为养成 / 渡劫 / 卡组编辑 /                       │
+│  炼丹 / 铭刻 / 开局身份 / 轮回天赋 / 成就 /                     │
+│  剧情 / 对话 / 结局分支                                        │
 ├──────────────────────────────────────────────────────────────┤
-│  CORE 层 (5 系统)                                            │
-│  卡牌系统 / 费用系统 / 行动力系统 / 状态效果系统 / 境界系统  │
+│  CORE 层 (8 系统)                                             │
+│  卡牌系统 / 费用系统 / 行动力系统 / 状态效果系统 / 境界系统 /  │
+│  阵营系统 / 资源系统 / 流派系统                               │
 ├──────────────────────────────────────────────────────────────┤
 │  FOUNDATION 层 (6 系统)                                      │
 │  游戏状态管理器 / 存档读档 / 事件系统 /                       │
@@ -74,10 +75,13 @@
 | 模块 | 拥有 | 暴露 | 消费 | 引擎 API |
 |------|------|------|------|---------|
 | **卡牌系统** | `CardTemplate`、`CardInstance` 运行时集合 | `get_card(id)` / `get_collection()` | 游戏状态管理器 | `Resource` (模板)、`JSON` |
-| **费用系统** | 每回合费用值 | `get_current_cost()` / `spend(n)` / `reset_for_turn()` | 境界系统 | — |
+| **费用系统** | 每回合费用值、临时加成栈 | `get_current_cost()` / `spend(n)` / `can_afford(n)` / `reset_for_turn()` / `add_temp_bonus()` | 境界系统、战斗系统 | — |
 | **行动力系统** | `action_points` 值 | `get_ap()` / `spend_ap(n)` / `restore_ap(n)` | 游戏状态管理器、境界系统 | — |
 | **境界系统** | `RealmTable` 属性表、压制系数、稀有度权重表 | `get_realm_property(level, key)` / `realm_penalty()` / `get_rarity_weights()` | GSM、战斗/上场/卡牌/卡组/探索/修为/渡劫/AI/UI 共 13+ 系统 | `Dictionary` (const 编译时常量) |
 | **状态效果系统** | 所有 `StatusEffect` 实例 | `apply_status()` / `remove_status()` / `get_active(target)` / `tick_all()` | 卡牌效果引擎 | `Object` (实例管理) |
+| **阵营系统** | `FACTION_LIBRARY` 标签库（const Dictionary） | `get_tag_info()` / `count_on_field()` / `check_condition()` / `is_hostile_to()` / `belongs_to_alignment()` | 阵法、效果引擎、流派、探索、AI | `Dictionary` (const 编译时常量) |
+| **资源系统** | 7 条资源公式 + 类型安全读写 API | `add_resource()` / `spend_resource()` / `can_spend()` / `dismantle_value()` / `delete_card_cost()` / `realm_gap_penalty()` | GSM、商店、卡组编辑、炼丹炼器、法宝铭刻、战斗、探索、事件 | — |
+| **流派系统** | `SCHOOL_LIBRARY` 5 流派静态库（const Dictionary） | `detect(state)` / `calculate_match()` / `get_school_effects()` / `get_school_info()` | 战斗、卡组编辑UI、战斗HUD | `Dictionary` (const 编译时常量) |
 
 ### FEATURE 层
 
@@ -87,32 +91,30 @@
 |------|------|------|------|---------|
 | **战斗系统** | `CombatTurn`、7 阶段状态机 | `start_battle(enemy)` / `end_battle(result)` | 9 个子系统 (费用/卡牌/AI/效果引擎/状态/上场/绑定/阵法/境界) | `SceneTree` |
 | **卡牌效果引擎** | 效果解析栈、效果类型注册表 | `resolve(card, target)` / `register_effect(type, handler)` | 7 个系统 (卡牌/绑定/状态/阵法/阵营/费用/GSM) | `Object` (动态类型) |
-| **上场阵位系统** | `CharacterDeployment` | `deploy(card, slot)` / `withdraw(slot)` / `get_field()` | 战斗系统、境界系统、卡牌系统 | — |
-| **绑定系统** | `BindingRelationship` | `bind(character, item)` / `unbind(slot)` / `get_bindings(character)` | 战斗系统、卡牌系统、上场阵位系统 | — |
+| **上场阵位系统** | `_field` Dictionary（6格阵位）、内部状态机（STANDBY→READY→ACTED）、`_unavailable_characters` 不可用角色列表 | `deploy(card, slot)` / `remove_character(id)` / `is_targetable(id)` / `is_standby(id)` / `get_field()` / `clear_standby_state()` / `mark_unavailable()` / `revive_character()` / `is_game_over()` | 战斗系统、AI系统、绑定系统、阵法系统、商店系统、事件系统 | `Dictionary` (const 编译时常量) |
+| **绑定系统** | `BindingRelationship` (RefCounted) | `bind(character, item)` / `unbind(slot)` / `get_bindings(character)` | 战斗系统、卡牌系统、上场阵位系统 | — |
 | **阵法系统** | `FormationAura` | `deploy_formation(card, slots)` / `get_aura()` | 战斗系统、上场阵位系统、阵营系统 | — |
-| **阵营系统** | 阵营定义表 | `get_faction(card)` / `check_synergy(f1, f2)` | 卡牌系统 | — |
-| **AI 系统** | 行为树/状态机 | `get_next_action(enemy, field)` / `evaluate_threat(target)` | 战斗系统、卡牌效果引擎、卡牌系统 | — |
+| **AI 系统** | `EnemyTemplate` (Resource, .tres)、`EnemyBattleState` (RefCounted)、BossPhaseMgr 内部状态机 | `execute_turn(field_state)` / `create_enemy_roster(template_ids)` / `register_preconfigured_bindings()` | 战斗系统、卡牌效果引擎、绑定系统、阵法系统 | `Resource` (.tres 模板) |
 
 #### 探索与经济子系统
 
 | 模块 | 拥有 | 暴露 | 消费 | 引擎 API |
 |------|------|------|------|---------|
 | **探索系统** | 地图布局、节点状态 | `generate_map(seed)` / `move_to_node(id)` / `resolve_node(id)` | 事件/行动力/GSM/境界/资源 共 5 系统 | `RandomNumberGenerator` |
-| **修为养成系统** | `cultivation` 值、溢出池 | `add_cultivation(n)` / `get_progress()` / `check_breakthrough()` | GSM、境界系统 | — |
-| **境界系统** | `RealmLevel`、属性表 | `get_realm(level)` / `get_property(level, key)` / `get_next_realm()` | 修为养成系统 | — |
+| **修为养成系统** | `cultivation` 值、溢出池、统一获取入口 | `gain_cultivation(amount, source)` / `get_progress()` / `get_overflow_pool()` / `settle_overflow()` | GSM、境界系统、渡劫系统、HUD | — |
+| **境界系统** | `RealmTable` 属性表、压制系数、稀有度权重表 | `get_realm_property(level, key)` / `realm_penalty()` / `get_rarity_weights()` | GSM、战斗/上场/卡牌/卡组/探索/修为/渡劫/AI/UI 共 13+ 系统 | `Dictionary` (const 编译时常量) |
 | **境界压制规则** | 压制系数计算 | `get_suppression(attacker_realm, defender_realm)` | 境界系统、战斗系统 | — |
-| **渡劫突破系统** | 渡劫流程、天劫参数 | `trigger_tribulation()` / `get_tribulation_difficulty(realm)` | 境界系统、战斗系统、修为养成系统 | — |
-| **资源系统** | 灵石/灵材/丹药碎片 | `get_resource(type)` / `add(type, n)` / `spend(type, n)` | 卡牌/探索/GSM | — |
-| **卡组编辑系统** | `Deck`、卡组验证器 | `add_to_deck(card)` / `remove_from_deck(card)` / `validate_deck()` | 卡牌/GSM/资源 | — |
-| **炼丹炼器系统** | 配方表、制造流程 | `craft(recipe, materials)` / `get_recipes()` | 资源/卡牌/GSM | — |
+| **渡劫突破系统** | 渡劫流程编排、TribulationState 状态机 | `trigger_tribulation()` / `check_tribulation_ready()` / `use_tribulation_pill()` | 境界系统、战斗系统、修为养成系统、输入管理器 | — |
+| **卡组编辑系统** | `Deck`、卡组验证器、战利品编排 | `add_to_deck(card)` / `remove_from_deck(card)` / `generate_loot_options()` / `execute_delete()` / `initialize_initial_deck()` | 卡牌/GSM/资源系统/探索系统 | — |
+| **炼丹炼器系统** | 配方表（const Dictionary, 8 配方）、独立 RNG 实例 | `craft(recipe, materials)` / `get_recipes()` / `get_recipe_by_id()` / `roll_quality()` / `forge_artifact_stat()` | 资源/卡牌/GSM/卡组编辑 | — (RefCounted class_name, 非 Autoload) |
 | **法宝铭刻系统** | 铭刻属性、铭刻配方 | `inscribe(item, inscription)` / `get_inscriptions(item)` | 炼丹炼器/资源/境界 | — |
-| **开局身份系统** | 身份模板、初始卡组 | `select_identity(id)` / `get_starting_deck(id)` | GSM/卡牌/卡组编辑 | — |
+| **开局身份系统** | 身份模板 `const Dictionary`（6 个）、天赋键值注册表 | `get_available_identities()` / `apply_identity(id)` / `is_identity_selected()` | GSM/卡牌/卡组编辑/资源/轮回天赋 | `Dictionary` (const 编译时常量) |
 
 #### 成长与元进度子系统
 
 | 模块 | 拥有 | 暴露 | 消费 | 引擎 API |
 |------|------|------|------|---------|
-| **流派系统** | 流派定义、流派等级 | `get_school(card)` / `get_bonus(school, level)` | 阵营/卡牌/阵法 | — |
+| **流派系统** | 5 流派静态库（已迁移至 Core 层——ADR-0025） | — | — | — |
 | **轮回天赋系统** | `PlayerTalents`、天赋树、轮回结算 | `unlock_talent(id)` / `get_active_talents()` / `settle_run(gsm)` | 存档系统、开局身份 | — |
 | **成就系统** | `Achievement` 实例、解锁状态 | `check(criteria)` / `get_achievements()` | 存档系统、GSM | — |
 
@@ -120,9 +122,9 @@
 
 | 模块 | 拥有 | 暴露 | 消费 | 引擎 API |
 |------|------|------|------|---------|
-| **剧情系统** | `ChapterState`、章节序列 | `get_current_chapter()` / `advance_chapter()` | 探索/境界/事件系统 | — |
-| **对话系统** | 对话树、角色对话资源 | `start_dialogue(id)` / `select_option(opt)` | 剧情/事件/GSM | — |
-| **结局分支系统** | 结局条件映射 | `evaluate_ending()` / `get_endings_by_flag(flags)` | 剧情系统、GSM (只读) | — |
+| **剧情系统** | `CHAPTER_TEMPLATES` 5 章静态定义 + GSM `narrative.*` 域 | `get_current_chapter()` / `complete_chapter()` / `can_enter_chapter()` / `get_chapter_context()` | 探索/境界/事件系统 | `Dictionary` (const 编译时常量) |
+| **对话系统** | DialoguePlayer + DialogueDatabase + BarkManager（RefCounted，非 Autoload） | `start_dialogue(id)` / `select_option(opt)` / `play_bark(npc, key)` | 剧情/事件/GSM | — (RefCounted 服务类) |
+| **结局分支系统** | `EndingEvaluator` 纯函数工具类（嵌入 StorySystem，非 Autoload） | `evaluate_ending()` / `get_ending_by_flag(flags)` / `get_endings_by_flag(flags)` | 剧情系统、GSM (只读) | — (RefCounted 嵌入 StorySystem) |
 
 ### PRESENTATION 层 ⚠️ HIGH RISK (4.6 双焦点)
 
@@ -263,7 +265,7 @@ advance_phase() → bool  # 每阶段结束检查前置条件，失败则报告�
 
 ### 输入管理器 ⚠️ 4.6 HIGH
 
-> **完整 API 规范见 `docs/decisions/ADR-0005-input-manager-four-tier-lock-stack-dual-focus.md`**
+> **完整 API 规范见 `docs/decisions/ADR-0004-input-manager-four-tier-lock-stack-dual-focus.md`**
 > 以下为架构摘要——签名可能已细化。以 ADR-0005 为准。
 
 ```
@@ -314,7 +316,9 @@ pop_lock(source: StringName)
 
 ## ADR 审计
 
-**现有 ADR**：14 个（ADR-0001 至 ADR-0014）。覆盖 Foundation 层 5 个（GSM、存档、事件、输入、场景）、Core 层 4 个（卡牌、信号通信、境界、状态效果）、Feature 层 4 个（战斗、卡牌效果引擎、绑定、探索）、Meta 层 1 个（跨局元进度）。全部处于 **Proposed** 状态——Foundation 层 ADR 需推进到 Accepted 后方可进入实现阶段。
+**现有 ADR**：29 个（ADR-0001 至 ADR-0029）。覆盖 Foundation 层 5 个（GSM、存档、事件、输入、场景）、Core 层 9 个（卡牌、信号通信、境界、状态效果、费用、阵营、资源、卡牌效果引擎、流派）、Feature 层 12 个（战斗、绑定、探索、上场阵位、AI、修为养成、渡劫、卡组编辑、开局身份、阵法、剧情、炼丹炼器）、叙事层 2 个（对话、结局分支——均非 Autoload）、Meta 层 1 个（跨局元进度）。全部处于 **Proposed** 状态——Foundation 层 ADR 需推进到 Accepted 后方可进入实现阶段。
+
+**Autoload 链**：25 个（超出 Godot 20 软上限 ⚠️）。ADR-0027（对话）、ADR-0028（炼丹炼器）、ADR-0029（结局分支）均采用 RefCounted 轻量模式——零 Autoload 扩容。
 
 完整覆盖矩阵见 `docs/architecture/architecture-review-2026-07-25.md`。
 
@@ -342,6 +346,10 @@ pop_lock(source: StringName)
 | 9 | 卡牌效果引擎: 效果栈 + 递归上限 + PRD | TR-effect-001→003 | HIGH (4.5 GDScript) | ✅ Proposed |
 | 10 | 境界系统: 属性表 + 原子变更 | TR-realm-001→003 | LOW | ✅ Proposed |
 | 11 | 状态效果生命周期: 叠加 + 免疫 + 倒计时 | TR-status-001,002 | LOW | ✅ Proposed |
+| 15 | 费用系统: 内部状态管理 + 回合重置委托 | TR-cost-001 | LOW | ✅ Proposed |
+| 19 | 资源系统: 公式服务 + GSM 数据存储分离 | TR-resource-001 | LOW | ✅ Proposed |
+| 18 | 阵营系统: 标签库 + 实时遍历统计（Core 层） | TR-faction-001 | LOW | ✅ Proposed |
+| 25 | 流派系统: 静态流派库 + 纯计算检测引擎（Core 层） | TR-school-001 | LOW | ✅ Proposed |
 
 ### 可推迟到实现阶段
 
@@ -350,8 +358,21 @@ pop_lock(source: StringName)
 | 12 | 跨局元进度: progression.dat 独立存储 | TR-progression-001,002 | ✅ Proposed |
 | 13 | 绑定系统: 角色阵亡=绑卡洗回牌库 | TR-binding-001,002 | ✅ Proposed |
 | 14 | 探索系统: 随机种子地图生成 + DAG | TR-explore-001→003 | ✅ Proposed |
+| 16 | 上场阵位系统: 内部状态机 + GSM 快照 | TR-deploy-001,002 | ✅ Proposed |
+| 17 | AI 系统: EnemyTemplate Resource + 效果引擎统一路径 | TR-ai-001,002 | ✅ Proposed |
+| 20 | 修为养成系统: 统一 gain_cultivation() + 溢出池管理 | TR-cultivation-001 | ✅ Proposed |
+| 21 | 渡劫突破系统: 编排器 + CombatSystem 配置复用 | TR-tribulation-001 | ✅ Proposed |
+| 22 | 开局身份系统: const 模板 + 服务编排写入 | TR-identity-001 | ✅ Proposed |
+| 23 | 卡组编辑系统: GSM deck 域 + 公式委托 | TR-deck-edit-001 | ✅ Proposed |
+| 24 | 阵法系统: 4 级光环作用域 + AuraScope 枚举 | TR-formation-001 | ✅ Proposed |
+| 26 | 剧情系统: GSM-primary + EventSystem 委托写入 | TR-story-001 | ✅ Proposed |
+| 27 | 对话系统: RefCounted 服务类 + JSON 按需加载（零 Autoload） | TR-dialogue-001 | ✅ Proposed |
+| 28 | 炼丹炼器系统: RefCounted 工具类 + PRD 独立 RNG（零 Autoload） | TR-alchemy-001 | ✅ Proposed |
+| 29 | 结局分支系统: EndingEvaluator 嵌入 StorySystem（零 Autoload） | TR-ending-001 | ✅ Proposed |
 
-### 仍需创建的 ADR（下一批优先级）
+### 所有系统已覆盖 ✅
+
+36 个 GDD 系统中已有 29 个通过 ADR 决策。剩余 7 个为 Presentation 层 UI 系统（战斗UI/探索UI/卡组编辑UI/HUD/主菜单/音频/成就）和法宝铭刻系统——这些属于 UI 实现层或小型功能，可在编码阶段直接决策，不阻塞开发。
 
 ---
 
@@ -359,7 +380,7 @@ pop_lock(source: StringName)
 
 1. **GSM 是真理的单一来源**——所有游戏状态通过 GSM API 访问。没有系统持有一份拷贝。没有系统绕过 GSM 直接修改另一个系统的数据。
 
-   > **例外（ADR-0011、ADR-0013）**：战斗中活跃状态实例由 StatusEffectSystem Autoload 内部管理（`_instances` / `_by_target` 注册表）——不通过 GSM 实时存储。战斗中绑定数据由 BindingManager Autoload 内部管理（`_bindings` / `_by_character` / `_card_to_character` 注册表）——不通过 GSM 实时存储。原因：状态叠加/倒计时/免疫检查和绑定槽位查找是战斗热路径（每帧 O(1) 查询需求 + RefCounted 对象引用而非序列化 Dictionary）。战斗结束时通过 `serialize_all() → Array[Dictionary]` 导出状态快照和绑定快照至 GSM 用于存档。
+   > **例外（ADR-0011、ADR-0013、ADR-0016、ADR-0024）**：战斗中活跃状态实例由 StatusEffectSystem Autoload 内部管理（`_instances` / `_by_target` 注册表）——不通过 GSM 实时存储。战斗中绑定数据由 BindingManager Autoload 内部管理（`_bindings` / `_by_character` / `_card_to_character` 注册表）——不通过 GSM 实时存储。战斗中阵位数据和角色在场状态由 DeploymentSystem 内部管理（`_field` Dictionary）——不通过 GSM 实时存储。原因：状态叠加/倒计时/免疫检查、绑定槽位查找和前后排保护查询（`is_targetable()`）是战斗热路径（每帧 O(1) 查询需求 + RefCounted/Dictionary 对象引用而非序列化 Dictionary）。战斗结束时通过 `serialize_all() → Array[Dictionary]` 导出状态快照、绑定快照和阵位快照至 GSM 用于存档。
 
 2. **信号用于通知，不是用于逻辑**——信号是只读的 UI 刷新钩子。游戏逻辑通过原子 GSM 操作完成，在信号发出前数据已一致。
 

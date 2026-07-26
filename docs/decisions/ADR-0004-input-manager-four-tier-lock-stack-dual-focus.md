@@ -73,13 +73,14 @@ Godot 4.6 的核心技术挑战：**双焦点系统**将鼠标/触摸焦点与�
 │  │   LockEntry = {                                        │       │
 │  │     type: LockType,          # dialogue|animation|...  │       │
 │  │     source: StringName,      # 调用方标识              │       │
-│  │     device_mask: int,        # 位掩码——限制的设备      │       │
+│  │     device_mask: int,        # 位掩码——允许的设备（白名单） │       │
 │  │   }                                                    │       │
 │  │                                                        │       │
 │  │ 严格度映射 (ascending):                                │       │
 │  │   dialogue  = 0  → 允许 DIALOGUE + UI_NAV + ANY       │       │
 │  │   animation = 1  → 允许 UI_NAV + ANY                  │       │
-│  │   modal     = 2  → 允许 MODAL_OWNER + ANY              │       │
+│  │   modal     = 2  → 阻止非当前弹窗拥有者的输入            │       │
+│  │                    （弹窗拥有者自行通过 has_lock() 判定）│       │
 │  │   transition = 3 → 允许 NOTHING                        │       │
 │  │                                                        │       │
 │  │ 设备类型位掩码 (可组合):                               │       │
@@ -190,8 +191,13 @@ func is_input_allowed(action_type: ActionType, device: DeviceType) -> bool:
             # 动画锁——阻止 GAMEPLAY + DIALOGUE，允许 UI_NAV
             return action_type == ActionType.UI_NAV
         LockType.MODAL:
-            # 模态锁——仅允许特定弹窗的输入（在弹窗上下文中处理）
-            # 默认阻止所有非 ANY 输入——弹窗自行覆盖
+            # 模态锁——默认阻止所有非 ANY 输入
+            # 弹窗拥有者通过 has_lock(source) 自行判定是否允许输入：
+            #   1. 弹窗 push MODAL 锁时记录 source（如 &"shop_dialog"）
+            #   2. 弹窗处理输入前调用 has_lock(&"shop_dialog") 检查自己是否是当前模态拥有者
+            #   3. 若是拥有者 → 允许输入（绕过 is_input_allowed 的 false 返回值）
+            #   4. 否则 → 遵守 is_input_allowed 的 false 返回值
+            # 此设计将模态覆盖逻辑限制在弹窗自身，保持 InputManager 的通用性
             return false
         LockType.TRANSITION:
             # 转场锁——阻止所有输入（包括 UI_NAV）
@@ -199,12 +205,12 @@ func is_input_allowed(action_type: ActionType, device: DeviceType) -> bool:
     
     return false  # 不应到达
 
-## 4.6 双焦点——检查设备是否被当前锁栈中的设备掩码覆盖
+## 4.6 双焦点——检查设备是否被当前锁栈中的所有锁允许（白名单语义）
 func _check_device_allowed(device: DeviceType) -> bool:
     for lock_entry in _lock_stack:
-        # device_mask 是位掩码——检查 device 位是否被设置
+        # device_mask 是白名单位掩码——检查 device 位是否在允许集合中
         if not (lock_entry.device_mask & device):
-            return false  # 此设备被该锁的掩码排除
+            return false  # 此设备不在该锁的白名单中
     return true
 ```
 
@@ -215,7 +221,7 @@ func _check_device_allowed(device: DeviceType) -> bool:
 class LockEntry:
     var type: LockType
     var source: StringName      # 调用方标识（如 &"dialogue_system"、&"scene_manager"）
-    var device_mask: int        # 此锁限制的设备位掩码
+    var device_mask: int        # 此锁允许的设备位掩码（白名单——mask 包含的设备类型可通过）
 
 ## push 锁——调用方负责：系统完成后 pop_lock(source)
 func push_lock(type: LockType, source: StringName, device_mask: int = DEVICE_ALL) -> void:

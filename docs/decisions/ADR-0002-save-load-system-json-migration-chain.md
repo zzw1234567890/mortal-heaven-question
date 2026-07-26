@@ -160,9 +160,13 @@ Godot 4.4 引入了关键变更：`FileAccess.store_*` 系列方法从返回 `vo
 │  │   GSM.battle_ended.connect(_on_battle_ended)            │        │
 │  │   GSM.battle_started.connect(_on_battle_started_snapshot)│       │
 │  │   ProgressionSystem.progression_updated.connect(_on_progression_changed)│      │
+│  │   EventSystem.event_resolved.connect(_on_event_resolved_autosave) │      │
 │  │                                                        │        │
 │  │ _on_progression_changed(_key, _value):                  │        │
 │  │   # 被动响应——不暴露 save_progression() 公共 API        │        │
+│  │                                                        │        │
+│  │ _on_event_resolved_autosave(_event_id: StringName):     │        │
+│  │   # 事件结算后触发自动存档——防抖：同一事件链中 5 秒内最多 1 次  │        │
 │  │   _write_progression(ProgressionSystem)                   │        │
 │  └───────────────────────────────────────────────────────┘        │
 └──────────────────────────────────────────────────────────────────┘
@@ -236,7 +240,9 @@ func clear_battle_snapshot() -> void
     "realm": "筑基",
     "chapter": 2,
     "map_name": "碎星外环",
-    "deck_size": 32
+    "deck_size": 32,
+    "current_scene": "exploration",     # 读档恢复场景定位——SceneManager 在 load_game() 步骤 2 后提取
+    "current_scene_id": 3               # 场景 ID（对应 SceneManager.SCENE_PATHS 的键）
   },
   "game_state": { ... },       # GSM.serialize() 输出（battle/session 域已被 GSM 排除）
   "complete": true             # 完整性标记——纵深防御。原子 rename 是主策略。
@@ -406,6 +412,8 @@ func _ready():
     GSM.battle_started.connect(_on_battle_started_snapshot)
     # Progression 被动保存——特性系统只通过 GSM 写入，不直接调用 SaveLoadSystem
     ProgressionSystem.progression_updated.connect(_on_progression_changed)
+    # 事件结算后自动存档——防止场景内事件进度丢失
+    EventSystem.event_resolved.connect(_on_event_resolved_autosave)
 
 func _on_autosave_trigger(_old_scene: String, _new_scene: String):
     if _can_autosave():
@@ -522,9 +530,8 @@ func _on_progression_changed(_key: String, _value: Variant):
 
 ## 相关决策
 - ADR-0001（GSM——提供 `serialize()`/`deserialize()` 接口，battle 和 session 域排除规则）
-- ADR-0012（跨局元进度——`progression_updated` 信号源已变更为 ProgressionSystem，本 ADR 的 GSM 信号驱动写入模式更新为 ProgressionSystem 信号驱动）
+- ADR-0012（跨局元进度——`progression_updated` 信号源已变更为 ProgressionSystem，`progression.dat` 独立存储；本 ADR 的 GSM 信号驱动写入是其 Foundation 层支撑）
 - ADR-0006（卡牌数据模型——`CardSystem.reconstitute_instances()` 读档后重构 CardInstance 对象的契约）
-- ADR-0003（事件系统——`story_flags` 通过 GSM 持久化，由存档系统写入磁盘）
+- ADR-0003（事件系统——`story_flags` 通过 GSM 持久化，由存档系统写入磁盘；`event_resolved` 信号触发自动存档）
 - ADR-0004（输入管理器——`session.input_locks` 不持久化，属于 session 域）
-- ADR-0005（场景管理器——存档恢复后通过 `request_scene_change` 切换场景）
-- ADR-0012（跨局元进度——`progression.dat` 独立存储，本 ADR 的 GSM 信号驱动写入是其 Foundation 层支撑）
+- ADR-0005（场景管理器——存档恢复后通过 `request_scene_change` 切换场景；meta 容器提供 `current_scene` + `current_scene_id`）

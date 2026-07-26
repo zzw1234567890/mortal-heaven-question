@@ -6,6 +6,15 @@ Proposed
 ## 日期
 2026-07-24
 
+## 最后验证
+2026-07-26
+
+## 决策人
+技术总监 + 主程序员
+
+## 摘要
+确立 GameStateManager (GSM) 为 Godot Autoload 单例，通过三层 API（直接属性读取 / 原子写入操作 / 信号订阅）作为所有 39 个游戏系统的单一数据源。决策的核心取舍是集中式上帝对象 vs 原子批量操作保证——选择集中式是因为跨域变更（战斗结算同时更新灵石、修为、卡牌）在分散式管理器下无法保证一致性。
+
 ## 引擎兼容性
 
 | 字段 | 值 |
@@ -29,7 +38,13 @@ Proposed
 ## 上下文
 
 ### 问题陈述
-游戏有 39 个系统（6 个 Foundation、4 个 Core、22 个 Feature、6 个 Presentation、3 个横切）需要对共享游戏状态进行读写操作——玩家境界、修为、资源、卡牌收藏、战斗状态、探索进度、剧情标记等。在缺乏单一仲裁者的情况下，系统将直接修改彼此的状态，导致：
+游戏有 39 个系统（6 个 Foundation、4 个 Core、22 个 Feature、6 个 Presentation、3 个横切）需要对共享游戏状态进行读写操作——玩家境界、修为、资源、卡牌收藏、战斗状态、探索进度、剧情标记等。
+
+### 当前状态
+系统之间没有统一的状态访问仲裁者。每个系统各自维护对 GameState 的理解——境界系统记着玩家的修为，战斗系统在结算完成后更新灵石和修为，HUD 通过轮询或各自订阅不同信号来刷新显示。story_flags 被三个系统（事件、剧情、对话）写入而无协调（已在 systems-mapping-2026-07-24.md 中检测到重复写入风险）。
+
+### 问题
+在缺乏单一仲裁者的情况下，系统将直接修改彼此的状态，导致：
 - **数据漂移**：两个系统持有同一数据的副本，其中一个变陈旧
 - **重复写入**：三个系统写入 `story_flags` 而无协调（已在 systems-mapping-2026-07-24.md 中检测到）
 - **UI 不一致**：HUD 不知道何时刷新，因为变更来源不可预测
@@ -91,25 +106,25 @@ GSM.add_resource(type: String, amount: int) → bool
 GSM.allocate_card_id() → int
   # 返回单调递增的 _next_card_id 当前值，然后递增
   # 分配后不可收回——CardSystem 在创建 CardInstance 时调用
-  # 定义于 ADR-0002（卡牌数据模型）——此处记录以供 API 完整性
+  # 定义于 ADR-0006（卡牌数据模型）——此处记录以供 API 完整性
 
 GSM.add_card_to_collection(inst_dict: Dictionary) → void
   # inst_dict 由 CardSystem.serialize_instance() 生成
   # 在 validation_enabled == false 时拒绝写入并记录警告
   # 在 validation_enabled == true 时校验 inst_dict["template_id"] 存在于 CardSystem.templates
-  # 定义于 ADR-0002（卡牌数据模型）——此处记录以供 API 完整性
+  # 定义于 ADR-0006（卡牌数据模型）——此处记录以供 API 完整性
 
 GSM.remove_card_from_collection(card_instance_id: int) → bool
   # 按 card_instance_id 从 owned_cards 中删除
   # 未找到时返回 false
-  # 定义于 ADR-0002（卡牌数据模型）
+  # 定义于 ADR-0006（卡牌数据模型）
 
 GSM.set_narrative_flag(flag: StringName, value: Variant) → void
   # story_flags 的唯一运行时写入入口——仅 EventSystem 调用
   # 写入 GSM.narrative.story_flags[flag] = value
   # 值无变化时不发射信号（de-deup）
   # 值变更后发射 batch_updated({"narrative.story_flags.{flag}": {old, new}})
-  # 定义于 ADR-0004（事件系统）——此处记录以供 API 完整性
+  # 定义于 ADR-0003（事件系统）——此处记录以供 API 完整性
   # ⚠️ 剧情/对话/效果引擎不得直接调用——它们通过 EventSystem.set_flag() 委托写入
 
 GSM.set_input_locks(data: Array[Dictionary]) → void
@@ -187,6 +202,8 @@ GSM.gsm_initialized()  # 一旦 GSM._ready() 完成即发射
 
 ### 关键接口
 
+### 实现指南
+
 ```
 ## 读取者契约（所有消费者）
 1. 任意时刻均允许读取——不需要 guard
@@ -198,6 +215,7 @@ GSM.gsm_initialized()  # 一旦 GSM._ready() 完成即发射
 2. 在一次信号处理中绝不多次写入同一路径
 3. 检查返回值（spend_resource 和 add_resource 会失败）
 4. 写入仅在事件响应中（按键/结算/章节推进）——从不在 _process 中
+5. 例外：SceneManager 是 GSM.session.current_scene 和 GSM.session.scene_id 的唯一授权直接写入者（详见 ADR-0005 §写入者契约）。session 域为瞬态数据，不持久化
 
 ## 启动合约
 1. GSM 以 validation_enabled = false 启动
@@ -209,6 +227,12 @@ GSM.gsm_initialized()  # 一旦 GSM._ready() 完成即发射
 1. GSM.serialize() → Dictionary（battle 和 session 域被排除）
 2. GSM.deserialize(Dictionary) → bool（达到校验标准）
 3. 存档 I/O 由 SaveLoadSystem 负责——GSM 仅提供数据
+
+## exploration.* 域说明
+GSM.exploration.* 为第一层可读取属性（ADR-0014 探索系统定义），写入通过探索系统专用的 7 个第二层方法：
+set_exploration_map() / set_exploration_position() / add_visited_node() /
+set_exploration_ap() / update_exploration_map_state() / clear_exploration_navigation()
+详见 ADR-0014 §"GSM 第二层原子方法"。
 ```
 
 ## 考虑的替代方案
@@ -242,9 +266,13 @@ GSM.gsm_initialized()  # 一旦 GSM._ready() 完成即发射
 
 ### 消极的
 - **单点故障**：如果 GSM 崩溃或返回谬误数据，所有系统都会受到影响——没有后备数据源。
-- **上帝对象的风险**：GSM 触及所有领域。随着游戏的成长，它必须抵制积累业务逻辑的倾向（"我应该在发放修为之前检查 curse_flag 吗？"——不，那属于行为系统，而非 GSM）。
+- **上帝对象的风险**：GSM 触及所有领域。随着游戏的成长，它必须抵制积累业务逻辑的倾向（"我应该在发放修为之前检查某个 story_flag 吗？"——不，那属于 EventSystem 的判定逻辑，而非 GSM）。
 - **Autoload 初始化顺序混乱**：Godot 的 Autoload `_ready()` 顺序取决于 Project Settings 中的列表顺序，而非类名。如果顺序错误，消费者可能在 GSM 的 `_ready()` 完成前调用 `GSM.get()`，从而导致静默的空值读取。
 - **信号发射成本**：战斗结算期间的 `batch_updated` 带有 3-5 个变更的字典需要分配字典并进行信号回调跳跃——对于在 16.6ms 预算内运行的 2D 卡牌游戏而言微不足道，但确实是开销。
+
+### 中性的
+- **统一入口模式**：所有消费者现在通过单一入口点（GSM）读取和写入状态——这是一个架构事实，既非固有优点也非缺点。优点是集中化的可观测性（所有写入可追踪），缺点是任何 GSM API 的变更都会影响所有消费者。
+- **Autoload #1 固定位置**：GSM 必须占据 Project Settings 中的第一个 Autoload 位置，占用全局命名空间的 `GSM` 标识符。这引入了命名约束，但也消除了初始化顺序的不确定性。
 
 ### 风险
 - **热路径中的上帝对象**：所有 35 个系统都触碰 GSM——如果读取 API 变慢，所有系统都会变慢。缓解措施：第一层直接属性读取是 O(1) 字典访问，无方法调用开销。在战斗期间，性能分析可进行路由变更。实际消耗预计 <0.1ms/帧。
@@ -254,15 +282,15 @@ GSM.gsm_initialized()  # 一旦 GSM._ready() 完成即发射
 
 ## 解决的 GDD 需求
 
-| GDD 系统 | 需求 | 本 ADR 如何解决 |
+| 设计文档 | 需求 | 本 ADR 如何解决 |
 |------------|-------------|--------------------------|
-| game-state-manager.md | §概述：GSM 为运行时单一数据源，通过 Autoload 常驻内存 | 确立 Godot Autoload 单例模式，在所有场景之前初始化，场景变更后继续留存 |
-| game-state-manager.md | §详细设计 #2 读写接口规范：通用 `get(path)`、批量设置、类型安全读取 | 定义三层接口：直接属性读取（第一层）、原子方法（第二层）、信号订阅（第三层） |
-| game-state-manager.md | §详细设计 #3 信号广播机制：13 个命名事件，同帧去重，`batch_updated` 用于批量变更 | 确立"写入优先，然后信号"的执行顺序，以及 HUD 高效刷新的 `batch_updated` 展平合并字典格式 |
-| game-state-manager.md | §公式 #5 卡牌校验初始化合约：GSM 以跳过模式启动，card-system 调用 `enable_validation()` | 正式确立启动合约，将其作为 Foundation 层初始化顺序的一部分 |
-| game-state-manager.md | §边界情况：batch_updated 载荷格式——展平合并字典 | 确立 `{ "player.resources.ling_shi": {old, new}, ... }` 格式 |
-| game-state-manager.md | §调优参数：单帧最大信号广播 50，资源上限 999999 | 作为配置常量纳入 GSM——可调节，有文档记录 |
-| systems-mapping-2026-07-24.md | §4.1：GSM 必须定义三层访问，然后任何消费者才能开始 | 直接解决——本 ADR 正是该规范 |
+| design/gdd/game-state-manager.md | §概述：GSM 为运行时单一数据源，通过 Autoload 常驻内存 | 确立 Godot Autoload 单例模式，在所有场景之前初始化，场景变更后继续留存 |
+| design/gdd/game-state-manager.md | §详细设计 #2 读写接口规范 | 定义三层接口：直接属性读取（第一层）、原子方法（第二层）、信号订阅（第三层） |
+| design/gdd/game-state-manager.md | §详细设计 #3 信号广播机制 | 确立"写入优先，然后信号"的执行顺序，以及 HUD 高效刷新的 `batch_updated` 展平合并字典格式 |
+| design/gdd/game-state-manager.md | §公式 #5 卡牌校验初始化合约 | 正式确立启动合约，将其作为 Foundation 层初始化顺序的一部分 |
+| design/gdd/game-state-manager.md | §边界情况：batch_updated 载荷格式 | 确立 `{ "player.resources.ling_shi": {old, new}, ... }` 格式 |
+| design/gdd/game-state-manager.md | §调优参数：单帧最大信号广播 50，资源上限 999999 | 作为配置常量纳入 GSM——可调节，有文档记录 |
+| design/docs/systems-mapping-2026-07-24.md | §4.1：GSM 必须定义三层访问 | 直接解决——本 ADR 正是该规范 |
 
 ## 性能影响
 - **CPU**：每帧 <0.1ms 用于读取（约 10-12 个活跃系统的 35 × O(1) 字典查询）。信号发射仅在事件中（每场战斗 1 次战斗结算、每局 1-4 次境界突破），而非每帧。
