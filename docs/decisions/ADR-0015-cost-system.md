@@ -1,7 +1,7 @@
 # ADR-0015：费用系统 — 独立 CORE Autoload + 内部状态管理 + 直接调用查询 + 回合重置委托
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查通过。修复：Autoload 数量 17→18→25 矛盾统一、ADR-0013 过时引用移除、GSM 契约缺口明确标注。待后续同步：在接受 ADR-0015 后更新 ADR-0001 第二层 API 追加 `_set_battle_cost()`。）
 
 ## 日期
 2026-07-25
@@ -24,7 +24,8 @@ Proposed
 | **依赖** | ADR-0001（GSM——`battle.current_cost` / `battle.max_cost` 的 GSM 写入权委托；`batch_updated` 信号传播费用变更；`gsm_initialized` 准入信号）；ADR-0007（三分类信号体系——`cost_changed` 分类为 Cat 2b 系统信号；CombatSystem/CardEffectEngine 通过直接调用查询费用状态）；ADR-0008（CombatSystem——Phase 2 PLAY 出牌阶段调用 `CostSystem.spend()` 扣费；Phase 6 END 结束阶段调用 `CostSystem.reset_for_turn()` 重置费用；`battle_start()` 中调用 `CostSystem.init_for_battle()` 初始化；CombatSystem 通过直接方法调用编排 CostSystem）；ADR-0010（RealmSystem——`get_realm_property(level, &quot;cost_per_turn&quot;)` 查询当前境界费用上限；`realm_changed` 信号触发费用上限更新） |
 | **启用** | ADR-0009（CardEffectEngine——在效果结算前通过 `CostSystem.can_afford()` 校验费用；丹药效果的临时费用加成通过 `CostSystem.add_temp_bonus()` 注入）；战斗 UI 系统 ADR（CombatUI 费用栏显示——通过 `CostSystem.get_current_cost()` / `CostSystem.get_max_cost()` 读取当前值和上限；监听 `cost_changed` Cat 2b 信号刷新显示） |
 | **阻塞** | 战斗 Epic（出牌阶段的费用校验、回合结束费用重置、丹药临时费用加成流程）；卡牌效果 Epic（丹药类卡牌的"临时+费"效果实现、费用不足时的卡牌灰色不可用状态）；战斗 UI Epic（费用栏组件的数据源和刷新订阅） |
-| **排序说明** | Core 层第 3 个 ADR（在 ADR-0006 CardSystem 和 ADR-0010 RealmSystem 之后，ADR-0011 StatusEffectSystem 之前）。CostSystem 在 Autoload 链中为 #7（已在 ADR-0013 的链中预留——本 ADR 为其补充完整架构决策记录）。CostSystem 的 `_ready()` 执行时，GSM（#1）和 CardSystem（#6）已完全初始化——RealmSystem（#11）在 CostSystem 之后初始化，因此 CostSystem._ready() 不能调用 `get_current_property()`（需等待 RealmSystem 就绪）——`init_for_battle()` 由 CombatSystem 在 `battle_start()` 中显式调用，此时所有 Autoload 均已就绪 |
+| **排序说明** | Core 层第 3 个 ADR（在 ADR-0006 CardSystem 和 ADR-0010 RealmSystem 之后，ADR-0011 StatusEffectSystem 之前）。CostSystem 在 Autoload 链中为 #7（见 `production/session-state/active.md` Autoload 全链）。CostSystem 的 `_ready()` 执行时，GSM（#1）和 CardSystem（#6）已完全初始化——RealmSystem（#11）在 CostSystem 之后初始化，因此 CostSystem._ready() 不能调用 `get_current_property()`（需等待 RealmSystem 就绪）——`init_for_battle()` 由 CombatSystem 在 `battle_start()` 中显式调用，此时所有 Autoload 均已就绪 |
+| **GSM 契约说明** | 本 ADR 提出的 `GSM._set_battle_cost()` 方法为新增 API——在接受本 ADR 后需同步更新 ADR-0001 第二层 API 列表，追加此方法（签名：`_set_battle_cost(current_cost: int, max_cost: int) → void`——写入 `battle.current_cost` / `battle.max_cost` 并发射 `batch_updated`） |
 
 ## 上下文
 
@@ -370,7 +371,7 @@ GSM._set_battle_cost(current_cost: int, max_cost: int) → void
 
 - **描述**：费用状态（`current_cost`、`max_cost`、`temp_bonus`）存储在 GSM 的 `battle.*` 域中。CombatSystem 通过 GSM 第二层方法直接读写费用——不创建 CostSystem Autoload。`can_afford()` 由 CombatSystem 或 CardEffectEngine 原地计算。
 - **优点**：
-  - 减少 1 个 Autoload（项目 Autoload 总数保持在 17 个）
+  - 项目 Autoload 总数保持稳定——不新增不必要的基础设施节点
   - 费用状态与 battle 域其他数据同处一处——GSM 序列化/反序列化不需要额外处理
   - 无需跨 Autoload 初始化顺序依赖
 - **缺点**：
@@ -408,7 +409,7 @@ GSM._set_battle_cost(current_cost: int, max_cost: int) → void
 
 ### 消极的
 
-- **增加 1 个 Autoload**：CostSystem 为 Autoload #7——本 ADR 批次前项目链中已预留此槽位（ADR-0013 完整链中已列出 CostSystem）。现补充完整架构决策记录。项目 Autoload 总数 18 个（本批次后）
+- **增加 1 个 Autoload**：CostSystem 为 Autoload #7——已在 `active.md` Autoload 全链中记录（25 个 Autoload）。费用系统仅管理 4 个整数 + 1 个数组——不显著增加初始化开销
 - **GSM 写委托的额外契约**：CostSystem 通过 `GSM._set_battle_cost()` 写入 battle 域——需要 CombatSystem 显式授予此窄范围写入权（由本 ADR 记录委托关系）。若委托未正确执行，费用变更可能无法传播到 GSM Cat 1 信号链
 - **初始化顺序约束**：CostSystem（#7）在 RealmSystem（#11）之前初始化——`init_for_battle()` 必须在 RealmSystem 就绪后由 CombatSystem 显式调用。若初始化顺序在未来被调整，需要同步更新 CostSystem 的初始化契约
 - **双重信号路径**：费用变更同时通过 `CostSystem.cost_changed`（Cat 2b）和 `GSM.batch_updated`（Cat 1）传播——CombatUI 可选择监听任一信号。潜在风险：两条信号路径的发射时序不一致（CostSystem 先发射 Cat 2b，再写入 GSM → Cat 1 发射）。缓解措施：CombatUI 统一监听 `GSM.batch_updated`（Cat 1）作为刷新源——`cost_changed`（Cat 2b）仅作为高效直达路径（载荷结构化更好）

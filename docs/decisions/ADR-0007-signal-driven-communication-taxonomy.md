@@ -1,7 +1,7 @@
 # ADR-0007：信号驱动通信 — 三分类信号体系 + 信号 vs 直接调用决策矩阵
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查。修复：全局 ADR 编号偏移修正（5 个 Foundation 引用全部移位 -1）、幽灵信号 `load_started` 移除、令行禁止模式 #14 过时引用清理、信号审计表补充 ADR-0006 CardSystem 的 `templates_loaded`。已知问题：行数 511 行超出 ≤250 目标——架构图和代码片段待未来精简。）
 
 ## 日期
 2026-07-25
@@ -24,7 +24,7 @@ Proposed
 | **依赖** | ADR-0001（GSM 三层 API——信号分类中的 GSM 状态信号以此为基础）、ADR-0003（EventSystem 信号委托模式——本 ADR 将其推广为通用原则）、ADR-0004（InputManager——通过 GSM 传播锁状态而非自有信号——本 ADR 将其确立为标准模式） |
 | **启用** | 所有 Foundation 层之后创建的 ADR（ADR-0008+ 战斗系统、ADR-0009 卡牌效果引擎等——信号设计决策矩阵指导其 API 设计） |
 | **阻塞** | 战斗 Epic（战斗系统 7 阶段状态机需定义哪些转换发射信号 vs 直接调用）、卡牌效果 Epic（效果引擎的信号粒度决策）、UI Epic（HUD 订阅策略） |
-| **排序说明** | Foundation 层最后一个 ADR（#7）。在 Foundation 层所有模块 ADR 之后、Core/Feature 层 ADR 开始之前被接受。本 ADR 不给现有 ADR 增加新需求——它编纂现有 ADR 中已使用的模式 |
+| **排序说明** | Foundation 层 ADR（#7），在 Core/Feature 层 ADR 开始之前被接受。本 ADR 不给现有 ADR 增加新需求——它编纂已有 ADR 中已使用的模式 |
 
 ## 上下文
 
@@ -35,7 +35,7 @@ Proposed
 | ADR | 定义的信号 | 特点 |
 |-----|-----------|------|
 | ADR-0001 (GSM) | `batch_updated`、`player_changed`、`realm_changed`、`resource_changed`、`gsm_initialized` | 数据变更广播——多消费者、消费者未知 |
-| ADR-0002 (SaveLoad) | `save_completed`、`load_started`、`load_completed`、`save_corrupted`、`progression_saved` | 操作结果通知——存档/读档生命周期 |
+| ADR-0002 (SaveLoad) | `save_completed`、`load_completed`、`save_corrupted`、`progression_saved` | 操作结果通知——存档/读档生命周期 |
 | ADR-0003 (EventSystem) | `event_triggered`、`event_resolved`、`chain_triggered`、`chain_ended`、`card_reward_requested`、`templates_loaded`、`flag_changed` | 事件动作通知 + 信号委托（`card_reward_requested`） |
 | ADR-0004 (InputManager) | 无自有信号——通过 GSM `batch_updated` 传播锁状态 | 复用 GSM 信号体系 |
 | ADR-0005 (SceneManager) | `pre_transition`、`post_transition` | 生命周期钩子——2 个确定消费者 |
@@ -225,7 +225,7 @@ Proposed
 
 ### 现有 ADR 信号汇总与合规性
 
-对已有 6 个 ADR 的所有信号进行分类和合规检查：
+对已有 5 Foundation + 1 Core 层 ADR（ADR-0001 至 ADR-0006）的所有信号进行分类和合规检查：
 
 | 信号 | ADR | 分类 | 命名合规 | 载荷合规 | 备注 |
 |------|-----|------|---------|---------|------|
@@ -234,22 +234,22 @@ Proposed
 | `realm_changed` | ADR-0001 | Cat 1 | ✅ 状态变更式 | ✅ 简单参数 | — |
 | `resource_changed` | ADR-0001 | Cat 1 | ✅ 状态变更式 | ✅ 简单参数 | — |
 | `gsm_initialized` | ADR-0001 | Cat 1 | ✅ 过去式 | ✅ 无参数 | — |
-| `save_completed` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `load_started` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `load_completed` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `save_corrupted` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `progression_saved` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `event_triggered` | ADR-0004 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `event_resolved` | ADR-0004 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `flag_changed` | ADR-0004 | Cat 1 | ✅ 状态变更式 | ⚠️ 通过 GSM batch_updated 承载 | 无独立信号——ADR-0004 正确设计 |
-| `chain_triggered` | ADR-0004 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `chain_ended` | ADR-0004 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `card_reward_requested` | ADR-0004 | Cat 2c | ✅ 过去式被动 | ✅ 简单参数 | 委托信号——Fire-and-forget |
-| `templates_loaded` | ADR-0004 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
-| `pre_transition` | ADR-0006 | Cat 2a | ⚠️ 现在式 | ✅ 简单参数 | 合法例外——pre/post 配对 |
-| `post_transition` | ADR-0006 | Cat 2a | ⚠️ 现在式 | ✅ 简单参数 | 合法例外——pre/post 配对 |
+| `save_completed` | ADR-0002 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `load_completed` | ADR-0002 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `save_corrupted` | ADR-0002 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `progression_saved` | ADR-0002 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `event_triggered` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `event_resolved` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `flag_changed` | ADR-0003 | Cat 1 | ✅ 状态变更式 | ⚠️ 通过 GSM batch_updated 承载 | 无独立信号——ADR-0003 正确设计 |
+| `chain_triggered` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `chain_ended` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `card_reward_requested` | ADR-0003 | Cat 2c | ✅ 过去式被动 | ✅ 简单参数 | 委托信号——Fire-and-forget |
+| `templates_loaded` | ADR-0003 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | — |
+| `templates_loaded`（CardSystem） | ADR-0006 | Cat 2b | ✅ 过去式 | ✅ 简单参数 | 与 EventSystem 同名异义——GSM 分别监听两者 |
+| `pre_transition` | ADR-0005 | Cat 2a | ⚠️ 现在式 | ✅ 简单参数 | 合法例外——pre/post 配对 |
+| `post_transition` | ADR-0005 | Cat 2a | ⚠️ 现在式 | ✅ 简单参数 | 合法例外——pre/post 配对 |
 
-**命名合规结果**：19 个现有信号中，17 个符合过去式规范，2 个（`pre_transition`/`post_transition`）为合法的 pre/post 配对例外。无需重命名任何现有信号。
+**命名合规结果**：19 个现有信号中，17 个符合过去式规范，2 个（`pre_transition`/`post_transition`）为合法的 pre/post 配对例外。无需重命名任何现有信号。与 ADR-0006 的 `templates_loaded` 共 20 个已分类信号。
 
 ### 架构图
 
@@ -433,7 +433,7 @@ func _emit_signal_safe(target: Object, signal_name: StringName, args: Array) -> 
 
 ## 禁止模式汇总
 
-以下禁止模式来自所有 6 个 Foundation 层 ADR——集中记录以消除跨 ADR 分散：
+以下禁止模式来自所有 5 个 Foundation + 1 个 Core 层 ADR——集中记录以消除跨 ADR 分散：
 
 | # | 禁止模式 | 来源 ADR | 违规示例 | 正确做法 |
 |---|---------|---------|---------|---------|
@@ -443,14 +443,14 @@ func _emit_signal_safe(target: Object, signal_name: StringName, args: Array) -> 
 | 4 | **绕过 GSM 直接写入游戏状态** | ADR-0001 | 任何系统直接操作 `GSM.player.realm = 5` | 通过 GSM 第二层原子方法——`GSM.change_realm(5)` |
 | 5 | **通用 `set(path, value)` 绕过原子方法** | ADR-0001 | `GSM.set("player.realm", 5)` | 使用专用原子方法——`GSM.change_realm(5)` |
 | 6 | **在 `_process()` 热路径中写入 GSM** | ADR-0001 | `_process()` 中调用 `GSM.add_resource()` | 写入仅在事件响应中进行——按键/结算/章节推进 |
-| 7 | **Fire-and-forget 信号（Cat 2c）未标注预期消费者** | ADR-0004, ADR-0007 | `card_reward_requested.emit(id)` 无文档注释说明谁监听 | Cat 2c 信号声明包含 `# 消费者：CardSystem` 文档注释 |
+| 7 | **Fire-and-forget 信号（Cat 2c）未标注预期消费者** | ADR-0003, ADR-0007 | `card_reward_requested.emit(id)` 无文档注释说明谁监听 | Cat 2c 信号声明包含 `# 消费者：CardSystem` 文档注释 |
 | 8 | **Cat 2 信号处理器抛出未捕获异常** | ADR-0007 | 信号处理器内 `assert()` 失败逃逸 | 处理器入口包裹逻辑——`if not valid: push_error(...); return` |
 | 9 | **`Callable.bind()` 捕获对象但不断开信号连接** | ADR-0007 | `signal.connect(_handler.bind(node))` 在 `node.queue_free()` 后泄漏 | 订阅者 `_exit_tree()` 中手动 `disconnect()`；避免 `bind()` 捕获生命周期短的对象 |
 | 10 | **过度使用委托信号（Cat 2c）——每个 Foundation 系统 2+ 个 Cat 2c 信号** | ADR-0007 | 3 个 Foundation 系统各有 3 个 Cat 2c 信号 = 9 个隐式依赖 | 预期每 3 个 Foundation 系统 ≤1 个 Cat 2c 信号；多数跨层通信通过 GSM 状态（Cat 1）而非委托信号 |
-| 11 | **业务系统直接连接 Godot 内置信号（Cat 3）** | ADR-0005, ADR-0007 | 10 个业务系统各自连接 `tree_changed` | 基础设施系统（InputManager）集中连接——业务系统通过 API 间接使用 |
+| 11 | **业务系统直接连接 Godot 内置信号（Cat 3）** | ADR-0004, ADR-0007 | 10 个业务系统各自连接 `tree_changed` | 基础设施系统（InputManager）集中连接——业务系统通过 API 间接使用 |
 | 12 | **信号载荷携带指令（"应该做什么"）而非事实（"发生了什么"）** | ADR-0007 | `event_resolved(event_id, "SHOW_REWARD_PANEL", prize_data)` | `event_resolved(event_id, option_idx, outcomes)`——消费者自行决定如何响应 |
 | 13 | **反复对同帧内同一路径多次发射 GSM 信号（未启用去重）** | ADR-0001 | 同一帧内 3 次 `add_resource("gold", 10)` 发射 3 次 `batch_updated` | GSM 同帧去重——仅最后一次变更发射信号（ADR-0001 已强制） |
-| 14 | **声明 pre_ 信号而无配对 post_ 信号** | ADR-0006, ADR-0007 | 仅 `pre_combat_started` 而无 `post_combat_started` | Cat 2a 信号必须 pre_/post_ 配对声明——不存在单向生命周期钩子 |
+| 14 | **声明 pre_ 信号而无配对 post_ 信号** | ADR-0007 | 仅 `pre_thing` 而无 `post_thing` | Cat 2a 信号必须 pre_/post_ 配对声明——不存在单向生命周期钩子。示例：ADR-0006 的 `pre_transition`/`post_transition` 为正确配对 |
 
 **审查强制执行**：PR 审查清单必须验证所有信号使用符合本表——任何匹配的违规模式 = 拒绝 PR。
 
@@ -460,10 +460,10 @@ func _emit_signal_safe(target: Object, signal_name: StringName, args: Array) -> 
 | architecture.md §架构原则 #2 | 信号订阅者接受状态但不允许更改——除非通过系统明确请求 | 编纂为禁止模式 #1（Cat 1 处理器不可写回 GSM）——由 ADR-0001 和本 ADR 双重强制执行 |
 | architecture.md OQ-06 | 语义门控命名应避免误导——GDScript 单线程无真正竟态条件 | "信号链深度"（signal chain depth）取代"递归调用深度"——明确指信号→处理器→再发射信号的传播层级 |
 | ADR-0001 §信号 | GSM 第三层信号——`batch_updated`、`player_changed`、`realm_changed` | 归类为 Cat 1（GSM 状态信号）——确立展平字典载荷为 GSM 专用格式 |
-| ADR-0004 §信号委托 | `card_reward_requested`——Foundation 层不依赖 Core 层 | 确立 Cat 2c（委托信号）为跨层解耦的标准模式 |
-| ADR-0005 §锁通知 | InputManager 通过 GSM batch_updated 传播锁状态——无自有信号 | 确立此模式为 Cat 1 复用的正确实践——避免专用信号与 GSM 信号重复 |
-| ADR-0006 §生命周期信号 | `pre_transition` / `post_transition`——audio、HUD、探索系统各自响应 | 归类为 Cat 2a（生命周期信号）——pre/post 配对约束正式确立 |
-| ADR-0003 §信号 | `save_completed`、`load_completed`、`save_corrupted`、`progression_saved` | 归类为 Cat 2b（动作通知信号）——消费者 ≤3（UI 提示、HUD 更新、错误弹窗） |
+| ADR-0003 §信号委托 | `card_reward_requested`——Foundation 层不依赖 Core 层 | 确立 Cat 2c（委托信号）为跨层解耦的标准模式 |
+| ADR-0004 §锁通知 | InputManager 通过 GSM batch_updated 传播锁状态——无自有信号 | 确立此模式为 Cat 1 复用的正确实践——避免专用信号与 GSM 信号重复 |
+| ADR-0005 §生命周期信号 | `pre_transition` / `post_transition`——audio、HUD、探索系统各自响应 | 归类为 Cat 2a（生命周期信号）——pre/post 配对约束正式确立 |
+| ADR-0002 §信号 | `save_completed`、`load_completed`、`save_corrupted`、`progression_saved` | 归类为 Cat 2b（动作通知信号）——消费者 ≤3（UI 提示、HUD 更新、错误弹窗） |
 
 ## 性能影响
 
@@ -484,9 +484,9 @@ func _emit_signal_safe(target: Object, signal_name: StringName, args: Array) -> 
 ## 需同步更新的 ADR
 
 - **ADR-0001**：GSM 信号声明部分添加分类标注（Cat 1）——在信号注释中添加 `# Category 1: GSM 数据变更信号`。非阻塞——纯文档标注
-- **ADR-0004**：在 `card_reward_requested` 信号文档中添加 `# Category 2c: 委托信号` 标注。非阻塞
-- **ADR-0006**：在 `pre_transition`/`post_transition` 信号文档中添加 `# Category 2a: 生命周期信号` 标注。非阻塞
-- **ADR-0003**：在 SaveLoad 信号文档中添加 `# Category 2b: 动作通知信号` 标注。非阻塞
+- **ADR-0003**：在 `card_reward_requested` 信号文档中添加 `# Category 2c: 委托信号` 标注。非阻塞
+- **ADR-0006**：已标注 `templates_loaded` 为 Cat 2b、`pre_transition`/`post_transition` 为 Cat 2a（2026-07-26 更新）
+- **ADR-0002**：在 SaveLoad 信号文档中添加 `# Category 2b: 动作通知信号` 标注。非阻塞
 
 ## 验证标准
 
@@ -503,9 +503,9 @@ func _emit_signal_safe(target: Object, signal_name: StringName, args: Array) -> 
 ## 相关决策
 
 - ADR-0001（游戏状态管理器——Cat 1 GSM 信号的定义和发射规则）
-- ADR-0003（存档/读档——Cat 2b 动作通知信号）
-- ADR-0004（事件系统——Cat 2b 动作通知 + Cat 2c 委托信号）
-- ADR-0005（输入管理器——Cat 1 复用模式——通过 GSM 信号传播而非自有信号）
-- ADR-0006（场景管理器——Cat 2a 生命周期信号 pre/post 配对）
+- ADR-0002（存档/读档——Cat 2b 动作通知信号）
+- ADR-0003（事件系统——Cat 2b 动作通知 + Cat 2c 委托信号）
+- ADR-0004（输入管理器——Cat 1 复用模式——通过 GSM 信号传播而非自有信号）
+- ADR-0005（场景管理器——Cat 2a 生命周期信号 pre/post 配对）
 - architecture.md §架构原则 #2（信是通知，不是逻辑——本 ADR 的父原则）
 - architecture.md OQ-06（术语统一——本 ADR 解决）

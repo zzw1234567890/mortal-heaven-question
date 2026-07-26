@@ -1,7 +1,7 @@
 # ADR-0027：对话系统 — RefCounted 服务类 + JSON 数据存储 + 零 Autoload 扩容
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-25

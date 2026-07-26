@@ -1,7 +1,7 @@
 # 活跃会话状态
 
 > **会话 ID**：2026-07-25
-> **上次更新**：2026-07-26（Foundation 层 ADR Accepted + architecture.md v1.4 同步）
+> **上次更新**：2026-07-26（Feature 层 ADR-0008/0009 Accepted + architecture.md v1.7 同步）
 
 ## 本会话成果
 
@@ -20,6 +20,25 @@
 | ADR | 系统 | 模式 | 状态 |
 |-----|------|------|:--:|
 | ADR-0030 | 法宝铭刻系统 | RefCounted + class_name（零 Autoload） | **Proposed** |
+
+### Feature 层 ADR 第四批 Accepted ✅
+
+| ADR | 系统 | 审查结果 | 修复项 | 最终状态 |
+|-----|------|:--:|:--:|:--:|
+| ADR-0022 | 开局身份选择 | Foundation 计数 7→5 | `§排序说明` Foundation 层 "7 个 ADR"→"5 个" | **Accepted** |
+| ADR-0023 | 卡组编辑 | EventSystem 层归属修正 | `§排序说明` EventSystem 标注 "Foundation" 层→已在 ADR-0003 确认 | **Accepted** |
+| ADR-0024 | 阵法系统 | InputManager 引用 ADR-0005→0004、拼写 Formaton→Formation | InputManager 编号偏移 + 类名拼写修正 | **Accepted** |
+| ADR-0026 | 剧情系统 | ✅ PASS | 编号引用正确，Autoload 链完整 | **Accepted** |
+
+### 跨 ADR 修复
+
+- architecture.md v1.9→v2.0：Feature 层 12/12 全部 Accepted ✅
+- active.md 统计更新：Feature 8→12，总计 22→26
+
+| ADR | 系统 | 审查结果 | 修复项 | 最终状态 |
+|-----|------|:--:|:--:|:--:|
+| ADR-0008 | 战斗系统 | 11 项 | Foundation 编号偏移 ×6、Deployment/AI ADR 编号修正、Foundation 计数 7→5、InputManager ADR-0005→0004、markdown 表格结构 | **Accepted** |
+| ADR-0009 | 卡牌效果引擎 | 10 项 | Foundation 编号偏移 ×4、ADN0008 拼写→ADR-0008、ADR-0010→0016/ADR-0011→0017、CostSystem "待 ADR"→ADR-0015、StatusSystem 风险更新、ADR-0005→0004/ADR-0006→0005 | **Accepted** |
 
 ### 跨 ADR 修复
 
@@ -66,9 +85,9 @@
 | 结局分支系统 | EndingEvaluator 纯函数工具类嵌入 StorySystem | ADR-0029 |
 
 <!-- STATUS -->
-Epic: Architecture Foundation
-Feature: Foundation ADR Accepted + ADR-0030 创建
-Task: architecture.md v1.4 同步 — complete ✅
+Epic: Architecture Review
+Feature: 全部 ADR 审查完成 ✅ (30 个)
+Task: 🎉 全部 30 个 ADR Accepted ✅ ——架构审查完成
 <!-- /STATUS -->
 
 ## 关键架构决策
@@ -85,12 +104,12 @@ Task: architecture.md v1.4 同步 — complete ✅
 | 层 | 数量 | Autoload | 非 Autoload | Accepted |
 |-----|------|:--:|:--:|:--:|
 | Foundation | 5 | 5 | 0 | 5 ✅ |
-| Core | 9 | 8 | 0 | 0 |
-| Feature | 11 | 11 | 0 | 0 |
-| Meta | 1 | 1 | 0 | 0 |
-| Narrative | 2 | 0 | 2 | 0 |
-| Economy | 2 | 0 | 2 | 0 |
-| **总计** | **30** | **25** | **4** | **5** |
+| Core | 9 | 8 | 0 | 8 ✅ |
+| Feature | 11 | 11 | 0 | 12 ✅ |
+| Meta | 1 | 1 | 0 | 1 ✅ |
+| Narrative | 2 | 0 | 2 | 2 ✅ |
+| Economy | 2 | 0 | 2 | 2 ✅ |
+| **总计** | **30** | **25** | **4** | **30 ✅** |
 
 ## 已知遗留问题
 

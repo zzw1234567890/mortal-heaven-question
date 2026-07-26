@@ -142,7 +142,7 @@ requirements:
     requirement: "卡牌数据模型——Template/Instance 分离的两层架构"
     created: 2026-07-25
     status: active
-    covered_by: ADR-0002
+    covered_by: ADR-0006
 
   - id: TR-card-002
     system: card
@@ -150,7 +150,7 @@ requirements:
     requirement: "222 个模板文件的异步加载策略——防止启动卡顿"
     created: 2026-07-25
     status: active
-    covered_by: ADR-0002
+    covered_by: ADR-0006
 
   - id: TR-signal-001
     system: signal-communication

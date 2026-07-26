@@ -1,7 +1,7 @@
 # ADR-0029：结局分支系统 — 嵌入 StorySystem 纯函数引擎 + ProgressionSystem 图鉴持久化
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-25
@@ -460,5 +460,5 @@ func _generate_epilogue(ending_id: StringName, event_system, chapter_path) -> St
 - ADR-0026（StorySystem——game_victory 信号、chapter_path 所有权、结局判定的宿主）
 - ADR-0003（EventSystem——story_flags 的只读查询 `get_flag()`）
 - ADR-0012（ProgressionSystem——结局图鉴持久化 API `unlock_ending()`、`get_unlocked_endings()`）
-- ADR-0001（GSM——`player.realm`、`player.identity_id` 只读）(已被 ADR-0012 取代 progress.* 域所有权)
+- ADR-0001（GSM——`player.realm`、`player.identity_id` 只读）
 - ADR-0007（信号分类体系——ending_evaluated 为 Cat 2b 信号）

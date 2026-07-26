@@ -1,7 +1,7 @@
 # ADR-0021：渡劫突破系统 — Feature Autoload 编排器 + CombatSystem 配置复用
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：InputManager ADR-0004（正确编号）。）
 
 ## 日期
 2026-07-25

@@ -1,6 +1,6 @@
 # ADR-0030：法宝铭刻系统 — RefCounted + class_name 工具类 + const 权重表 + 委托消费架构
 
-- **Status**: proposed
+- **Status**: Accepted
 - **Date**: 2026-07-26
 - **Authors**: @zwzhang
 - **Reviewers**: -

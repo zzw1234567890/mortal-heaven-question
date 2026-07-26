@@ -1,7 +1,7 @@
 # ADR-0018：阵营系统 — Core 层轻量 Autoload 服务 + 标签库字典 + 实时遍历统计
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查通过。修复：Autoload 计数统一为 25。）
 
 ## 日期
 2026-07-25
@@ -408,7 +408,7 @@ func _get_field_characters() -> Array:
 
 ### 消极的
 
-- **增加 1 个 Autoload**：项目 Autoload 从当前 17 个增加到 18 个（GSM #1 → InputManager #2 → SceneManager #3 → SaveLoad #4 → EventSystem #5 → CardSystem #6 → CostSystem #7 → StatusEffectSystem #8 → CombatSystem #9 → CardEffectEngine #10 → RealmSystem #11 → ProgressionSystem #12 → BindingManager #13 → ExplorationSystem #14 → **FactionSystem #15** → ResourceSystem #16 → DeploymentSystem #17 → AISystem #18）。根据 Godot 文档，Autoload 数量 < 20 对启动时间的影响可忽略不计
+- **增加 1 个 Autoload**：FactionSystem 为 Autoload #15——项目 Autoload 总计 25 个（见 `production/session-state/active.md` Autoload 全链）。FactionSystem 仅持有 18+ 条目的 const Dictionary——不显著增加初始化开销
 - **初始化顺序依赖**：FactionSystem 的 `_ready()` 必须在 CardSystem 的 `_ready()` 之后——因为 `get_tags_of_character()` 通过 CardSystem 查询模板。需在 `project.godot` 中确保 FactionSystem 列在 CardSystem 之后
 - **遍历查询无法缓存单次调用结果**：连续多次 `count_on_field("zhengdao")` 在同一帧内会重复遍历场上角色——每次 O(6×3)。调用方如需多次使用同一统计结果，应自行缓存返回值。框架不介入优化——遵循"调用方负责"原则
 
@@ -416,7 +416,7 @@ func _get_field_characters() -> Array:
 
 | 风险 | 概率 | 影响 | 缓解措施 |
 |------|------|------|----------|
-| Autoload 数量持续增长（18→22+） | 中 | 启动时间增加、初始化顺序复杂度 | 当前 18 个安全（< 20 阈值）。本 ADR 的"Autoload 扩容"风险已明确记录，后续 ADR 创建新 Autoload 时需引用本风险 |
+| Autoload 数量持续增长 | 中 | 启动时间增加、初始化顺序复杂度 | 当前 25 个已超过 20 警戒线。本 ADR 的"Autoload 扩容"风险已明确记录于 `active.md`。后续 ADR 创建新 Autoload 时需引用本风险并论证为何不可用 RefCounted 替代 |
 | `FACTION_LIBRARY` 内容被意外修改 | 低 | 运行时数据损坏 | 团队约定：仅通过 `get_tag_info()` 读取，禁止直接写入 `FACTION_LIBRARY` 内容。GUT 冒烟测试在 `_ready()` 中验证 `FACTION_LIBRARY["zhengdao"].name == "正道"` |
 | CardTemplate.faction_tags 与标签库不同步（标签 ID 在模板中存在但不在库中） | 中 | `derive_major_alignment()` 返回空字符串——该标签在统计中被忽略 | `get_tag_info()` 无效 tag_id 时触发 `push_warning()`——开发阶段可见。建议增加启动时全量校验：遍历所有 CardTemplate 的 faction_tags，对每个 tag_id 检查是否存在于 FACTION_LIBRARY |
 | 场上角色遍历遗漏"暂时离场"角色 | 低 | 阵营统计与实际不一致 | 阵营统计依赖 `CardSystem.get_field_characters()`——此方法由 DeploymentSystem 维护。若 DeploymentSystem 正确排除暂时离场角色，阵营统计自动正确。与 DeploymentSystem 的契约由集成测试覆盖 |

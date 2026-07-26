@@ -1,7 +1,7 @@
 # ADR-0017：AI 系统 — Feature 层独立 Autoload + 效果引擎统一路径 + Boss 内部阶段状态机
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 计数 7→5。）
 
 ## 日期
 2026-07-25

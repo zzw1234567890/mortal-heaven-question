@@ -1,7 +1,7 @@
 # ADR-0006：卡牌数据模型 — Template/Instance 分离 + Resource 序列化
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查通过。HIGH 修复：TR 注册表 covered_by 修正、ADR-0001 契约缺口声明更新、层归属修正、templates_loaded Cat 2b 标注 + ADR-0007 信号目录同步。已知问题：行数 441 行超出 ≤250 目标——代码片段和架构图待未来精简提取。）
 
 ## 日期
 2026-07-24
@@ -26,7 +26,7 @@ Proposed
 | **阻塞** | 所有涉及卡牌数据的史诗（战斗 Epic、卡组编辑 Epic、绑定 Epic、阵法 Epic、炼丹/铭刻 Epic、AI Epic）——在这些系统可以编码前必须接受本 ADR |
 | **排序说明** | 在 ADR-0001 之后、ADR-0009（卡牌效果引擎）之前被接受。Core 层第一个 ADR（CardSystem 在 architecture.md 层映射中属于 CORE 层，在 Foundation 层 GSM 就绪后构建） |
 
-> **跨 ADR 契约说明**：本 ADR 依赖 ADR-0001 中的两个 API——`GSM.allocate_card_id() → int` 和 `GSM.add_card_to_collection(inst_dict: Dictionary) → void`。这两个 API 目前**未在 ADR-0001 中显式列出**——在接受本 ADR 之前需补充到 ADR-0001 的第二层原子操作中。详见下文「GSM 集成合约」。
+> **跨 ADR 契约说明**：本 ADR 依赖 ADR-0001 中的三个 API——`GSM.allocate_card_id() → int`、`GSM.add_card_to_collection(inst_dict: Dictionary) → void`、`GSM.remove_card_from_collection(card_instance_id: int) → bool`。这三个 API **已在 Foundation 层审查期间补充到 ADR-0001 的第二层原子操作中**（ADR-0001 L106-L117）。`GSM.enable_validation(db)` 也已记录在 ADR-0001 L263。本 ADR 中定义的签名与 ADR-0001 一致——无契约缺口。
 
 ## 上下文
 
@@ -223,9 +223,10 @@ T+1..T+N: CardSystem._process(delta) —— 分批处理
   → 记录耗时: print("CardSystem: %d templates loaded in %d ms" % [total, elapsed])
 
 T+N: 全部加载完成
-  → CardSystem 发射 signals.templates_loaded
+  → CardSystem 发射 signals.templates_loaded（Cat 2b 动作通知——ADR-0007 §2b）
   → GSM 收到信号后调用 GSM.enable_validation(db=CardSystem.templates)
   → 从此刻起，add_card_to_collection() 校验 template_id 是否在注册表中存在
+  → 注意：与 EventSystem.templates_loaded 同名但语义不同——EventSystem 信号表示事件模板就绪，CardSystem 信号表示卡牌模板就绪。GSM 分别监听两者。
 ```
 
 > **API 注意事项（引擎验证）**：`ResourceLoader.load_threaded_request()` **不支持通配符**——必须先用 `DirAccess` 枚举 .tres 文件名，然后对每个文件单独调用 `load_threaded_request()`。每个文件的完整语法：
@@ -276,7 +277,7 @@ T+N: 全部加载完成
 │  │   完成 → signals.templates_loaded.emit()             │     │
 │  └──────────────────────────────────────────────────────┘      │
 │                                                              │
-│  信号: templates_loaded                                      │
+│  信号: templates_loaded (Cat 2b — ADR-0007 信号分类)       │
 └──────────────────────────────────────────────────────────────┘
          │                        │
          ▼                        ▼
@@ -337,7 +338,7 @@ GSM.enable_validation(db: Dictionary[StringName, CardTemplate]) → void
   # 设置在 add_card_to_collection 时校验 template_id 存在于 db 中
 ```
 
-> **⚠ ADR-0001 契约缺口**：截至本 ADR 编写时（2026-07-24），`allocate_card_id()` 和 `add_card_to_collection(inst_dict)` 的正式签名**未在 ADR-0001 的第二层原子操作列表中列出**。在接受本 ADR 之前，应补充到 ADR-0001 中。本 ADR 中定义的签名是该接口的权威规范。
+> **✅ 契约缺口已解决（2026-07-26）**：`allocate_card_id()`、`add_card_to_collection(inst_dict)`、`remove_card_from_collection()` 的正式签名已在 Foundation 层审查期间补充到 ADR-0001 的第二层原子操作列表中（ADR-0001 L106-L117）。本 ADR 中定义的签名是该接口的权威规范，现已与 ADR-0001 同步。
 
 **访问 Instance 的路径**（调用者视角）：
 
@@ -421,7 +422,7 @@ card_name = template.name                              # String
 - **网络**：不适用（纯单机游戏）。
 
 ## 迁移计划
-无现有代码需迁移——这是第二个 Foundation ADR。在 CardSystem 实现之前，GSM 以校验跳过模式运行（`validation_enabled = false`），所有 `add_card_to_collection()` 调用返回 false。
+无现有代码需迁移——这是第一个 Core 层 ADR。在 CardSystem 实现之前，GSM 以校验跳过模式运行（`validation_enabled = false`），所有 `add_card_to_collection()` 调用返回 false。
 
 ## 验证标准
 - **GUT 单元测试**：

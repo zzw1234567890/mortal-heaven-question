@@ -17,7 +17,7 @@
 
 - [ ] `description:` 字段存在且领域特定（提及架构、可行性、ADR——而非泛泛而谈）
 - [ ] `allowed-tools:` 列表可能包含用于架构文档的 Read；仅当技术检查需要时包含 Bash
-- [ ] 模型层级为 `claude-opus-4-6`（依据 coordination-rules.md：具有门禁综合评审职能的总监为 Opus）
+- [ ] 模型层级为 `deepseek-v4-pro`（依据 coordination-rules.md：具有门禁综合评审职能的总监为 Opus）
 - [ ] 代理定义未声称对游戏设计决策或创意方向拥有权威
 
 ---

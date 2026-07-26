@@ -1,7 +1,7 @@
 # ADR-0013：绑定系统 — BindingManager Autoload + RefCounted BindingRecord 实例模型 + 效果引擎集成
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号偏移 ×3、CardSystem ADR-0002→0006、Foundation 计数 7→5、ADR-0012 层归属修正。）
 
 ## 日期
 2026-07-25
@@ -22,10 +22,10 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——`player.realm_level` 只读查询获取当前境界以确定绑定位上限；`battle.*` 域在战斗结束时接收绑定快照）；ADR-0002（CardSystem——功法/法宝卡牌模板查询 `get_template(id)`；`create_instance()` 创建卡牌实例）；ADR-0007（三分类信号体系——绑定生命周期事件归类为 Cat 2b 系统信号）；ADR-0008（CombatSystem——Phase 2 PLAY 阶段触发绑定流程；角色阵亡/离场/上场事件驱动绑定生命周期）；ADR-0009（CardEffectEngine——`register_persistent_effect()` / `remove_effects_by_source()` / `suspend_effects_by_source()` / `restore_effects_by_source()` 效果生命周期接口）；ADR-0010（RealmSystem——`get_realm_property(level, "gongfa_slots"/"fabao_slots"/"deploy_count")` 查询绑定位上限随境界成长）；ADR-0011（StatusEffectSystem——Template/Instance 分离模式先例；战斗热路径 O(1) 查询先例；GSM 例外模式先例——战斗期间数据在子系统内部管理） |
+| **依赖** | ADR-0001（GSM——`player.realm_level` 只读查询获取当前境界以确定绑定位上限；`battle.*` 域在战斗结束时接收绑定快照）；ADR-0006（CardSystem——功法/法宝卡牌模板查询 `get_template(id)`；`create_instance()` 创建卡牌实例）；ADR-0007（三分类信号体系——绑定生命周期事件归类为 Cat 2b 系统信号）；ADR-0008（CombatSystem——Phase 2 PLAY 阶段触发绑定流程；角色阵亡/离场/上场事件驱动绑定生命周期）；ADR-0009（CardEffectEngine——`register_persistent_effect()` / `remove_effects_by_source()` / `suspend_effects_by_source()` / `restore_effects_by_source()` 效果生命周期接口）；ADR-0010（RealmSystem——`get_realm_property(level, "gongfa_slots"/"fabao_slots"/"deploy_count")` 查询绑定位上限随境界成长）；ADR-0011（StatusEffectSystem——Template/Instance 分离模式先例；战斗热路径 O(1) 查询先例；GSM 例外模式先例——战斗期间数据在子系统内部管理） |
 | **启用** | 前向引用：CombatUI（尚无独立 ADR——订阅绑定生命周期 Cat 2b 信号更新角色绑定状态图标、本命标记、叠加层数徽章、hover tooltip）；前向引用：AI 系统（尚无独立 ADR——查询敌方绑定状态 `get_bindings_by_character()` 评估威胁值）；前向引用：阵法系统（尚无独立 ADR——绑定状态变更通知重查阵法激活条件） |
 | **阻塞** | 绑定 Epic（功法/法宝卡牌的绑定、覆盖、叠加、阵亡洗回全部流程）；战斗 Epic（Phase 2 出牌阶段的功法/法宝绑定交互——角色选择面板、覆盖确认 UI、叠加动画）；卡牌效果 Epic（效果引擎的 register_persistent_effect / remove / suspend / restore 接口依赖 BindingManager 提供绑定上下文） |
-| **排序说明** | Feature 层——在 Foundation 层全部 7 个 ADR + Feature 层 ADR-0008（CombatSystem）、ADR-0009（CardEffectEngine）、ADR-0010（RealmSystem）、ADR-0011（StatusEffectSystem）被接受后编写。Autoload 初始化顺序：BindingManager 为 Autoload #13（完整链 13 个：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoad #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11 / ProgressionSystem #12 / BindingManager #13）。BindingManager._ready() 执行时 #1-#11 已完全初始化。遵循 ADR-0012 模式——BindingManager._ready() 通过直接方法调用查询上游系统（GSM.player.realm_level、RealmSystem.get_realm_property()），不 await 可能已发射的信号（Godot 信号同步发射不重放——Autoload #13 连接 #1 在 `_ready()` 中发射的信号时，信号早已发射完毕） |
+| **排序说明** | Feature 层——在 Foundation 层全部 5 个 ADR + Feature 层 ADR-0008（CombatSystem）、ADR-0009（CardEffectEngine）、ADR-0010（RealmSystem）、ADR-0011（StatusEffectSystem）被接受后编写。Autoload 初始化顺序：BindingManager 为 Autoload #13（完整链 13 个：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoad #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11 / ProgressionSystem #12 / BindingManager #13）。BindingManager._ready() 执行时 #1-#11 已完全初始化。遵循 ADR-0012 模式——BindingManager._ready() 通过直接方法调用查询上游系统（GSM.player.realm_level、RealmSystem.get_realm_property()），不 await 可能已发射的信号（Godot 信号同步发射不重放——Autoload #13 连接 #1 在 `_ready()` 中发射的信号时，信号早已发射完毕） |
 
 ## 上下文
 
@@ -358,7 +358,7 @@ effective_value = base_value × native_multiplier × (stack_multiplier ^ (stack_
 
 ## 相关决策
 - [ADR-0001：GameStateManager](ADR-0001-game-state-manager-autoload-singleton-three-tier-api.md) — GSM 只读 + battle.* 域快照
-- [ADR-0002：CardSystem](ADR-0006-card-data-model-template-instance-separation.md) — CardTemplate Resource + CardInstance RefCounted 先例（注：CardSystem ADR 编号为 ADR-0006，文件命名为 ADR-0002——历史命名遗留问题，本文以 ADR 编号为准）
+- [ADR-0006：CardSystem](ADR-0006-card-data-model-template-instance-separation.md) — CardTemplate Resource + CardInstance RefCounted 先例
 - [ADR-0008：CombatSystem](ADR-0008-combat-system-seven-phase-state-machine.md) — Phase 2 PLAY 触发绑定流程 + 角色阵亡/离场/上场事件
 - [ADR-0009：CardEffectEngine](ADR-0009-card-effect-engine-resource-refcounted-model.md) — persistent effect 注册/移除/暂挂/恢复接口
 - [ADR-0010：RealmSystem](ADR-0010-realm-system-autoload-dedicated-service.md) — 绑定位上限随境界成长

@@ -17,7 +17,7 @@
 
 - [ ] `description:` 字段存在且领域特定（提及创意愿景、支柱、GDD 对齐——而非泛泛而谈）
 - [ ] `allowed-tools:` 列表以读取为主；除非创意工作流有正当理由，否则不应包含 Bash
-- [ ] 模型层级为 `claude-opus-4-6`（依据 coordination-rules.md：具有门禁综合评审职能的总监为 Opus）
+- [ ] 模型层级为 `deepseek-v4-pro`（依据 coordination-rules.md：具有门禁综合评审职能的总监为 Opus）
 - [ ] 代理定义未声称对技术架构或生产排期拥有权威
 
 ---

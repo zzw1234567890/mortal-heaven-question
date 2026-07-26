@@ -2,11 +2,10 @@
 
 ## 文档状态
 
-- **版本 (Version)**：1.4
-- **最后更新 (Last Updated)**：2026-07-25
-- **引擎 (Engine)**：Godot 4.6
-- **覆盖的 GDD (GDDs Covered)**：36 个系统（见 design/gdd/systems-index.md）
-- **引用的 ADR (ADRs Referenced)**：29 个（ADR-0001 至 ADR-0029，全部 Proposed）
+- **版本 (Version)**：2.1
+- **最后更新 (Last Updated)**：2026-07-26
+- **覆盖的 GDD (GDDs Covered)**：36 个系统
+- **引用的 ADR (ADRs Referenced)**：30 个（ADR-0001 至 ADR-0030）—— 全部 30 ✅ Accepted
 - **最近架构审查**：2026-07-25 — 裁决 CONCERNS（见 `docs/architecture/architecture-review-2026-07-25.md`）
 - **技术总监签署 (TD Sign-Off)**：2026-07-24 — APPROVED WITH CONDITIONS（5 个 CONCERNS 全部已通过对应 ADR 解决 ✅）
 - **主程序员可行性 (LP Feasibility)**：FEASIBLE — 所有 5 个 CONCERNS 已解决
@@ -105,6 +104,8 @@
 | **境界系统** | `RealmTable` 属性表、压制系数、稀有度权重表 | `get_realm_property(level, key)` / `realm_penalty()` / `get_rarity_weights()` | GSM、战斗/上场/卡牌/卡组/探索/修为/渡劫/AI/UI 共 13+ 系统 | `Dictionary` (const 编译时常量) |
 | **境界压制规则** | 压制系数计算 | `get_suppression(attacker_realm, defender_realm)` | 境界系统、战斗系统 | — |
 | **渡劫突破系统** | 渡劫流程编排、TribulationState 状态机 | `trigger_tribulation()` / `check_tribulation_ready()` / `use_tribulation_pill()` | 境界系统、战斗系统、修为养成系统、输入管理器 | — |
+
+> **注**：境界系统已由 ADR-0010 从 Feature 层正式迁移至 Core 层（见上方 Core 层表格）。Feature 层中保留本条目仅作为上下文——境界系统在 Core 层完整定义。
 | **卡组编辑系统** | `Deck`、卡组验证器、战利品编排 | `add_to_deck(card)` / `remove_from_deck(card)` / `generate_loot_options()` / `execute_delete()` / `initialize_initial_deck()` | 卡牌/GSM/资源系统/探索系统 | — |
 | **炼丹炼器系统** | 配方表（const Dictionary, 8 配方）、独立 RNG 实例 | `craft(recipe, materials)` / `get_recipes()` / `get_recipe_by_id()` / `roll_quality()` / `forge_artifact_stat()` | 资源/卡牌/GSM/卡组编辑 | — (RefCounted class_name, 非 Autoload) |
 | **法宝铭刻系统** | 铭刻属性、铭刻配方 | `inscribe(item, inscription)` / `get_inscriptions(item)` | 炼丹炼器/资源/境界 | — |
@@ -316,7 +317,7 @@ pop_lock(source: StringName)
 
 ## ADR 审计
 
-**现有 ADR**：30 个（ADR-0001 至 ADR-0030）。Foundation 层 5 个（GSM、存档、事件、输入、场景）为 **Accepted** ✅；Core 层 9 个（卡牌、信号通信、境界、状态效果、费用、阵营、资源、卡牌效果引擎、流派）、Feature 层 12 个（战斗、绑定、探索、上场阵位、AI、修为养成、渡劫、卡组编辑、开局身份、阵法、剧情、炼丹炼器）、叙事层 2 个（对话、结局分支——均非 Autoload）、Meta 层 1 个（跨局元进度）、经济层 1 个（法宝铭刻——非 Autoload）全部处于 **Proposed** 状态。
+**现有 ADR**：30 个（ADR-0001 至 ADR-0030）。Foundation 层 5 个为 **Accepted** ✅；Core 层 9 个为 **Accepted** ✅；Feature 层 12 个为 **Accepted** ✅；Meta 层 1 个为 **Accepted** ✅；叙事层 2 个为 **Accepted** ✅；经济层 2 个为 **Accepted** ✅。**全部 30 个 ADR Accepted ✅**
 
 **Autoload 链**：25 个（超出 Godot 20 软上限 ⚠️）。ADR-0027（对话）、ADR-0028（炼丹炼器）、ADR-0029（结局分支）均采用 RefCounted 轻量模式——零 Autoload 扩容。
 
@@ -330,45 +331,45 @@ pop_lock(source: StringName)
 
 | # | ADR | 覆盖 TR | 引擎风险 | 状态 |
 |---|-----|---------|---------|------|
-| 1 | 游戏状态管理器: Autoload 单例 + 三层 API | TR-gsm-001→003 | — | ✅ Proposed |
-| 2 | 存档/读档: JSON 格式 + schema_version + 迁移链 | TR-save-001→003 | MEDIUM (FileAccess) | ✅ Proposed |
-| 3 | 事件系统: story_flags 唯一运行时写入者 | TR-event-001→003 | — | ✅ Proposed |
-| 4 | 输入管理器: 四级锁栈 + 双焦点 | TR-input-001,002 | HIGH (4.6) | ✅ Proposed |
-| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — | ✅ Proposed |
-| 6 | 卡牌数据模型: Template/Instance 分离 | TR-card-001,002 | HIGH (load_threaded) | ✅ Proposed |
-| 7 | 信号驱动通信: GSM 信号 vs 直接调用 | TR-signal-001,002 (横切) | — | ✅ Proposed |
+| 1 | 游戏状态管理器: Autoload 单例 + 三层 API | TR-gsm-001→003 | — | ✅ Accepted |
+| 2 | 存档/读档: JSON 格式 + schema_version + 迁移链 | TR-save-001→003 | MEDIUM (FileAccess) | ✅ Accepted |
+| 3 | 事件系统: story_flags 唯一运行时写入者 | TR-event-001→003 | — | ✅ Accepted |
+| 4 | 输入管理器: 四级锁栈 + 双焦点 | TR-input-001,002 | HIGH (4.6) | ✅ Accepted |
+| 5 | 场景管理器: 唯一场景转换仲裁者 | TR-scene-001,002 | — | ✅ Accepted |
+| 6 | 卡牌数据模型: Template/Instance 分离 | TR-card-001,002 | HIGH (load_threaded) | ✅ Accepted |
+| 7 | 信号驱动通信: GSM 信号 vs 直接调用 | TR-signal-001,002 (横切) | — | ✅ Accepted |
 
 ### 在相关系统构建前应拥有
 
 | # | ADR | 覆盖 TR | 引擎风险 | 状态 |
 |---|-----|---------|---------|------|
-| 8 | 战斗系统: 7 阶段状态机 + 阶段验证 | TR-combat-001→003 | — | ✅ Proposed |
-| 9 | 卡牌效果引擎: 效果栈 + 递归上限 + PRD | TR-effect-001→003 | HIGH (4.5 GDScript) | ✅ Proposed |
-| 10 | 境界系统: 属性表 + 原子变更 | TR-realm-001→003 | LOW | ✅ Proposed |
-| 11 | 状态效果生命周期: 叠加 + 免疫 + 倒计时 | TR-status-001,002 | LOW | ✅ Proposed |
-| 15 | 费用系统: 内部状态管理 + 回合重置委托 | TR-cost-001 | LOW | ✅ Proposed |
-| 19 | 资源系统: 公式服务 + GSM 数据存储分离 | TR-resource-001 | LOW | ✅ Proposed |
-| 18 | 阵营系统: 标签库 + 实时遍历统计（Core 层） | TR-faction-001 | LOW | ✅ Proposed |
-| 25 | 流派系统: 静态流派库 + 纯计算检测引擎（Core 层） | TR-school-001 | LOW | ✅ Proposed |
+| 8 | 战斗系统: 7 阶段状态机 + 阶段验证 | TR-combat-001→003 | — | ✅ Accepted |
+| 9 | 卡牌效果引擎: 效果栈 + 递归上限 + PRD | TR-effect-001→003 | HIGH (4.5 GDScript) | ✅ Accepted |
+| 10 | 境界系统: 属性表 + 原子变更 | TR-realm-001→003 | LOW | ✅ Accepted |
+| 11 | 状态效果生命周期: 叠加 + 免疫 + 倒计时 | TR-status-001,002 | LOW | ✅ Accepted |
+| 15 | 费用系统: 内部状态管理 + 回合重置委托 | TR-cost-001 | LOW | ✅ Accepted |
+| 19 | 资源系统: 公式服务 + GSM 数据存储分离 | TR-resource-001 | LOW | ✅ Accepted |
+| 18 | 阵营系统: 标签库 + 实时遍历统计（Core 层） | TR-faction-001 | LOW | ✅ Accepted |
+| 25 | 流派系统: 静态流派库 + 纯计算检测引擎（Core 层） | TR-school-001 | LOW | ✅ Accepted |
 
 ### 可推迟到实现阶段
 
 | # | ADR | 覆盖 TR | 状态 |
 |---|-----|---------|------|
-| 12 | 跨局元进度: progression.dat 独立存储 | TR-progression-001,002 | ✅ Proposed |
-| 13 | 绑定系统: 角色阵亡=绑卡洗回牌库 | TR-binding-001,002 | ✅ Proposed |
-| 14 | 探索系统: 随机种子地图生成 + DAG | TR-explore-001→003 | ✅ Proposed |
-| 16 | 上场阵位系统: 内部状态机 + GSM 快照 | TR-deploy-001,002 | ✅ Proposed |
-| 17 | AI 系统: EnemyTemplate Resource + 效果引擎统一路径 | TR-ai-001,002 | ✅ Proposed |
-| 20 | 修为养成系统: 统一 gain_cultivation() + 溢出池管理 | TR-cultivation-001 | ✅ Proposed |
-| 21 | 渡劫突破系统: 编排器 + CombatSystem 配置复用 | TR-tribulation-001 | ✅ Proposed |
-| 22 | 开局身份系统: const 模板 + 服务编排写入 | TR-identity-001 | ✅ Proposed |
-| 23 | 卡组编辑系统: GSM deck 域 + 公式委托 | TR-deck-edit-001 | ✅ Proposed |
-| 24 | 阵法系统: 4 级光环作用域 + AuraScope 枚举 | TR-formation-001 | ✅ Proposed |
-| 26 | 剧情系统: GSM-primary + EventSystem 委托写入 | TR-story-001 | ✅ Proposed |
-| 27 | 对话系统: RefCounted 服务类 + JSON 按需加载（零 Autoload） | TR-dialogue-001 | ✅ Proposed |
-| 28 | 炼丹炼器系统: RefCounted 工具类 + PRD 独立 RNG（零 Autoload） | TR-alchemy-001 | ✅ Proposed |
-| 29 | 结局分支系统: EndingEvaluator 嵌入 StorySystem（零 Autoload） | TR-ending-001 | ✅ Proposed |
+| 12 | 跨局元进度: progression.dat 独立存储 | TR-progression-001,002 | ✅ Accepted |
+| 13 | 绑定系统: 角色阵亡=绑卡洗回牌库 | TR-binding-001,002 | ✅ Accepted |
+| 14 | 探索系统: 随机种子地图生成 + DAG | TR-explore-001→003 | ✅ Accepted |
+| 16 | 上场阵位系统: 内部状态机 + GSM 快照 | TR-deploy-001,002 | ✅ Accepted |
+| 17 | AI 系统: EnemyTemplate Resource + 效果引擎统一路径 | TR-ai-001,002 | ✅ Accepted |
+| 20 | 修为养成系统: 统一 gain_cultivation() + 溢出池管理 | TR-cultivation-001 | ✅ Accepted |
+| 21 | 渡劫突破系统: 编排器 + CombatSystem 配置复用 | TR-tribulation-001 | ✅ Accepted |
+| 22 | 开局身份系统: const 模板 + 服务编排写入 | TR-identity-001 | ✅ Accepted |
+| 23 | 卡组编辑系统: GSM deck 域 + 公式委托 | TR-deck-edit-001 | ✅ Accepted |
+| 24 | 阵法系统: 4 级光环作用域 + AuraScope 枚举 | TR-formation-001 | ✅ Accepted |
+| 26 | 剧情系统: GSM-primary + EventSystem 委托写入 | TR-story-001 | ✅ Accepted |
+| 27 | 对话系统: RefCounted 服务类 + JSON 按需加载（零 Autoload） | TR-dialogue-001 | ✅ Accepted |
+| 28 | 炼丹炼器系统: RefCounted 工具类 + PRD 独立 RNG（零 Autoload） | TR-alchemy-001 | ✅ Accepted |
+| 29 | 结局分支系统: EndingEvaluator 嵌入 StorySystem（零 Autoload） | TR-ending-001 | ✅ Accepted |
 
 ### 所有系统已覆盖 ✅
 

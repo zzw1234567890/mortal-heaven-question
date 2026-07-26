@@ -1,7 +1,7 @@
 # ADR-0023：卡组编辑系统 — Feature 层独立 Autoload + GSM deck 域存储 + 委托公式查询
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-25
@@ -24,7 +24,7 @@ Proposed
 | **依赖** | ADR-0001（GSM——`player.deck` 域数据存储、`batch_updated` Cat 1 信号传播卡组变更）；ADR-0006（CardSystem——`create_instance()` 工厂方法用于战利品/购买生成实例；`get_template()` 模板查询；`owned_cards` 反序列化重构成）；ADR-0019（ResourceSystem——`dismantle_value()` 出售定价、`delete_card_cost()` 散功费用公式）；ADR-0010（RealmSystem——`get_deck_limit(realm_level)` 境界上限查询）；ADR-0008（CombatSystem——Phase 7 `BATTLE_END` 触发战利品三选一流程）；ADR-0003（EventSystem——事件 `OUTCOME` 触发卡组增删接口）；ADR-0007（信号分类——卡组变更通过 GSM Cat 1 `batch_updated` 传播，DeckEditingSystem 不发射自有数据信号） |
 | **启用** | 坊市 Epic（购买/散功/出售 UI 消费本系统 API）、战利品 Epic（三选一混合奖励面板）、战斗 Epic（Phase 7 战利品触发）、事件 Epic（事件卡牌增删接口） |
 | **阻塞** | **不阻塞上游系统**——CombatSystem、EventSystem、ResourceSystem 可独立实现，仅在与 DeckEditingSystem 集成点需使用本 ADR 定义的接口签名。**阻塞**坊市 UI 和战利品 UI——在上述 UI 系统实现消费逻辑前必须接受本 ADR |
-| **排序说明** | Feature 层——在 Core 层 CardSystem（#6）、ResourceSystem（#16）、RealmSystem（#11）和 Feature 层 CombatSystem（#9）、EventSystem（#5）被接受后编写。Autoload 初始化顺序需排在 ResourceSystem（#16）之后——DeckEditingSystem 在运行时查询 `delete_card_cost()` 和 `dismantle_value()`。完整 Autoload 链 25 个（从 18 个增至 25 个，本批次 7 个 ADR 并行创建）：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoadSystem #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11 / ProgressionSystem #12 / BindingManager #13 / ExplorationSystem #14 / FactionSystem #15 / ResourceSystem #16 / DeploymentSystem #17 / AISystem #18 / SchoolSystem #19 / CultivationSystem #20 / IdentitySelectionSystem #21 / DeckEditingSystem #22 / FormationSystem #23 / TribulationSystem #24 / StorySystem #25 |
+| **排序说明** | Feature 层——在 Foundation 层 EventSystem（#5）、Core 层 CardSystem（#6）、ResourceSystem（#16）、RealmSystem（#11）和 Feature 层 CombatSystem（#9）被接受后编写。Autoload 初始化顺序需排在 ResourceSystem（#16）之后——DeckEditingSystem 在运行时查询 `delete_card_cost()` 和 `dismantle_value()`。完整 Autoload 链 25 个（从 18 个增至 25 个，本批次 7 个 ADR 并行创建）：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoadSystem #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11 / ProgressionSystem #12 / BindingManager #13 / ExplorationSystem #14 / FactionSystem #15 / ResourceSystem #16 / DeploymentSystem #17 / AISystem #18 / SchoolSystem #19 / CultivationSystem #20 / IdentitySelectionSystem #21 / DeckEditingSystem #22 / FormationSystem #23 / TribulationSystem #24 / StorySystem #25 |
 
 ## 上下文
 

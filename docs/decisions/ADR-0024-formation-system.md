@@ -1,7 +1,7 @@
 # ADR-0024：阵法系统 — Feature 层 Autoload + 内部条件状态机 + GSM 快照持久化
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-25
@@ -348,7 +348,7 @@ FormationSystem 在阵法状态变更时调用 CardEffectEngine 的 persistent e
 FormationSystem 初始化顺序（Autoload #23——完整链 25 个）：
 
   #1  GSM              (Foundation, ADR-0001)
-  #2  InputManager      (Foundation, ADR-0005)
+  #2  InputManager      (Foundation, ADR-0004)
   #3  SceneManager      (Foundation)
   #4  SaveLoad           (Foundation, ADR-0002)
   #5  EventSystem        (Foundation, ADR-0003)
@@ -369,7 +369,7 @@ FormationSystem 初始化顺序（Autoload #23——完整链 25 个）：
   #20 CultivationSystem  (Feature)
   #21 IdentitySelectionSystem (Feature, ADR-0022)
   #22 DeckEditingSystem  (Feature, ADR-0023)
-  #23 FormatonSystem     (Feature, ADR-0024)  ← 本 ADR
+  #23 FormationSystem     (Feature, ADR-0024)  ← 本 ADR
   #24 TribulationSystem  (Feature)
   #25 StorySystem        (Feature, ADR-0026)
 

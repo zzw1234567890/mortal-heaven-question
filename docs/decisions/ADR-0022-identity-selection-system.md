@@ -1,7 +1,7 @@
 # ADR-0022：开局身份选择系统 — Feature Autoload + const 模板字典 + 服务编排模型
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-25
@@ -24,7 +24,7 @@ Proposed
 | **依赖** | ADR-0001（GSM——`player.identity_id`、`player.talent_map` 运行时存储；`batch_updated` 信号传播身份选择完成）；ADR-0006（CardSystem——初始卡组中的卡牌模板验证、`create_instance()` 创建初始角色卡实例）；ADR-0007（三分类信号体系——`identity_selected` 归类为 Cat 2b 系统信号）；ADR-0012（ProgressionSystem——`get_talent_tree_state()` 查询轮回天赋解锁状态以确定哪些身份可选）；ADR-0019（ResourceSystem——`add_resource()` 设置初始灵石——遵循"所有资源写入必须通过 ResourceSystem"的强制契约） |
 | **启用** | 卡组编辑系统（初始卡组写入 `deck.current_deck`）、探索系统（ADR-0014——身份选择完成后才开始探索流程）、事件系统（事件文本通过 `player.identity_id` 做分支）、战斗系统（天赋效果如首回合+1费、战斗开始护盾在 CombatSystem 中注册）、卡牌掉落/商店/战利品系统（身份ID用于卡池权重过滤） |
 | **阻塞** | 身份选择 Epic（UI 界面 + 6 身份卡片 + 确认流程 + 初始状态应用 + 天赋注册）、开局叙事 Epic（身份 flavor_text 的逐行展示）、新游戏流程 Epic（主菜单 → 身份选择 → 开局叙事 → 探索地图） |
-| **排序说明** | Feature 层——在 Foundation 层全部 7 个 ADR（#1~#7）+ Core 层关键 ADR（#6 CardSystem、#10 RealmSystem、#12 ProgressionSystem、#19 ResourceSystem）之后被接受。Autoload 初始化顺序：IdentitySelectionSystem 为 Autoload #21（完整 25 链：#1 GSM → #2 InputManager → #3 SceneManager → #4 SaveLoadSystem → #5 EventSystem → #6 CardSystem → #7 CostSystem → #8 StatusEffectSystem → #9 CombatSystem → #10 CardEffectEngine → #11 RealmSystem → #12 ProgressionSystem → #13 BindingManager → #14 ExplorationSystem → #15 FactionSystem → #16 ResourceSystem → #17 DeploymentSystem → #18 AISystem → #19 SchoolSystem → #20 CultivationSystem → #21 IdentitySelectionSystem → #22 DeckEditingSystem → #23 FormationSystem → #24 TribulationSystem → #25 StorySystem） |
+| **排序说明** | Feature 层——在 Foundation 层全部 5 个 ADR（#1~#5）+ Core 层关键 ADR（#6 CardSystem、#10 RealmSystem、#12 ProgressionSystem、#19 ResourceSystem）之后被接受。Autoload 初始化顺序：IdentitySelectionSystem 为 Autoload #21（完整 25 链：#1 GSM → #2 InputManager → #3 SceneManager → #4 SaveLoadSystem → #5 EventSystem → #6 CardSystem → #7 CostSystem → #8 StatusEffectSystem → #9 CombatSystem → #10 CardEffectEngine → #11 RealmSystem → #12 ProgressionSystem → #13 BindingManager → #14 ExplorationSystem → #15 FactionSystem → #16 ResourceSystem → #17 DeploymentSystem → #18 AISystem → #19 SchoolSystem → #20 CultivationSystem → #21 IdentitySelectionSystem → #22 DeckEditingSystem → #23 FormationSystem → #24 TribulationSystem → #25 StorySystem） |
 
 ## 上下文
 

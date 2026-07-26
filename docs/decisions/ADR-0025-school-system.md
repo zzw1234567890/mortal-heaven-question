@@ -1,7 +1,7 @@
 # ADR-0025：流派系统 — Core 层轻量 Autoload + 静态流派库 + 纯计算检测引擎
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查通过。Autoload 计数 25 已确认与 active.md 一致。）
 
 ## 日期
 2026-07-25

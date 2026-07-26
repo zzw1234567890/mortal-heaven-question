@@ -1,6 +1,6 @@
 # ADR-0028：炼丹炼器系统 — RefCounted + class_name 工具类 + const 配方表 + 委托消费架构
 
-- **Status**: proposed
+- **Status**: Accepted
 - **Date**: 2026-07-25
 - **Authors**: @zwzhang
 - **Reviewers**: -

@@ -1,7 +1,7 @@
 # ADR-0019：资源系统 — Core 层 Autoload 公式服务 + GSM 数据存储分离
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查通过。修复：Autoload 计数统一为 25、过时引用 ADR-0017 移除。）
 
 ## 日期
 2026-07-25
@@ -44,7 +44,7 @@ Proposed
 ### 约束
 
 - **GSM 数据所有权不变**：`player.resources.ling_shi` 和 `player.resources.ling_cai.{low,medium,high,top}` 的所有权仍在 GSM——ResourceSystem 不持有数据副本
-- **Autoload 槽位**：ResourceSystem 作为 Autoload #16——仅依赖 GSM（#1），初始化依赖链极简。完整链 18 个见 ADR-0017 排序说明
+- **Autoload 槽位**：ResourceSystem 为 Autoload #16——仅依赖 GSM（#1），初始化依赖链极简。完整链 25 个见 `production/session-state/active.md` Autoload 全链
 - **Godot 4.6 惯用性**：使用 GDScript Autoload 模式 + const Dictionary 公式表——与 ADR-0010（RealmSystem）一致的架构模式
 - **所有消费必须先校验**：GDD §4 `can_spend()` 是所有消费操作的唯一前置入口——ResourceSystem 强制执行此契约
 - **公式为纯函数**：所有资源公式无副作用——输入参数 → 返回数值。不修改 GSM 状态，不发射信号
@@ -266,7 +266,7 @@ GSM._set_resource_ling_cai(quality: int, value: int) → void:
 
 ### 消极的
 
-- **增加第 18 个 Autoload（链中最末）**：初始化链增长。但 ResourceSystem 仅依赖 GSM（#1）——初始化顺序简单，不增加依赖复杂度
+- **增加 1 个 Autoload（#16，总链 25 个）**：初始化链增长。但 ResourceSystem 仅依赖 GSM（#1）——初始化顺序简单，不增加依赖复杂度
 - **间接性**：调用方需要同时了解 GSM（读裸数据）和 ResourceSystem（读写 API）——两个入口。缓解：文档明确"读用 GSM 第一层，写用 ResourceSystem API"
 - **GSM 第二层方法膨胀**：新增 `_set_resource_ling_shi` 和 `_set_resource_ling_cai` 两个专用方法——GSM 接口表面积继续增长。但这是架构委托的既定模式（CombatSystem 定义 `_set_battle_*`，ExplorationSystem 定义 `set_exploration_*`）——一致的代价
 

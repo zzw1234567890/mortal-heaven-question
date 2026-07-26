@@ -1,7 +1,7 @@
 # ADR-0020：修为养成系统 — Feature 层 Autoload + GSM 数据存储 + 统一获取接口
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 计数 7→5。）
 
 ## 日期
 2026-07-25
@@ -24,7 +24,7 @@ Proposed
 | **依赖** | ADR-0001（GSM——`player.cultivation` 和 `player.overflow_pool` 数据存储所有权；GSM 第二层原子写入方法；`batch_updated` Cat 1 信号传播修为变更）；ADR-0007（三分类信号体系——`cultivation_changed`/`cultivation_full` 分类为 Cat 1 GSM 状态信号）；ADR-0010（RealmSystem——`get_current_property(&quot;max_cultivation&quot;)` 查询当前境界修为上限；`realm_upgraded` 信号触发突破后溢出结算） |
 | **启用** | 渡劫突破系统（TribulationSystem——`check_breakthrough(cultivation, max_cultivation)` 判定是否可触发突破）；HUD 系统（修为进度条显示——订阅 `batch_updated` Cat 1 信号刷新）；战斗系统（CombatSystem——战斗胜利结算修为奖励）；探索系统（ExplorationSystem——探索事件中修为获取）；资源系统/炼丹系统（ResourceSystem——丹药使用修为获取） |
 | **阻塞** | 渡劫突破 Epic（突破前置条件判定、突破后溢出结算、修为溢出属性丹发放）；战斗结算 Epic（战斗胜利修为奖励的发放流程）；探索 Epic（探索事件中的修为获取与溢出处理）；HUD Epic（修为进度条的实时刷新） |
-| **排序说明** | Feature 层初中期 ADR。在 Foundation 层全部 7 个 ADR + Core 层关键依赖（ADR-0010 RealmSystem）被接受后编写。Autoload 初始化顺序 #20——排在 SchoolSystem（#19）之后。链：GSM #1 → … → AISystem #18 → SchoolSystem #19 → CultivationSystem #20。CultivationSystem 在 `_ready()` 时无显式初始化需求——所有逻辑为按需调用的纯函数+GSM 交互 |
+| **排序说明** | Feature 层初中期 ADR。在 Foundation 层全部 5 个 ADR + Core 层关键依赖（ADR-0010 RealmSystem）被接受后编写。Autoload 初始化顺序 #20——排在 SchoolSystem（#19）之后。链：GSM #1 → … → AISystem #18 → SchoolSystem #19 → CultivationSystem #20。CultivationSystem 在 `_ready()` 时无显式初始化需求——所有逻辑为按需调用的纯函数+GSM 交互 |
 
 ## 上下文
 

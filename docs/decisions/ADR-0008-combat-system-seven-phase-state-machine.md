@@ -1,7 +1,7 @@
 # ADR-0008：战斗系统 — 7 阶段状态机 + 阶段验证 + 回合编排器
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号系统性偏移 ×6、Deployment/AI ADR 编号修正、Foundation 计数 7→5、InputManager ADR-0005→0004、markdown 表格结构。）
 
 ## 日期
 2026-07-25
@@ -21,10 +21,10 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——`battle.*` 域由 CombatSystem 独占运行时写入；`apply_battle_rewards()` + `add_resource()` + `add_cultivation()`；详见 §GSM battle.* 域写入所有权例外）、ADR-0002（CardSystem——卡牌模板查询、`create_instance()`）、ADR-0003（SaveLoad——`create_battle_snapshot()` + `clear_battle_snapshot()` 战斗快照生命周期）、ADR-0004（EventSystem——`TRIGGER_BATTLE` Outcome → CombatSystem.battle_start()）、ADR-0005（InputManager——Phase 2/3/5 的 ANIMATION 锁 push/pop）、ADR-0006（SceneManager——战斗场景加载和退出）、ADR-0007（信号分类——Cat 2b 信号通过 `_emit_signal_safe` 路由；直接方法调用编排 9 个子系统） |
-| **启用** | ADR-0009（卡牌效果引擎——效果解析在出牌/攻击阶段被调用）、ADR-0010（上场阵位系统——阵位在备战阶段设置）、ADR-0011（AI 系统——敌方行动阶段的决策输入） |
+| **依赖** | ADR-0001（GSM——`battle.*` 域由 CombatSystem 独占运行时写入；`apply_battle_rewards()` + `add_resource()` + `add_cultivation()`；详见 §GSM battle.* 域写入所有权例外）、ADR-0006（CardSystem——卡牌模板查询、`create_instance()`）、ADR-0002（SaveLoad——`create_battle_snapshot()` + `clear_battle_snapshot()` 战斗快照生命周期）、ADR-0003（EventSystem——`TRIGGER_BATTLE` Outcome → CombatSystem.battle_start()）、ADR-0004（InputManager——Phase 2/3/5 的 ANIMATION 锁 push/pop）、ADR-0005（SceneManager——战斗场景加载和退出）、ADR-0007（信号分类——Cat 2b 信号通过 `_emit_signal_safe` 路由；直接方法调用编排 9 个子系统） |
+| **启用** | ADR-0009（卡牌效果引擎——效果解析在出牌/攻击阶段被调用）、ADR-0016（上场阵位系统——阵位在备战阶段设置）、ADR-0017（AI 系统——敌方行动阶段的决策输入） |
 | **阻塞** | 战斗 Epic（核心游戏循环的实现）、卡牌效果 Epic（效果引擎的结算入口在战斗中）、AI Epic（AI 依赖战斗状态机提供阶段上下文） |
-| **排序说明** | Core/Feature 层第一个 ADR。在 Foundation 层所有 7 个 ADR 之后被接受。必须在卡牌效果引擎（ADR-0009）之前被接受——效果引擎的结算入口在战斗系统的出牌和攻击阶段中 |
+| **排序说明** | Core/Feature 层第一个 ADR。在 Foundation 层所有 5 个 ADR 之后被接受。必须在卡牌效果引擎（ADR-0009）之前被接受——效果引擎的结算入口在战斗系统的出牌和攻击阶段中 |
 
 ## 上下文
 
@@ -145,11 +145,11 @@ Proposed
 | 1 DRAW | 2 PLAY | 无条件——自动推进 | — |
 | 2 PLAY | 3 ATK_DEC | player_confirmed_end \|\| timer_exceeded \|\| (hand_empty AND not can_afford_any_card) | advance_phase() 返回 false——UI 显示"请结束回合" |
 | 3 ATK_DEC | 4 ATK_RES | all_characters_targeted \|\| player_confirmed_skip \|\| _attack_queue.is_empty() | advance_phase() 返回 false——UI 高亮未分配目标 |
-
-**Phase 3 空攻击队列边界情况**：当所有己方角色均处于"待命"或"已行动"状态时（无可攻击角色），`_attack_queue` 为空。此时 `all_characters_targeted()` 为空真（vacuously true——0 个可攻击角色全部已"分配目标"），系统**自动推进**——无需等待玩家确认跳过。这与 GDD §6 "每个己方角色每回合可攻击 1 次"一致——首回合所有角色待命，Phase 3 自动跳过。
 | 4 ATK_RES | 5 ENEMY | 无条件——自动推进（所有攻击结算完毕） | — |
 | 5 ENEMY | 6 END | 无条件——自动推进（敌方行动完毕） | — |
 | 6 END | 0 PREP | 战斗未结束（双方均有存活角色） | — |
+
+> **Phase 3 空攻击队列边界情况**：当所有己方角色均处于"待命"或"已行动"状态时（无可攻击角色），`_attack_queue` 为空。此时 `all_characters_targeted()` 为空真（vacuously true——0 个可攻击角色全部已"分配目标"），系统**自动推进**——无需等待玩家确认跳过。这与 GDD §6 "每个己方角色每回合可攻击 1 次"一致——首回合所有角色待命，Phase 3 自动跳过。
 
 **自动推进 vs 手动推进**：
 - 阶段 0→1→2 和 4→5→6→0：自动推进——进入阶段后立即执行完毕然后 `advance_phase()`
@@ -276,7 +276,7 @@ retreat() → void
 - 费用变更 → `GSM.batch_updated({"battle.current_cost": {old, new}})`
 - 状态效果变更 → `GSM.batch_updated({"battle.player_field[1].statuses": {old, new}})`
 
-战斗数据变更通过 GSM 第二层方法写入——由 CombatSystem 编排，GSM 负责发射 `batch_updated`——与 ADR-0005 的 InputManager→GSM 锁传播模式一致（无自有信号，复用 Cat 1）。
+战斗数据变更通过 GSM 第二层方法写入——由 CombatSystem 编排，GSM 负责发射 `batch_updated`——与 ADR-0004 的 InputManager→GSM 锁传播模式一致（无自有信号，复用 Cat 1）。
 
 ### 架构图
 
@@ -639,9 +639,9 @@ func _schedule_auto_advance() -> void:
 ## 相关决策
 
 - ADR-0001（游戏状态管理器——battle.* 域 + `apply_battle_rewards()` + `add_resource()` + `add_cultivation()`）
-- ADR-0002（卡牌数据模型——卡牌模板查询用于 battle_start 加载敌人卡组；CardInstance 用于 player_field）
-- ADR-0003（存档/读档——战斗快照 `pre_battle.json`；`battle_ended` 触发自动存档）
-- ADR-0004（事件系统——EventSystem 的 TRIGGER_BATTLE Outcome → 调用 CombatSystem.battle_start()）
-- ADR-0005（输入管理器——Phase 2 推入/弹出 ANIMATION 锁；Phase 3 推入/弹出 gameplay 锁）
-- ADR-0006（场景管理器——`battle_started` → 加载战斗场景；`battle_ended` → 切换到探索/结算场景）
+- ADR-0006（卡牌数据模型——卡牌模板查询用于 battle_start 加载敌人卡组；CardInstance 用于 player_field）
+- ADR-0002（存档/读档——战斗快照 `pre_battle.json`；`battle_ended` 触发自动存档）
+- ADR-0003（事件系统——EventSystem 的 TRIGGER_BATTLE Outcome → 调用 CombatSystem.battle_start()）
+- ADR-0004（输入管理器——Phase 2 推入/弹出 ANIMATION 锁；Phase 3 推入/弹出 gameplay 锁）
+- ADR-0005（场景管理器——`battle_started` → 加载战斗场景；`battle_ended` → 切换到探索/结算场景）
 - ADR-0007（信号分类——5 个 Cat 2b 信号 + 直接方法调用编排 9 个子系统）

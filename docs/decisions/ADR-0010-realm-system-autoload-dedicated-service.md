@@ -1,7 +1,7 @@
 # ADR-0010：境界系统 — 专用 Autoload 服务 + 静态数据表 + GSM 状态所有权分离
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查通过。修复：层归属 "Progression"→"Core" 修正、architecture.md Feature 层境界系统重复条目标注。）
 
 ## 日期
 2026-07-25
@@ -24,7 +24,7 @@ Proposed
 | **依赖** | ADR-0001（GSM——`player.realm_level` 所有权、`change_realm()` 原子写入、`realm_changed` 信号、`gsm_initialized` 准入信号）；ADR-0007（三分类信号体系——`realm_upgraded` 分类为 Cat 2b 动作通知信号） |
 | **启用** | ADR-0006（CardSystem——通过 `get_realm_property()` 查询 card_pool_tier + `get_rarity_weights()` 查询稀有度权重）；ADR-0008（CombatSystem——通过 `get_realm_property()` 查询 base_speed、cost_per_turn、压制系数）；ADR-0009（CardEffectEngine——通过 `get_realm_property()` 查询 card_pool_tier） |
 | **阻塞** | 渡劫突破 Epic（TribulationSystem——依赖 `realm_up()` 执行突破后升级流程）；探索 Epic（ExplorationSystem——依赖 `map_unlock` 数据解锁地图入口）；战斗 Epic（CombatSystem——依赖境界压制系数和基础速度） |
-| **排序说明** | Progression 层第一个 ADR。在 Foundation 层（ADR-0001~0007）全部接受后、Core/Feature 层 ADR 开始之前被接受 |
+| **排序说明** | Core 层 ADR。境界属性表为 13+ 系统提供只读基础设施，与 CardSystem（ADR-0006，Core 层）的只读模板注册表角色一致 |
 
 ## 上下文
 

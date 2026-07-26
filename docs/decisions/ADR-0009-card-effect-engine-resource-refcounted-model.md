@@ -1,7 +1,7 @@
 # ADR-0009：卡牌效果引擎 — Resource 模板 + RefCounted 运行时实例 + 栈式结算
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号偏移 ×4、ADN0008 拼写→ADR-0008、ADR-0010→0016（DeploymentSystem）、ADR-0011→0017（AI）、Foundation 计数 7→5、CostSystem "待 ADR"→ADR-0015、StatusSystem 风险更新为已 Accepted、ADR-0016 资产管线引用移除。）
 
 ## 日期
 2026-07-25
@@ -21,10 +21,10 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——只读上下文：`player.*` / `battle.*` / `narrative.*` / `session.*`；不直接写入 GSM——效果结果通过各子系统接口写入）；ADR-0006（CardSystem——`get_template(id)` 模板查询、`create_instance()` / `serialize_instance()` 实例工厂——Template/Instance 分离模式）；ADR-0003（EventSystem——`SET_FLAG` 效果类型通过 `EventSystem.set_flag()` 委托写入；共享 `OutcomeType` 枚举词汇表——本 ADR 扩展非复制）；ADR-0007（三分类信号体系——效果生命周期信号归类为 Cat 2b；状态变更通过 GSM Cat 1 信号传播；直接调用编排子系统）；ADN0008（CombatSystem——7 阶段转换触发效果结算入口：Phase 0 tick、Phase 1 抽牌时触发、Phase 2 出牌、Phase 3 攻击声明、Phase 4 攻击结算、Phase 5 敌方行动、Phase 6 回合结束；CombatSystem 在 `advance_phase()` 成功后发射 `phase_changed(old_phase, new_phase, turn)` [Cat 2b]——效果引擎不订阅此信号，由 CombatSystem 通过直接调用 `resolve_phase_effects()` 编排） |
-| **启用** | ADR-0011（AI 系统——`evaluate_effect()` / `simulate_chain()` / `GameStateSnapshot` 评估接口）、ADR-0011（状态效果系统——`apply_status()` / `remove_status()` / `get_accumulated_value()` 接口）、ADR-0010（上场阵位系统——对场上角色的效果结算需要角色位置信息） |
+| **依赖** | ADR-0001（GSM——只读上下文：`player.*` / `battle.*` / `narrative.*` / `session.*`；不直接写入 GSM——效果结果通过各子系统接口写入）；ADR-0006（CardSystem——`get_template(id)` 模板查询、`create_instance()` / `serialize_instance()` 实例工厂——Template/Instance 分离模式）；ADR-0003（EventSystem——`SET_FLAG` 效果类型通过 `EventSystem.set_flag()` 委托写入；共享 `OutcomeType` 枚举词汇表——本 ADR 扩展非复制）；ADR-0007（三分类信号体系——效果生命周期信号归类为 Cat 2b；状态变更通过 GSM Cat 1 信号传播；直接调用编排子系统）；ADR-0008（CombatSystem——7 阶段转换触发效果结算入口：Phase 0 tick、Phase 1 抽牌时触发、Phase 2 出牌、Phase 3 攻击声明、Phase 4 攻击结算、Phase 5 敌方行动、Phase 6 回合结束；CombatSystem 在 `advance_phase()` 成功后发射 `phase_changed(old_phase, new_phase, turn)` [Cat 2b]——效果引擎不订阅此信号，由 CombatSystem 通过直接调用 `resolve_phase_effects()` 编排） |
+| **启用** | ADR-0017（AI 系统——`evaluate_effect()` / `simulate_chain()` / `GameStateSnapshot` 评估接口）、ADR-0011（状态效果系统——`apply_status()` / `remove_status()` / `get_accumulated_value()` 接口）、ADR-0016（上场阵位系统——对场上角色的效果结算需要角色位置信息） |
 | **阻塞** | 卡牌效果 Epic（所有卡牌效果的运行时结算——伤害、治疗、buff/debuff、绑定、阵法激活、触发式效果）、战斗 Epic（阶段 0/2/3/4/5/6 的效果触发）、AI Epic（敌方出牌决策的评估接口）、状态效果 Epic（状态施加/移除/查询的实现依赖引擎接口） |
-| **排序说明** | Feature 层第一个 ADR——在 Foundation 层全部 7 个 ADR + CombatSystem (ADR-0008) 被接受后编写。Autoload 初始化顺序见 §对象生命周期——CardEffectEngine 为 Autoload #10（在 CardSystem #6、CostSystem #7、StatusEffectSystem #8、CombatSystem #9 之后）。必须在 AI 系统（ADR-0011）之前被接受——AI 评估接口依赖效果引擎的干跑评估能力 |
+| **排序说明** | Feature 层第一个 ADR——在 Foundation 层全部 5 个 ADR + CombatSystem (ADR-0008) 被接受后编写。Autoload 初始化顺序见 §对象生命周期——CardEffectEngine 为 Autoload #10（在 CardSystem #6、CostSystem #7、StatusEffectSystem #8、CombatSystem #9 之后）。必须在 AI 系统（ADR-0017）之前被接受——AI 评估接口依赖效果引擎的干跑评估能力 |
 
 ## 上下文
 
@@ -290,14 +290,14 @@ get_effect_categories(card_id) → Array[EffectCategory]:
 CardEffectEngine 初始化顺序（Autoload #10）：
   前提：GSM / InputManager / SceneManager / SaveLoad / EventSystem / CardSystem / CostSystem / StatusEffectSystem / CombatSystem 已就绪
 
-  # 修正后的 Autoload 顺序（综合 ADR-0001/0005/0006/0003/0002/0006-card/0008）：
+  # 修正后的 Autoload 顺序（综合 ADR-0001/0004/0005/0002/0003/0006/0008）：
   # #1  GSM              (Foundation, ADR-0001)
-  # #2  InputManager      (Foundation, ADR-0005)
-  # #3  SceneManager      (Foundation, ADR-0006)
-  # #4  SaveLoad           (Foundation, ADR-0003)
-  # #5  EventSystem        (Foundation, ADR-0004)
-  # #6  CardSystem         (Core, ADR-0006-card)
-  # #7  CostSystem         (Core, 待 ADR)
+  # #2  InputManager      (Foundation, ADR-0004)
+  # #3  SceneManager      (Foundation, ADR-0005)
+  # #4  SaveLoad           (Foundation, ADR-0002)
+  # #5  EventSystem        (Foundation, ADR-0003)
+  # #6  CardSystem         (Core, ADR-0006)
+  # #7  CostSystem         (Core, ADR-0015)
   # #8  StatusEffectSystem (Core, ADR-0011)
   # #9  CombatSystem       (Feature, ADR-0008)
   # #10 CardEffectEngine   (Feature, ADR-0009)
@@ -381,8 +381,8 @@ _ready():
 - **触发链的不可预测性**：复杂效果交互（A 触发 B → B 触发 C → C 修改 A 的优先级）可能导致非直觉的结算顺序——即使符合规则。GDD 已定义优先级规则但玩家可能不理解"为什么我的效果在那个时候触发了"。缓解措施：战斗日志的可选详细模式——列出每次结算的优先级依据
 - **PRD 种子同步**：如果 `GsM.meta.seed` 在战斗中途因存档读档而改变——PRD 的内部状态 `P_current` 需重置（存档不保存概率累加值——"读档后重新掷骰"）。确保重播和回归测试中种子一致性。缓解措施：存档时仅保存 `meta.seed`，不保存 `P_current` 字典——读档后所有 PRD 状态从 P_base 重新开始
 - **Autoload 扩容**：8 个 Autoload 增加了初始化顺序脆弱性——单次 init-order 错误可能导致难以诊断的启动崩溃。缓解措施：编写自动化初始化顺序验证测试（`test_autoload_order.gd`）——在 CI 中阻止顺序偏差
-- **StatusSystem 接口为提议式契约**：本 ADR 定义的 StatusSystem API（`apply_status`、`remove_status`、`get_active_statuses`、`get_accumulated_value`、`remove_statuses_by_source`）因 ADR-0011（状态效果系统）当时尚未编写而标记为 proposed contract。ADR-0011 现已接受——接口签名详见 ADR-0011 §与 ADR-0009 的接口映射。若 ADR-0011 定义的接口与本 ADR 的假设存在差异，需同步更新本 ADR 的集成契约
-- **EffectTemplate 资产管线缺口**：222 个 EffectTemplate `.tres` 文件需要创作。本 ADR 未指定创作工作流（手动 Godot Inspector？CSV 导入工具？编辑器内插件？）——这是一个必须在编码前解决的生产风险。缓解措施：ADR-0016（资产管线）或编码前独立决策中解决——MVP 可使用脚本驱动的 CSV→`.tres` 批量导出
+- **StatusSystem 接口已确认**：本 ADR 定义的 StatusSystem API（`apply_status`、`remove_status`、`get_active_statuses`、`get_accumulated_value`、`remove_statuses_by_source`）已在 ADR-0011（状态效果系统，Accepted）中正式定义——接口签名详见 ADR-0011 §与 ADR-0009 的接口映射。两者保持一致，无需同步更新。
+- **EffectTemplate 资产管线缺口**：222 个 EffectTemplate `.tres` 文件需要创作。本 ADR 未指定创作工作流（手动 Godot Inspector？CSV 导入工具？编辑器内插件？）——这是一个必须在编码前解决的生产风险。缓解措施：编码前独立决策中解决——MVP 可使用脚本驱动的 CSV→`.tres` 批量导出。
 
 ## 解决的 GDD 需求
 
@@ -426,8 +426,8 @@ _ready():
 - ADR-0001（GSM——效果引擎的只读上下文和状态传播路径）
 - ADR-0006（CardSystem——Template/Instance 分离模式 + 实例工厂）
 - ADR-0003（EventSystem——OutcomeType 共享词汇表 + SET_FLAG 委托写入）
-- ADR-0005（InputManager——战斗动画期间通过 ANIMATION 锁栈阻止输入）
-- ADR-0006（SceneManager——战斗场景加载和退出）
+- ADR-0004（InputManager——战斗动画期间通过 ANIMATION 锁栈阻止输入）
+- ADR-0005（SceneManager——战斗场景加载和退出）
 - ADR-0007（信号分类——效果生命周期信号归类为 Cat 2b）
 - ADR-0008（CombatSystem——7 阶段触发时机 + 效果结算入口 + `phase_changed(old_phase, new_phase, turn)` 信号）
 - ADR-0011（状态效果系统——status-system.md 的接口已在 ADR-0011 中规定——接口映射详见 ADR-0011 §与 ADR-0009 的接口映射）

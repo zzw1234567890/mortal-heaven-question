@@ -1,7 +1,7 @@
 # ADR-0026：剧情系统 — 独立 Feature Autoload + GSM-主存储 + EventSystem 委托写入
 
 ## 状态
-Proposed
+Accepted
 
 ## 日期
 2026-07-25

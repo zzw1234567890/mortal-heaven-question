@@ -1,7 +1,7 @@
 # ADR-0014：探索系统 — Autoload + GSM 主存储 + 程序化 DAG 生成 + 信号驱动子系统委托
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号偏移（ADR-0004→0003 EventSystem、ADR-0006→0005 SceneManager、ADR-0001~0007→0001~0005）。）
 
 ## 日期
 2026-07-25
@@ -21,10 +21,10 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——`exploration.*` 域运行时状态存储、`batch_updated` 信号传播导航状态变更）；ADR-0004（EventSystem——事件节点触发委托、`event_node_reached` / `event_resolved` 信号协作）；ADR-0006（SceneManager——战斗场景加载/卸载、探索场景切换）；ADR-0007（三分类信号体系——探索系统 Cat 2b 信号定义、信号 vs 直接调用决策矩阵）；ADR-0008（CombatSystem——战斗节点委托、`combat_node_reached` / `combat_ended` 信号协作）；ADR-0010（RealmSystem——`map_unlock` 数据、`map_effective_realm()` 柔性压制查询、`get_realm_property()` 行动力上限查询） |
+| **依赖** | ADR-0001（GSM——`exploration.*` 域运行时状态存储、`batch_updated` 信号传播导航状态变更）；ADR-0003（EventSystem——事件节点触发委托、`event_node_reached` / `event_resolved` 信号协作）；ADR-0005（SceneManager——战斗场景加载/卸载、探索场景切换）；ADR-0007（三分类信号体系——探索系统 Cat 2b 信号定义、信号 vs 直接调用决策矩阵）；ADR-0008（CombatSystem——战斗节点委托、`combat_node_reached` / `combat_ended` 信号协作）；ADR-0010（RealmSystem——`map_unlock` 数据、`map_effective_realm()` 柔性压制查询、`get_realm_property()` 行动力上限查询） |
 | **启用** | ADR-0015+（探索 UI 系统——节点图渲染、地图选择界面、交互弹窗的数据源和指令接口） |
 | **阻塞** | 探索 Epic（地图选择→DAG 生成→节点导航→子系统协作的完整流程实现）、探索 UI Epic（节点图渲染和交互依赖探索系统的地图数据模型） |
-| **排序说明** | Feature 层中期 ADR。在 Foundation 层（ADR-0001~0007）和 Core 层关键 ADR（ADR-0010 RealmSystem、ADR-0012 ProgressionSystem）之后被接受。在探索 UI 系统 ADR 之前被接受——UI 依赖探索系统的数据模型和信号接口 |
+| **排序说明** | Feature 层中期 ADR。在 Foundation 层（ADR-0001~0005）和 Core 层关键 ADR（ADR-0010 RealmSystem、ADR-0012 ProgressionSystem）之后被接受。在探索 UI 系统 ADR 之前被接受——UI 依赖探索系统的数据模型和信号接口 |
 
 ## 上下文
 
@@ -36,7 +36,7 @@ Proposed
 
 2. **DAG 生成策略**：GDD 待解决问题 #1 标记了「程序化生成 vs 预定义模板」的选择。GDD §3 描述了完整的加权随机分配算法，但需要明确边连接保证、独立路径数约束、后处理验证的具体策略。
 
-3. **子系统委托模式**：探索系统需要触发 6 种不同类型的节点交互（事件、战斗、商店、渡劫、回复、行动力泉），每种涉及不同的子系统。需要统一的信号委托模式——遵循 ADR-0004（EventSystem 委托）和 ADR-0008（CombatSystem 编排）的先例。
+3. **子系统委托模式**：探索系统需要触发 6 种不同类型的节点交互（事件、战斗、商店、渡劫、回复、行动力泉），每种涉及不同的子系统。需要统一的信号委托模式——遵循 ADR-0003（EventSystem 委托）和 ADR-0008（CombatSystem 编排）的先例。
 
 4. **地图经济模型**：重入传送费（公式 10）、境界差额惩罚（公式 6）、永久免费地图安全阀——这些经济规则影响 ResourceSystem 和 RealmSystem 的接口设计。
 
@@ -202,7 +202,7 @@ generate_map(map_id: StringName, player_realm: int) → Dictionary:
 
 ### 决策 3：统一信号驱动子系统委托
 
-**探索系统通过 Cat 2b 信号触发子系统交互——遵循 ADR-0004（EventSystem 委托）和 ADR-0008（CombatSystem 编排）的先例。探索系统本身只负责地图生成、节点导航和状态管理——节点到达后的具体交互委托给对应的子系统。**
+**探索系统通过 Cat 2b 信号触发子系统交互——遵循 ADR-0003（EventSystem 委托）和 ADR-0008（CombatSystem 编排）的先例。探索系统本身只负责地图生成、节点导航和状态管理——节点到达后的具体交互委托给对应的子系统。**
 
 **信号接口定义（Godot 4.6 Cat 2b——遵循 ADR-0007）：**
 
@@ -218,7 +218,7 @@ generate_map(map_id: StringName, player_realm: int) → Dictionary:
 | `exploration_ended` | ExplorationSystem | `(reason: StringName, summary: Dictionary)` | 探索 UI 系统 | 探索阶段结束 |
 | `map_reentry_denied` | ExplorationSystem | `(map_id: StringName, reason: StringName)` | 探索 UI 系统 | 重入被拒绝 |
 
-**委托流程（事件节点示例——遵循 ADR-0004 先例）：**
+**委托流程（事件节点示例——遵循 ADR-0003 先例）：**
 
 ```
 ① 玩家移动到事件节点 → ExplorationSystem.move_to_node(node_id)
@@ -509,7 +509,7 @@ get_node_detail(node_id: int) → Dictionary:
 - **清晰的职责边界**：ExplorationSystem（Autoload #14）负责地图生成、导航编排、经济计算。GSM 负责状态持久化。子系统通过信号接收委托——各司其职
 - **存档/读档简化**：GSM-primary 模型使探索状态自动纳入 GSM.serialize() 管道——无需自定义序列化逻辑。读档后从 map_state 重建 DAG 缓存的复杂度可控（纯函数式重建）
 - **程序化生成的可重播性**：独立 RNG 实例 + GSM.meta.seed 种子 → 同一 seed 产生同一地图。支持调试重播和回归测试
-- **信号委托的统一性**：遵循 ADR-0004（事件委托）和 ADR-0008（战斗编排）的先例——所有子系统交互通过 Cat 2b 信号，无直接跨层依赖。新增节点类型只需添加新信号 + 新监听器
+- **信号委托的统一性**：遵循 ADR-0003（事件委托）和 ADR-0008（战斗编排）的先例——所有子系统交互通过 Cat 2b 信号，无直接跨层依赖。新增节点类型只需添加新信号 + 新监听器
 - **Autoload 定位清晰**：位置 #14——在 RealmSystem(#11) 之后（需要境界数据），在探索 UI 系统 ADR 之前（UI 依赖探索数据模型）
 - **经济安全阀**：永久免费地图确保玩家始终有可进入的地图——防止「全通+灵石不足」的软锁状态
 
@@ -546,7 +546,7 @@ get_node_detail(node_id: int) → Dictionary:
 | exploration-system.md | §6 Boss 节点与地图通关——首次通关奖励、地图状态标记 | calculate_map_clear_rewards() + _mark_map_cleared()——经济公式 5 + 6 |
 | exploration-system.md | §7 回旧地图——柔性压制、境界差额惩罚、卡牌池提升 | calculate_realm_penalty() → RealmSystem.map_effective_realm()——进攻压制/防御保留分离 |
 | exploration-system.md | §8 地图初始解锁顺序——章节驱动的渐进式解锁 | get_map_list() 从 RealmSystem.get_realm_property() 查询 map_unlock——不硬编码序列 |
-| exploration-system.md | §10 事件节点与事件系统的协作——信号架构 | event_node_reached 信号 → EventSystem 委托——遵循 ADR-0004 先例 |
+| exploration-system.md | §10 事件节点与事件系统的协作——信号架构 | event_node_reached 信号 → EventSystem 委托——遵循 ADR-0003 先例 |
 | action-point-system.md | 行动力在 GSM exploration 域中的存储路径 | exploration.action_points / exploration.max_action_points——GSM 第二层写入 |
 | action-point-system.md | 行动力变更通知（action_points_changed/depleted/refilled） | 通过 GSM batch_updated 信号传播——遵循 ADR-0007 Cat 1 数据变更通知 |
 | realm-system.md | 行动力上限按境界查询 | 通过 RealmSystem.get_realm_property(L, "action_points") 查询——不重复定义数值 |
@@ -582,8 +582,8 @@ get_node_detail(node_id: int) → Dictionary:
 
 ## 相关决策
 - ADR-0001：GSM 三层 API——exploration.* 域状态所有权基础
-- ADR-0004：EventSystem 信号委托模式——探索事件委托的先例
-- ADR-0006：SceneManager——探索/战斗场景切换
+- ADR-0003：EventSystem 信号委托模式——探索事件委托的先例
+- ADR-0005：SceneManager——探索/战斗场景切换
 - ADR-0007：三分类信号体系——探索系统 Cat 2b 信号命名和路由
 - ADR-0008：CombatSystem 7 阶段状态机——战斗节点委托目标
 - ADR-0010：RealmSystem——map_unlock、行动力上限、柔性压制

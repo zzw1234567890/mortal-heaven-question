@@ -1,7 +1,7 @@
 # ADR-0016：上场阵位系统 — Feature 层 Autoload + 内部状态机 + GSM 快照持久化
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 计数 7→5。）
 
 ## 日期
 2026-07-25
@@ -24,7 +24,7 @@ Proposed
 | **依赖** | ADR-0001（GSM——`player.realm_level` 只读查询获取 `max_deploy`；战斗结束时接收不可用角色快照 `GSM.battle.deployment_snapshot`）；ADR-0006（CardSystem——角色卡模板查询 `get_template(id)`；`create_instance()` 创建角色卡实例）；ADR-0007（三分类信号体系——上场/阵亡/待命清除等生命周期事件归类为 Cat 2b 系统信号）；ADR-0008（CombatSystem——Phase 0 PREPARATION 备战阶段调用 `DeploymentSystem.setup_field()`；Phase 2 PLAY 出牌阶段调用 `DeploymentSystem.deploy()`；Phase 6 END 回合结束时调用 `DeploymentSystem.clear_standby_state()`；`character_died` 信号触发 `mark_unavailable()`）；ADR-0010（RealmSystem——`get_realm_property(level, &"max_deploy")` 查询上场人数上限）；ADR-0011（StatusEffectSystem——Template/Instance 分离模式先例；战斗热路径 O(1) 查询先例；GSM 例外模式先例——战斗期间数据在子系统内部管理）；ADR-0013（BindingManager——Feature 层 Autoload 先例；角色上场/阵亡事件触发 BindingManager 的挂起/恢复/移除） |
 | **启用** | 前向引用：阵法系统（尚无独立 ADR——上场人数变更通知重查阵法激活条件）；前向引用：AI 系统（尚无独立 ADR——`is_targetable()` 查询目标合法性 + `get_field()` 获取阵位分布用于决策）；前向引用：CombatUI（尚无独立 ADR——订阅 Cat 2b 信号更新阵位状态显示、待命标记、不可用灰显） |
 | **阻塞** | 战斗 Epic——备战阶段的上场选择 UI + 战中补位的阵位选择 UI + 阵亡后空位显示；角色管理 Epic——不可用角色的复活途径（涅槃丹/事件/天赋） + 角色位替换逻辑 |
-| **排序说明** | Feature 层——在 Foundation 层全部 7 个 ADR + Core 层 ADR-0010（RealmSystem）+ Feature 层 ADR-0008（CombatSystem）、ADR-0013（BindingManager）被接受后编写。DeploymentSystem 依赖 BindingManager（#13）的绑定生命周期 + CombatSystem（#9）的阶段编排——初始化顺序需排在两者之后。完整 Autoload 链 18 个：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoad #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11 / ProgressionSystem #12 / BindingManager #13 / ExplorationSystem #14 / FactionSystem #15 / ResourceSystem #16 / DeploymentSystem #17 / AISystem #18。DeploymentSystem._ready() 执行时 #1-#16 已完全初始化 |
+| **排序说明** | Feature 层——在 Foundation 层全部 5 个 ADR + Core 层 ADR-0010（RealmSystem）+ Feature 层 ADR-0008（CombatSystem）、ADR-0013（BindingManager）被接受后编写。DeploymentSystem 依赖 BindingManager（#13）的绑定生命周期 + CombatSystem（#9）的阶段编排——初始化顺序需排在两者之后。完整 Autoload 链 18 个：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoad #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11 / ProgressionSystem #12 / BindingManager #13 / ExplorationSystem #14 / FactionSystem #15 / ResourceSystem #16 / DeploymentSystem #17 / AISystem #18。DeploymentSystem._ready() 执行时 #1-#16 已完全初始化 |
 
 ## 上下文
 

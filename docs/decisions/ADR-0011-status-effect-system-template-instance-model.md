@@ -1,7 +1,7 @@
 # ADR-0011：状态效果系统 — 双层对象模型 + Autoload 服务 + 专用 Cat 2b 信号总线
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Core 层审查通过。修复：CardSystem 引用 ADR-0002→ADR-0006 全部 8 处修正、Autoload 链 Foundation 层编号偏移修正、排序说明 "全部 7 个" 措辞更新。）
 
 ## 日期
 2026-07-25
@@ -24,7 +24,7 @@ Proposed
 | **依赖** | ADR-0001（GSM——`player.*` / `battle.*` 只读查询；不直接写入 GSM——状态数据存储在 StatusEffectSystem 内部注册表，GSM 仅在战斗结束时接收序列化快照）；ADR-0007（三分类信号体系——`status_applied/removed/updated/immunity_blocked` 分类为 Cat 2b 系统信号；CombatSystem 直接调用 StatusEffectSystem 方法而非订阅信号）；ADR-0008（CombatSystem——Phase 0 发动 `tick_all()` 倒计时编排；Phase 4/5 发动 `apply_status()` / `remove_status()` 作为效果结算的一部分；`battle_end()` 发动 `clear_all_statuses()` 清理）；ADR-0009（CardEffectEngine——效果引擎通过 `apply_status()` / `remove_status()` / `get_active_statuses()` / `get_accumulated_value()` 接口调用 StatusEffectSystem；不直接访问 StatusEffectSystem 内部状态） |
 | **启用** | ADR-0012（战斗 UI 系统——订阅 StatusEffectSystem 的 Cat 2b 信号更新角色头顶状态图标和 tooltip）；ADR-0014（AI 系统——通过 `get_active_statuses()` / `get_accumulated_value()` 查询目标状态以评估技能价值）；ADR-0015（绑定系统——角色阵亡时调用 `suspend_statuses_by_source()` / 复活时调用 `restore_statuses()` 协调非绑定来源的状态暂挂/恢复） |
 | **阻塞** | 状态效果 Epic（所有 buff/debuff/特殊状态的施加、叠加、倒计时、免疫、移除——依赖 StatusEffectSystem 运行时）；战斗 Epic（Phase 0 状态倒计时 + Phase 4/5 状态施加结算）；卡牌效果 Epic（效果引擎的 APPLY_STATUS / REMOVE_STATUS / MODIFY_STAT 效果类型依赖 StatusEffectSystem 接口） |
-| **排序说明** | Core 层——在 Foundation 层全部 7 个 ADR 被接受后编写。与 ADR-0009（CardEffectEngine）并行——两者互为消费者/提供者。Autoload 初始化顺序：StatusEffectSystem 为 Autoload #8（完整链：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoad #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11——ADR-0009 §对象生命周期 + ADR-0010 §Autoload 初始化）。StatusEffectSystem 的 `_ready()` 执行时，#1-#7 已完全初始化 |
+| **排序说明** | Core 层——在 Foundation 层 ADR 被接受后编写。与 ADR-0009（CardEffectEngine）并行——两者互为消费者/提供者。Autoload 初始化顺序：StatusEffectSystem 为 Autoload #8（完整链：GSM #1 / InputManager #2 / SceneManager #3 / SaveLoad #4 / EventSystem #5 / CardSystem #6 / CostSystem #7 / StatusEffectSystem #8 / CombatSystem #9 / CardEffectEngine #10 / RealmSystem #11——ADR-0009 §对象生命周期 + ADR-0010 §Autoload 初始化）。StatusEffectSystem 的 `_ready()` 执行时，#1-#7 已完全初始化 |
 
 ## 上下文
 
@@ -43,7 +43,7 @@ Proposed
 ### 约束
 
 - **Core 层定位**：StatusEffectSystem 是 Core 层 Autoload——消费 Foundation 层（GSM 只读查询），被 Feature 层（CombatSystem、CardEffectEngine）和 Presentation 层（CombatUI、HUD）消费。不依赖 Feature 层系统
-- **双层对象模型**：StatusTemplate（Resource，`.tres`，策划在 Inspector 编辑）只读——所有运行时可变状态在 StatusInstance（RefCounted）上管理（与 ADR-0002 CardTemplate/CardInstance 和 ADR-0009 EffectTemplate/EffectInstance 分离模式一致）
+- **双层对象模型**：StatusTemplate（Resource，`.tres`，策划在 Inspector 编辑）只读——所有运行时可变状态在 StatusInstance（RefCounted）上管理（与 ADR-0006 CardTemplate/CardInstance 和 ADR-0009 EffectTemplate/EffectInstance 分离模式一致）
 - **状态生命周期**：创建→施加检查→施加/合并→持续跟踪→倒计时/触发→暂挂/恢复→到期移除——8 个阶段，每阶段有明确的触发条件和状态转换规则
 - **叠加规则**：3 种——独立（每次创建新实例）、刷新（同名状态刷新 duration 取 max+value 取新值）、叠加上限（同名状态层数+1 直到 max_stacks，同时刷新 duration）
 - **持续时间倒计时**：在每个己方回合 Phase 0（PREPARATION）执行——由 CombatSystem 编排（与 ADR-0008 Phase 0 一致）。永久状态（duration=-1）不参与倒计时
@@ -101,7 +101,7 @@ Proposed
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**设计理由**：与 ADR-0002（CardTemplate/CardInstance）和 ADR-0009（EffectTemplate/EffectInstance）的 Template/Instance 分离模式一致——Godot Resource 的共享引用语义（修改一处污染所有引用者）决定了 Resource 必须只读。RefCounted 没有 Resource 的路径和引用语义包袱——更轻量（~200 bytes/实例），且天然防止模板污染。
+**设计理由**：与 ADR-0006（CardTemplate/CardInstance）和 ADR-0009（EffectTemplate/EffectInstance）的 Template/Instance 分离模式一致——Godot Resource 的共享引用语义（修改一处污染所有引用者）决定了 Resource 必须只读。RefCounted 没有 Resource 的路径和引用语义包袱——更轻量（~200 bytes/实例），且天然防止模板污染。
 
 **为什么不是纯 Dictionary**：类型安全——编译时检查 enum 值（StatusType.BUFF vs 字符串 "增益"）、`match` 分支遗漏在编译时捕获而非运行时调试。Godot Inspector 集成——策划可在编辑器中可视化编辑 `.tres` StatusTemplate，无需手写 JSON。220+ 状态模板 × 每战斗 50+ 实例的规模证明了编译时类型安全的价值。
 
@@ -338,11 +338,11 @@ ADR-0009 §子系统集成契约 以 proposed contract 形式引用了 StatusSys
 StatusEffectSystem 初始化顺序（Autoload #8——完整链 11 个 Autoload）：
 
   #1  GSM              (Foundation, ADR-0001)
-  #2  InputManager      (Foundation, ADR-0005)
-  #3  SceneManager      (Foundation, ADR-0006)
-  #4  SaveLoad           (Foundation, ADR-0003)
-  #5  EventSystem        (Foundation, ADR-0004)
-  #6  CardSystem         (Core, ADR-0002)
+  #2  InputManager      (Foundation, ADR-0004)
+  #3  SceneManager      (Foundation, ADR-0005)
+  #4  SaveLoad           (Foundation, ADR-0002)
+  #5  EventSystem        (Foundation, ADR-0003)
+  #6  CardSystem         (Core, ADR-0006)
   #7  CostSystem         (Core)
   #8  StatusEffectSystem (Core)  ← 本 ADR
   #9  CombatSystem       (Feature, ADR-0008)
@@ -397,7 +397,7 @@ StatusInstance 采用直接 `RefCounted.new()` / 引用计数归零模式——*
 
 ### 积极的
 
-- **双层模型的一致性**：StatusTemplate/StatusInstance 与 CardTemplate/CardInstance（ADR-0002）、EffectTemplate/EffectInstance（ADR-0009）构成统一的 Template/Instance 三元组——程序员无需记忆不同的对象模型规则
+- **双层模型的一致性**：StatusTemplate/StatusInstance 与 CardTemplate/CardInstance（ADR-0006）、EffectTemplate/EffectInstance（ADR-0009）构成统一的 Template/Instance 三元组——程序员无需记忆不同的对象模型规则
 - **O(1) 角色级状态查询**：`_by_target` 索引 + `_instances` 字典——`get_active_statuses(target_id)` 和 `get_accumulated_value(target_id, stat)` 在战斗热路径上 O(1)
 - **专用 Cat 2b 信号避免 GSM 信号表膨胀**：4 个 StatusEffectSystem 信号（vs 如果通过 GSM batch_updated 传播 → 每帧 50+ 状态 × 6 角色的数据变更事件），保持 GSM 信号表的可维护性
 - **GDD 开放问题全部解决**：#1（双层模型）→ StatusTemplate/StatusInstance；#2（max_stacks 来源）→ StatusTemplate 定义；#3（隐藏状态）→ 公式中排除 is_hidden
@@ -478,7 +478,7 @@ StatusInstance 采用直接 `RefCounted.new()` / 引用计数归零模式——*
 ## 相关决策
 
 - ADR-0001（GSM——只读查询 player.*/battle.*；战斗结束时接收状态快照）
-- ADR-0002（CardSystem——Template/Instance 分离模式——本 ADR 的 StatusTemplate/StatusInstance 三元组之一）
+- ADR-0006（CardSystem——Template/Instance 分离模式——本 ADR 的 StatusTemplate/StatusInstance 三元组之一）
 - ADR-0007（信号分类——4 个 Cat 2b 信号 + 直接方法调用编排）
 - ADR-0008（CombatSystem——Phase 0 发动 tick_all()；Phase 2/4/5 发动 apply/remove；battle_end 发动 clear_all）
 - ADR-0009（CardEffectEngine——apply_status/remove_status/get_active_statuses/get_accumulated_value/remove_statuses_by_source 的 proposed contract）

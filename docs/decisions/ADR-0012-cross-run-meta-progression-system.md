@@ -1,7 +1,7 @@
 # ADR-0012：跨局元进度系统 — ProgressionSystem Autoload + 领域化 API + 直写缓存模型
 
 ## 状态
-Proposed
+Accepted（2026-07-26——Meta 层审查通过。修复：SaveLoad ADR-0003→0002、EventSystem ADR-0004→0003、层归属 Foundation→Meta、Autoload 计数更新。）
 
 ## 日期
 2026-07-25
@@ -21,10 +21,10 @@ Proposed
 
 | 字段 | 值 |
 |-------|-------|
-| **依赖** | ADR-0001（GSM——但**取代** `progression.*` 域所有权）；ADR-0003（SaveLoadSystem——progression.dat 的持久化读写、`progression_saved` 信号——**同时也取代** SaveLoadSystem 的 `progression_updated` 信号源：从 `GSM.progression_updated` 改为 `ProgressionSystem.progression_updated`）；ADR-0007（信号分类体系——Cat 2b 动作通知信号） |
+| **依赖** | ADR-0001（GSM——但**取代** `progression.*` 域所有权）；ADR-0002（SaveLoadSystem——progression.dat 的持久化读写、`progression_saved` 信号——**同时也取代** SaveLoadSystem 的 `progression_updated` 信号源：从 `GSM.progression_updated` 改为 `ProgressionSystem.progression_updated`）；ADR-0007（信号分类体系——Cat 2b 动作通知信号） |
 | **启用** | 成就系统（AchievementSystem）、轮回天赋系统（ReincarnationTalentSystem）、结局分支系统（EndingBranchSystem）——上述所有系统通过 ProgressionSystem API 读写跨局数据 |
 | **阻塞** | **成就 Epic**（62 个成就的解锁/进度追踪）、**轮回天赋 Epic**（20 个天赋节点 + 槽位装备）、**结局图鉴 Epic**（6 个结局的解锁/展示）——在上述系统端到端测试前必须接受本 ADR |
-| **排序说明** | Foundation 层第 12 个 ADR（在 ADR-0011 之后）。Autoload 初始化顺序 #12。成就/天赋/结局系统在运行时通过 ProgressionSystem 直写 API 访问跨局数据——SaveLoadSystem 通过信号被动响应持久化，不主动调用 ProgressionSystem 方法 |
+| **排序说明** | Meta 层 ADR。Autoload 初始化顺序 #12。成就/天赋/结局系统在运行时通过 ProgressionSystem 直写 API 访问跨局数据——SaveLoadSystem 通过信号被动响应持久化，不主动调用 ProgressionSystem 方法 |
 
 ## 上下文
 
@@ -38,7 +38,7 @@ Proposed
 4. **卡牌图鉴**（card-system.md）：222 张卡牌的全局发现状态（跨局累计去重）。数据量 <5KB。
 5. **游戏统计**（跨系统）：累计战斗次数/胜利、最高伤害、总游戏时间等。数据量 <2KB。
 
-目前 ADR-0001 将 `progression.*` 域的运行时所有权分配给 GSM，SaveLoadSystem 通过 `GSM.progression_updated` 信号被动响应持久化到 `progression.dat`（ADR-0003）。但此模型存在三个结构性问题：
+目前 ADR-0001 将 `progression.*` 域的运行时所有权分配给 GSM，SaveLoadSystem 通过 `GSM.progression_updated` 信号被动响应持久化到 `progression.dat`（ADR-0002）。但此模型存在三个结构性问题：
 
 - **生命周期错配**：`progression` 数据跨局持久存在——`new_game()` 从不重置它。但 GSM 的 `serialize()` 明确排除 `battle` 和 `session` 域，而 `progression` 数据与单局存档数据混在同一个序列化输出中。这造成概念混淆——"哪些数据随存档重置，哪些不随？"
 - **写入路径分散**：已注册为 `progression.*` 拥有者的 GSM（ADR-0001）实际上并不理解 achievement/talent/ending 的内部结构——它只是一个被动的字典容器。当 AchievementSystem 写入 `achievements.unlocked` 时，它通过 GSM 第二层方法（`GSM.set_progression_flag()` 或直接字典操作）写入，但 GSM 不校验成就 ID 是否存在或进度值是否有效。校验逻辑分散在 4 个特征系统中。
@@ -51,7 +51,7 @@ Proposed
 - **Autoload 槽位**：已有 11 个 Autoload（GSM→Input→Scene→SaveLoad→Event→Card→Cost→StatusEffect→Combat→CardEffect→Realm）。ProgressionSystem 为第 12 个。
 - **初始化顺序**：ProgressionSystem 必须在 SaveLoadSystem（#4）之后初始化——它需要 `progression.dat` 已加载。但必须在任何特征系统（AchievementSystem、ReincarnationSystem）之前就绪——这些系统为非 Autoload，在场景内按需实例化。
 - **GSM 解耦**：ProgressionSystem 的数据不经过 GSM——GSM 不再持有 `progression.*` 域。特征系统查询跨局数据时直接访问 ProgressionSystem。
-- **SaveLoadSystem 契约**：ProgressionSystem 通过 `progression_updated` 信号触发 SaveLoadSystem 的被动持久化——继承 ADR-0003 的信号驱动被动保存模式（"特征系统不直接调用 SaveLoadSystem"）。
+- **SaveLoadSystem 契约**：ProgressionSystem 通过 `progression_updated` 信号触发 SaveLoadSystem 的被动持久化——继承 ADR-0002 的信号驱动被动保存模式（"特征系统不直接调用 SaveLoadSystem"）。
 - **JSON 类型兼容性**：`serialize()` 输出必须仅包含 JSON 兼容类型——GSM 不再作为中间层，ProgressionSystem 自行保证类型兼容性。
 - **首局默认值**：progression.dat 不存在时为全新玩家——ProgressionSystem 必须从零初始化所有域，不报错。
 
@@ -147,7 +147,7 @@ ProgressionSystem.purchase_talent(talent_id: String) → {success: bool, reason:
 
 ProgressionSystem.grant_talent(talent_id: String) → {success: bool, reason: String}
   # 直接授予天赋（不扣除轮回点）——用于 EventSystem GAIN_TALENT Outcome 和特殊事件奖励
-  # ADR-0004 EventSystem.apply_outcomes() 中 OutcomeType.GAIN_TALENT 的迁移目标
+  # ADR-0003 EventSystem.apply_outcomes() 中 OutcomeType.GAIN_TALENT 的迁移目标
   # 如果天赋已解锁则无操作并返回 success: true（幂等）
 
 ProgressionSystem.get_talent_tree_state() → Dictionary
@@ -333,14 +333,14 @@ ADR-0001 §state_ownership 当前将 `progression.*` 域运行时所有权分配
 - **理由**：跨局数据与单局游戏状态具有根本不同的生命周期——`progression` 跨局持续存在，`new_game()` 从不重置它。将其保留在 GSM 中混淆了两个不同的数据生命周期，并迫使 GSM 成为它不理解的数据的被动容器。专用系统在写入时提供校验（有效的成就 ID、足够的天赋点数、合法的 ending_id），而 GSM 作为泛型字典容器无法提供这些校验。
 - **ADR-0001 修正**：ADR-0001 §state_ownership 的 `progression.*` 条目状态设为 `superseded_by: ADR-0012`
 
-### 与 ADR-0003 的信号源变更
+### 与 ADR-0002 的信号源变更
 
-ADR-0003 §api_decisions 确立了 `SaveLoadSystem` 监听 `GSM.progression_updated` 信号的被动保存模式。本 ADR 将 progression 数据所有权从 GSM 迁移到 ProgressionSystem——信号源随所有权转移：
+ADR-0002 §api_decisions 确立了 `SaveLoadSystem` 监听 `GSM.progression_updated` 信号的被动保存模式。本 ADR 将 progression 数据所有权从 GSM 迁移到 ProgressionSystem——信号源随所有权转移：
 
 - **之前**：SaveLoadSystem 监听 `GSM.progression_updated` → 触发 `_atomic_write(progression.dat)`
 - **之后**：SaveLoadSystem 监听 `ProgressionSystem.progression_updated` → 触发 `_atomic_write(progression.dat)`
 - **理由**：信号源遵循数据所有权。ProgressionSystem 是 progression 数据的唯一权威源——只有它知道数据何时变更。GSM 不再持有 progression 数据，因此无法发射该信号。
-- **ADR-0003 修正**：ADR-0003 §api_decisions 的 `progression_updated` 监听目标从 `GSM` 变更为 `ProgressionSystem`
+- **ADR-0002 修正**：ADR-0002 §api_decisions 的 `progression_updated` 监听目标从 `GSM` 变更为 `ProgressionSystem`
 
 ## 考虑的替代方案
 
@@ -363,7 +363,7 @@ ADR-0003 §api_decisions 确立了 `SaveLoadSystem` 监听 `GSM.progression_upda
 - **描述**：不设 progression.dat。AchievementSystem 写入 `user://achievements.json`；ReincarnationSystem 写入 `user://talents.json`；EndingBranchSystem 写入 `user://endings.json`。各系统通过自己的文件 I/O 管理持久化。
 - **优点**：完全去中心化——每个系统独立演进而不与其他系统冲突。无需协调器。
 - **缺点**：3-4 个独立的 JSON 文件，各自处理版本管理和损坏恢复。首局启动需要协调多个文件的默认值。删除 progression 数据需要删除多个文件而非一个。相互依赖（成就检查天赋点数、结局检查轮回次数）需要跨文件读取——这破坏了封装性。SaveLoadSystem 的原子写入保证必须跨多个文件复制。
-- **拒绝原因**：过度去中心化会导致重复的 I/O 逻辑、版本管理和损坏恢复——每个元系统都重新实现 SaveLoadSystem 已经做好的事情。progression.dat 作为单一触点已经在 ADR-0003 中被接受——本 ADR 只是改变了*谁构建数据*，而非数据存储在哪里。
+- **拒绝原因**：过度去中心化会导致重复的 I/O 逻辑、版本管理和损坏恢复——每个元系统都重新实现 SaveLoadSystem 已经做好的事情。progression.dat 作为单一触点已经在 ADR-0002 中被接受——本 ADR 只是改变了*谁构建数据*，而非数据存储在哪里。
 
 ## 后果
 
@@ -372,7 +372,7 @@ ADR-0003 §api_decisions 确立了 `SaveLoadSystem` 监听 `GSM.progression_upda
 - **清晰的关注点分离**：ProgressionSystem 拥有所有跨局数据——GSM 不再困惑于"这个域会随存档重置吗？"。运行时职责边界明确：ProgressionSystem = 跨局数据，GSM = 单局数据。
 - **写入时校验**：`unlock_achievement("ach_invalid")` 在 ProgressionSystem 层被捕获——返回 `{success: false, reason: "unknown_id"}`。不再有静默写入无效成就 ID 到字典的情况。
 - **统一 schema 权威源**：6 个领域在 ProgressionSystem 内部定义——GDD 引用 ProgressionSystem API 作为权威接口，而非各自独立定义持久化 schema。
-- **继承的信号驱动持久化模式**：与 ADR-0003 的模式一致——"特征系统不直接调用 SaveLoadSystem"。只有 ProgressionSystem 的 `progression_updated` 信号触发持久化。
+- **继承的信号驱动持久化模式**：与 ADR-0002 的模式一致——"特征系统不直接调用 SaveLoadSystem"。只有 ProgressionSystem 的 `progression_updated` 信号触发持久化。
 - **存档系统更简单**：`new_game()` 不触及 progression——GSM 重置单局状态，ProgressionSystem 不变。`delete_save()` 仅删除存档槽位——progression 保持原样。消除了"记住不重置 progression"的隐式约束。
 - **GDD 需求可追溯**：所有 4 个元系统的 GDD 需求均可链接到 ProgressionSystem API 中的特定方法。
 
@@ -387,7 +387,7 @@ ADR-0003 §api_decisions 确立了 `SaveLoadSystem` 监听 `GSM.progression_upda
 
 ### 风险
 
-- **progression.dat 损坏导致所有跨局进度丢失**：5 个领域的数据在一次文件损坏中全部归零——成就、天赋、图鉴、结局、统计。缓解措施：(a) 原子写入策略（.tmp → rename）将损坏风险降至最低——详见 ADR-0003；(b) 损坏检测时保留 `.bak` 备份；(c) Steam Cloud 作为远程备份（若上架 Steam）；(d) 成就总数 62 在同一文件中——部分损坏极小可能。
+- **progression.dat 损坏导致所有跨局进度丢失**：5 个领域的数据在一次文件损坏中全部归零——成就、天赋、图鉴、结局、统计。缓解措施：(a) 原子写入策略（.tmp → rename）将损坏风险降至最低——详见 ADR-0002；(b) 损坏检测时保留 `.bak` 备份；(c) Steam Cloud 作为远程备份（若上架 Steam）；(d) 成就总数 62 在同一文件中——部分损坏极小可能。
 - **Godot 同步信号发射导致帧尖峰**：`progression_updated` 信号触发 SaveLoadSystem 的 `_atomic_write()` ——该调用在当前调用栈中同步执行，约 50ms 磁盘 I/O 直接加到帧上。缓解措施：(a) 批量更新 API（`batch_update_begin/end`）将多次统计增量合并为一次信号发射；(b) SaveLoadSystem 内部防抖——每 5 秒最多一次写盘或退出时最后一次写盘；(c) 对于 `WorkerThreadPool` 的未来评估（Godot 4.6 中 FileAccess 非线程安全——需要完整的序列化到线程安全缓冲区+工作线程 I/O，增加了显著复杂度）。在 MVP 中接受帧尖峰——progression 写入为低频事件（跨局累计），不会每帧发生。
 - **Autoload 初始化顺序错误**：ProgressionSystem._ready() 在 progression.dat 被加载前运行——特征系统可能在 `initialize()` 被调用前查询空存储。缓解措施：ProgressionSystem 在所有域存储填充完成前设置 `_initialized_and_loaded = false`。消费者在查询前检查此标志。Godot 的 Autoload _ready() 顺序严格遵循 Project Settings——顺序在编码前即已知。直接调用模式（在 _ready() 中调用 SaveLoadSystem.load_progression()）保证了在 _ready() 返回前数据已填充——消除了信号等待的竞态条件（godot-specialist 审查 H-1 已解决）。
 
@@ -418,13 +418,13 @@ ADR-0003 §api_decisions 确立了 `SaveLoadSystem` 监听 `GSM.progression_upda
 ## 迁移计划
 
 1. **ADR-0001 修订**：`progression.*` 域所有权条目状态设为 `superseded_by: ADR-0012`。GSM 移除 `progression` 域（无现有代码需重构——pre-production）。
-2. **ADR-0003 修订**：`api_decisions` 第 348-352 行 `"监听 GSM.progression_updated"` → `"监听 ProgressionSystem.progression_updated"`。迁移目标与 §"与 ADR-0003 的信号源变更" 一致。
+2. **ADR-0002 修订**：`api_decisions` 第 348-352 行 `"监听 GSM.progression_updated"` → `"监听 ProgressionSystem.progression_updated"`。迁移目标与 §"与 ADR-0002 的信号源变更" 一致。
 3. **架构注册表更新**：
    - `state_ownership` 第 64-69 行：`progression.*` 域条目——所有权从 `game-state-manager` 变更为 `progression-system`，status 设为 `superseded_by: ADR-0012`
    - `state_ownership` 新增：ProgressionSystem 的 6 个域条目（achievements、talents、card_gallery、endings、statistics、meta）
    - `api_decisions` 第 348-352 行：`"监听 GSM.progression_updated"` → `"监听 ProgressionSystem.progression_updated"`
 4. **SaveLoadSystem 接口调整**：`save_progression()` 和 `load_progression()` 改为与 ProgressionSystem（而非 GSM）对接。调用 `ProgressionSystem.serialize()` / `deserialize()` 替代 `GSM.progression` 域访问。
-5. **EventSystem GAIN_TALENT 适配**：ADR-0004 的 `apply_outcomes()` 中 `OutcomeType.GAIN_TALENT` 当前调用 `GSM.progression.unlock_talent()`。迁移后改为调用 `ProgressionSystem.grant_talent(talent_id)`——此方法直接授予天赋（不消耗轮回点），匹配事件奖励语义。
+5. **EventSystem GAIN_TALENT 适配**：ADR-0003 的 `apply_outcomes()` 中 `OutcomeType.GAIN_TALENT` 当前调用 `GSM.progression.unlock_talent()`。迁移后改为调用 `ProgressionSystem.grant_talent(talent_id)`——此方法直接授予天赋（不消耗轮回点），匹配事件奖励语义。
 6. **特征系统适配**：AchievementSystem、ReincarnationSystem、EndingBranchSystem、CardSystem（图鉴）将其 progression 数据访问从 GSM（如适用）改为 ProgressionSystem API。
 
 ## 验证标准

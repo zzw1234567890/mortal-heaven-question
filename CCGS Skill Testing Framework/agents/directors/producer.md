@@ -17,7 +17,7 @@
 
 - [ ] `description:` 字段存在且领域特定（提及范围、冲刺、里程碑、生产——而非泛泛而谈）
 - [ ] `allowed-tools:` 列表主要以读取为主；仅当冲刺/里程碑文件需要解析时才包含 Bash
-- [ ] 模型层级为 `claude-opus-4-6`（依据 coordination-rules.md：具有门禁综合评审职能的总监为 Opus）
+- [ ] 模型层级为 `deepseek-v4-pro`（依据 coordination-rules.md：具有门禁综合评审职能的总监为 Opus）
 - [ ] 代理定义未声称对设计决策或技术架构拥有权威
 
 ---
