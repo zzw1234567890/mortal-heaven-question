@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://b5m8d5unyring"]
+
+[ext_resource type="Script" uid="uid://c53kq1sx8w3rl" path="res://prototypes/cultivation-card-battle-vertical-slice/scripts/battle_controller.gd" id="1_controller"]
+[ext_resource type="Script" uid="uid://dmim1wa7rifkj" path="res://prototypes/cultivation-card-battle-vertical-slice/scripts/player_state.gd" id="2_player"]
+[ext_resource type="Script" uid="uid://c4absuhqt6yc8" path="res://prototypes/cultivation-card-battle-vertical-slice/scripts/enemy_ai.gd" id="3_enemy"]
+[ext_resource type="Script" uid="uid://bv3w8og20p6xo" path="res://prototypes/cultivation-card-battle-vertical-slice/scripts/battle_hud.gd" id="4_hud"]
+[ext_resource type="Script" uid="uid://bco7sfpqeh0ws" path="res://prototypes/cultivation-card-battle-vertical-slice/scripts/deployment_state.gd" id="5_deployment"]
+
+[node name="Battle" type="Node" unique_id=40657813]
+script = ExtResource("1_controller")
+
+[node name="PlayerState" type="Node" parent="." unique_id=1129844479]
+unique_name_in_owner = true
+script = ExtResource("2_player")
+
+[node name="EnemyAI" type="Node" parent="." unique_id=676802377]
+unique_name_in_owner = true
+script = ExtResource("3_enemy")
+
+[node name="DeploymentState" type="Node" parent="." unique_id=1031972414]
+unique_name_in_owner = true
+script = ExtResource("5_deployment")
+
+[node name="BattleHUD" type="Control" parent="." unique_id=760299743]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = 2.0
+offset_right = 3.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("4_hud")
