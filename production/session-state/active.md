@@ -1,7 +1,7 @@
 # 活跃会话状态
 
 > **会话 ID**：2026-07-25
-> **上次更新**：2026-07-26（主菜单 UX 规范完成）
+> **上次更新**：2026-07-27（UX 规范审查通过——3/3 APPROVED）
 
 ## 本会话成果
 
@@ -85,12 +85,30 @@
 | 结局分支系统 | EndingEvaluator 纯函数工具类嵌入 StorySystem | ADR-0029 |
 
 <!-- STATUS -->
-Epic: Card System Assets
-Feature: 卡牌系统全部 6 种类型资产规范完成
-Task: 200 个资产规范已写入 6 个规范文件
+Epic: Foundation 层实现
+Feature: GameStateManager (GSM)
+Task: Story 001 完成——Autoload 基础结构与第一层属性读取
 <!-- /STATUS -->
 
 ## 最近活动
+
+- 2026-07-27：Story 001 实现完成——GSM Autoload 基础结构与第一层属性读取：
+  - `src/foundation/game_state_manager.gd` —— 178 行，8 个数据域（progression 已按 ADR-0012 移除），RealmLevel 枚举，get(path) 通用路径读取，gsm_initialized 信号
+  - `tests/unit/gsm/autoload_and_tier1_read_test.gd` —— 18 条测试，覆盖 AC-001/AC-002/AC-003 + 补充测试（全域初始化、progression 缺席、默认值正确性）
+  - `_get_domain()` 私有方法使用 match + String 分支，兼容 Godot 4.6
+  - 所有代码：静态类型、## 文档注释、snake_case 信号命名
+
+- 2026-07-27：QA 计划写入——Sprint 1 Foundation 层：
+  - 21 个预期 story（14 逻辑 + 7 集成）
+  - 预估 ~110 单元测试 + ~48 集成测试
+  - 3 项手动 QA 检查（双焦点验证、grep 扫描、Windows 原子写入复现）
+  - 无试玩要求（Foundation 层无面向玩家 UI）
+
+- 2026-07-27：UX 规范审查完成——3/3 APPROVED：
+  - `design/ux/hud.md`——APPROVED（0 BLOCKING / 2 ADVISORY）
+  - `design/ux/main-menu.md`——APPROVED（修复后：制作人员界面移出 MVP + 加载/错误状态补充）
+  - `design/ux/pause-menu.md`——APPROVED（修复后：保存失败错误状态 + 战败结算流程）
+  - 审查发现共 7 项问题（2 BLOCKING + 5 ADVISORY），全部已修复写入文件
 
 - 2026-07-26：全部卡牌资产规范完成——5 个新规范文件写入：
   - `design/assets/specs/card-system-techniques-assets.md`——52 张功法卡运功图（ASSET-016~063）
