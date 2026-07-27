@@ -1,16 +1,16 @@
 # VERTICAL SLICE - NOT FOR PRODUCTION
+# Validation Question: 玩家能否在 4 分钟内无需引导完成「炼气战斗→修为满→渡劫→突破→再战」？
 # Date: 2026-07-27
 ##
 ## 战斗编排器 —— 双方 6 阵位卡牌对战。
 ## 状态机：PREPARATION → PLAY → ENEMY → CHECK → (循环)
-## 角色选择 → 角色部署 + 敌方部署 → 回合循环
-## 每回合抽 3 张卡，玩家打出任意数量后点"结束回合"
+## 垂直切片 D1：接入境界/费用/修为养成系统。
+## 角色选择 → 角色部署 + 敌方部署 → 回合循环 → 战斗奖励(修为) → 突破就绪检测
 
 class_name VSBattleController
 extends Node
 
 enum BattlePhase { PREPARATION, PLAY, ENEMY, CHECK }
-
 enum TargetSelectionMode { NONE, SELECTING_HEAL, SELECTING_SHIELD }
 
 @onready var player_state: VSPlayerState = %PlayerState
@@ -25,13 +25,17 @@ var _battle_over: bool = false
 
 var _target_selection_mode: TargetSelectionMode = TargetSelectionMode.NONE
 var _pending_card: Dictionary = {}
+var _reward_screen: VSRewardScreen  ## 追踪奖励界面引用——避免 get_node_or_null 失败
 
 
 func _ready() -> void:
+	player_state.setup()
+
 	hud.setup(player_state, enemy_ai, deployment)
 	hud.end_turn_button.pressed.connect(_on_end_turn_pressed)
 	hud.return_button.pressed.connect(_on_return_to_menu_pressed)
 	hud.character_slot_clicked.connect(_on_ally_slot_clicked)
+	hud.breakthrough_button_pressed.connect(_on_breakthrough_pressed)
 
 	_start_character_selection()
 
@@ -43,7 +47,6 @@ func _start_character_selection() -> void:
 
 
 func _on_characters_selected(character_ids: Array[String]) -> void:
-	# 关闭选择界面
 	var sel = get_node_or_null("VSCharacterSelectionScreen")
 	if sel:
 		sel.queue_free()
@@ -53,14 +56,13 @@ func _on_characters_selected(character_ids: Array[String]) -> void:
 		var cd: Dictionary = VSCharacterData.CHARACTERS[character_ids[i]]
 		deployment.deploy_character(i, character_ids[i], cd["max_hp"], cd["attack"])
 
-	# 部署敌方角色（数量 = 玩家数量）
-	enemy_ai.deploy_random(character_ids.size())
+	# 部署敌方角色（等级随玩家境界）
+	var enemy_count: int = 2  ## 炼气期 2 个敌人
+	if player_state.realm_level >= VSRealmData.RealmLevel.FOUNDATION:
+		enemy_count = 3
 
-	# 通知 HUD 刷新敌方显示
-	for i in range(6):
-		var es: Dictionary = enemy_ai.get_slot(i)
-		if es.get("character_id", "") != "":
-			hud._on_enemy_hp_changed(i, 0, es["current_hp"])
+	enemy_ai.deploy_random(enemy_count, player_state.realm_level)
+	hud.update_enemy_display(enemy_ai)
 
 	_start_turn()
 
@@ -74,7 +76,10 @@ func _start_turn() -> void:
 	_draw_hand()
 
 	_current_phase = BattlePhase.PLAY
-	hud.set_turn_label("第 %d 回合" % player_state.turn_number)
+	hud.set_turn_label("第 %d 回合 · %s" % [
+		player_state.turn_number,
+		VSRealmData.get_realm_name(player_state.realm_level),
+	])
 
 
 func _draw_hand() -> void:
@@ -159,17 +164,25 @@ func _execute_card_effect(card_def: Dictionary, target_slot: int) -> void:
 	var val: int = card_def.get("value", 0)
 	var target: String = card_def.get("target", "enemy")
 
+	# 应用境界压制倍率到伤害
+	var realm_mult: float = 1.0
+	if etype == "damage" and target == "enemy":
+		realm_mult = VSRealmData.get_suppression(player_state.realm_level, enemy_ai.get_realm_level())
+
 	match etype:
 		"damage":
 			if target == "enemy":
-				# 攻击随机存活的敌方
+				var actual_damage: int = int(ceil(val * realm_mult))
 				var alive := enemy_ai.get_front_row_alive()
 				if alive.is_empty():
 					alive = enemy_ai.get_back_row_alive()
 				if not alive.is_empty():
 					var tgt: int = alive[randi() % alive.size()]
-					enemy_ai.take_damage(tgt, val)
-					hud.log_action(card_def.get("name", ""), "造成伤害", val)
+					enemy_ai.take_damage(tgt, actual_damage)
+					if realm_mult != 1.0:
+						hud.log_action(card_def.get("name", ""), "造成伤害(x%.1f压制)" % realm_mult, actual_damage)
+					else:
+						hud.log_action(card_def.get("name", ""), "造成伤害", actual_damage)
 					if enemy_ai.is_all_dead():
 						_battle_over = true
 						await get_tree().create_timer(0.3).timeout
@@ -292,19 +305,75 @@ func _show_reward_screen() -> void:
 	var rc: Array[String] = []
 	for _i in range(rng.randi_range(1, 2)):
 		rc.append(VSCardData.STARTING_DECK[rng.randi_range(0, VSCardData.STARTING_DECK.size() - 1)])
-	var rl: int = rng.randi_range(10, 30)
+
+	# 修为奖励——按战斗难度
+	var cultivation_reward: int = rng.randi_range(40, 80)
+	var ling_shi: int = rng.randi_range(10, 30)
 
 	var rs := VSRewardScreen.new()
+	_reward_screen = rs
 	add_child(rs)
-	rs.set_rewards(rc, rl)
+	# 等待下一帧确保 _build_ui() 执行完毕再设置数据
+	await get_tree().process_frame
+	rs.set_rewards(rc, ling_shi, cultivation_reward)
 	rs.reward_collected.connect(_on_reward_collected)
 
 
-func _on_reward_collected() -> void:
-	var rs = get_node_or_null("VSRewardScreen")
-	if rs:
-		rs.queue_free()
-	get_tree().change_scene_to_file("res://prototypes/cultivation-card-battle-vertical-slice/scenes/main_menu.tscn")
+func _on_reward_collected(cultivation_amount: int) -> void:
+	if _reward_screen:
+		_reward_screen.queue_free()
+		_reward_screen = null
+
+	print("[DEBUG] 奖励领取: 修为+%d" % cultivation_amount)
+
+	# 发放修为奖励
+	player_state.cultivation_system.gain_cultivation(cultivation_amount, "战斗奖励")
+
+	# 检查是否突破就绪
+	if player_state.cultivation_system.is_breakthrough_ready():
+		print("[DEBUG] 修为已满，显示突破提示")
+		hud.show_breakthrough_ready()
+	else:
+		# 继续战斗——再来一场
+		print("[DEBUG] 修为进度: %d/%d" % [player_state.cultivation_system.get_current_cultivation(), player_state.cultivation_system.get_max_cultivation()])
+		_start_next_battle()
+
+
+func _start_next_battle() -> void:
+	# 重置敌方和战斗状态
+	_battle_over = false
+	_current_phase = BattlePhase.PREPARATION
+
+	# 重新部署敌方（可能等级更高）
+	var enemy_count: int = 2
+	if player_state.realm_level >= VSRealmData.RealmLevel.FOUNDATION:
+		enemy_count = 3
+	enemy_ai.reset_all()
+	enemy_ai.deploy_random(enemy_count, player_state.realm_level)
+	hud.update_enemy_display(enemy_ai)
+
+	# 回复队伍
+	for i in range(6):
+		var cd: Dictionary = deployment.get_character(i)
+		if cd.get("is_alive", false):
+			var cdata: Dictionary = VSCharacterData.CHARACTERS.get(cd.get("character_id", ""), {})
+			var mhp: int = cdata.get("max_hp", 0)
+			deployment.heal_character(i, mhp)
+
+	_start_turn()
+
+
+func _on_breakthrough_pressed() -> void:
+	if not player_state.cultivation_system.is_breakthrough_ready():
+		return
+
+	# 进入渡劫战（D2 实现——当前简化为直接突破）
+	var new_name: String = player_state.attempt_breakthrough()
+	if not new_name.is_empty():
+		hud.show_breakthrough_success(new_name)
+		# 突破后继续战斗验证
+		await get_tree().create_timer(2.0).timeout
+		_start_next_battle()
 
 
 func _on_return_to_menu_pressed() -> void:

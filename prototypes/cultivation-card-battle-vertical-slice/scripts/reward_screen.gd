@@ -1,16 +1,19 @@
 # VERTICAL SLICE - NOT FOR PRODUCTION
 # Date: 2026-07-27
 ##
-## 胜利奖励界面 -- 居中面板 + 全屏暗背景
+## 胜利奖励界面 -- 居中面板 + 全屏暗背景。
+## 垂直切片 D1：新增修为奖励显示。
 
 class_name VSRewardScreen
 extends Control
 
-signal reward_collected
+signal reward_collected(cultivation_amount: int)
 
 var _reward_cards: Array[String] = []
 var _reward_lingshi: int = 0
+var _reward_cultivation: int = 0
 var _lingshi_label: Label
+var _cultivation_label: Label
 var _card_list: VBoxContainer
 
 
@@ -30,7 +33,7 @@ func _build_ui(vs: Vector2) -> void:
 	add_child(bg)
 
 	var pw: float = 400.0
-	var ph: float = 320.0
+	var ph: float = 380.0
 	var panel := PanelContainer.new()
 	panel.position = Vector2((vs.x - pw) / 2.0, (vs.y - ph) / 2.0)
 	panel.size = Vector2(pw, ph)
@@ -65,6 +68,13 @@ func _build_ui(vs: Vector2) -> void:
 	rt.add_theme_font_size_override("font_size", 20)
 	vbox.add_child(rt)
 
+	_cultivation_label = Label.new()
+	_cultivation_label.text = "修为：+0"
+	_cultivation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cultivation_label.add_theme_font_size_override("font_size", 18)
+	_cultivation_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6, 1))
+	vbox.add_child(_cultivation_label)
+
 	_lingshi_label = Label.new()
 	_lingshi_label.text = "灵石：+0"
 	_lingshi_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -90,9 +100,12 @@ func _build_ui(vs: Vector2) -> void:
 	vbox.add_child(cb)
 
 
-func set_rewards(cards: Array[String], lingshi: int) -> void:
+func set_rewards(cards: Array[String], lingshi: int, cultivation: int) -> void:
 	_reward_cards = cards
 	_reward_lingshi = lingshi
+	_reward_cultivation = cultivation
+	if _cultivation_label:
+		_cultivation_label.text = "修为：+%d" % cultivation
 	if _lingshi_label:
 		_lingshi_label.text = "灵石：+%d" % lingshi
 	if _card_list:
@@ -109,4 +122,4 @@ func set_rewards(cards: Array[String], lingshi: int) -> void:
 
 
 func _on_confirm_pressed() -> void:
-	reward_collected.emit()
+	reward_collected.emit(_reward_cultivation)

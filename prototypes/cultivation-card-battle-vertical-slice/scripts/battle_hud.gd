@@ -1,17 +1,21 @@
 # VERTICAL SLICE - NOT FOR PRODUCTION
 # Date: 2026-07-27
 ##
-## 战斗 HUD -- 显示双方 6 阵位 + 手牌 + 行动日志。
+## 战斗 HUD -- 显示双方 6 阵位 + 手牌 + 行动日志 + 修为进度 + 境界信息。
+## 垂直切片 D1：新增修为进度条、境界标签、突破按钮。
 ## 所有子节点程序化创建，无外部 .tscn 依赖。
-## 布局：敌方阵位(上) -> 我方阵位(下) -> 行动日志 -> 手牌 -> 按钮
 
 class_name VSBattleHUD
 extends Control
 
 signal character_slot_clicked(slot_index: int)
 signal enemy_slot_clicked(slot_index: int)
+signal breakthrough_button_pressed()
 
 var mana_label: Label
+var realm_label: Label
+var cultivation_bar: ProgressBar
+var cultivation_label: Label
 var shield_label: Label
 var turn_label: Label
 var alive_count_label: Label
@@ -19,6 +23,7 @@ var alive_count_label: Label
 var hand_container: HBoxContainer
 var action_log: RichTextLabel
 var end_turn_button: Button
+var breakthrough_button: Button
 
 var result_panel: Panel
 var result_label: Label
@@ -28,8 +33,10 @@ var ally_slot_buttons: Array[Button] = []
 var enemy_slot_buttons: Array[Button] = []
 
 var _target_selection_label: Label
+var _breakthrough_ready_panel: Panel
 var _deployment_ref: VSDeploymentState
 var _enemy_ref: VSEnemyAI
+var _player_ref: VSPlayerState
 
 
 func _ready() -> void:
@@ -56,11 +63,9 @@ func _build_ui() -> void:
 	both_sides.mouse_filter = MOUSE_FILTER_PASS
 	main_vbox.add_child(both_sides)
 
-	# 敌方阵位（上方）
 	var enemy_panel := _build_side_panel("敌方", Color(0.5, 0.15, 0.15, 0.5), false)
 	both_sides.add_child(enemy_panel)
 
-	# 我方阵位（下方）
 	var ally_panel := _build_side_panel("我方", Color(0.2, 0.3, 0.5, 0.5), true)
 	both_sides.add_child(ally_panel)
 
@@ -94,9 +99,15 @@ func _build_ui() -> void:
 	alive_count_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1))
 	status_bar.add_child(alive_count_label)
 
+	realm_label = Label.new()
+	realm_label.add_theme_font_size_override("font_size", 13)
+	realm_label.text = "境界：炼气期"
+	realm_label.add_theme_color_override("font_color", Color(0.95, 0.85, 0.4, 1))
+	status_bar.add_child(realm_label)
+
 	mana_label = Label.new()
 	mana_label.add_theme_font_size_override("font_size", 13)
-	mana_label.text = "灵力：3"
+	mana_label.text = "灵力：0"
 	status_bar.add_child(mana_label)
 
 	shield_label = Label.new()
@@ -109,6 +120,67 @@ func _build_ui() -> void:
 	turn_label.add_theme_font_size_override("font_size", 13)
 	turn_label.text = "准备中..."
 	status_bar.add_child(turn_label)
+
+	# -- 修为进度条 --
+	var cultivation_box := HBoxContainer.new()
+	cultivation_box.add_theme_constant_override("separation", 8)
+	cultivation_box.mouse_filter = MOUSE_FILTER_PASS
+	main_vbox.add_child(cultivation_box)
+
+	var cult_title := Label.new()
+	cult_title.text = "修为："
+	cult_title.add_theme_font_size_override("font_size", 12)
+	cult_title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1))
+	cultivation_box.add_child(cult_title)
+
+	cultivation_bar = ProgressBar.new()
+	cultivation_bar.custom_minimum_size = Vector2(200, 18)
+	cultivation_bar.min_value = 0.0
+	cultivation_bar.max_value = 100.0
+	cultivation_bar.value = 0.0
+	cultivation_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cultivation_box.add_child(cultivation_bar)
+
+	cultivation_label = Label.new()
+	cultivation_label.text = "0/100"
+	cultivation_label.add_theme_font_size_override("font_size", 12)
+	cultivation_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9, 1))
+	cultivation_box.add_child(cultivation_label)
+
+	# -- 突破按钮 --
+	var btn_wrap := HBoxContainer.new()
+	btn_wrap.add_theme_constant_override("separation", 12)
+	btn_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_wrap.mouse_filter = MOUSE_FILTER_PASS
+	main_vbox.add_child(btn_wrap)
+
+	breakthrough_button = Button.new()
+	breakthrough_button.text = "突破！"
+	breakthrough_button.add_theme_font_size_override("font_size", 14)
+	breakthrough_button.custom_minimum_size = Vector2(100, 30)
+	breakthrough_button.visible = false
+	breakthrough_button.pressed.connect(_on_breakthrough_button_pressed)
+	btn_wrap.add_child(breakthrough_button)
+
+	# -- 突破就绪面板 --
+	_breakthrough_ready_panel = Panel.new()
+	_breakthrough_ready_panel.anchor_left = 0.5
+	_breakthrough_ready_panel.anchor_right = 0.5
+	_breakthrough_ready_panel.offset_left = -200.0
+	_breakthrough_ready_panel.offset_right = 200.0
+	_breakthrough_ready_panel.anchor_top = 1.0
+	_breakthrough_ready_panel.anchor_bottom = 1.0
+	_breakthrough_ready_panel.offset_top = -80.0
+	_breakthrough_ready_panel.offset_bottom = -0.0
+	_breakthrough_ready_panel.visible = false
+	var bstyle := StyleBoxFlat.new()
+	bstyle.bg_color = Color(0.15, 0.1, 0.3, 0.95)
+	bstyle.border_width_left = 2
+	bstyle.border_width_right = 2
+	bstyle.border_width_top = 2
+	bstyle.border_color = Color(0.9, 0.7, 0.2, 1)
+	_breakthrough_ready_panel.add_theme_stylebox_override("panel", bstyle)
+	add_child(_breakthrough_ready_panel)
 
 	# -- 手牌区域 --
 	var hand_bg := PanelContainer.new()
@@ -128,16 +200,16 @@ func _build_ui() -> void:
 	hand_bg.add_child(hand_container)
 
 	# -- 结束回合按钮 --
-	var btn_wrap := HBoxContainer.new()
-	btn_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
-	btn_wrap.mouse_filter = MOUSE_FILTER_PASS
-	main_vbox.add_child(btn_wrap)
+	var endbtn_wrap := HBoxContainer.new()
+	endbtn_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	endbtn_wrap.mouse_filter = MOUSE_FILTER_PASS
+	main_vbox.add_child(endbtn_wrap)
 
 	end_turn_button = Button.new()
 	end_turn_button.text = "结束回合 ->"
 	end_turn_button.add_theme_font_size_override("font_size", 13)
 	end_turn_button.custom_minimum_size = Vector2(110, 28)
-	btn_wrap.add_child(end_turn_button)
+	endbtn_wrap.add_child(end_turn_button)
 
 	# -- 结算面板（屏幕居中） --
 	result_panel = Panel.new()
@@ -246,15 +318,28 @@ func _on_enemy_slot_pressed(slot_index: int) -> void:
 	enemy_slot_clicked.emit(slot_index)
 
 
+func _on_breakthrough_button_pressed() -> void:
+	breakthrough_button_pressed.emit()
+
+
 func setup(player_state: VSPlayerState, enemy_ai: VSEnemyAI, deployment: VSDeploymentState) -> void:
 	_deployment_ref = deployment
 	_enemy_ref = enemy_ai
+	_player_ref = player_state
 
-	mana_label.text = "灵力：%d" % player_state.current_mana
+	realm_label.text = "境界：%s" % VSRealmData.get_realm_name(player_state.realm_level)
+	mana_label.text = "灵力：%d" % player_state.get_current_mana()
+	cultivation_bar.max_value = float(player_state.cultivation_system.get_max_cultivation())
+	_update_cultivation_display()
 	turn_label.text = "第 1 回合"
 	update_alive_count()
 
-	player_state.mana_changed.connect(_on_mana_changed)
+	# 信号连接
+	player_state.cost_changed.connect(_on_mana_changed)
+	player_state.cultivation_changed.connect(_on_cultivation_changed)
+	player_state.cultivation_max_changed.connect(_on_cultivation_max_changed)
+	player_state.breakthrough_ready.connect(_on_breakthrough_ready)
+	player_state.realm_changed.connect(_on_realm_changed)
 
 	deployment.character_deployed.connect(_on_ally_deployed)
 	deployment.character_hp_changed.connect(_on_ally_hp_changed)
@@ -267,6 +352,43 @@ func setup(player_state: VSPlayerState, enemy_ai: VSEnemyAI, deployment: VSDeplo
 
 func _on_mana_changed(_old: int, new: int) -> void:
 	mana_label.text = "灵力：%d" % new
+
+
+func _on_cultivation_changed(_old: int, new: int) -> void:
+	_update_cultivation_display()
+
+
+func _on_cultivation_max_changed(_old: int, new: int) -> void:
+	cultivation_bar.max_value = float(new)
+	_update_cultivation_display()
+
+
+func _on_breakthrough_ready() -> void:
+	breakthrough_button.visible = true
+	breakthrough_button.disabled = false
+	_breakthrough_ready_panel.visible = true
+
+
+func _on_realm_changed(_old_realm: int, new_realm: int, new_name: String) -> void:
+	realm_label.text = "境界：%s" % new_name
+	breakthrough_button.visible = false
+	_breakthrough_ready_panel.visible = false
+
+
+func _update_cultivation_display() -> void:
+	if _player_ref == null:
+		return
+	var cur: int = _player_ref.cultivation_system.get_current_cultivation()
+	var m: int = _player_ref.cultivation_system.get_max_cultivation()
+	cultivation_bar.value = float(cur) if m > 0 else 0.0
+	cultivation_label.text = "%d/%d" % [cur, m]
+
+
+func update_enemy_display(enemy_ai: VSEnemyAI) -> void:
+	_enemy_ref = enemy_ai
+	for i in range(6):
+		_refresh_enemy_slot(i)
+	update_alive_count()
 
 
 func _on_ally_deployed(slot_index: int, _char_id: String) -> void:
@@ -328,11 +450,15 @@ func _refresh_enemy_slot(slot_index: int) -> void:
 		btn.text = "阵亡"
 		btn.modulate = Color(0.35, 0.35, 0.35, 0.5)
 		return
-	var ecd: Dictionary = VSEnemyAI.ENEMY_CHARACTERS.get(ed.get("character_id", ""), {})
-	var n: String = ecd.get("name", "?")
+	# 获取敌方角色名称（支持按境界缩放后的名字）
+	var cid: String = ed.get("character_id", "")
+	var ename: String = cid  # 默认用 ID
+	# 从敌方 AI 的库中找（可能按境界缩放后）
+	if _enemy_ref.has_method("get_enemy_name"):
+		ename = _enemy_ref.get_enemy_name(slot_index)
 	var hp: int = ed.get("current_hp", 0)
 	var mhp: int = ed.get("max_hp", 0)
-	btn.text = "%s\n%d/%d" % [n, hp, mhp]
+	btn.text = "%s\n%d/%d" % [ename, hp, mhp]
 	btn.modulate = Color(1.0, 0.75, 0.7) if slot_index < 3 else Color(1.0, 0.6, 0.6)
 
 
@@ -366,12 +492,35 @@ func show_defeat() -> void:
 	_show_result("败  北", Color(0.8, 0.2, 0.2))
 
 
+func show_breakthrough_ready() -> void:
+	## 修为满了——在日志中提示玩家点击突破按钮。
+	_log("")
+	_log("[color=gold][b]修为已满！点击底部 [突破！] 按钮触发渡劫突破！[/b][/color]")
+	breakthrough_button.visible = true
+	breakthrough_button.disabled = false
+	_breakthrough_ready_panel.visible = false  ## 战斗结算后不弹面板，让玩家点突破
+
+
+func show_breakthrough_success(new_name: String) -> void:
+	## 突破成功——大屏提示。
+	_log("")
+	_log("[color=gold][b]突破成功！你已进入 [%s]！[/b][/color]" % new_name)
+	# 闪烁效果
+	var tween := create_tween()
+	tween.tween_callback(func(): realm_label.modulate = Color.GOLD)
+	tween.tween_interval(0.3)
+	tween.tween_callback(func(): realm_label.modulate = Color(0.95, 0.85, 0.4, 1))
+	tween.tween_interval(0.3)
+
+
 func _show_result(text: String, color: Color) -> void:
 	result_label.text = text
 	result_label.add_theme_color_override("font_color", color)
 	result_panel.visible = true
 	end_turn_button.disabled = true
 	hand_container.visible = false
+	breakthrough_button.visible = false
+	_breakthrough_ready_panel.visible = false
 
 
 func log_action(card_name: String, effect: String, value: int) -> void:

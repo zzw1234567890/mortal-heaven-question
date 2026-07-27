@@ -1,9 +1,41 @@
 # 活跃会话状态
 
 > **会话 ID**：2026-07-25
-> **上次更新**：2026-07-27（UX 规范审查通过——3/3 APPROVED）
+> **上次更新**：2026-07-27（gate-check Pre-Production→Production：FAIL——6 阻塞项——执行 vertical-slice 中）
 
 ## 本会话成果
+
+### gate-check Pre-Production→Production：🔴 FAIL
+
+**审查日期**：2026-07-27
+**审查模式**：full
+
+#### 主管小组
+
+| 主管 | 裁决 |
+|------|:--:|
+| 创意总监 | 🔴 NOT READY |
+| 技术总监 | 🔴 NOT READY |
+| 制作人 | 🟡 CONCERNS |
+| 美术总监 | 🟡 CONCERNS |
+
+#### 阻塞项
+
+| # | 阻塞项 | 来源 | 严重度 |
+|---|--------|------|:--:|
+| B1 | 无可玩原型/垂直切片——核心循环从未被实际玩过 | CD + TD | 致命 |
+| B2 | 零试玩数据——绑定情感张力、渡劫紧张曲线、战斗节奏全未验证 | CD | 致命 |
+| B3 | 缺少 `/review-all-gdds` 全局交叉审查 | CD | 高 |
+| B4 | Godot 4.6 双焦点行为未在目标硬件验证（OQ-02 HIGH） | TD | 高 |
+| B5 | 性能预算全为纸面估算——从未实测 | TD | 高 |
+| B6 | 25 Autoload 初始化顺序从未在 Godot 4.6 实际运行 | TD | 高 |
+
+#### 最小 PASS 路径
+
+1. 运行 `/vertical-slice`（覆盖 B1、B4、B5、B6）
+2. 至少 1 次有记录的试玩（覆盖 B2）
+3. 运行 `/review-all-gdds`（覆盖 B3）
+4. 重新提交 `/gate-check`
 
 ### Foundation 层 ADR 全部 Accepted ✅
 
@@ -85,18 +117,61 @@
 | 结局分支系统 | EndingEvaluator 纯函数工具类嵌入 StorySystem | ADR-0029 |
 
 <!-- STATUS -->
-Epic: Foundation 层实现
-Feature: GameStateManager (GSM)
-Task: Story 001 完成——Autoload 基础结构与第一层属性读取
+Epic: Pre-Production → Production 关卡
+Feature: 垂直切片 (Vertical Slice)
+Task: D1——境界系统 + 费用系统 + 修为养成
 <!-- /STATUS -->
+
+## 垂直切片：仙途问道——扩展战斗原型
+
+> **启动**：2026-07-27
+> **验证问题**：玩家能否在 4 分钟内无需引导完成「炼气战斗→修为满→渡劫→突破筑基→再战」？
+> **审查模式**：full
+> **硬时间限制**：7 个工作日（D1=2026-07-27）
+> **原型目录**：`prototypes/cultivation-card-battle-vertical-slice/`
+
+### 逐日进度
+
+| 日 | 计划 | 状态 |
+|:--:|------|:--:|
+| D1 | 境界系统 + 费用系统 + 修为养成 | ✅ 完成 |
+| D2 | 渡劫突破 + 绑定系统 | ⬜ |
+| D3 | 扩展现有战斗 + 整合 | ⬜ |
+| D4 | 渡劫战 + 境界突破流程 | ⬜ |
+| D5 | 完整循环穿线 + 调试 | ⬜ |
+| D6 | 打磨 + 试玩准备 | ⬜ |
+| D7 | 试玩 + REPORT.md | ⬜ |
+
+### D1 产出
+
+| 文件 | 行数 | 说明 |
+|------|:--:|------|
+| `scripts/realm_data.gd` | 65 | 炼气/筑基属性表 + 压制系数表 + get_realm_property()/get_suppression() |
+| `scripts/cost_system.gd` | 86 | 灵力费用：can_afford()/spend()/reset_for_turn()/temp_bonus |
+| `scripts/cultivation_system.gd` | 100 | 修为获取统一入口 + 溢出池 + 突破就绪检测 |
+| `scripts/player_state.gd` | 147 | 重写——委托给 CostSystem/CultivationSystem + 信号转发 |
+| `scripts/battle_controller.gd` | 251 | 接入三系统 + 境界压制 + 突破流程（简化为直接突破） |
+| `scripts/battle_hud.gd` | 389 | 新增修为进度条 + 境界标签 + 突破按钮 + 突破成功动画 |
+| `scripts/enemy_ai.gd` | 155 | 新增按境界缩放 + get_enemy_name() + reset_all() |
+| `scripts/reward_screen.gd` | 125 | 新增修为奖励显示 |
+| **总计** | **1,318 行** | 3 新文件 + 5 修改
+
+### 范围外
+探索地图、卡组自由编辑、阵法、炼丹炼器、剧情对话、音频
 
 ## 最近活动
 
+- 2026-07-27：垂直切片启动——阶段 1-3 完成，扩展战斗原型进入 D1
 - 2026-07-27：Story 001 实现完成——GSM Autoload 基础结构与第一层属性读取：
   - `src/foundation/game_state_manager.gd` —— 178 行，8 个数据域（progression 已按 ADR-0012 移除），RealmLevel 枚举，get(path) 通用路径读取，gsm_initialized 信号
   - `tests/unit/gsm/autoload_and_tier1_read_test.gd` —— 18 条测试，覆盖 AC-001/AC-002/AC-003 + 补充测试（全域初始化、progression 缺席、默认值正确性）
   - `_get_domain()` 私有方法使用 match + String 分支，兼容 Godot 4.6
   - 所有代码：静态类型、## 文档注释、snake_case 信号命名
+
+- 2026-07-27：AD-PHASE-GATE 审查完成——CONCERNS（1 CONCERN + 2 ADVISORY，无 BLOCKER）：
+  - C-1: `design/assets/entity-inventory.md` 缺失——需在 Production 第一周内（不晚于 2026-08-04）创建敌方/Boss/NPC 实体视觉清单
+  - A-1: UI 图标 (~48) 和 VFX (12) 规范待 UI 实现后补充
+  - A-2: LOD-0 角色立绘数量（38 vs 表格中的 15）导致 LOD 金字塔内存估算偏低——建议更新
 
 - 2026-07-27：QA 计划写入——Sprint 1 Foundation 层：
   - 21 个预期 story（14 逻辑 + 7 集成）
