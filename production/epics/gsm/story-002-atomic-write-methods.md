@@ -1,7 +1,7 @@
 # Story 002: 第二层原子写入方法
 
 > **Epic**: 游戏状态管理器
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-07-26
@@ -30,16 +30,16 @@
 
 *来自 GDD:*
 
-- [ ] **AC-003**: GIVEN 系统A调用 `add_cultivation(100)`，WHEN 系统B读取 `player.cultivation`，THEN 值增加了100
-- [ ] **AC-004**: GIVEN 修为值500，WHEN 调用 `spend_resource("ling_shi", 30)` 且灵石余额>=30，THEN 灵石扣除30，返回true
-- [ ] **AC-005**: GIVEN 灵石余额20，WHEN 调用 `spend_resource("ling_shi", 30)`，THEN 灵石不扣除，返回false
-- [ ] **AC-006**: GIVEN 写入 `set("nonexistent.path", value)`，WHEN 调用，THEN 拒绝写入，日志记录错误
-- [ ] **AC-007**: GIVEN 战斗开始，WHEN 调用 `battle_start()`，THEN `battle` 域初始化，发射 `battle_started` 事件
-- [ ] **AC-008**: GIVEN 战斗结束，WHEN 调用 `battle_end(victory)`，THEN `battle` 域清空为null
-- [ ] **AC-009**: GIVEN 修为溢出，WHEN 修为达到 max_cultivation 后继续增加，THEN 溢出部分存储在溢出字段
-- [ ] **AC-010**: GIVEN 突破后，WHEN 读取修为值，THEN 溢出修为计入新境界进度
-- [ ] **AC-011**: GIVEN 角色死亡，WHEN 执行轮回结算，THEN `player.cultivation` 清零，`collection.owned_cards` 保留，`progression` 更新
-- [ ] **AC-012**: GIVEN 新游戏开始，WHEN 身份选择完成，THEN `player.identity_id` 正确设置
+- [x] **AC-003**: GIVEN 系统A调用 `add_cultivation(100)`，WHEN 系统B读取 `player.cultivation`，THEN 值增加了100
+- [x] **AC-004**: GIVEN 修为值500，WHEN 调用 `spend_resource("ling_shi", 30)` 且灵石余额>=30，THEN 灵石扣除30，返回true
+- [x] **AC-005**: GIVEN 灵石余额20，WHEN 调用 `spend_resource("ling_shi", 30)`，THEN 灵石不扣除，返回false
+- [x] **AC-006**: GIVEN 写入 `set("nonexistent.path", value)`，WHEN 调用，THEN 拒绝写入，日志记录错误
+- [x] **AC-007**: GIVEN 战斗开始，WHEN 调用 `battle_start()`，THEN `battle` 域初始化，发射 `battle_started` 事件
+- [x] **AC-008**: GIVEN 战斗结束，WHEN 调用 `battle_end(victory)`，THEN `battle` 域清空为null
+- [x] **AC-009**: GIVEN 修为溢出，WHEN 修为达到 max_cultivation 后继续增加，THEN 溢出部分存储在溢出字段
+- [x] **AC-010**: GIVEN 突破后，WHEN 读取修为值，THEN 溢出修为计入新境界进度
+- [x] **AC-011**: GIVEN 角色死亡，WHEN 执行轮回结算，THEN `player.cultivation` 清零，`collection.owned_cards` 保留，`progression` 更新
+- [x] **AC-012**: GIVEN 新游戏开始，WHEN 身份选择完成，THEN `player.identity_id` 正确设置
 
 ---
 
@@ -166,7 +166,7 @@ reincarnation_reset() → void
 
 **Story 类型**: Logic
 **需要证据**: `tests/unit/gsm/atomic_write_methods_test.gd` — 必须存在且通过
-**状态**: [x] 已创建
+**状态**: [x] 已创建——32/32 测试全部通过
 
 ---
 

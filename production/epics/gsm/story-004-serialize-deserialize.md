@@ -1,10 +1,11 @@
 # Story 004: 序列化与反序列化
 
 > **Epic**: 游戏状态管理器
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-07-26
+> **Last Updated**: 2026-07-28
 
 ## 上下文
 
@@ -28,9 +29,9 @@
 
 *来自 GDD:*
 
-- [ ] **AC-017**: GIVEN 战斗中存档，WHEN 序列化状态，THEN `battle` 域和 `session` 域不包含在输出中
-- [ ] **AC-018**: GIVEN 读档文件损坏，WHEN 调用 `deserialize(corrupted_data)`，THEN 返回false，内存状态不变
-- [ ] **AC-019**: GIVEN 旧版本存档缺少新字段，WHEN 调用 `deserialize(old_data)`，THEN 缺失字段采用默认值，返回true
+- [x] **AC-017**: GIVEN 战斗中存档，WHEN 序列化状态，THEN `battle` 域和 `session` 域不包含在输出中
+- [x] **AC-018**: GIVEN 读档文件损坏，WHEN 调用 `deserialize(corrupted_data)`，THEN 返回false，内存状态不变
+- [x] **AC-019**: GIVEN 旧版本存档缺少新字段，WHEN 调用 `deserialize(old_data)`，THEN 缺失字段采用默认值，返回true
 
 ---
 
@@ -130,7 +131,7 @@ GSM 产生的序列化数据为纯 Dictionary，不含 `schema_version`——Sch
 
 **Story 类型**: Logic
 **需要证据**: `tests/unit/gsm/serialize_deserialize_test.gd` — 必须存在且通过
-**状态**: [ ] 尚未创建
+**状态**: [x] 已创建——21/21 测试全部通过
 
 ---
 

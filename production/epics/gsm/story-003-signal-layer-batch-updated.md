@@ -1,7 +1,7 @@
 # Story 003: 第三层信号订阅层 + batch_updated 展平字典
 
 > **Epic**: 游戏状态管理器
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-07-26
@@ -31,10 +31,10 @@
 
 *来自 GDD:*
 
-- [ ] **AC-013**: GIVEN 系统修改 `player.realm`，WHEN 监听 `realm_changed` 信号，THEN 收到包含新旧境界的载荷
-- [ ] **AC-014**: GIVEN 场上角色属性变更，WHEN 监听 `resource_changed` 以外的信号，THEN 不触发（信号不混淆）
-- [ ] **AC-015**: GIVEN 同帧内多次修改 `player.cultivation`，WHEN 检查信号广播，THEN 仅最后一次变更广播事件
-- [ ] **AC-016**: GIVEN 批量修改（战斗结算），WHEN 监听信号，THEN 收到一个 `batch_updated` 事件而非多个逐条事件
+- [x] **AC-013**: GIVEN 系统修改 `player.realm`，WHEN 监听 `realm_changed` 信号，THEN 收到包含新旧境界的载荷
+- [x] **AC-014**: GIVEN 场上角色属性变更，WHEN 监听 `resource_changed` 以外的信号，THEN 不触发（信号不混淆）
+- [x] **AC-015**: GIVEN 同帧内多次修改 `player.cultivation`，WHEN 检查信号广播，THEN 仅最后一次变更广播事件
+- [x] **AC-016**: GIVEN 批量修改（战斗结算），WHEN 监听信号，THEN 收到一个 `batch_updated` 事件而非多个逐条事件
 
 ---
 
@@ -137,7 +137,7 @@ unsubscribe(event_name: StringName, callback: Callable) → void
 
 **Story 类型**: Logic
 **需要证据**: `tests/unit/gsm/signal_layer_and_batch_updated_test.gd` — 必须存在且通过
-**状态**: [ ] 尚未创建
+**状态**: [x] 已创建——15/15 测试全部通过
 
 ---
 

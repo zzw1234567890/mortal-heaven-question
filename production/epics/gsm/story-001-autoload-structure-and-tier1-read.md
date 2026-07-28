@@ -1,12 +1,12 @@
 # Story 001: GSM Autoload 基础结构与第一层属性读取
 
 > **Epic**: 游戏状态管理器
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Estimate**: 2.5h
 > **Manifest Version**: 2026-07-26
-> **Last Updated**: 2026-07-27
+> **Last Updated**: 2026-07-28
 
 ## 上下文
 
@@ -29,9 +29,9 @@
 
 *来自 GDD:*
 
-- [ ] **AC-001**: GIVEN GSM 初始化完成，WHEN 读取 `player.realm`，THEN 返回默认境界（炼气）
-- [ ] **AC-002**: GIVEN GSM 初始化完成，WHEN 读取 `player.resources.ling_shi`，THEN 返回初始灵石数量（>=0）
-- [ ] **AC-003**: GIVEN GSM 初始化完成，WHEN 通过 `get("player.realm")` 路径读取境界，THEN 返回值与直接属性读取 `GSM.player.realm` 相同
+- [x] **AC-001**: GIVEN GSM 初始化完成，WHEN 读取 `player.realm`，THEN 返回默认境界（炼气）
+- [x] **AC-002**: GIVEN GSM 初始化完成，WHEN 读取 `player.resources.ling_shi`，THEN 返回初始灵石数量（>=0）
+- [x] **AC-003**: GIVEN GSM 初始化完成，WHEN 通过 `get("player.realm")` 路径读取境界，THEN 返回值与直接属性读取 `GSM.player.realm` 相同
 
 ---
 
@@ -85,7 +85,7 @@
 
 **Story 类型**: Logic
 **需要证据**: `tests/unit/gsm/autoload_and_tier1_read_test.gd` — 必须存在且通过
-**状态**: [ ] 尚未创建
+**状态**: [x] 已创建——16/16 测试全部通过
 
 ---
 

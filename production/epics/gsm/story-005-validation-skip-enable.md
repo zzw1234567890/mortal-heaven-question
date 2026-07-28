@@ -1,10 +1,11 @@
 # Story 005: 启动校验跳过模式 + enable_validation 激活流程
 
 > **Epic**: 游戏状态管理器
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-07-26
+> **Last Updated**: 2026-07-28
 
 ## 上下文
 
@@ -27,10 +28,10 @@
 
 *来自 GDD:*
 
-- [ ] **AC-020**: GIVEN 无效卡牌ID，WHEN 调用 `add_card_to_collection(invalid_id)`（校验开启后），THEN 拒绝写入，返回false
-- [ ] **AC-021**: GIVEN GSM 以 `validation_enabled = false` 启动，WHEN 在 `enable_validation()` 调用前执行 `add_card_to_collection(valid_id)`，THEN 拒绝写入，返回 false + 日志警告
-- [ ] **AC-022**: GIVEN CardSystem `_ready()` 加载模板库完成，WHEN 调用 `GSM.enable_validation(card_template_database)`，THEN `validation_enabled` 变为 true，发射 `card_validation_ready`，此后 `add_card_to_collection()` 执行引用完整性校验
-- [ ] **AC-023**: GIVEN `enable_validation()` 已调用一次，WHEN 再次调用，THEN 触发 `push_warning()` 但不重复初始化
+- [x] **AC-020**: GIVEN 无效卡牌ID，WHEN 调用 `add_card_to_collection(invalid_id)`（校验开启后），THEN 拒绝写入，返回false
+- [x] **AC-021**: GIVEN GSM 以 `validation_enabled = false` 启动，WHEN 在 `enable_validation()` 调用前执行 `add_card_to_collection(valid_id)`，THEN 拒绝写入，返回 false + 日志警告
+- [x] **AC-022**: GIVEN CardSystem `_ready()` 加载模板库完成，WHEN 调用 `GSM.enable_validation(card_template_database)`，THEN `validation_enabled` 变为 true，发射 `card_validation_ready`，此后 `add_card_to_collection()` 执行引用完整性校验
+- [x] **AC-023**: GIVEN `enable_validation()` 已调用一次，WHEN 再次调用，THEN 触发 `push_warning()` 但不重复初始化
 
 ---
 
@@ -145,7 +146,7 @@ func add_card_to_collection(inst_dict: Dictionary) → bool:
 
 **Story 类型**: Integration
 **需要证据**: `tests/integration/gsm/validation_skip_and_enable_test.gd` — 必须存在且通过
-**状态**: [ ] 尚未创建
+**状态**: [x] 已创建——14/14 测试全部通过
 
 **集成测试覆盖**:
 - GSM `_ready()` 后 validation_enabled=false
