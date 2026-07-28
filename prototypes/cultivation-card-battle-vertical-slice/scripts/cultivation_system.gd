@@ -49,7 +49,7 @@ func update_realm(new_level: int) -> void:
 ##   - [param amount]: 获取的修为量（必须 > 0）。[br]
 ##   - [param source]: 来源标识字符串（战斗/丹药/事件等——用于日志）。[br]
 ## [b]返回:[/b] 实际增加的修为量（超出上限部分进入溢出池）。
-func gain_cultivation(amount: int, source: String = "") -> int:
+func gain_cultivation(amount: int, _source: String = "") -> int:
 	if amount <= 0:
 		return 0
 

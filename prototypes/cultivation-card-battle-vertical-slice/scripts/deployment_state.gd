@@ -14,10 +14,14 @@ signal character_removed(slot_index: int)
 signal character_died(slot_index: int)
 signal character_hp_changed(slot_index: int, old_hp: int, new_hp: int)
 signal character_shield_changed(slot_index: int, old_shield: int, new_shield: int)
+signal card_bound(slot_index: int, card_id: String)           ## 卡牌绑定到角色
+signal card_unbound(slot_index: int, card_id: String)         ## 卡牌从角色解绑
+signal bound_effect_triggered(slot_index: int, card_id: String, subtype: String, value: int)  ## 绑定效果触发
 
 const MAX_SLOTS: int = 6
 const FRONT_ROW: Array[int] = [0, 1, 2]  ## 前排阵位
 const BACK_ROW: Array[int] = [3, 4, 5]   ## 后排阵位
+const MAX_BOUND_CARDS: int = 2            ## 每角色最多绑定 2 张卡
 
 ## 阵位状态：每个阵位存储角色实例数据
 var _slots: Array[Dictionary] = []
@@ -33,6 +37,7 @@ func _ready() -> void:
 			"attack": 0,
 			"shield": 0,
 			"is_alive": false,
+			"bound_cards": [],  ## 绑定的卡牌 [{card_id, subtype, value, bind_text}]
 		})
 
 
@@ -51,6 +56,7 @@ func deploy_character(slot_index: int, character_id: String, max_hp: int, attack
 		"attack": attack,
 		"shield": 0,
 		"is_alive": true,
+		"bound_cards": [],
 	}
 
 	character_deployed.emit(slot_index, character_id)
@@ -69,6 +75,7 @@ func remove_character(slot_index: int) -> void:
 		"attack": 0,
 		"shield": 0,
 		"is_alive": false,
+		"bound_cards": [],
 	}
 
 	character_removed.emit(slot_index)
@@ -191,6 +198,16 @@ func get_total_attack() -> int:
 	return total
 
 
+func get_character_name(slot_index: int) -> String:
+	## 返回指定角色的显示名称（中文）。
+	if slot_index < 0 or slot_index >= MAX_SLOTS:
+		return "?"
+	var cid: String = _slots[slot_index].get("character_id", "")
+	if cid.is_empty():
+		return "?"
+	return VSCharacterData.CHARACTERS.get(cid, {}).get("name", "?")
+
+
 func get_alive_count() -> int:
 	## 获取存活角色数量
 	return get_alive_characters().size()
@@ -203,3 +220,78 @@ func get_total_count() -> int:
 		if _slots[i].get("character_id", "") != "":
 			count += 1
 	return count
+
+
+## === 绑定卡牌系统 =============================================================
+
+func bind_card(slot_index: int, card_def: Dictionary) -> bool:
+	## 将绑定类卡牌绑定到指定阵位角色——超过 MAX_BOUND_CARDS 上限则失败。
+	if slot_index < 0 or slot_index >= MAX_SLOTS:
+		return false
+	if not _slots[slot_index].get("is_alive", false):
+		return false
+
+	var bound: Array = _slots[slot_index].get("bound_cards", [])
+	if bound.size() >= MAX_BOUND_CARDS:
+		return false
+
+	# 存储绑定信息子集
+	var bind_entry: Dictionary = {
+		"card_id": card_def.get("id", card_def.get("name", "")),
+		"subtype": card_def.get("subtype", ""),
+		"value": card_def.get("value", 0),
+		"bind_text": card_def.get("bind_text", ""),
+	}
+	bound.append(bind_entry)
+	_slots[slot_index]["bound_cards"] = bound
+
+	card_bound.emit(slot_index, bind_entry["card_id"])
+	return true
+
+
+func unbind_card(slot_index: int, card_id: String) -> bool:
+	## 从角色阵位解绑指定卡牌。
+	if slot_index < 0 or slot_index >= MAX_SLOTS:
+		return false
+	var bound: Array = _slots[slot_index].get("bound_cards", [])
+	for i in range(bound.size()):
+		if bound[i].get("card_id", "") == card_id:
+			bound.remove_at(i)
+			_slots[slot_index]["bound_cards"] = bound
+			card_unbound.emit(slot_index, card_id)
+			return true
+	return false
+
+
+func get_bound_cards(slot_index: int) -> Array:
+	## 返回角色的所有绑定卡牌。
+	if slot_index < 0 or slot_index >= MAX_SLOTS:
+		return []
+	return _slots[slot_index].get("bound_cards", []).duplicate()
+
+
+func trigger_bound_effects(slot_index: int) -> void:
+	## 触发该角色所有绑定卡的效果——每回合开始调用。
+	## 返回触发的效果列表 [{card_id, subtype, value}], 由 battle_controller 路由执行。
+	if slot_index < 0 or slot_index >= MAX_SLOTS:
+		return
+	if not _slots[slot_index].get("is_alive", false):
+		return
+
+	var bound: Array = _slots[slot_index].get("bound_cards", [])
+	for entry in bound:
+		var cid: String = entry.get("card_id", "")
+		var st: String = entry.get("subtype", "")
+		var val: int = entry.get("value", 0)
+		# 先发信号让外部（battle_controller）执行实际效果
+		bound_effect_triggered.emit(slot_index, cid, st, val)
+
+
+func clear_bound_cards(slot_index: int) -> void:
+	## 清空指定阵位的所有绑定卡牌（新战斗开始时调用）。
+	if slot_index < 0 or slot_index >= MAX_SLOTS:
+		return
+	for entry in _slots[slot_index].get("bound_cards", []).duplicate():
+		var cid: String = entry.get("card_id", "")
+		card_unbound.emit(slot_index, cid)
+	_slots[slot_index]["bound_cards"] = []

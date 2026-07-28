@@ -34,6 +34,7 @@ var enemy_slot_buttons: Array[Button] = []
 
 var _target_selection_label: Label
 var _breakthrough_ready_panel: Panel
+var _tribulation_overlay: Panel  ## 天劫降临全屏过场
 var _deployment_ref: VSDeploymentState
 var _enemy_ref: VSEnemyAI
 var _player_ref: VSPlayerState
@@ -247,6 +248,44 @@ func _build_ui() -> void:
 	return_button.custom_minimum_size = Vector2(150, 36)
 	rv.add_child(return_button)
 
+	# -- 天劫降临过场面板（全屏）--
+	_tribulation_overlay = Panel.new()
+	_tribulation_overlay.anchor_left = 0.0
+	_tribulation_overlay.anchor_right = 1.0
+	_tribulation_overlay.anchor_top = 0.0
+	_tribulation_overlay.anchor_bottom = 1.0
+	_tribulation_overlay.visible = false
+	_tribulation_overlay.mouse_filter = MOUSE_FILTER_IGNORE
+	var tover_style := StyleBoxFlat.new()
+	tover_style.bg_color = Color(0.05, 0.02, 0.08, 0.92)
+	_tribulation_overlay.add_theme_stylebox_override("panel", tover_style)
+	add_child(_tribulation_overlay)
+
+	# 天劫过场中央文字
+	var tover_vbox := VBoxContainer.new()
+	tover_vbox.set_anchors_preset(Control.PRESET_CENTER)
+	tover_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	tover_vbox.mouse_filter = MOUSE_FILTER_IGNORE
+	_tribulation_overlay.add_child(tover_vbox)
+
+	var trib_title := Label.new()
+	trib_title.name = "TribTitle"
+	trib_title.text = "⚡ 天劫降临 ⚡"
+	trib_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	trib_title.add_theme_font_size_override("font_size", 42)
+	trib_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1))
+	trib_title.mouse_filter = MOUSE_FILTER_IGNORE
+	tover_vbox.add_child(trib_title)
+
+	var trib_sub := Label.new()
+	trib_sub.name = "TribSub"
+	trib_sub.text = "天道不容修士逆天而行\n唯有渡劫方能突破！"
+	trib_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	trib_sub.add_theme_font_size_override("font_size", 20)
+	trib_sub.add_theme_color_override("font_color", Color(0.9, 0.8, 0.9, 1))
+	trib_sub.mouse_filter = MOUSE_FILTER_IGNORE
+	tover_vbox.add_child(trib_sub)
+
 
 func _build_side_panel(title: String, bg_color: Color, is_ally: bool) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -345,6 +384,8 @@ func setup(player_state: VSPlayerState, enemy_ai: VSEnemyAI, deployment: VSDeplo
 	deployment.character_hp_changed.connect(_on_ally_hp_changed)
 	deployment.character_shield_changed.connect(_on_ally_shield_changed)
 	deployment.character_died.connect(_on_ally_died)
+	deployment.card_bound.connect(_on_card_bound)
+	deployment.card_unbound.connect(_on_card_unbound)
 
 	enemy_ai.enemy_slot_hp_changed.connect(_on_enemy_hp_changed)
 	enemy_ai.enemy_slot_died.connect(_on_enemy_died)
@@ -354,7 +395,7 @@ func _on_mana_changed(_old: int, new: int) -> void:
 	mana_label.text = "灵力：%d" % new
 
 
-func _on_cultivation_changed(_old: int, new: int) -> void:
+func _on_cultivation_changed(_old: int, _new: int) -> void:
 	_update_cultivation_display()
 
 
@@ -369,7 +410,7 @@ func _on_breakthrough_ready() -> void:
 	_breakthrough_ready_panel.visible = true
 
 
-func _on_realm_changed(_old_realm: int, new_realm: int, new_name: String) -> void:
+func _on_realm_changed(_old_realm: int, _new_realm: int, new_name: String) -> void:
 	realm_label.text = "境界：%s" % new_name
 	breakthrough_button.visible = false
 	_breakthrough_ready_panel.visible = false
@@ -418,6 +459,16 @@ func _on_enemy_died(slot_index: int) -> void:
 	_refresh_enemy_slot(slot_index)
 
 
+func _on_card_bound(slot_index: int, _card_id: String) -> void:
+	## 卡牌绑定到角色——更新阵位显示。
+	_refresh_ally_slot(slot_index)
+
+
+func _on_card_unbound(slot_index: int, _card_id: String) -> void:
+	## 卡牌解绑——更新阵位显示。
+	_refresh_ally_slot(slot_index)
+
+
 func _refresh_ally_slot(slot_index: int) -> void:
 	if slot_index < 0 or slot_index >= ally_slot_buttons.size() or _deployment_ref == null:
 		return
@@ -434,6 +485,14 @@ func _refresh_ally_slot(slot_index: int) -> void:
 	var sh: int = cd.get("shield", 0)
 	var st := "S" if sh > 0 else ""
 	btn.text = "%s\n%d/%d%s" % [n, hp, mhp, st]
+	# 显示绑定卡牌标记
+	var bound := _deployment_ref.get_bound_cards(slot_index)
+	if not bound.is_empty():
+		var bind_names: Array[String] = []
+		for b in bound:
+			bind_names.append("[%s]" % str(b.get("card_id", "?")).substr(0, 3))
+		btn.text += "\n" + "".join(bind_names)
+		btn.disabled = false
 	btn.modulate = Color(0.85, 0.9, 1.0) if slot_index < 3 else Color(0.92, 0.85, 1.0)
 
 
@@ -513,6 +572,39 @@ func show_breakthrough_success(new_name: String) -> void:
 	tween.tween_interval(0.3)
 
 
+func show_tribulation_intro() -> void:
+	## 天劫降临过场——全屏暗背景 + 震动感文字。
+	_tribulation_overlay.visible = true
+	breakthrough_button.visible = false
+	_breakthrough_ready_panel.visible = false
+	_log("")
+	_log("[color=red][b]⚡ 天劫降临！天道降下考验……[/b][/color]")
+
+	# 闪烁效果——天劫文字闪烁
+	var tween := create_tween()
+	tween.set_loops(4)
+	tween.tween_callback(func(): _tribulation_overlay.modulate = Color(1.0, 1.0, 1.0, 0.3))
+	tween.tween_interval(0.2)
+	tween.tween_callback(func(): _tribulation_overlay.modulate = Color(1.0, 1.0, 1.0, 1.0))
+	tween.tween_interval(0.2)
+	tween.tween_callback(func(): _tribulation_overlay.visible = false)
+
+
+func hide_breakthrough_button() -> void:
+	## 隐藏突破按钮——渡劫战开始后不再显示。
+	breakthrough_button.visible = false
+	_breakthrough_ready_panel.visible = false
+
+
+func show_tribulation_failed() -> void:
+	## 渡劫失败——修为回退提示。
+	_tribulation_overlay.visible = false
+	_log("")
+	_log("[color=orange][b]渡劫失败……修为受损，但尚可重试。[/b][/color]")
+	# 如果修为仍接近满，重新显示突破按钮
+	# （由 cultivation_changed 信号自动更新显示）
+
+
 func _show_result(text: String, color: Color) -> void:
 	result_label.text = text
 	result_label.add_theme_color_override("font_color", color)
@@ -523,11 +615,25 @@ func _show_result(text: String, color: Color) -> void:
 	_breakthrough_ready_panel.visible = false
 
 
-func log_action(card_name: String, effect: String, value: int) -> void:
-	if effect == "---":
-		_log(card_name)
+func reset_display() -> void:
+	## 新战斗前重置界面——清除旧日志、隐藏结算面板、清空手牌。
+	action_log.clear()
+	result_panel.visible = false
+	hand_container.visible = true
+	for c in hand_container.get_children():
+		c.queue_free()
+	end_turn_button.disabled = false
+	breakthrough_button.visible = false
+	_breakthrough_ready_panel.visible = false
+	_tribulation_overlay.visible = false
+	_target_selection_label.visible = false
+	_reset_ally_highlights()
+
+func log_action(source: String, action: String, target: String, value: int) -> void:
+	if value > 0:
+		_log("[color=cyan]%s[/color] → [color=#ffaa66]%s[/color]：%s [color=#ffdd44]%d[/color] 点" % [source, target, action, value])
 	else:
-		_log("打出 [color=cyan]%s[/color]：%s %d 点" % [card_name, effect, value])
+		_log("[color=cyan]%s[/color] → [color=#ffaa66]%s[/color]：%s" % [source, target, action])
 
 
 func _log(msg: String) -> void:
@@ -551,6 +657,7 @@ func _highlight_ally_slots() -> void:
 	for i in range(ally_slot_buttons.size()):
 		var cd: Dictionary = _deployment_ref.get_character(i)
 		if cd.get("is_alive", false):
+			ally_slot_buttons[i].disabled = false
 			ally_slot_buttons[i].add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))
 		else:
 			ally_slot_buttons[i].disabled = true

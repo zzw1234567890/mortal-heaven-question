@@ -33,7 +33,7 @@ func init(realm_level: int) -> void:
 ## 根据新旧境界更新费用上限（境界突破时调用）。
 ## 保留当前费用值（如果新上限更高，差额需要等到下回合回复）。
 func update_realm(new_level: int) -> void:
-	var old_max: int = _max_cost
+	var _old_max: int = _max_cost
 	_max_cost = VSRealmData.get_realm_property(new_level, "cost_per_turn")
 	# 上限提升了，当前费用不变——下回合才恢复
 

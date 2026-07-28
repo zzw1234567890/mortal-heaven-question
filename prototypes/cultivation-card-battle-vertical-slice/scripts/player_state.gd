@@ -144,7 +144,7 @@ func attempt_breakthrough() -> String:
 		return ""
 
 	# 过渡到新境界
-	var old_name: String = VSRealmData.get_realm_name(current_level)
+	var _old_name: String = VSRealmData.get_realm_name(current_level)
 	var new_name: String = VSRealmData.get_realm_name(new_level)
 
 	if new_name == "未知境界":

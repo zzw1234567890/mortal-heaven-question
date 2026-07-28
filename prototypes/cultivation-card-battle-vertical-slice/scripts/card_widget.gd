@@ -127,5 +127,9 @@ func _get_type_color(type: String) -> Color:
 			return Color(0.2, 0.7, 0.3, 0.85)    ## 翠玉绿
 		"shield":
 			return Color(0.3, 0.5, 0.9, 0.85)    ## 湛蓝
+		"binding":
+			return Color(0.7, 0.4, 0.9, 0.85)
+		"mana":
+			return Color(0.3, 0.7, 0.9, 0.85)
 		_:
 			return Color(0.5, 0.5, 0.5, 0.85)    ## 中灰
