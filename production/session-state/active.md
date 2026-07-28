@@ -117,9 +117,9 @@
 | 结局分支系统 | EndingEvaluator 纯函数工具类嵌入 StorySystem | ADR-0029 |
 
 <!-- STATUS -->
-Epic: Pre-Production → Production 关卡
-Feature: 垂直切片 (Vertical Slice)
-Task: D1——境界系统 + 费用系统 + 修为养成
+Epic: Production
+Feature: Sprint 1 - Foundation 层
+Task: Story 002 完成——准备 Story 003
 <!-- /STATUS -->
 
 ## 垂直切片：仙途问道——扩展战斗原型

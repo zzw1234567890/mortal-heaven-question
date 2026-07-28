@@ -307,7 +307,7 @@ func _show_reward_screen() -> void:
 		rc.append(VSCardData.STARTING_DECK[rng.randi_range(0, VSCardData.STARTING_DECK.size() - 1)])
 
 	# 修为奖励——按战斗难度
-	var cultivation_reward: int = rng.randi_range(40, 80)
+	var cultivation_reward: int = rng.randi_range(60, 100)  ## 调参：配合 max_cultivation 100→300，确保 3-5 场战斗触发突破
 	var ling_shi: int = rng.randi_range(10, 30)
 
 	var rs := VSRewardScreen.new()
@@ -324,18 +324,14 @@ func _on_reward_collected(cultivation_amount: int) -> void:
 		_reward_screen.queue_free()
 		_reward_screen = null
 
-	print("[DEBUG] 奖励领取: 修为+%d" % cultivation_amount)
-
 	# 发放修为奖励
 	player_state.cultivation_system.gain_cultivation(cultivation_amount, "战斗奖励")
 
 	# 检查是否突破就绪
 	if player_state.cultivation_system.is_breakthrough_ready():
-		print("[DEBUG] 修为已满，显示突破提示")
 		hud.show_breakthrough_ready()
 	else:
 		# 继续战斗——再来一场
-		print("[DEBUG] 修为进度: %d/%d" % [player_state.cultivation_system.get_current_cultivation(), player_state.cultivation_system.get_max_cultivation()])
 		_start_next_battle()
 
 

@@ -21,14 +21,14 @@ enum RealmLevel {
 const REALM_TABLE: Dictionary = {
 	RealmLevel.QI_REFINING: {
 		"name": "炼气期",
-		"max_cultivation": 100,     ## 切片缩小——完整游戏为 1000
+		"max_cultivation": 300,     ## 切片缩小——完整游戏为 1000；调参：确保 ≥3 场战斗触发突破
 		"cost_per_turn": 2,         ## 每回合灵力恢复
 		"max_deploy": 2,            ## 最大上场人数
 		"realm_bonus_damage": 1.0,  ## 伤害基础倍率
 	},
 	RealmLevel.FOUNDATION: {
 		"name": "筑基期",
-		"max_cultivation": 200,     ## 切片缩小——完整游戏为 1500
+		"max_cultivation": 500,     ## 切片缩小——完整游戏为 1500；调参：确保 ≥3 场战斗触发突破
 		"cost_per_turn": 5,         ## 每回合灵力恢复
 		"max_deploy": 3,            ## 最大上场人数
 		"realm_bonus_damage": 1.2,  ## 伤害倍率（筑基打炼气有加成）

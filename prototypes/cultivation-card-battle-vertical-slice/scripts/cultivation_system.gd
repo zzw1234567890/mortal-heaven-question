@@ -18,7 +18,7 @@ signal breakthrough_ready()  ## 修为已满，可以触发渡劫
 ## === 内部状态 ==================================================================
 
 var _current_cultivation: int = 0
-var _max_cultivation: int = 100     ## 炼气期默认值
+var _max_cultivation: int = 300     ## 炼气期默认值（调参：100→300，确保 ≥3 场战斗触发突破）
 var _overflow_pool: int = 0         ## 溢出池（突破后转化的修为）
 var _realm_level: int = VSRealmData.RealmLevel.QI_REFINING
 

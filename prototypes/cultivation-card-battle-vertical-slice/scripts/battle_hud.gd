@@ -136,13 +136,13 @@ func _build_ui() -> void:
 	cultivation_bar = ProgressBar.new()
 	cultivation_bar.custom_minimum_size = Vector2(200, 18)
 	cultivation_bar.min_value = 0.0
-	cultivation_bar.max_value = 100.0
+	cultivation_bar.max_value = 300.0  ## 初始占位值——将在 set_player_state() 中覆盖
 	cultivation_bar.value = 0.0
 	cultivation_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cultivation_box.add_child(cultivation_bar)
 
 	cultivation_label = Label.new()
-	cultivation_label.text = "0/100"
+	cultivation_label.text = "0/300"  ## 初始占位值
 	cultivation_label.add_theme_font_size_override("font_size", 12)
 	cultivation_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9, 1))
 	cultivation_box.add_child(cultivation_label)

@@ -1,10 +1,11 @@
 # Story 003: 第三层信号订阅层 + batch_updated 展平字典
 
 > **Epic**: 游戏状态管理器
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-07-26
+> **Last Updated**: 2026-07-28
 
 ## 上下文
 

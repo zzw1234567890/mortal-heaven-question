@@ -1,10 +1,11 @@
 # Story 002: 第二层原子写入方法
 
 > **Epic**: 游戏状态管理器
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-07-26
+> **Last Updated**: 2026-07-28
 
 ## 上下文
 
@@ -165,7 +166,7 @@ reincarnation_reset() → void
 
 **Story 类型**: Logic
 **需要证据**: `tests/unit/gsm/atomic_write_methods_test.gd` — 必须存在且通过
-**状态**: [ ] 尚未创建
+**状态**: [x] 已创建
 
 ---
 
