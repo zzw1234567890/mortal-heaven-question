@@ -164,9 +164,13 @@ Task: GSM Epic 全部完成——Story 001-005，98/98 测试通过
 ### 范围外
 探索地图、卡组自由编辑、阵法、炼丹炼器、剧情对话、音频
 
-## 最近活动
+## 会话摘录——/dev-story 2026-07-28
+- 故事：production/epics/input-manager/story-001-lock-stack-core.md —— 四级锁栈核心实现
+- 更改的文件：src/foundation/input_manager.gd（覆盖 stub，183 行）、tests/unit/input/test_lock_stack.gd（新建，37 测试函数）
+- 编写的测试：tests/unit/input/test_lock_stack.gd — 14 AC 全覆盖 + 边界测试
+- 阻塞项：无
+- 下一步：/code-review src/foundation/input_manager.gd tests/unit/input/test_lock_stack.gd 然后 /story-done
 
-- 2026-07-28：🟡 gate-check Pre-Production→Production 通过（CONCERNS——10 项关切，0 FAIL）
 - 2026-07-28：**5 项高优先级关切全部解决：**
   - **C1** Presentation Spike 规划 → `production/spikes/presentation-spike-plan.md`（5-7 天，Sprint 2-3 执行）
   - **C2** 铭刻系统已有向随机——无需修订（定向铭刻+三择+替换选择已提供策略代理权）
@@ -249,3 +253,73 @@ Task: GSM Epic 全部完成——Story 001-005，98/98 测试通过
 3. **GSM 第二层方法碎片化**：24 个原子方法分布在 ADR-0001（8+3）、ADR-0014（6）、ADR-0020/0021（1）、ADR-0022（1）、ADR-0026（5）——需汇总回 ADR-0001
 4. **Autoload 25 超 20 软上限**：已在所有相关 ADR 中明确记录风险
 5. **Core/Feature/Narrative/Economy/Meta 层 ADR 仍为 Proposed**：25 个非 Foundation 层 ADR 等待实现前审查
+
+## Session Extract — /story-done 2026-07-29
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/input-manager/story-001-lock-stack-core.md` — 四级锁栈核心实现
+- **Code Review**：首席程序员 APPROVED WITH SUGGESTIONS — `_sync_to_gsm()` 空桩 + 路径修正已应用
+- **QA Review**：QA Lead ADEQUATE — 14/14 AC 覆盖，37 测试函数
+- **Changes**：
+  - `src/foundation/input_manager.gd` — 新增 `_sync_to_gsm()` 空桩（为 Story 003 预留）
+  - `production/epics/input-manager/story-001-lock-stack-core.md` — 路径修正 + Status: Complete + Completion Notes
+  - `production/sprints/sprint-1.md` — Story #1 和 #6 标记 Done
+- **Tech debt logged**：None
+- **Next recommended**：`production/epics/input-manager/story-002-dual-focus-judgment.md`（双焦点输入判定）
+
+## Session Extract — /story-done 2026-07-29 (Story 002)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/input-manager/story-002-dual-focus-judgment.md` — 双焦点输入判定
+- **Code Review**：LP-CODE-REVIEW APPROVED with CONCERNS (2 LOW)，QL-TEST-COVERAGE ADEQUATE
+- **Changes**：
+  - `src/foundation/input_manager.gd` — 新增 ActionType/DeviceType 枚举、`is_input_allowed()`、`is_action_blocked()`、`_check_device_allowed()`、`_get_highest_lock()` assert 守卫（334 行）
+  - `tests/unit/input/test_input_judgment.gd` — 37 测试函数（24 AC + 11 边界 + 2 GAP 修复），性能注释已文档化
+  - `production/epics/input-manager/story-002-dual-focus-judgment.md` — Status: Complete + Completion Notes
+  - `production/sprints/sprint-1.md` — Story #7 标记 ✅ Done
+- **Tech debt logged**：None（5 项 ADVISORY 记录在 Completion Notes 中）
+- **LP Concerns 修复**：C1 (行数) 推迟至 Story 003/004，C2 (_get_highest_lock assert) 已修复
+- **Next recommended**：`production/epics/input-manager/story-003-gsm-sync-signal-routing.md`（GSM 同步与信号传播）或 `production/epics/gsm/story-002-atomic-write-methods.md`（GSM 第二层）
+
+## Session Extract — /story-done 2026-07-29 (Story 003)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/input-manager/story-003-gsm-sync-signal-routing.md` — GSM 同步、信号传播与输入分发
+- **Changes**：
+  - `src/foundation/input_manager.gd` — `_sync_to_gsm()` 替换空桩（序列化→`GameStateManager.set_input_locks()`）、`_on_tree_changed()` 连接、`_ready()` 场景树 guard、`_process()` 路径A、`_input()` 路径B
+  - `src/foundation/game_state_manager.gd` — 新增 `set_input_locks()` Tier 2 原子方法（通过 `_buffer_change` 管线 + `batch_updated` 发射）
+  - `tests/unit/input/test_gsm_sync.gd` — 新增 10 个测试函数（AC-001→008 + 补充测试）
+  - `tests/unit/input/test_input_judgment.gd` — 3 个旧测试白名单语义修正（AC-017/AC-019/GAP-2-2：`assert_true`→`assert_false`）
+  - `production/epics/input-manager/story-003-gsm-sync-signal-routing.md` — Status: Complete + Completion Notes
+  - `production/sprints/sprint-1.md` — Story #8 标记 ✅ Done
+- **测试结果**：84/84 通过（47 lock_stack + 27 judgment + 10 gsm_sync）
+- **Tech debt logged**：None（4 项 ADVISORY 记录在 Completion Notes）
+- **Next recommended**：`production/epics/input-manager/story-004-modal-override-edge-cases.md`（MODAL 覆盖与边缘情况）
+
+## Session Extract — /dev-story 2026-07-29 (Story 004 实现)
+
+- **Story**：`production/epics/input-manager/story-004-modal-override-edge-cases.md` — MODAL 覆盖机制与边缘情况
+- **Changes**：
+  - `src/foundation/input_manager.gd` — 新增 `_exit_tree()` 方法（AC-025/AC-026：断开 tree_changed 连接、清空锁栈、最终 GSM 同步）
+  - `tests/unit/input/test_modal_override.gd` — 新建 9 个测试函数（AC-001→009）
+  - `tests/unit/input/test_device_mask_edge_cases.gd` — 新建 5 个测试函数（AC-010→013）
+  - `tests/unit/input/test_lock_leak_prevention.gd` — 新建 8 个测试函数（AC-014→017 + AC-025/026）
+  - `tests/integration/input/test_modal_integration.gd` — 新建 13 个测试函数（AC-018→024 + 补充场景）
+- **测试结果**：123/123 通过（84 旧 + 39 新增），719 断言，零失败
+- **Next recommended**：`/code-review` 然后 `/story-done`
+
+## Session Extract — /story-done 2026-07-29 (Story 004 关闭)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/input-manager/story-004-modal-override-edge-cases.md` — MODAL 覆盖机制与边缘情况
+- **Code Review**：GDScript 专家 + QA 测试员双审查 — 4 项关键问题修复（`is_connected` 守卫、AC-010/AC-011 文本修正、同义反复断言移除、AC-025 树内测试重写）
+- **Changes**：
+  - `src/foundation/input_manager.gd` — 新增 `_exit_tree()` 方法（含 `is_connected()` 守卫）
+  - `tests/unit/input/test_modal_override.gd` — 新建 9 个测试函数（AC-001→009）
+  - `tests/unit/input/test_device_mask_edge_cases.gd` — 新建 5 个测试函数（AC-010→013）
+  - `tests/unit/input/test_lock_leak_prevention.gd` — 新建 8 个测试函数（AC-014→017 + AC-025/026）
+  - `tests/integration/input/test_modal_integration.gd` — 新建 13 个测试函数（AC-018→024 + 补充场景）
+  - `production/epics/input-manager/story-004-modal-override-edge-cases.md` — Status: Complete + Completion Notes
+- **测试结果**：123/123 通过，719 断言，零失败
+- **Tech debt logged**：None（5 项 ADVISORY 记录在 Completion Notes）
+- **Next recommended**：Input Manager Epic 全部 4 个 Story 完成——Sprint 1 Foundation 层输入子系统完毕

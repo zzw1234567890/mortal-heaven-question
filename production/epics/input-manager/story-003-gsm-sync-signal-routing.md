@@ -2,6 +2,8 @@
 
 > **Epic**: input-manager (输入管理器)
 > **Story 类型**: Integration（集成）
+> **Status**: Complete
+> **Last Updated**: 2026-07-29
 > **依赖 Story**: Story 001（锁栈核心） + Story 002（双焦点判定）
 > **管辖 ADR**: ADR-0004 + ADR-0001
 > **预计工作量**: 4 点
@@ -152,3 +154,15 @@ func set_input_locks(locks: Array[Dictionary]) -> void:
 | Story 001 | 锁栈基础——本 Story 将其同步到 GSM |
 | Story 002 | 判定逻辑——本 Story 在多路径中消费其判定结果 |
 | Story 004 | MODAL 覆盖——扩展 `_input()` 中的 ESC 处理，支持 MODAL 拥有者自检 |
+
+## Completion Notes
+**Completed**：2026-07-29
+**Criteria**：12/16 通过（4 项排除范围内延迟——AC-009/AC-012/AC-015 依赖下游系统）
+**Deviations**：
+- ADVISORY: AC-011 `accept_event()`→`get_viewport().set_input_as_handled()`——Godot 4.6 中 Autoload 非 Control 节点无法调用 `accept_event()`
+- ADVISORY: AC-012 路径C（鼠标 `_gui_input`）未新增独立测试文件——需 Control 节点集成（排除范围外，留待 UI Story 覆盖）
+- ADVISORY: AC-009/AC-015 延迟——依赖 SceneManager/HUD（排除范围外）
+- ADVISORY + FIXED: Story 002 白名单语义修正——`test_input_judgment.gd` 中 3 个旧测试（AC-017/AC-019/GAP-2-2）已从黑名单语义修正为 ADR-0004 白名单语义
+**Test Evidence**：`tests/unit/input/test_gsm_sync.gd` — 10/10 通过；全部 84 个输入单元测试通过
+**Code Review**：待处理
+**GSM 新增**：`src/foundation/game_state_manager.gd` — `set_input_locks()` Tier 2 原子方法

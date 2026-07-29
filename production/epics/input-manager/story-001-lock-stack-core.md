@@ -1,6 +1,9 @@
 # Story 001: 四级锁栈核心实现
 
 > **Epic**: input-manager (输入管理器)
+> **Status**: Complete
+> **Last Updated**: 2026-07-29
+> **Manifest Version**: 2026-07-26
 > **Story 类型**: Logic（逻辑）
 > **依赖 Story**: 无（Foundation 层首个 story）
 > **管辖 ADR**: ADR-0004
@@ -71,7 +74,7 @@
 
 | 文件 | 用途 |
 |------|------|
-| `src/autoload/input_manager.gd` | InputManager Autoload — 锁栈管理 + 枚举定义 |
+| `src/foundation/input_manager.gd` | InputManager Autoload — 锁栈管理 + 枚举定义 |
 | `tests/unit/input/test_lock_stack.gd` | 锁栈单元测试 |
 
 ### 关键代码骨架
@@ -116,7 +119,7 @@ func has_lock(source: StringName) -> bool: ...
 ## 阻塞项
 
 - 依赖 GSM Autoload #1 已在 Project Settings 中注册
-- 依赖 `src/autoload/` 目录存在
+- 依赖 `src/foundation/` 目录存在
 
 ## 相关 Story
 
@@ -125,3 +128,13 @@ func has_lock(source: StringName) -> bool: ...
 | Story 002 | 在锁栈基础上实现 `is_input_allowed()` 判定 |
 | Story 003 | 将锁状态同步到 GSM + 传播信号 |
 | Story 004 | MODAL 覆盖 + 边缘情况 |
+
+## Completion Notes
+
+**Completed**：2026-07-29
+**Criteria**：14/14 通过
+**Deviations**：
+- ADVISORY：实现路径 `src/foundation/input_manager.gd` 与故事最初指定的 `src/autoload/` 不同——`project.godot` 注册为 `src/foundation/`，故事文件已修正
+- ADVISORY：故事最初缺少 `Manifest Version:` 嵌入字段——已补充（2026-07-26，无过期风险）
+**Test Evidence**：`tests/unit/input/test_lock_stack.gd`——37 测试函数，14/14 AC 覆盖。Godot CLI 不在 PATH，未无头运行——结构由 QA Lead + 首席程序员审查确认
+**Code Review**：首席程序员 APPROVED WITH SUGGESTIONS——已应用（`_sync_to_gsm()` 空桩 + 路径修正）

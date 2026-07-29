@@ -351,6 +351,14 @@ func _retroactive_validate_collection() -> void:
 		collection.total_count = cards.size()
 		push_warning("GSM._retroactive_validate_collection: 共移除 %d 个无效卡牌实例" % removed)
 
+## 设置输入锁栈——仅 [b]InputManager[/b] 调用。
+## [br]写入 [code]session.input_locks[/code] 并通过 [signal batch_updated] 传播变更。
+## [param locks] [code]Array[Dictionary][/code]——每个元素 [code]{type: int, source: StringName, device_mask: int}[/code]。
+func set_input_locks(locks: Array[Dictionary]) -> void:
+	var old: Array = session.input_locks.duplicate(true)
+	session.input_locks = locks.duplicate(true)
+	_buffer_change("session.input_locks", old, session.input_locks)
+
 ## === 第三层：信号订阅 API ====================================================
 
 ## 有效信号名列表——subscribe/unsubscribe 的白名单。
