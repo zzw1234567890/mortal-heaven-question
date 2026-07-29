@@ -50,8 +50,8 @@
 - [ ] **AC-018**: 设备独立判定 — 仅锁键盘：`push_lock(ANIMATION, &"test", device_mask=KEYBOARD)` → `is_input_allowed(GAMEPLAY, KEYBOARD)` → `false`
 - [ ] **AC-019**: 设备独立判定 — 仅锁鼠标+手柄：`push_lock(DIALOGUE, &"test", device_mask=MOUSE|GAMEPAD)` → `is_input_allowed(DIALOGUE, KEYBOARD)` → `true`（键盘不在锁范围）
 - [ ] **AC-020**: `_check_device_allowed(MOUSE)` 遍历全栈——任一锁的 mask 不包含 MOUSE 则返回 false
-- [ ] **AC-021**: `is_action_blocked(&"end_turn")` → 若当前锁禁止 GAMEPLAY+KEYBOARD 则返回 true（委托给 `is_input_allowed` 内部判定）
-- [ ] **AC-022**: 空栈 + 无操作 → `is_action_blocked(&"end_turn")` → `false`
+- [ ] **AC-021**: `is_action_blocked(&"end_turn")` → 若当前锁禁止 GAMEPLAY+KEYBOARD 则返回 true。分类映射表：`end_turn` → (GAMEPLAY, KEYBOARD)；`pause/escape` → (UI_NAV, KEYBOARD)。调用方亦可直接调用 `is_input_allowed()` 替代（分类映射表为最小实现——消费系统按需扩展）
+- [ ] **AC-022**: 空栈 + 无操作 → `is_action_blocked(&"end_turn")` → `false` → `is_input_allowed(GAMEPLAY, KEYBOARD)` → `true`
 - [ ] **AC-023**: 性能验证：`is_input_allowed()` 单次调用 <0.005ms（GUT perf 断言或在 QA 冒烟测试中验证）
 - [ ] **AC-024**: 所有枚举值从 0 开始，可为位掩码 DeviceType 使用按位 OR 组合
 

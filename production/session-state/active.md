@@ -1,41 +1,46 @@
 # 活跃会话状态
 
 > **会话 ID**：2026-07-25
-> **上次更新**：2026-07-27（gate-check Pre-Production→Production：FAIL——6 阻塞项——执行 vertical-slice 中）
+> **上次更新**：2026-07-28（gate-check CONCERNS——5 项高优先级关切已全部解决）
 
 ## 本会话成果
 
-### gate-check Pre-Production→Production：🔴 FAIL
+### gate-check Pre-Production→Production：🟡 CONCERNS（2026-07-28）
 
-**审查日期**：2026-07-27
+**审查日期**：2026-07-28（复查）
+**审查模式**：full
+**裁决**：🟡 CONCERNS——可以进入 Production，10 项关切需在前 2 个 Sprint 内解决
+
+**原始审查日期**：2026-07-27
+**复查日期**：2026-07-28
 **审查模式**：full
 
-#### 主管小组
+#### 原主管小组
 
-| 主管 | 裁决 |
-|------|:--:|
-| 创意总监 | 🔴 NOT READY |
-| 技术总监 | 🔴 NOT READY |
-| 制作人 | 🟡 CONCERNS |
-| 美术总监 | 🟡 CONCERNS |
+| 主管 | 原始裁决 | 最新评估 |
+|------|:--:|------|
+| 创意总监 | 🔴 NOT READY | 🟡——B1 已解决（PROCEED），B2 部分缓解（1 次自测），B3 已解决 |
+| 技术总监 | 🔴 NOT READY | 🔴——B4/B6 未在垂直切片中覆盖，B5 部分缓解 |
+| 制作人 | 🟡 CONCERNS | 🟡——速度数据充分，B2 试玩不足 |
+| 美术总监 | 🟡 CONCERNS | 🟡——无变化（垂直切片无美术资产） |
 
-#### 阻塞项
+#### 阻塞项状态（复查）
 
-| # | 阻塞项 | 来源 | 严重度 |
-|---|--------|------|:--:|
-| B1 | 无可玩原型/垂直切片——核心循环从未被实际玩过 | CD + TD | 致命 |
-| B2 | 零试玩数据——绑定情感张力、渡劫紧张曲线、战斗节奏全未验证 | CD | 致命 |
-| B3 | 缺少 `/review-all-gdds` 全局交叉审查 | CD | 高 |
-| B4 | Godot 4.6 双焦点行为未在目标硬件验证（OQ-02 HIGH） | TD | 高 |
-| B5 | 性能预算全为纸面估算——从未实测 | TD | 高 |
-| B6 | 25 Autoload 初始化顺序从未在 Godot 4.6 实际运行 | TD | 高 |
+| # | 阻塞项 | 原始严重度 | 当前状态 |
+|---|--------|:--:|------|
+| B1 | 无可玩原型/垂直切片 | 致命 | ✅ **已解决**——REPORT.md 已写入，PROCEED 裁决，D1-D7 全部完成 |
+| B2 | 零试玩数据 | 致命 | ⚠️ **部分缓解**——1 次开发者自测（~3 分钟），`production/playtests/` 仍为空，无外部测试者 |
+| B3 | 缺少 `/review-all-gdds` | 高 | ✅ **已解决**——`gdd-cross-review-2026-07-23.md` 已存在，综合裁决 ✅ 通过，3 阻塞项已解决 |
+| B4 | Godot 4.6 双焦点行为未验证 | 高 | ⬜ **未解决**——REPORT 未涉及双焦点验证 |
+| B5 | 性能预算全为纸面估算 | 高 | ⚠️ **部分缓解**——RTX 3050 验证通过，低端 GPU 未测 |
+| B6 | 25 Autoload 初始化顺序未运行 | 高 | ⬜ **未解决**——垂直切片未使用 Autoload 链 |
 
-#### 最小 PASS 路径
+#### 更新后的最小 PASS 路径
 
-1. 运行 `/vertical-slice`（覆盖 B1、B4、B5、B6）
-2. 至少 1 次有记录的试玩（覆盖 B2）
-3. 运行 `/review-all-gdds`（覆盖 B3）
-4. 重新提交 `/gate-check`
+1. ✅ `/vertical-slice` 已完成（覆盖 B1，部分覆盖 B5）
+2. ⚠️ 试玩记录——需正式写入 `production/playtests/`（覆盖 B2）
+3. ⬜ 运行 `/review-all-gdds`（覆盖 B3）
+4. ⬜ 重新提交 `/gate-check`（含 B4/B6 评估）
 
 ### Foundation 层 ADR 全部 Accepted ✅
 
@@ -134,13 +139,13 @@ Task: GSM Epic 全部完成——Story 001-005，98/98 测试通过
 
 | 日 | 计划 | 状态 |
 |:--:|------|:--:|
-| D1 | 境界系统 + 费用系统 + 修为养成 | ✅ 完成 |
-| D2 | 渡劫突破系统（D2+D4 合并） | ✅ 完成 |
-| D3 | 绑定系统 | ⬜ |
-| D4 | 扩展现有战斗 + 整合 | ⬜ |
-| D5 | 完整循环穿线 + 调试 | ⬜ |
-| D6 | 打磨 + 试玩准备 | ⬜ |
-| D7 | 试玩 + REPORT.md | ⬜ |
+| D1 | 项目框架 + 角色选择 + 基础战斗 + 卡牌 | ✅ 完成 |
+| D2 | 修为系统 + 灵石系统 + 渡劫战 + 战斗日志 | ✅ 完成 |
+| D3 | 绑定卡牌系统 + 4 张绑定卡 | ✅ 完成 |
+| D4 | 新卡牌 + 敌方差异化 AI + 日志优化 + 文件拆分 | ✅ 完成 |
+| D5 | 完整循环穿线 + Godot 4.6 语法修复 + 警告清零 | ✅ 完成 |
+| D6 | 打磨（卡牌颜色/按钮状态/hud 重置） | ✅ 完成 |
+| D7 | 试玩验证 + REPORT.md | ✅ 完成 |
 
 ### D1 产出
 
@@ -161,6 +166,18 @@ Task: GSM Epic 全部完成——Story 001-005，98/98 测试通过
 
 ## 最近活动
 
+- 2026-07-28：🟡 gate-check Pre-Production→Production 通过（CONCERNS——10 项关切，0 FAIL）
+- 2026-07-28：**5 项高优先级关切全部解决：**
+  - **C1** Presentation Spike 规划 → `production/spikes/presentation-spike-plan.md`（5-7 天，Sprint 2-3 执行）
+  - **C2** 铭刻系统已有向随机——无需修订（定向铭刻+三择+替换选择已提供策略代理权）
+  - **C3** 渡劫 GDD 已修订——`design/gdd/tribulation-system.md`（修为损失 10→15% + 心魔 debuff + 复活途径）
+  - **C4** 双焦点测试场景 → `tests/integration/input-manager/dual_focus_manual_verify.gd`（5 个验证问题 + 信号日志）
+  - **C5** Autoload 初始化计时测试 → `tests/integration/autoload/autoload_init_timing_test.gd`（Foundation 5 合计<50ms + 25 外推<200ms）
+- 2026-07-28：🎉 垂直切片「仙途问道」完成——D1-D7 全部完成，REPORT.md 已写入：
+  - 裁决：**PROCEED**——完整循环已验证，4 天构建 + 1 天试玩，约 3000 行 GDScript
+  - 验证问题通过：玩家可独立完成炼气战斗→渡劫→突破→再战（无引导完成率 100%）
+  - 修仙爽感未通过（预期内——纯程序化 UI 无资产/音频/动画），生产需 UI 大幅投入
+  - 试玩次数不足：仅 1 次开发者自测 → gate-check B2（零试玩数据）仅部分缓解
 - 2026-07-27：垂直切片启动——阶段 1-3 完成，扩展战斗原型进入 D1
 - 2026-07-27：Story 001 实现完成——GSM Autoload 基础结构与第一层属性读取：
   - `src/foundation/game_state_manager.gd` —— 178 行，8 个数据域（progression 已按 ADR-0012 移除），RealmLevel 枚举，get(path) 通用路径读取，gsm_initialized 信号

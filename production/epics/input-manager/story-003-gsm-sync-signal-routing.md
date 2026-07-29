@@ -41,7 +41,10 @@
 - [ ] **AC-010**: 输入分发路径 A（GAMEPLAY 键盘）→ InputManager Autoload 的 `_process()` 中通过 `Input.is_action_just_pressed()` + `is_input_allowed()` 判定
 - [ ] **AC-011**: 输入分发路径 B（UI_NAV 快捷键——ESC 暂停）→ InputManager Autoload 的 `_input()` 中拦截 → `accept_event()` 阻止传播
 - [ ] **AC-012**: 输入分发路径 C（鼠标交互）→ 各 Control 节点的 `_gui_input()` / Area2D 的 `_input_event()` 中调用 `is_input_allowed()`
-- [ ] **AC-013**: ESC 键在任何锁级别除 TRANSITION 外部可通过 `is_input_allowed(UI_NAV, KEYBOARD)` → 转场时 ESC 也不可用
+- [ ] **AC-013**: ESC 键可达性——通过 `is_input_allowed()` 或弹窗拥有者自检：
+  - DIALOGUE/ANIMATION → `is_input_allowed(UI_NAV, KEYBOARD)` → `true`
+  - MODAL → `is_input_allowed(UI_NAV, KEYBOARD)` → `false`，但弹窗拥有者通过 `has_lock(source)` 绕行（参见 Story 004）
+  - TRANSITION → `is_input_allowed(UI_NAV, KEYBOARD)` → `false`，且不可绕行
 - [ ] **AC-014**: `_input()` 优先于 GUI 派发——全局快捷键在任何 Control 消耗事件之前拦截
 - [ ] **AC-015**: HUD 监听 `GSM.batch_updated` 信号 → 当 `session.input_locks` 变更时更新输入提示 UI（例如："已锁定"图标）
 - [ ] **AC-016**: GSM 若尚未提供 `set_input_locks()` —— 本 Story 须在 GSM 中新增此第二层原子方法（参见 ADR-0001 §第二层）
