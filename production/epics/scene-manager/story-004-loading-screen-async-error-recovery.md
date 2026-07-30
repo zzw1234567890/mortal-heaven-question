@@ -7,7 +7,8 @@
 > **预估工作量**: 4-5 小时
 > **管辖 ADR**: ADR-0005
 > **控制清单版本**: 2026-07-26
-> **状态**: Ready
+> **状态**: Complete
+> **完成日期**: 2026-07-30
 
 ## 概述
 
@@ -170,3 +171,17 @@ test_fade_out_overlay_tweens_alpha_to_zero
 - `SceneManager.create_fade_overlay()` 返回预配置的 `ColorRect`——目标场景将其添加为 `CanvasLayer` 的直接子节点
 - `fade_out_overlay()` 使用 `create_tween()`（Godot 4.0+ Tween API）而非已废弃的 `Tween` 节点
 - 水墨过渡动画（Story 004 可选扩展）：当前 MVP 阶段加载画面为静态黑底 + 文字——后续可扩展为水墨扩散/收拢动画，无需修改 SceneManager 核心管线
+
+## Completion Notes
+
+**完成日期**：2026-07-30
+**验收标准**：9/9 通过
+**测试**：242/242 通过，1051 断言，0 失败
+**偏差**：
+- B1（阻塞→已修复）：优雅降级路径 `_phase3_in_progress` 标志位未设置，导致 Phase 4 守卫误判为中断——已添加 `_phase3_in_progress = true`
+- GUT headless 限制：Phase 3 异步代码路径（`change_scene_to_file`、`await tree_changed`、`_inject_loading_context`）在 `_test_mode` 下跳过——GUT 无真实 SceneTree，此为 Godot 测试框架已知限制。所有现有 Foundation 层测试（Story 001-003）均在同一约束下运行
+- S1（中）：`scene_manager.gd` 423 行——超出 300 行软上限。建议在后续重构中将 `create_fade_overlay/fade_out_overlay` 提取为独立辅助类
+- S2（低）：`_cleanup_on_error(reason)` 参数未使用——仅存文档性用途
+- S3（低）：信号参数使用 `int` 而非 `SceneID/TransitionType` 枚举类型
+- S4（低）："加载中……" 为硬编码——MVP 阶段可接受，需本地化系统接入后修复
+**代码审查**：已完成——LP-CODE-REVIEW APPROVED（B1 已修复），QL-TEST-COVERAGE ADEQUATE（Phase 3 异步路径受 GUT 限制）

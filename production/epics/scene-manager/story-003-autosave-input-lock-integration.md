@@ -7,7 +7,8 @@
 > **预估工作量**: 3-4 小时
 > **管辖 ADR**: ADR-0005、ADR-0004、ADR-0002
 > **控制清单版本**: 2026-07-26
-> **状态**: Ready
+> **状态**: Complete
+> **完成日期**: 2026-07-30
 
 ## 概述
 
@@ -163,3 +164,14 @@ test_no_permanent_deadlock_after_loading_scene_failure
 - 测试中使用 mock 对象注入——SceneManager 提供 `set_input_manager(mock)` / `set_save_load(mock)` 方法（仅测试可见）
 - Phase 2 中 push_lock 和 auto_save 的顺序有意设计——先锁输入再存档。这样即使存档写入耗时 100ms，玩家也无法在此期间触发操作
 - `_phase3_in_progress` 标志位在 Phase 3 第一步设为 true，在 Phase 4 正常到达后立即设为 false。`tree_changed` 信号可能在非场景切换场景下触发——此标志位作为双重校验
+
+## Completion Notes
+
+**完成日期**：2026-07-30
+**验收标准**：8/8 通过
+**测试**：221/221 通过，1000 断言，0 失败（14 脚本，含 3 个新增集成测试文件共 26 测试）
+**偏差**：
+- ADVISORY（LOW）：AC-3 要求 `GSM 写入 → post_transition → pop_lock` 排序，代码遵循 ADR-0005（pop_lock 在 post_transition 之前）— ADR 优先于故事 AC。ADR-0005 §Phase 4 定义 pop_lock 在信号发射前执行
+- ADVISORY（LOW）：`change_scene_to_file` 返回值使用 `int` 而非 `Error` 枚举——GDScript 惯用法，`int` 可安全匹配 `Error` 枚举值
+- 已修复（MEDIUM）：L300——AC-5 回退 `request_scene_change` 返回值现被检查（`fallback_ok`），失败时记录 `push_error("SceneManager: 回退主菜单也失败——手动恢复")`
+**代码审查**：已完成——LP-CODE-REVIEW APPROVED WITH CONCERNS（MEDIUM 已修复，2 LOW 已记录）

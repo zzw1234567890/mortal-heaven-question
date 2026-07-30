@@ -332,3 +332,37 @@ Task: GSM Epic 全部完成——Story 001-005，98/98 测试通过
 - **测试结果**：123/123 通过，719 断言，零失败
 - **Tech debt logged**：None（5 项 ADVISORY 记录在 Completion Notes）
 - **Next recommended**：Input Manager Epic 全部 4 个 Story 完成——Sprint 1 Foundation 层输入子系统完毕
+
+## Session Extract — /story-done 2026-07-30 (Story 004 关闭)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/scene-manager/story-004-loading-screen-async-error-recovery.md` — 加载画面 + 异步加载 + 错误恢复
+- **Code Review**：LP-CODE-REVIEW NEEDS REVISION → APPROVED（B1 已修复），QL-TEST-COVERAGE GAPS（Phase 3 异步路径受 GUT 约束限制）
+- **Fixes**：B1（阻塞）——优雅降级路径 `_phase3_in_progress` 标志位修复，Phase 4 守卫正确通过
+- **Changes**：
+  - `src/ui/loading/loading_screen.gd` — 新建 33 行：`class_name LoadingScreen extends Control` + `set_context()` 同步方法
+  - `src/ui/loading/loading_screen.tscn` — 新建 14 行：全屏 Control + 黑色 ColorRect（D3D12 闪烁遮挡） + "加载中…" Label
+  - `src/foundation/scene_manager.gd` — Phase 3 重构（优雅降级 + _phase3_in_progress 重排 + _inject_loading_context 提取）+ `create_fade_overlay`/`fade_out_overlay` 静态方法（422 行）
+  - `tests/integration/scene_manager/test_loading_screen.gd` — 新建 21 测试，覆盖 AC-1 到 AC-8（340 行）
+  - `production/epics/scene-manager/story-004-*.md` — Status: Complete + Completion Notes
+  - `production/sprints/sprint-1.md` — Story #13 标记 ✅ Done
+- **测试结果**：242/242 通过，1051 断言，零失败（15 脚本）
+- **Tech debt logged**：None（5 项 LP SUGGESTIONS 记录在 Completion Notes）
+- **Next recommended**：Scene Manager Epic ✅ 已全部完成——Foundation 层场景子系统完毕。下一个 Epic：`save-load`——Story #14 `save-load/story-001-json-engine-enums.md`（JSON 引擎 + 枚举定义，2.5h）
+
+## Session Extract — /story-done 2026-07-30 (Story 003 关闭)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/scene-manager/story-003-autosave-input-lock-integration.md` — 转场前自动存档 + 输入锁定集成
+- **Code Review**：LP-CODE-REVIEW APPROVED WITH CONCERNS — 1 MEDIUM（L300 回退返回值未检查）+ 2 LOW
+- **Fixes**：MEDIUM 已修复——L300 回退 `request_scene_change` 返回值检查（`fallback_ok`）+ `push_error` 记录
+- **Changes**：
+  - `src/foundation/scene_manager.gd` — 新增 `_save_load` 依赖注入、`_cleanup_on_error()` 统一错误恢复、`_phase3_in_progress` 双重保底、Phase 2 push_lock + auto_save、Phase 3 两段加载 + 错误恢复（~62 行新增代码）
+  - `tests/integration/scene_manager/test_input_lock_integration.gd` — 新建 10 个测试（AC-1/3/7）
+  - `tests/integration/scene_manager/test_auto_save_integration.gd` — 新建 7 个测试（AC-2/8）
+  - `tests/integration/scene_manager/test_error_recovery_integration.gd` — 新建 9 个测试（AC-4/5/6）
+  - `production/epics/scene-manager/story-003-autosave-input-lock-integration.md` — Status: Complete + Completion Notes
+  - `production/sprints/sprint-1.md` — Story #12 标记 ✅ Done
+- **测试结果**：221/221 通过，1000 断言，零失败
+- **Tech debt logged**：None（2 项 LOW ADVISORY 记录在 Completion Notes）
+- **Next recommended**：`production/epics/scene-manager/story-004-loading-screen-async-error-recovery.md`（加载画面 + 异步加载 + 错误恢复）

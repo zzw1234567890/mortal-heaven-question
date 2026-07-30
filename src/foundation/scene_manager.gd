@@ -264,8 +264,9 @@ func _emit_post_transition(from: int, to: int) -> void:
 
 ## Phase 3-4-5 异步执行体。[br]
 ## [br]Phase 3: 加载画面 → 目标场景（两段式 change_scene_to_file）。[br]
-## 测试中直接调用 [method _execute_post_load]（同步的 Phase 4-5），无需 mock SceneTree。
-## [br][br][b]错误恢复[/b]: 加载画面缺失 → 清理状态返回；目标场景缺失 → 回退 MAIN_MENU。
+## 测试中直接调用 [method _execute_post_load]（同步的 Phase 4-5），无需 mock SceneTree。[br]
+## [br]AC-7（Story 004）：[b]优雅降级[/b]——加载画面缺失时跳过加载画面，直接加载目标场景。[br]
+## [b]错误恢复[/b]: 目标场景缺失 → 清理状态 + 回退 MAIN_MENU。
 func _execute_transition(from: int, to: int) -> void:
 	# 测试模式：跳过异步场景加载——直接执行 Phase 4-5
 	if _test_mode:
@@ -273,31 +274,40 @@ func _execute_transition(from: int, to: int) -> void:
 		return
 
 	# Phase 3 —— LOAD（两段式：加载画面 → 目标场景）
-	_phase3_in_progress = true
 	var loading_path: String = SCENE_PATHS[SceneID.LOADING]
 	var target_path: String = SCENE_PATHS[to]
 
 	# Step 1: 切换到加载画面
 	var err1: int = get_tree().change_scene_to_file(loading_path)
 	if err1 != OK:
-		# AC-4: 加载画面缺失——清理状态，返回当前场景
-		push_error("SceneManager: 无法加载 loading_screen.tscn（err=%d）" % err1)
-		_cleanup_on_error(&"loading_screen_missing")
-		return
+		# AC-7: 优雅降级——加载画面缺失，直接加载目标场景。
+		# 不调用 _cleanup_on_error——保留 Phase 2 锁和 _transitioning 状态。
+		# 设置 _phase3_in_progress = true 让 Phase 4 守卫正常通过——加载画面虽未启动，
+		# 但标志位为 true 表示管线应正常完成 Phase 4-5（而非错误中止）。
+		push_error("SceneManager: 无法加载 loading_screen.tscn（err=%d）——跳过加载画面，直接加载目标场景" % err1)
+		_phase3_in_progress = true
+	else:
+		# 加载画面加载成功——设置标志位（AC-3 步骤 2）
+		_phase3_in_progress = true
 
-	await get_tree().tree_changed
-	# tree_changed 后再检查：若 Phase 3 被外部中断则清理
-	if not _phase3_in_progress:
-		return
+		await get_tree().tree_changed
+		# tree_changed 后再检查：若 Phase 3 被外部中断则清理
+		if not _phase3_in_progress:
+			return
 
-	# Step 2: 切换到目标场景
+		# 向加载画面注入上下文（同步调用，AC-2）
+		_inject_loading_context(from, to)
+
+	# Step 2: 切换到目标场景（正常路径和降级路径共用）
 	var err2: int = get_tree().change_scene_to_file(target_path)
 	if err2 != OK:
 		# AC-5: 目标场景不存在——记录错误，尝试回退 MAIN_MENU
 		push_error("SceneManager: 目标场景不存在：%s（err=%d）" % [target_path, err2])
 		_cleanup_on_error(&"target_scene_missing")
 		# 尝试回退到主菜单
-		request_scene_change(_current_scene_id, SceneID.MAIN_MENU, TransitionType.GAME_TO_MENU)
+		var fallback_ok: bool = request_scene_change(_current_scene_id, SceneID.MAIN_MENU, TransitionType.GAME_TO_MENU)
+		if not fallback_ok:
+			push_error("SceneManager: 回退主菜单也失败——手动恢复")
 		return
 
 	await get_tree().tree_changed
@@ -334,6 +344,17 @@ func _cleanup_on_error(reason: StringName) -> void:
 		im.pop_lock(&"scene_manager")
 
 
+## 向加载画面场景注入上下文（from, to, type）。[br]
+## 提取为独立方法以便测试覆盖。[br]
+## 在加载画面场景的 [code]await tree_changed[/code] 之后、
+## [code]change_scene_to_file(target)[/code] 之前调用。[br]
+## [br][b]AC-2[/b]（Story 004）：上下文传递为同步调用——不依赖 [code]_ready()[/code] 的 await。
+func _inject_loading_context(from: int, to: int) -> void:
+	var loading_scene: Node = get_tree().current_scene
+	if loading_scene != null and loading_scene.has_method("set_context"):
+		loading_scene.set_context(from, to, _transition_type)
+
+
 ## Phase 4-5 同步执行体。[br]
 ## [br][b]生产[/b]: 由 [method _execute_transition] 在 [code]await tree_changed[/code] 成功后调用。[br]
 ## [b]测试[/b]: 可直接调用——绕过 [code]await[/code] 和 Godot SceneTree 依赖。[br]
@@ -363,3 +384,43 @@ func _execute_post_load(from: int, to: int, target_path: String) -> void:
 	_transitioning = false
 	_transition_type = TransitionType.NONE
 	_phase3_in_progress = false
+
+
+## 创建全屏不透明 ColorRect 用于目标场景的淡入保护。[br]
+## [br][b]D3D12 闪烁缓解[/b]（ADR-0005 风险 #5）：目标场景在 [code]_ready()[/code] 中调用
+## 本方法叠加一个黑色矩形，然后调用 [method fade_out_overlay] 淡出显示场景。[br]
+## [br][b]用法[/b]（在目标场景中）：[br]
+## [codeblock]
+## var _overlay: ColorRect
+## func _ready():
+##     _overlay = SceneManager.create_fade_overlay()
+##     SceneManager.fade_out_overlay(_overlay, 0.25)
+## [/codeblock]
+## [br]返回全屏锚定的 ColorRect，设置 Color.BLACK 和 mouse_filter = IGNORE。
+static func create_fade_overlay() -> ColorRect:
+	var rect := ColorRect.new()
+	rect.name = "FadeOverlay"
+	rect.color = Color.BLACK
+	rect.anchor_left = 0.0
+	rect.anchor_right = 1.0
+	rect.anchor_top = 0.0
+	rect.anchor_bottom = 1.0
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree and tree.root:
+		tree.root.add_child(rect)
+	return rect
+
+
+## 淡出全屏叠加 ColorRect 并移除。[br]
+## [br]使用 [method Node.create_tween]（Godot 4.0+ API——[code]Tween[/code] 节点已废弃）。[br]
+## 渐变完成后通过 [method Node.queue_free] 释放叠加层。[br]
+## [br][b]参数[/b]:[br]
+##   - [param overlay]: 要淡出并移除的 ColorRect。[br]
+##   - [param duration]: 渐变持续时间，单位秒（默认 0.25s——依据 AC-5 建议）。
+static func fade_out_overlay(overlay: ColorRect, duration: float = 0.25) -> void:
+	if overlay == null:
+		return
+	var tween := overlay.create_tween()
+	tween.tween_property(overlay, "modulate:a", 0.0, duration).set_trans(Tween.TRANS_LINEAR)
+	tween.tween_callback(overlay.queue_free)
