@@ -66,6 +66,33 @@ signal progression_reset(reason: StringName)
 ## Cat 1：卡牌校验就绪——CardSystem 调用 enable_validation() 后发射。
 signal card_validation_ready()
 
+## === 信号链深度追踪 (ADR-0007) ==============================================
+
+## 当前信号链深度——Cat 2 信号通过 [method _emit_signal_safe] 增减。
+## 每帧开始时由 [signal SceneTree.process_frame] 信号重置，防止异常泄漏。
+static var _signal_chain_depth: int = 0
+
+## 信号链硬限制——超出时截断并记录错误。
+const MAX_SIGNAL_CHAIN_DEPTH: int = 4
+
+## Cat 2 信号安全发射包装器——信号链深度追踪。[br]
+## [br][b]用法[/b]: [code]GameStateManager._emit_signal_safe(self, &"my_signal", [arg1, arg2])[/code][br]
+## [br]深度超出 [constant MAX_SIGNAL_CHAIN_DEPTH] 时截断并记录 [method @GlobalScope.push_error]。[br]
+## [b]注意[/b]: 若信号处理器抛出未捕获异常，深度计数器会泄漏——[method _ready] 通过
+## [code]process_frame[/code] 每帧重置来恢复。
+static func _emit_signal_safe(target: Object, signal_name: StringName, args: Array) -> void:
+	_signal_chain_depth += 1
+	if _signal_chain_depth > MAX_SIGNAL_CHAIN_DEPTH:
+		push_error("GSM._emit_signal_safe: 信号链深度超出 (%d > %d)。最后信号: %s。已截断。"
+				% [_signal_chain_depth, MAX_SIGNAL_CHAIN_DEPTH, signal_name])
+		_signal_chain_depth -= 1
+		return
+
+	var call_args: Array = [signal_name]
+	call_args.append_array(args)
+	target.callv("emit_signal", call_args)
+	_signal_chain_depth -= 1
+
 ## === 内部状态 ================================================================
 
 ## 初始化完成标志——消费者在读取前应检查此标志或等待 [signal gsm_initialized]。
@@ -124,7 +151,13 @@ var session: Dictionary = {}
 func _ready() -> void:
 	_init_all_domains()
 	_initialized = true
+	# ADR-0007: 每帧重置信号链深度——防止异常泄漏导致永久计数器偏移
+	get_tree().process_frame.connect(_reset_signal_chain_depth, CONNECT_DEFERRED)
 	gsm_initialized.emit()
+
+## 每帧重置信号链深度计数器——防止信号处理器异常逃逸导致持久泄漏。
+func _reset_signal_chain_depth() -> void:
+	_signal_chain_depth = 0
 
 ## === 第一层：通用读取方法 ====================================================
 
@@ -359,6 +392,17 @@ func set_input_locks(locks: Array[Dictionary]) -> void:
 	session.input_locks = locks.duplicate(true)
 	_buffer_change("session.input_locks", old, session.input_locks)
 
+## 设置当前场景——仅 [b]SceneManager[/b] 调用（ADR-0005 独占写入授权）。
+## [br]写入 [code]session.scene_id[/code] 和 [code]session.current_scene[/code]，
+## 通过 [signal batch_updated] 传播 [code]scene_changed[/code]。
+func set_session_scene(id: int, path: String) -> void:
+	var old_id: int = session.get("scene_id", 0)
+	var old_path: String = session.get("current_scene", "")
+	session.scene_id = id
+	session.current_scene = path
+	_buffer_change("session.scene_id", old_id, id)
+	_buffer_change("session.current_scene", old_path, path)
+
 ## === 第三层：信号订阅 API ====================================================
 
 ## 有效信号名列表——subscribe/unsubscribe 的白名单。
@@ -479,6 +523,7 @@ func _init_all_domains() -> void:
 
 	session = {
 		"current_scene": "",
+		"scene_id": 0,
 		"ui_state": {},
 		"input_locks": [],
 	}

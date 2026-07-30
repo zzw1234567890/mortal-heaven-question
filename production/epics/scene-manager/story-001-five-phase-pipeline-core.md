@@ -7,7 +7,8 @@
 > **预估工作量**: 4-6 小时
 > **管辖 ADR**: ADR-0005
 > **控制清单版本**: 2026-07-26
-> **状态**: Ready
+> **状态**: Complete
+> **Last Updated**: 2026-07-30
 
 ## 概述
 
@@ -51,69 +52,69 @@
 
 ### AC-1：SceneManager Autoload 正确初始化
 
-- [ ] SceneManager 作为 Autoload #3 注册（在 InputManager 之后、SaveLoad 之前）
-- [ ] `_ready()` 初始化 `_transitioning = false`、`_transition_type = TransitionType.NONE`
-- [ ] `SCENE_PATHS` 常数字典包含全部 12 个 SceneID 条目（MAIN_MENU 到 CULTIVATION + LOADING）
+- [x] SceneManager 作为 Autoload #3 注册（在 InputManager 之后、SaveLoad 之前）
+- [x] `_ready()` 初始化 `_transitioning = false`、`_transition_type = TransitionType.NONE`
+- [x] `SCENE_PATHS` 常数字典包含全部 12 个 SceneID 条目（MAIN_MENU 到 CULTIVATION + LOADING）
 
 ### AC-2：SceneID 枚举 + 路径注册表
 
-- [ ] `SceneID` 枚举定义全部 13 个值（含 LOADING = 99）
-- [ ] `SCENE_PATHS: Dictionary[SceneID, String]` 为编译时常量
-- [ ] 所有路径以 `res://` 开头
+- [x] `SceneID` 枚举定义全部 12 个值（含 LOADING = 99）
+- [x] `SCENE_PATHS: Dictionary[SceneID, String]` 为编译时常量
+- [x] 所有路径以 `res://` 开头
 
 ### AC-3：request_scene_change() 入口
 
-- [ ] 签名：`request_scene_change(from: SceneID, to: SceneID, type: TransitionType) -> bool`
-- [ ] `_transitioning == true` 时立即返回 `false`（拒绝并发请求）
-- [ ] `to` 不在 `SCENE_PATHS` 中时返回 `false`
-- [ ] `from != _current_scene_id` 时记录警告但继续执行（防御性检查）
-- [ ] 正常情况返回 `true`——转换被接受并异步执行
+- [x] 签名：`request_scene_change(from: SceneID, to: SceneID, type: TransitionType) -> bool`
+- [x] `_transitioning == true` 时立即返回 `false`（拒绝并发请求）
+- [x] `to` 不在 `SCENE_PATHS` 中时返回 `false`
+- [x] `from != _current_scene_id` 时记录警告但继续执行（防御性检查）
+- [x] 正常情况返回 `true`——转换被接受并异步执行
 
 ### AC-4：Phase 1 —— VALIDATE
 
-- [ ] 第 1 步：检查 `_transitioning` 标志
-- [ ] 第 2 步：检查 `to` 在 `SCENE_PATHS.has(to)` 中存在
-- [ ] 第 3 步：防御性检查 `from == _current_scene_id`（不匹配时记录 `push_warning`）
-- [ ] 任何一步失败 → 返回 `false` 且不修改任何状态
+- [x] 第 1 步：检查 `_transitioning` 标志
+- [x] 第 2 步：检查 `to` 在 `SCENE_PATHS.has(to)` 中存在
+- [x] 第 3 步：防御性检查 `from == _current_scene_id`（不匹配时记录 `push_warning`）
+- [x] 任何一步失败 → 返回 `false` 且不修改任何状态
 
 ### AC-5：Phase 2 —— PRE-TRANSITION
 
-- [ ] 设置 `_transitioning = true`
-- [ ] 存储 `_transition_type = type`
-- [ ] 发射 `pre_transition(from, to, type)` 信号（通过 `_emit_signal_safe()`）
+- [x] 设置 `_transitioning = true`
+- [x] 存储 `_transition_type = type`
+- [x] 发射 `pre_transition(from, to, type)` 信号（通过 `_emit_signal_safe()`）
 
 ### AC-6：Phase 5 —— FINALIZE
 
-- [ ] 设置 `_transitioning = false`
-- [ ] 设置 `_transition_type = TransitionType.NONE`
+- [x] 设置 `_transitioning = false`
+- [x] 设置 `_transition_type = TransitionType.NONE`
 
 ### AC-7：公共查询方法
 
-- [ ] `get_current_scene_id() -> SceneID`：返回 `_current_scene_id`
-- [ ] `is_transitioning() -> bool`：返回 `_transitioning`
+- [x] `get_current_scene_id() -> SceneID`：返回 `_current_scene_id`
+- [x] `is_transitioning() -> bool`：返回 `_transitioning`
 
 ### AC-8：信号
 
-- [ ] `pre_transition(from: SceneID, to: SceneID, type: TransitionType)` —— Phase 2 发射
-- [ ] `post_transition(from: SceneID, to: SceneID)` —— Phase 4 发射
-- [ ] 信号声明在 SceneManager 中（非 SignalBus Autoload） —— 来源: ADR-0007
-- [ ] 信号通过 `_emit_signal_safe()` 包装器路由 —— 来源: ADR-0007
+- [x] `pre_transition(from: SceneID, to: SceneID, type: TransitionType)` —— Phase 2 发射
+- [x] `post_transition(from: SceneID, to: SceneID)` —— Phase 4 发射
+- [x] 信号声明在 SceneManager 中（非 SignalBus Autoload） —— 来源: ADR-0007
+- [x] 信号通过 `_emit_signal_safe()` 包装器路由 —— 来源: ADR-0007
 
 ### AC-9：GSM 集成（Phase 4 写入）
 
-- [ ] Phase 4 更新 `GSM.session.current_scene` 为目标场景文件路径（String）
-- [ ] Phase 4 更新 `GSM.session.scene_id` 为目标 SceneID（int）
-- [ ] 通过 GSM `batch_updated` 传播 `scene_changed`（格式：`{"session.current_scene": {old, new}}`）
-- [ ] SceneManager 是这两个字段的**唯一写入者**——其他系统写入时 GSM 记录警告
+- [x] Phase 4 更新 `GSM.session.current_scene` 为目标场景文件路径（String）
+- [x] Phase 4 更新 `GSM.session.scene_id` 为目标 SceneID（int）
+- [x] 通过 GSM `batch_updated` 传播 `scene_changed`（格式：`{"session.current_scene": {old, new}}`）
+- [x] SceneManager 是这两个字段的**唯一写入者**——其他系统写入时 GSM 记录警告
 
 ### AC-10：防御性 tree_changed 校验
 
-- [ ] Phase 4 中 `get_tree().current_scene.scene_file_path` 与 `SCENE_PATHS[to]` 不匹配时：
+- [x] Phase 4 中 `get_tree().current_scene.scene_file_path` 与 `SCENE_PATHS[to]` 不匹配时：
   - 不执行 GSM 写入
   - 不发射 `post_transition`
   - 记录 `push_error` 日志
   - 恢复 `_transitioning = false` + 解锁
-- [ ] 此防御逻辑在发布构建中也执行（使用 `if` 而非 `assert`）
+- [x] 此防御逻辑在发布构建中也执行（使用 `if` 而非 `assert`）
 
 ## 故事依赖
 
@@ -156,7 +157,7 @@ test_phase_4_writes_gsm_scene_id
 test_phase_4_emits_post_transition_signal
 test_phase_2_emits_pre_transition_signal
 test_phase_4_handles_tree_changed_mismatch
-test_scene_paths_contains_all_13_entries
+test_scene_paths_has_12_entries
 ```
 
 ## 实现注意事项
@@ -166,3 +167,12 @@ test_scene_paths_contains_all_13_entries
 - 使用 `await get_tree().tree_changed` 等待场景就绪（4.6 标准方式，已废弃 `yield()`）
 - Phase 3（加载画面切入 + 目标场景加载）的具体实现在 Story 004 中完成——Story 001 仅在 Phase 3 中调用 `change_scene_to_file(SCENE_PATHS[to])` 并 await `tree_changed`
 - 对 GSM / InputManager / SaveLoad 的调用通过依赖注入接口进行——便于单元测试 mock
+
+## Completion Notes
+
+**Completed**：2026-07-30
+**Criteria**：10/10 通过
+**Deviations**：
+- ADVISORY：`src/foundation/game_state_manager.gd` 被额外触及（+~50 行）——`_emit_signal_safe()` 静态方法、`set_session_scene()` 原子方法、`scene_id` 初始化、`_signal_chain_depth` 每帧重置——均为 ADR-0007 和 Control Manifest Foundation 层合规要求
+- ADVISORY：故事 AC-2 原文写"13 个 SceneID 值"——实际枚举 12 个值（`MAIN_MENU=0` 到 `CULTIVATION=10` + `LOADING=99`）。故事文件已更正为 12。
+**Code Review**：已完成（GDScript 专家 + QA 测试员双审查，5 项 BLOCKER 全部修复）

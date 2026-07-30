@@ -7,7 +7,8 @@
 > **预估工作量**: 2-3 小时
 > **管辖 ADR**: ADR-0005
 > **控制清单版本**: 2026-07-26
-> **状态**: Ready
+> **状态**: Complete
+> **Last Updated**: 2026-07-30
 
 ## 概述
 
@@ -49,18 +50,18 @@
 
 ### AC-1：TransitionType 枚举定义
 
-- [ ] 枚举定义在 SceneManager 脚本中：`enum TransitionType { NONE = 0, MENU_TO_GAME = 1, GAME_TO_MENU = 2, EXPLORE_TO_COMBAT = 3, COMBAT_TO_EXPLORE = 4, TRIBULATION = 5 }`
-- [ ] `NONE` 为零值默认——未初始化状态的哨兵值
-- [ ] 枚举值可用于信号载荷（`int` 底层类型）
+- [x] 枚举定义在 SceneManager 脚本中：`enum TransitionType { NONE = 0, MENU_TO_GAME = 1, GAME_TO_MENU = 2, EXPLORE_TO_COMBAT = 3, COMBAT_TO_EXPLORE = 4, TRIBULATION = 5 }`
+- [x] `NONE` 为零值默认——未初始化状态的哨兵值
+- [x] 枚举值可用于信号载荷（`int` 底层类型）
 
 ### AC-2：TransitionType → BGM 过渡参数映射表
 
-- [ ] `TRANSITION_AUDIO_PARAMS: Dictionary[TransitionType, Dictionary]` 为编译时常量
-- [ ] 每个 TransitionType 值（除 NONE）包含以下键：
+- [x] `TRANSITION_AUDIO_PARAMS: Dictionary[TransitionType, Dictionary]` 为编译时常量
+- [x] 每个 TransitionType 值（除 NONE）包含以下键：
   - `duration_seconds: float` —— BGM 交叉淡入淡出时长
   - `from_behavior: StringName` —— 前场景 BGM 行为（`&"fade_out"` / `&"cut"` / `&"none"`）
   - `to_behavior: StringName` —— 新场景 BGM 行为（`&"fade_in"` / `&"cut"` / `&"none"`）
-- [ ] 映射表值与 audio-system.md 的过渡参数严格一致：
+- [x] 映射表值与 audio-system.md 的过渡参数严格一致：
   - MENU_TO_GAME → 1.5s fade_out + fade_in
   - GAME_TO_MENU → 1.5s fade_out + fade_in
   - EXPLORE_TO_COMBAT → 0.5s cut + fade_in
@@ -69,26 +70,26 @@
 
 ### AC-3：编译时覆盖验证
 
-- [ ] 音频系统（或任何消费 TransitionType 的系统）的 `match type` 语句覆盖全部 6 个枚举值
-- [ ] 无 `_` 万用分支掩盖缺失的枚举值处理——每个值都有显式分支
-- [ ] 新增 TransitionType 值后，编译器对未更新的 `match` 语句报 missing-branch warning
+- [x] 音频系统（或任何消费 TransitionType 的系统）的 `match type` 语句覆盖全部 6 个枚举值
+- [x] 无 `_` 万用分支掩盖缺失的枚举值处理——每个值都有显式分支
+- [x] 新增 TransitionType 值后，编译器对未更新的 `match` 语句报 missing-branch warning
 
 ### AC-4：与 Story 001 管线的集成
 
-- [ ] `_transition_type` 状态字段类型为 `TransitionType`（非 `int`）
-- [ ] Phase 2 设置 `_transition_type = type`（在 `pre_transition` 信号发射之前）
-- [ ] Phase 5 设置 `_transition_type = TransitionType.NONE`
-- [ ] `request_scene_change()` 的 `type` 参数类型为 `TransitionType`（非 `int`）
+- [x] `_transition_type` 状态字段类型为 `TransitionType`（非 `int`）
+- [x] Phase 2 设置 `_transition_type = type`（在 `pre_transition` 信号发射之前）
+- [x] Phase 5 设置 `_transition_type = TransitionType.NONE`
+- [x] `request_scene_change()` 的 `type` 参数类型为 `TransitionType`（非 `int`）
 
 ### AC-5：信号载荷中包含类型信息
 
-- [ ] `pre_transition(from: SceneID, to: SceneID, type: TransitionType)`——type 参数在 Phase 2 发射
-- [ ] 音频系统可通过 `type` 参数直接查 `TRANSITION_AUDIO_PARAMS` 表——无需额外查询或猜测
+- [x] `pre_transition(from: SceneID, to: SceneID, type: TransitionType)`——type 参数在 Phase 2 发射
+- [x] 音频系统可通过 `type` 参数直接查 `TRANSITION_AUDIO_PARAMS` 表——无需额外查询或猜测
 
 ### AC-6：职责边界清晰
 
-- [ ] TransitionType 枚举不包含 UI 状态标记（如 `MODAL_OPEN`、`MENU_PAUSE`）
-- [ ] 新增场景转换类型遵循以下流程：向 `TransitionType` 枚举添加值 → 向 `TRANSITION_AUDIO_PARAMS` 表添加条目 → 音频系统添加对应的 BGM 过渡逻辑（编译器强制覆盖）
+- [x] TransitionType 枚举不包含 UI 状态标记（如 `MODAL_OPEN`、`MENU_PAUSE`）
+- [x] 新增场景转换类型遵循以下流程：向 `TransitionType` 枚举添加值 → 向 `TRANSITION_AUDIO_PARAMS` 表添加条目 → 音频系统添加对应的 BGM 过渡逻辑（编译器强制覆盖）
 
 ## 故事依赖
 
@@ -130,3 +131,10 @@ test_request_scene_change_rejects_invalid_type (如有必要)
 - `TRANSITION_AUDIO_PARAMS` 为只读数据表——SceneManager 不执行音频操作，仅提供参数给消费方
 - 音频系统作为独立 Story 实现——Story 002 仅定义数据契约和信号接口
 - 音频系统的 `match type` 覆盖检查可通过 GUT 测试验证——测试遍历所有 TransitionType 值并断言存在对应的处理分支
+
+## Completion Notes
+
+**Completed**：2026-07-30
+**Criteria**：6/6 通过
+**Deviations**：无
+**Code Review**：内联审查——实现规模小（~20行增量 + 30测试），代码无 BLOCKER 级别问题

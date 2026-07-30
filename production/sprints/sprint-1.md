@@ -22,9 +22,9 @@
 | 6 | input-manager | 四级锁栈核心实现 | `input-manager/story-001-lock-stack-core.md` | Logic | 3h | ✅ Done |
 | 7 | input-manager | 双焦点输入判定 | `input-manager/story-002-dual-focus-judgment.md` | Logic | 3h | ✅ Done |
 | 8 | input-manager | GSM 同步与信号传播 | `input-manager/story-003-gsm-sync-signal-routing.md` | Integration | 3h | ✅ Done |
-| 9 | input-manager | MODAL 覆盖与边缘情况 | `input-manager/story-004-modal-override-edge-cases.md` | Integration | 3h | — |
-| 10 | scene-manager | 5 阶段转换管线核心 | `scene-manager/story-001-five-phase-pipeline-core.md` | Logic | 5h | — |
-| 11 | scene-manager | TransitionType + 音频过渡矩阵 | `scene-manager/story-002-transition-type-audio-matrix.md` | Logic | 2.5h | — |
+| 9 | input-manager | MODAL 覆盖与边缘情况 | `input-manager/story-004-modal-override-edge-cases.md` | Integration | 3h | ✅ Done |
+| 10 | scene-manager | 5 阶段转换管线核心 | `scene-manager/story-001-five-phase-pipeline-core.md` | Logic | 5h | ✅ Done |
+| 11 | scene-manager | TransitionType + 音频过渡矩阵 | `scene-manager/story-002-transition-type-audio-matrix.md` | Logic | 2.5h | ✅ Done |
 | 12 | scene-manager | 转场前自动存档 + 输入锁集成 | `scene-manager/story-003-autosave-input-lock-integration.md` | Integration | 3.5h | — |
 | 13 | scene-manager | 加载画面 + 异步加载 + 错误恢复 | `scene-manager/story-004-loading-screen-async-error-recovery.md` | Integration | 4.5h | — |
 | 14 | save-load | JSON 引擎 + 枚举定义 | `save-load/story-001-json-engine-enums.md` | Logic | 2.5h | — |

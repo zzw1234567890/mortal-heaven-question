@@ -1,7 +1,16 @@
 # 活跃会话状态
 
-> **会话 ID**：2026-07-25
-> **上次更新**：2026-07-28（gate-check CONCERNS——5 项高优先级关切已全部解决）
+## Session Extract — /story-done 2026-07-30 (Story 002 关闭)
+- Verdict：✅ COMPLETE
+- Story：`production/epics/scene-manager/story-002-transition-type-audio-matrix.md` — TransitionType + 音频过渡矩阵
+- Next recommended：Story #12 — 转场前自动存档 + 输入锁集成
+
+## Session Extract — /story-done 2026-07-30 (Story 001)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/scene-manager/story-001-five-phase-pipeline-core.md` — 5 阶段转换管线核心
+- Fixes applied：STATIC_CALLED_ON_INSTANCE 警告 ×2（get_script() 静态调用）、AC-2 文本 "13"→"12"、测试列表 test_scene_paths_contains_all_13_entries→test_scene_paths_has_12_entries
+- Tech debt logged：None（2 项 ADVISORY 记录在 Completion Notes）
+- Next recommended：Story #11 — scene-manager TransitionType + 音频过渡矩阵 (`production/epics/scene-manager/story-002-transition-type-audio-matrix.md`)
 
 ## 本会话成果
 
