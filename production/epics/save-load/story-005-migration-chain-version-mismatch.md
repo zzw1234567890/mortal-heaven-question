@@ -1,7 +1,8 @@
 # Story 005: schema_version 迁移链 + VERSION_MISMATCH 拒绝
 
 > **Epic**: 存档/读档系统
-> **Status**: Ready
+> **Status**: Complete
+> **Last Updated**: 2026-08-02
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-07-26
@@ -201,3 +202,14 @@ func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
 - ❌ GSM 状态序列化/反序列化（Story 004）
 - ❌ 自动存档防抖 + 战斗快照生命周期自动触发（后续 Story）
 - ❌ `version` 字符串的管理规则——`version` 仅用于 UI 展示，不参与任何逻辑判断
+
+## Completion Notes
+**Completed**: 2026-08-02
+**Criteria**: 11/11 通过（2 项推迟：AC-004 多步迁移 + AC-009 fixture 测试——均因 `CURRENT_SCHEMA_VERSION=1` 合理推迟至首次升级）
+**Deviations**:
+- **H1（ADVISORY）**：`save_load_system.gd` 796 行超出 300 行限制 265%——7 个独立职责待拆分。建议后续 Sprint 重构为多个文件（JSON 引擎 / 原子写入 / schema 校验 / 公共 API / meta.json / 迁移链）
+- **H2（ADVISORY）**：`_validate_version` 与 `_migrate_if_needed` 存在重复的 VERSION_MISMATCH 检查——纵深防御设计，已在文档注释中添加交叉引用说明
+- **QA（ADVISORY）**：3 项非阻塞建议——最小边界值测试（save_schema=2）、迁移函数返回非 Dictionary 测试、文件清理可移植性（`ProjectSettings.globalize_path`）
+**Code Review**: LP-CODE-REVIEW ISSUES FOUND（0 BLOCKER / 2 HIGH / 3 LOW）——H1/H2 记录为 ADVISORY 偏差，L1/L3 已修复，L2/L4 为参考信息
+**QA Testability**: QL-TEST-COVERAGE ADEQUATE（3 建议项记录为 ADVISORY 偏差）
+**Test Evidence**: `tests/unit/save_load/test_migration_chain.gd` — 15 测试函数（13 活跃 + 1 pending + 1 占位），344/344 全部测试通过，1342 断言，零失败

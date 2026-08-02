@@ -1,0 +1,145 @@
+Godot Engine v4.6.3.stable.official.7d41c59c4 - https://godotengine.org
+
+---  GUT  ---
+[1m[INFO]:  [0musing [C:/Users/Administrator/AppData/Roaming/Godot/app_userdata/仙途问道] for temporary output.
+Godot version:  4.6.3
+GUT version:  9.6.1
+
+
+res://tests/unit/save_load/test_atomic_write.gd
+* test_atomic_write_first_time_no_bak
+* test_atomic_write_overwrite_existing_with_bak
+* test_save_path_resolution_autosave
+* test_save_path_resolution_manual_slot_2
+* test_save_path_resolution_manual_slot_1
+* test_save_path_resolution_manual_slot_3
+* test_save_path_resolution_snapshot
+* test_ensure_dir_creates_missing_dirs
+* test_ensure_dir_existing_dir_returns_true
+* test_get_save_root_default
+* test_rename_with_retry_success_first_attempt
+* test_rename_with_retry_all_fail
+WARNING: SaveLoadSystem: rename 第 1 次尝试失败，50ms 后重试...
+   at: push_warning (core/variant/variant_utility.cpp:1034)
+   GDScript backtrace (most recent call first):
+       [0] _rename_with_retry (res://src/foundation/save_load_system.gd:155)
+       [1] test_rename_with_retry_all_fail (res://tests/unit/save_load/test_atomic_write.gd:205)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+WARNING: SaveLoadSystem: rename 第 2 次尝试失败，50ms 后重试...
+   at: push_warning (core/variant/variant_utility.cpp:1034)
+   GDScript backtrace (most recent call first):
+       [0] _rename_with_retry (res://src/foundation/save_load_system.gd:155)
+       [1] test_rename_with_retry_all_fail (res://tests/unit/save_load/test_atomic_write.gd:205)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+* test_write_reentry_guard
+WARNING: SaveLoadSystem: 写入进行中——自动存档排队等待
+   at: push_warning (core/variant/variant_utility.cpp:1034)
+   GDScript backtrace (most recent call first):
+       [0] _atomic_write (res://src/foundation/save_load_system.gd:180)
+       [1] test_write_reentry_guard (res://tests/unit/save_load/test_atomic_write.gd:219)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+* test_pending_autosave_queue_and_reset
+* test_atomic_write_roundtrip
+* test_atomic_write_no_temp_file_leak
+16/16 passed.
+
+
+res://tests/unit/save_load/test_container_schema.gd
+* test_build_save_container_all_fields
+* test_build_save_container_missing_meta_defaults
+* test_build_save_container_meta_boundary_values
+* test_validate_save_data_all_valid
+* test_validate_save_data_missing_schema_version
+ERROR: Save file missing 'schema_version' field
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _validate_save_data (res://src/foundation/save_load_system.gd:284)
+       [1] test_validate_save_data_missing_schema_version (res://tests/unit/save_load/test_container_schema.gd:198)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+[ExpectedError]应产生一次 push_error 报告缺失 schema_version
+* test_validate_save_data_missing_game_state
+ERROR: Save file missing or invalid 'game_state' field
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _validate_save_data (res://src/foundation/save_load_system.gd:287)
+       [1] test_validate_save_data_missing_game_state (res://tests/unit/save_load/test_container_schema.gd:217)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+[ExpectedError]应产生一次 push_error 报告缺失 game_state
+* test_validate_save_data_game_state_not_dict
+ERROR: Save file missing or invalid 'game_state' field
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _validate_save_data (res://src/foundation/save_load_system.gd:287)
+       [1] test_validate_save_data_game_state_not_dict (res://tests/unit/save_load/test_container_schema.gd:233)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+[ExpectedError]应产生一次 push_error 报告 game_state 类型无效
+* test_validate_save_data_missing_complete
+ERROR: Save file missing 'complete' marker — possible write interruption or manual corruption
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _validate_save_data (res://src/foundation/save_load_system.gd:292)
+       [1] test_validate_save_data_missing_complete (res://tests/unit/save_load/test_container_schema.gd:252)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+[ExpectedError]应产生一次 push_error 报告缺失 complete 标记
+* test_validate_save_data_complete_false
+ERROR: Save file missing 'complete' marker — possible write interruption or manual corruption
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _validate_save_data (res://src/foundation/save_load_system.gd:292)
+       [1] test_validate_save_data_complete_false (res://tests/unit/save_load/test_container_schema.gd:268)
+       [2] _run_test (res://addons/gut/gut.gd:622)
+       [3] _test_the_scripts (res://addons/gut/gut.gd:835)
+[ExpectedError]应产生一次 push_error 报告 complete 不为 true
+* test_atomic_read_success
+* test_atomic_read_file_not_found
+* test_atomic_read_json_array_not_object
+* test_atomic_read_json_string_not_object
+* test_atomic_read_json_number_not_object
+* test_atomic_read_corrupted_json
+ERROR: 存档文件解析错误 第 0 行: Expected key
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _parse_json_file (res://src/foundation/save_load_system.gd:81)
+       [1] _atomic_read (res://src/foundation/save_load_system.gd:331)
+       [2] test_atomic_read_corrupted_json (res://tests/unit/save_load/test_container_schema.gd:373)
+       [3] _run_test (res://addons/gut/gut.gd:622)
+       [4] _test_the_scripts (res://addons/gut/gut.gd:835)
+* test_atomic_read_valid_json_missing_complete_marker
+ERROR: Save file missing 'complete' marker — possible write interruption or manual corruption
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _validate_save_data (res://src/foundation/save_load_system.gd:292)
+       [1] _atomic_read (res://src/foundation/save_load_system.gd:336)
+       [2] test_atomic_read_valid_json_missing_complete_marker (res://tests/unit/save_load/test_container_schema.gd:393)
+       [3] _run_test (res://addons/gut/gut.gd:622)
+       [4] _test_the_scripts (res://addons/gut/gut.gd:835)
+* test_validate_version_ok
+* test_validate_version_mismatch
+* test_atomic_read_ignores_tmp_and_bak
+19/19 passed.
+
+
+
+
+==============================================
+= Run Summary
+==============================================
+
+Totals
+------
+Scripts               2
+Tests                35
+Passing Tests        35
+Asserts             110
+Time              1.601s
+
+
+---- All tests passed! ----
+

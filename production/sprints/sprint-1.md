@@ -27,11 +27,11 @@
 | 11 | scene-manager | TransitionType + 音频过渡矩阵 | `scene-manager/story-002-transition-type-audio-matrix.md` | Logic | 2.5h | ✅ Done |
 | 12 | scene-manager | 转场前自动存档 + 输入锁集成 | `scene-manager/story-003-autosave-input-lock-integration.md` | Integration | 3.5h | ✅ Done |
 | 13 | scene-manager | 加载画面 + 异步加载 + 错误恢复 | `scene-manager/story-004-loading-screen-async-error-recovery.md` | Integration | 4.5h | ✅ Done |
-| 14 | save-load | JSON 引擎 + 枚举定义 | `save-load/story-001-json-engine-enums.md` | Logic | 2.5h | — |
-| 15 | save-load | 原子双写 + Windows 重试 | `save-load/story-002-atomic-write-retry.md` | Integration | 3h | — |
-| 16 | save-load | 容器 schema + 完整性校验 | `save-load/story-003-container-schema-validation.md` | Integration | 3h | — |
-| 17 | save-load | 公共 API + GSM 集成 | `save-load/story-004-public-api-gsm-integration.md` | Integration | 4h | — |
-| 18 | save-load | 迁移链 + VERSION_MISMATCH | `save-load/story-005-migration-chain-version-mismatch.md` | Logic | 3h | — |
+| 14 | save-load | JSON 引擎 + 枚举定义 | `save-load/story-001-json-engine-enums.md` | Logic | 2.5h | ✅ Done |
+| 15 | save-load | 原子双写 + Windows 重试 | `save-load/story-002-atomic-write-retry.md` | Integration | 3h | ✅ Done |
+| 16 | save-load | 容器 schema + 完整性校验 | `save-load/story-003-container-schema-validation.md` | Integration | 3h | ✅ Done |
+| 17 | save-load | 公共 API + GSM 集成 | `save-load/story-004-public-api-gsm-integration.md` | Integration | 4h | ✅ Done |
+| 18 | save-load | 迁移链 + VERSION_MISMATCH | `save-load/story-005-migration-chain-version-mismatch.md` | Logic | 3h | ✅ Done |
 | 19 | event-system | EventTemplate Resource 数据模型 | `event-system/story-001-event-template-resource-model.md` | Logic | 3h | — |
 | 20 | event-system | EventInstance + 触发/判定/结算 | `event-system/story-002-event-instance-trigger-resolve.md` | Logic | 4h | — |
 | 21 | event-system | story_flags 写入契约 | `event-system/story-003-story-flags-ownership-delegation.md` | Logic+Integration | 3h | — |

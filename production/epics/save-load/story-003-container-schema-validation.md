@@ -1,10 +1,13 @@
 # Story 003: 存档容器 schema + "complete" 标记 + 完整性校验
 
 > **Epic**: 存档/读档系统
-> **Status**: Ready
+> **Status**: Complete
+> **Last Updated**: 2026-07-31
 > **Layer**: Foundation
 > **Type**: Integration
+> **预估**: 3h
 > **Manifest Version**: 2026-07-26
+> **性能**: 预计无帧率影响 — 文件 I/O 仅在存档/读档时触发，不在帧循环内
 
 ## 上下文
 
@@ -27,22 +30,23 @@
 
 *来自 GDD `design/gdd/save-load-system.md` 与 ADR-0002:*
 
-- [ ] **AC-001**: `_build_save_container(serialized_gsm: Dictionary, meta: Dictionary) → Dictionary` — 构造完整的存档容器 Dictionary，包含全部 7 个顶层字段
-- [ ] **AC-002**: 存档容器包含 `schema_version: int = CURRENT_SCHEMA_VERSION`（当前值为 1）
-- [ ] **AC-003**: 存档容器包含 `version: String = "1.0.0"`（语义化版本，仅展示用途，不参与任何 if 判断）
-- [ ] **AC-004**: 存档容器包含 `timestamp: String`（ISO-8601 UTC 格式，由 `Time.get_datetime_string_from_system()` 生成）
-- [ ] **AC-005**: 存档容器包含 `playtime_seconds: int`（从 GSM 或 meta 中获取当前局已玩时间）
-- [ ] **AC-006**: 存档容器包含 `meta: Dictionary`（含 `player_name`, `realm`, `chapter`, `map_name`, `deck_size`, `current_scene`, `current_scene_id`）
-- [ ] **AC-007**: 存档容器包含 `game_state: Dictionary`（`GSM.serialize()` 的输出——battle/session 域已被 GSM 自动排除）
-- [ ] **AC-008**: 存档容器包含 `complete: true`
-- [ ] **AC-009**: `_validate_save_data(data)` — 缺失 `schema_version` 字段 → `push_error` + 返回 false
-- [ ] **AC-010**: `_validate_save_data(data)` — 缺失 `game_state` 字段或 `game_state` 类型非 Dictionary → `push_error` + 返回 false
-- [ ] **AC-011**: `_validate_save_data(data)` — 缺失 `complete` 字段或 `complete != true` → `push_error` + 返回 false
-- [ ] **AC-012**: `_validate_save_data(data)` — 所有字段合法 → 返回 true
-- [ ] **AC-013**: `_atomic_read(path)` — 完整读取流程：存在性检查 → `get_file_as_string` → `JSON.new().parse()` → 类型检查 → `_validate_save_data()` → 返回 `{result: LoadResult, data: Dictionary}`
-- [ ] **AC-014**: `_atomic_read(path)` — 仅读取规范文件名（忽略 `.tmp` 和 `.bak` 文件）
-- [ ] **AC-015**: `_validate_version(data)` — `data.schema_version > CURRENT_SCHEMA_VERSION` → 返回 `{error: "VERSION_MISMATCH", ...}`
-- [ ] **AC-016**: `_validate_version(data)` — `data.schema_version <= CURRENT_SCHEMA_VERSION` → 返回 `{ok: true}`
+- [x] **AC-001**: `_build_save_container(serialized_gsm: Dictionary, meta: Dictionary) → Dictionary` — 构造完整的存档容器 Dictionary，包含全部 7 个顶层字段
+- [x] **AC-002**: 存档容器包含 `schema_version: int = CURRENT_SCHEMA_VERSION`（当前值为 1）
+- [x] **AC-003**: 存档容器包含 `version: String = "1.0.0"`（语义化版本，仅展示用途，不参与任何 if 判断）
+- [x] **AC-004**: 存档容器包含 `timestamp: String`（ISO-8601 UTC 格式，由 `Time.get_datetime_string_from_system()` 生成）
+- [x] **AC-005**: 存档容器包含 `playtime_seconds: int`（从 GSM 序列化数据的 `session.playtime_seconds` 获取，缺失时默认 0）
+- [x] **AC-006**: 存档容器包含 `meta: Dictionary`（含 `player_name`, `realm`, `chapter`, `map_name`, `deck_size`, `current_scene`, `current_scene_id`）
+- [x] **AC-007**: 存档容器包含 `game_state: Dictionary`（`GSM.serialize()` 的输出——battle/session 域已被 GSM 自动排除）
+- [x] **AC-008**: 存档容器包含 `complete: true`
+- [x] **AC-009**: `_validate_save_data(data)` — 缺失 `schema_version` 字段 → `push_error` + 返回 false
+- [x] **AC-010**: `_validate_save_data(data)` — 缺失 `game_state` 字段或 `game_state` 类型非 Dictionary → `push_error` + 返回 false
+- [x] **AC-011**: `_validate_save_data(data)` — 缺失 `complete` 字段或 `complete != true` → `push_error` + 返回 false
+- [x] **AC-012**: `_validate_save_data(data)` — 所有字段合法 → 返回 true
+- [x] **AC-013**: `_atomic_read(path)` — 完整读取流程：存在性检查 → `get_file_as_string` → `JSON.new().parse()` → 类型检查 → `_validate_save_data()` → 返回 `{result: LoadResult, data: Dictionary}`
+- [x] **AC-014**: `_atomic_read(path)` — 仅读取规范文件名（忽略 `.tmp` 和 `.bak` 文件）
+- [x] **AC-014.5**: `_atomic_read(path)` — JSON 解析成功但 `_validate_save_data()` 校验失败（如缺少 `complete` 字段）→ 返回 `{result: LoadResult.CORRUPTED}`
+- [x] **AC-015**: `_validate_version(data)` — `data.schema_version > CURRENT_SCHEMA_VERSION` → 返回 `{error: "VERSION_MISMATCH", ...}`
+- [x] **AC-016**: `_validate_version(data)` — `data.schema_version <= CURRENT_SCHEMA_VERSION` → 返回 `{ok: true}`
 
 ---
 
@@ -144,6 +148,11 @@ func _validate_version(data: Dictionary) -> Dictionary:
   - Then: 返回 `{result: SUCCESS, data: Dictionary}`，data 包含存档容器全部字段
   - 边界情况: `.tmp` 文件存在于同目录 → _atomic_read 无视之，仅读取规范文件名
 
+- **AC-014.5**: _atomic_read 校验失败
+  - Given: 合法 JSON 文件 `{"schema_version": 1, "game_state": {}}`（无 `complete` 字段）
+  - When: 调用 `_atomic_read(path)`
+  - Then: 返回 `{result: LoadResult.CORRUPTED}`，`push_error` 被调用
+
 - **AC-015**: 高版本拒绝
   - Given: 存档 `schema_version: 99`，`CURRENT_SCHEMA_VERSION: 1`
   - When: 调用 `_validate_version(data)`
@@ -155,7 +164,7 @@ func _validate_version(data: Dictionary) -> Dictionary:
 
 **Story 类型**: Integration
 **需要证据**: `tests/unit/save_load/test_container_schema.gd` — 必须存在且通过
-**状态**: [ ] 尚未创建
+**状态**: [x] 已创建——19 测试函数，全部通过（35/35 测试，110 断言）
 
 **必需测试函数**:
 - `test_build_save_container_all_fields`
@@ -169,6 +178,7 @@ func _validate_version(data: Dictionary) -> Dictionary:
 - `test_atomic_read_success`
 - `test_atomic_read_file_not_found`
 - `test_atomic_read_corrupted_json`
+- `test_atomic_read_valid_json_missing_complete_marker`
 - `test_validate_version_ok`
 - `test_validate_version_mismatch`
 - `test_atomic_read_ignores_tmp_and_bak`
@@ -186,3 +196,18 @@ func _validate_version(data: Dictionary) -> Dictionary:
 - ❌ `CardSystem.reconstitute_instances()` 调用——Story 004
 - ❌ schema_version 迁移链执行——Story 005
 - ❌ `save_game()` / `load_game()` 公共 API——整合在 Story 004 完成后
+
+---
+
+## Completion Notes
+**Completed**：2026-07-31
+**Criteria**：17/17 通过（零延迟项）
+**Deviations**：无——ADR-0002 完全合规，清单版本匹配，范围外无触及
+**Test Evidence**：`tests/unit/save_load/test_container_schema.gd` — 19 测试函数，35/35 测试通过，110 断言
+**Code Review**：已完成——APPROVED WITH SUGGESTIONS（1 HIGH DRY 违规已修复，5 LOW/INFO 建议中 4 项已修复）
+**Post-Review Fixes**：
+- push_error 断言：5 个 validate 测试中追加 `assert_push_error_count(1, ...)`
+- JSON 解析边界覆盖：新增 3 个测试（Array/String/Number 非 Object 顶层 → CORRUPTED）
+- timestamp 格式验证：`test_build_save_container_all_fields` 中增加 ISO-8601 正则断言
+- meta 字段边界值：新增 `test_build_save_container_meta_boundary_values`（负数/零/空字符串）
+**Remaining LOW**：1 项——测试文件位于 `tests/unit/` 而非 `tests/integration/`（故事类型为 Integration）。不影响完成，建议在后续 Sprint 中调整目录结构。

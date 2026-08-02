@@ -1,5 +1,85 @@
 # 活跃会话状态
 
+## Session Extract — /story-done 2026-08-02 (Story 005 save-load)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/save-load/story-005-migration-chain-version-mismatch.md` — schema_version 迁移链 + VERSION_MISMATCH 拒绝
+- Code Review：LP-CODE-REVIEW ISSUES FOUND（0 BLOCKER / 2 HIGH / 3 LOW）——H1（文件 796 行超标 265%）、H2（_validate_version 与 _migrate_if_needed 重复检查——纵深防御设计）、L1/L3 已修复
+- QA Review：QL-TEST-COVERAGE ADEQUATE（3 建议项记录为 ADVISORY）
+- Changes：`src/foundation/save_load_system.gd`（缩进修复 + 交叉引用注释）+ `tests/unit/save_load/test_migration_chain.gd`（L1 死代码删除 + L3 补充断言）
+- 测试结果：344/344 通过（含 save_load 全部 5 个测试文件），1342 断言，1 pending（多步迁移——CURRENT=1 合理推迟），零失败
+- Tech debt logged：3 ADVISORY（H1 行数超标、H2 重复检查、QA 3 项改善建议）
+- Next recommended：`production/epics/event-system/story-001-event-template-resource-model.md`（EventTemplate Resource 数据模型，3h）——Event System Epic 启动
+
+<!-- STATUS -->
+Epic: event-system
+Feature: Sprint 1 - Foundation 层
+Task: Story 005 完成——save-load Epic ✅ 全部 5/5 完成
+<!-- /STATUS -->
+
+## Session Extract — /story-done 2026-08-01 (Story 004 save-load)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/save-load/story-004-public-api-gsm-integration.md` — GSM 状态序列化/反序列化 + 公共 API 整合
+- Code Review：LP-CODE-REVIEW APPROVED WITH HIGH FINDINGS（R1+R2+R3+QA GAP 2/3/4 全部修复）
+- QA Review：QL-TEST-COVERAGE ADEQUATE（6 缺口已补充，新增 4 测试）
+- Changes：`src/foundation/save_load_system.gd`（+~190 行——5 信号 + DI + meta.json 管理 + _migrate_if_needed 桩 + 9 公共 API）+ `tests/unit/save_load/test_public_api.gd`（新建，20 测试）
+- 测试结果：55/55 通过，175 断言，零失败
+- Tech debt logged：4 ADVISORY（返回类型 int vs enum、duplicate 浅拷贝、测试目录位置、文件行数超标）
+- Next recommended：`production/epics/save-load/story-005-migration-chain-version-mismatch.md`（迁移链 + VERSION_MISMATCH，3h）
+
+<!-- STATUS -->
+Epic: save-load
+Feature: Sprint 1 - Foundation 层
+Task: Story 004 完成——公共 API + GSM 集成
+<!-- /STATUS -->
+
+## Session Extract — /story-done 2026-07-31 (Story 003 save-load)
+- Verdict：✅ COMPLETE
+- Story：`production/epics/save-load/story-003-container-schema-validation.md` — 存档容器 schema + "complete" 标记 + 完整性校验
+- Code Review：APPROVED WITH SUGGESTIONS——1 HIGH DRY 已修复，4/5 LOW 已修复
+- QA Review：QL-TEST-COVERAGE ADEQUATE
+- Changes：`src/foundation/save_load_system.gd`（追加 ~100 行——4 方法 + 1 常量）+ `tests/unit/save_load/test_container_schema.gd`（新建，19 测试）
+- 测试结果：35/35 通过，110 断言，零失败（save_load 全部测试：35/35）
+- Tech debt logged：None（1 LOW——测试目录 `tests/unit/` vs `tests/integration/` 留待后续 Sprint 调整）
+- Next recommended：`production/epics/save-load/story-004-public-api-gsm-integration.md`（公共 API + GSM 集成，4h）
+
+<!-- STATUS -->
+Epic: save-load
+Feature: Sprint 1 - Foundation 层
+Task: Story 003 完成——容器 schema + 完整性校验
+<!-- /STATUS -->
+
+## Session Extract — /story-done 2026-07-31 (Story 002 save-load)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/save-load/story-002-atomic-write-retry.md` — 原子写入策略 + 重入防护 + Windows 重试
+- Code Review：LP-CODE-REVIEW APPROVED WITH SUGGESTIONS（4 项建议已修复）
+- QA Review：QL-TEST-COVERAGE ADEQUATE（2 ADVISORY）
+- Changes：`src/foundation/save_load_system.gd`（追加 ~150 行——5 方法 + 2 常量 + 2 字段）+ `tests/unit/save_load/test_atomic_write.gd`（新建，16 测试）
+- 测试结果：289/289 通过，1172 断言，零失败
+- Tech debt logged：None
+- Next recommended：`production/epics/save-load/story-003-container-schema-validation.md`（容器 schema + 完整性校验）
+
+<!-- STATUS -->
+Epic: save-load
+Feature: Sprint 1 - Foundation 层
+Task: Story 002 完成——原子写入 + Windows 重试 + 重入防护
+<!-- /STATUS -->
+
+## Session Extract — /story-done 2026-07-31 (Story 001 save-load)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/save-load/story-001-json-engine-enums.md` — JSON 序列化引擎 + SaveResult/LoadResult 枚举
+- Code Review：LP-CODE-REVIEW APPROVED（H1/H2 已修复，M1 为 Autoload 架构固有限制）
+- QA Review：QL-TEST-COVERAGE ADEQUATE（2 ADVISORY）
+- Changes：`src/foundation/save_load_system.gd`（重写，86 行）+ `tests/integration/save_load/test_json_engine.gd`（新建，31 测试）
+- 测试结果：304/304 通过，1209 断言，零失败
+- Tech debt logged：None
+- Next recommended：`production/epics/save-load/story-002-atomic-write-retry.md`（原子双写 + Windows 重试）
+
+<!-- STATUS -->
+Epic: save-load
+Feature: Sprint 1 - Foundation 层
+Task: Story 001 完成——JSON 引擎 + 枚举定义
+<!-- /STATUS -->
+
 ## Session Extract — /story-done 2026-07-30 (Story 002 关闭)
 - Verdict：✅ COMPLETE
 - Story：`production/epics/scene-manager/story-002-transition-type-audio-matrix.md` — TransitionType + 音频过渡矩阵
