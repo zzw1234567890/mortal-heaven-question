@@ -403,6 +403,18 @@ func set_session_scene(id: int, path: String) -> void:
 	_buffer_change("session.scene_id", old_id, id)
 	_buffer_change("session.current_scene", old_path, path)
 
+## story_flags 写入——仅 [b]EventSystem.set_flag()[/b] 调用（ADR-0003 唯一写入者契约）。[br]
+## [br][b]委托链[/b]: EventSystem.set_flag() → 此方法 → [method _buffer_change] → 帧末 [signal batch_updated]。[br]
+## [br]相同值重复写入不缓冲变更（去重），减少 SaveLoad 误触发自动存档。[br]
+## [br][param flag] flag 键名；[param value] flag 值（Variant——仅接口处使用，不在 Resource @export 中使用）。[br]
+## [br][b]示例[/b]: [code]GameStateManager.set_narrative_flag(&"chapter_1", true)[/code]
+func set_narrative_flag(flag: StringName, value: Variant) -> void:
+	var old: Variant = narrative.story_flags.get(flag, null)
+	if old == value:
+		return
+	narrative.story_flags[flag] = value
+	_buffer_change("narrative.story_flags.%s" % flag, old, value)
+
 ## === 第三层：信号订阅 API ====================================================
 
 ## 有效信号名列表——subscribe/unsubscribe 的白名单。
@@ -551,7 +563,7 @@ func _validate_resource_type(type: StringName) -> bool:
 
 ## 将单一路径变更写入帧内缓冲，并调度帧末刷新。
 ## 同路径多次写入：保留首次 old，更新末次 new。
-func _buffer_change(path: String, old_val, new_val) -> void:
+func _buffer_change(path: String, old_val: Variant, new_val: Variant) -> void:
 	if _emitting_in_progress:
 		push_warning("GSM: 递归写入检测——在信号回调中再次写入 %s" % path)
 	if _pending_changes.has(path):
@@ -592,8 +604,8 @@ func _flush_pending_changes() -> void:
 
 ## 根据路径自动路由到对应域信号。
 func _emit_domain_signal(path: String, data: Dictionary) -> void:
-	var old_val = data["old"]
-	var new_val = data["new"]
+	var old_val: Variant = data["old"]
+	var new_val: Variant = data["new"]
 	var delta: int = new_val - old_val if (old_val is int and new_val is int) else 0
 
 	if path == "player.realm":

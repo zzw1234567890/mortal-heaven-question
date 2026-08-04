@@ -5,6 +5,8 @@
 > **预估工作量**: 3 点
 > **依赖**: 无
 > **阻塞**: Story 002, Story 003, Story 004, Story 005
+> **Status**: Complete
+> **Last Updated**: 2026-08-02
 
 ## 覆盖的 GDD 需求
 
@@ -28,7 +30,7 @@ ADR-0003 决策 1：事件模板以 Godot Resource（`.tres`）格式存储，�
 
 ### 1. 枚举定义
 
-在 `src/event_system/event_enums.gd` 中定义：
+在 `src/foundation/event_system/event_enums.gd` 中定义：
 
 - **EventType**: `LING_MAI_CAIJUE = 0`, `FANG_SHI_JIAOYI = 1`, `DONG_FU_QIYU = 2`, `SHA_REN_DUO_BAO = 3`, `LIAN_DAN_LIAN_QI = 4`, `XIE_YUE_SAN_XING = 5`
 - **ConditionType**: `REALM = 0`, `FACTION = 1`, `RESOURCE = 2`, `CARD_OWNED = 3`, `FLAG_SET = 4`, `FLAG_NOT_SET = 5`
@@ -39,7 +41,7 @@ ADR-0003 决策 1：事件模板以 Godot Resource（`.tres`）格式存储，�
 
 ### 2. Resource 类定义
 
-在 `src/event_system/` 目录中创建以下 4 个 Resource 类，**所有 `@export` 字段使用 Inspector 原生类型**：
+在 `src/foundation/event_system/` 目录中创建以下 4 个 Resource 类，**所有 `@export` 字段使用 Inspector 原生类型**：
 
 | 类 | 文件 | 关键字段 |
 |---|------|---------|
@@ -81,3 +83,13 @@ ADR-0003 决策 1：事件模板以 Godot Resource（`.tres`）格式存储，�
 - OutcomeType 枚举值 0-11 必须与 ADR-0003 完全一致——禁止重排序
 - 所有 Resource 文件使用 `class_name` 注册——启用 Godot 全局引用
 - 文件命名：snake_case 匹配类名（`event_condition.gd`、`event_outcome.gd`、`event_option.gd`、`event_template.gd`、`event_enums.gd`）
+
+## Completion Notes
+**Completed**：2026-08-02
+**Criteria**：10/12 通过（AC-001/AC-002/AC-010 为 Inspector 编辑器行为，延迟至 Godot 编辑器手动验证）
+**Deviations**：
+  - ADVISORY：enum 字段使用 `int + @export_enum` 而非 `EventEnums.EventType` 等直接 enum 类型注解——GDScript 跨文件 inner enum 解析顺序限制（非 Variant，ADR-0003 精神合规）
+  - ADVISORY：Array 类型化（`Array[EventCondition]` 等）因 GDScript 4.6 class_name 跨文件解析顺序限制无法使用——改为裸 `Array` + 文档注释说明（非 Variant，ADR-0003 字母偏差）
+  - ADVISORY：`EventEnums extends Object` 而非 `extends RefCounted`——纯枚举类无需引用计数
+**Test Evidence**：Logic — `tests/unit/event_system/test_event_template.gd`（50 个测试，全部通过）
+**Code Review**：已完成——APPROVED WITH SUGGESTIONS（3 MEDIUM → 引擎限制 + 5 GDScript LOW → 已修复 + 5 QA LOW → 已添加测试）

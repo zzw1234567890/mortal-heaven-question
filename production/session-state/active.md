@@ -1,5 +1,89 @@
 # 活跃会话状态
 
+## 会话摘录——/dev-story 2026-08-03
+- 故事：`production/epics/event-system/story-004-chain-events-depth-cycle-detection.md` — 连锁事件 MAX_CHAIN_DEPTH=3 + visited_ids 循环检测
+- 更改的文件：
+  - `src/foundation/event_system/event_system.gd` — 新增 MAX_CHAIN_DEPTH 常量 + _chain_visited_ids 成员 + get_chain_event() + _check_chain_cycle()（方案A 混合信号归属）
+  - `tests/unit/event_system/test_chain_event_depth.gd` — 新建 15 测试（AC-001/002/003/007/008/011c + 边界）
+  - `tests/unit/event_system/test_chain_event_cycle.gd` — 新建 13 测试（AC-004/010c/011a/011b + 残留防护）
+  - `tests/unit/event_system/test_chain_event_option_filter.gd` — 新建 7 测试（AC-005/006 + 正向）
+  - `production/epics/event-system/story-004-chain-events-depth-cycle-detection.md` — 5 项就绪度修正（测试命名/方案A信号/删死代码/AC-011三场景/AC-012移除）+ Status: In Progress
+- 编写的测试：3 个文件 35 个测试函数覆盖 AC-001~011
+- 阻塞项：无
+- 关键决策：方案A 信号归属（chain_triggered 调用方发射，chain_ended 场景c 内部/场景a,b 调用方）；push_warning 不可由 GUT 原生断言，通过副作用（返回空+清空+信号）间接验证，记录 ADVISORY
+- 测试结果：486/487 通过（新增 35 测试：452→487），1 pending（migration_chain 既有），零失败
+- 下一步：`/code-review src/foundation/event_system/event_system.gd tests/unit/event_system/test_chain_event_*.gd` 然后 `/story-done production/epics/event-system/story-004-chain-events-depth-cycle-detection.md`
+
+## Session Extract — /story-done 2026-08-03 (Story 003 event-system)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/event-system/story-003-story-flags-ownership-delegation.md` — story_flags 唯一运行时写入者——委托写入契约（Logic+Integration）
+- Code Review：code-reviewer（godot-gdscript-specialist + qa-tester）APPROVED WITH SUGGESTIONS（0 BLOCKER / 0 HIGH / 9 LOW）。已修 LOW-2/3/4（`_buffer_change`/`_emit_domain_signal`/`_check_faction_condition`/`_check_flag_set_condition` 的 `var flags`/`old_val`/`new_val` 加 `: Variant` 注解）+ LOW-5（`_check_faction_condition` 注释更新指向 ADR-0022 身份选择系统）+ 补 qa-tester 缺口 3（story_flags 不误发域信号防护测试）。LP-CODE-REVIEW 关卡复用此审查结果。
+- QA Review：QL-TEST-COVERAGE ADEQUATE——18 个测试函数实质覆盖全部 11 条 AC。AC-002 时序断言可靠（数据写入在 _buffer_change 前，同步去重），AC-006/007 batch_updated 载荷路径与 old/new 正确，AC-009 grep 检查点诚实标注平凡通过。
+- Changes：
+  - `src/foundation/game_state_manager.gd` — 新增 `set_narrative_flag()` 第二层原子方法（_buffer_change 缓冲路径）+ L-2/L-3 类型注解修复
+  - `src/foundation/event_system/event_system.gd` — 新增 `set_flag()`/`get_flag()`（ADR-0003 唯一写入者契约）+ L-4/L-5 修复 + 委托写入合约文档注释
+  - `tests/unit/event_system/test_set_flag.gd` — 新建 5 测试（AC-001/002/003/010）
+  - `tests/unit/event_system/test_get_flag.gd` — 新建 5 测试（AC-004/005/011）
+  - `tests/unit/gsm/test_set_narrative_flag.gd` — 新建 4 测试（AC-006/007 + 去重 + 域信号防护）
+  - `tests/integration/event_system/test_story_flags_delegation.gd` — 新建 4 测试（AC-008/009，StubCaller 类）
+  - `production/epics/event-system/story-003-story-flags-ownership-delegation.md` — Status: Complete + Completion Notes
+  - `production/sprints/sprint-1.md` — Story #21 标记 ✅ Done
+- 测试结果：451/452 通过（新增 18 测试：434→452），1 pending（migration_chain 既有），零失败
+- Tech debt logged：None（5 项 ADVISORY 记录在 Completion Notes：测试命名偏差、AC-008/009 延后至 Story 005、LOW-1 ADR 文本过时、LOW-6 测试私有成员访问、qa-tester 缺口 1/2 未补）
+- Next recommended：`production/epics/event-system/story-004-chain-events-depth-cycle-detection.md`（连锁事件 + 循环检测，Logic，2.5h）——Story 004 依赖 EventTemplate.chain_next 引用完整性（已由 Story 002 `_validate_chain_references` 实现）
+
+<!-- STATUS -->
+Epic: event-system
+Feature: Sprint 1 - Foundation 层
+Task: Story 003 已完成——下一个 Story 004 连锁事件 + 循环检测
+<!-- /STATUS -->
+
+## Session Extract — /story-done 2026-08-03 (Story 002 event-system)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/event-system/story-002-event-instance-trigger-resolve.md` — EventInstance + 事件触发/条件判定/选项结算/加权随机选择
+- Code Review：code-reviewer APPROVED WITH CONCERNS（0 BLOCKER / 3 HIGH / 13 LOW）。H-1 已修复（resolve_option 不再发射 event_resolved，按 ADR-0003 §信号契约表留待 Story 005 的 apply_outcomes 发射），7 个安全 LOW 已修复（L-1/L-2/L-3/L-4/L-5/L-10/L-12）。H-2/H-3 记录为已知偏差。LP-CODE-REVIEW 关卡复用此审查结果。
+- QA Review：QL-TEST-COVERAGE GAPS（ADVISORY，不阻塞）——22 条 AC 中 20 条实质覆盖，统计型 AC（AC-016/019）循环次数与卡方计算达标，H-1 回归守护到位。G-1 缺口（AC-004/009 FACTION 测试按偏差路径编写）已归档为 Story 003 前置项。
+- Changes：
+  - `src/foundation/event_system/event_system.gd` — H-1 + L-1/L-2/L-3/L-4/L-5/L-12 修复
+  - `src/foundation/event_system/event_instance.gd` — L-10 注释修复
+  - `tests/unit/event_system/test_*.gd`（6 文件）— 新建，AC-001~022 全覆盖
+  - `production/epics/event-system/story-002-event-instance-trigger-resolve.md` — Status: Complete + Completion Notes
+  - `production/sprints/sprint-1.md` — Story #20 标记 ✅ Done
+- 测试结果：90/90 通过（event_system 单元测试），253 断言，零失败
+- Tech debt logged：None（H-2/H-3/G-1 共 3 项 ADVISORY 记录在 Completion Notes，待 Story 003 解决）
+- Next recommended：`production/epics/event-system/story-003-story-flags-ownership-delegation.md`（story_flags 写入契约，Logic+Integration，3h）——Story 003 将明确 player.faction 归属并同步修复 H-2/G-1
+
+## 会话摘录——/dev-story 2026-08-03
+- 故事：`production/epics/event-system/story-002-event-instance-trigger-resolve.md` — EventInstance + 触发/判定/结算
+- 更改的文件：
+  - `tests/unit/event_system/test_event_instance.gd`（原 `event_instance_test.gd` 重命名，AC-021，5 测试）
+  - `tests/unit/event_system/test_load_templates.gd`（新建，AC-001/002，8 测试）
+  - `tests/unit/event_system/test_event_trigger.gd`（新建，AC-003~007/022，10 测试）
+  - `tests/unit/event_system/test_check_condition.gd`（新建，AC-008~013，27 测试）
+  - `tests/unit/event_system/test_resolve_option.gd`（新建，AC-014~018，10 测试）
+  - `tests/unit/event_system/test_select_event.gd`（新建，AC-019/020，8 测试）
+- 编写的测试：6 个文件，68 个测试函数覆盖 AC-001~022（AC-021 已由 test_event_instance 覆盖）
+- 实现代码：未修改（Story 002 实现已在前序会话写完于 `src/foundation/event_system/event_system.gd` + `src/foundation/event_system/event_instance.gd`）
+- 阻塞项：无
+- 关键决策：AC-016/AC-019 统计型 AC 采用 `seed(42)` 固定全局 RNG（用户已确认）——满足测试标准确定性的意图
+- 测试结果：434/434 通过（新增 40 event-system 测试：394→434），1595 断言，1 pending（migration_chain 既有），零失败
+- 下一步：`/code-review src/foundation/event_system/event_system.gd tests/unit/event_system/test_*.gd` 然后 `/story-done production/epics/event-system/story-002-event-instance-trigger-resolve.md`
+
+## Session Extract — /story-done 2026-08-02 (Story 001 event-system)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/event-system/story-001-event-template-resource-model.md` — EventTemplate Resource 数据模型 + Inspector 可编辑字段
+- Code Review：已完成——APPROVED WITH SUGGESTIONS（3 MEDIUM → GDScript 4.6 引擎限制）
+- Changes：
+  - `src/foundation/event_system/event_enums.gd` — 4 enums（EventType/ConditionType/ConditionOperator/OutcomeType）
+  - `src/foundation/event_system/event_condition.gd` — EventCondition Resource（5 fields）
+  - `src/foundation/event_system/event_outcome.gd` — EventOutcome Resource（8 fields + @export_subgroup）
+  - `src/foundation/event_system/event_option.gd` — EventOption Resource（4 fields + 裸 Array 文档注释）
+  - `src/foundation/event_system/event_template.gd` — EventTemplate Resource（10 fields + @export_group 分层）
+  - `tests/unit/event_system/test_event_template.gd` — 50 个测试（41 original + 9 QA edge cases）
+- 测试结果：394/394 通过（新增 50 event template tests），1524 断言，1 pending（migration_chain），零失败
+- Tech debt logged：3 ADVISORY（int+@export_enum 偏差、裸 Array 偏差、extends Object）
+- Next recommended：`production/epics/event-system/story-002-event-instance-trigger-resolve.md`（EventInstance + 触发/判定/结算，4h）
+
 ## Session Extract — /story-done 2026-08-02 (Story 005 save-load)
 - Verdict：✅ COMPLETE WITH NOTES
 - Story：`production/epics/save-load/story-005-migration-chain-version-mismatch.md` — schema_version 迁移链 + VERSION_MISMATCH 拒绝
@@ -13,7 +97,7 @@
 <!-- STATUS -->
 Epic: event-system
 Feature: Sprint 1 - Foundation 层
-Task: Story 005 完成——save-load Epic ✅ 全部 5/5 完成
+Task: Story 002 已完成——下一个 Story 003 story_flags 写入契约
 <!-- /STATUS -->
 
 ## Session Extract — /story-done 2026-08-01 (Story 004 save-load)

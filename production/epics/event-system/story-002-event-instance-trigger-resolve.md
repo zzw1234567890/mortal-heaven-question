@@ -1,5 +1,7 @@
 # Story 002: EventInstance 运行时实例 + 事件触发/条件判定/选项结算
 
+> **Status**: Complete
+> **Last Updated**: 2026-08-03
 > **Epic**: event-system
 > **Story 类型**: Logic（需 GUT 单元测试）
 > **预估工作量**: 5 点
@@ -33,7 +35,7 @@
 
 ### 1. EventInstance RefCounted 类
 
-在 `src/event_system/event_instance.gd` 中定义：
+在 `src/foundation/event_system/event_instance.gd` 中定义：
 
 ```gdscript
 class_name EventInstance extends RefCounted
@@ -49,7 +51,7 @@ var resolved_outcomes: Array[Dictionary] = []
 
 ### 2. EventSystem Autoload 骨架
 
-在 `src/event_system/event_system.gd` 中实现：
+在 `src/foundation/event_system/event_system.gd` 中实现：
 
 - `_ready()`: 调用 `_load_templates()` → 发射 `templates_loaded(count)` 信号
 - `templates: Dictionary[StringName, EventTemplate]` —— 模板注册表
@@ -163,7 +165,7 @@ var resolved_outcomes: Array[Dictionary] = []
 - 所有信号声明在 EventSystem.gd 中——不使用 SignalBus Autoload
 - 文件结构：
   ```
-  src/event_system/
+  src/foundation/event_system/
   ├── event_enums.gd
   ├── event_condition.gd
   ├── event_outcome.gd
@@ -172,3 +174,14 @@ var resolved_outcomes: Array[Dictionary] = []
   ├── event_instance.gd
   └── event_system.gd       # Autoload
   ```
+
+## Completion Notes
+**Completed**：2026-08-03
+**Criteria**：22/22 通过（全部自动验证）
+**Deviations**：
+- ADVISORY（H-2）：`_check_faction_condition` 按 ADR-0003 §check_condition 应从 `GSM.player.faction` 读取，但 GSM player 域无 faction 字段。当前回退为 `narrative.story_flags["player_faction"]`。已在源码注释标注，待 Story 003（story_flags 所有权）明确 player.faction 归属后更新 ADR-0003 第 326 行契约与实现。
+- ADVISORY（H-3）：`trigger_event()` 签名按故事 §4 应为 `(event_id, context: Dictionary = {})`，实现采用 `(event_id, chain_depth: int = 0)`。连锁深度参数为 Story 004 所需，签名差异已在 ADR-0003 实现指南中明确。
+- ADVISORY（G-1）：AC-004/AC-009 的 FACTION 测试按实现偏差路径（story_flags["player_faction"]）编写而非 ADR-0003 契约路径（player.faction），验证了实际行为但未守护契约。S3 级，不阻塞本故事，作为 Story 003 前置项——届时需同步更新 ADR-0003 契约和对应测试路径。
+**Test Evidence**：Logic 故事，6 个测试文件位于 `tests/unit/event_system/`（test_load_templates / test_event_trigger / test_check_condition / test_resolve_option / test_select_event / test_event_instance），90/90 通过，253 断言，零失败。
+**Code Review**：已完成——code-reviewer 返回 APPROVED WITH CONCERNS（0 BLOCKER, 3 HIGH, 13 LOW）。H-1 已修复（resolve_option 不再发射 event_resolved，按 ADR-0003 §信号契约表留待 apply_outcomes 在 Story 005 发射），7 个安全 LOW 已修复（L-1/L-2/L-3/L-4/L-5/L-10/L-12）。H-2/H-3 记录为已知偏差。LP-CODE-REVIEW 关卡复用此审查结果。
+**QL-TEST-COVERAGE**：GAPS（ADVISORY，不阻塞）——22 条 AC 中 20 条实质覆盖，统计型 AC（AC-016/019）循环次数与卡方计算达标，H-1 回归守护（assert_signal_not_emitted）到位。G-1 缺口已归档为 Story 003 前置项。
