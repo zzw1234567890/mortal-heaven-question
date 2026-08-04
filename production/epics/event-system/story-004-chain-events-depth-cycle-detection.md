@@ -140,3 +140,18 @@ const MAX_CHAIN_DEPTH: int = 3
 - `chain_ended` 信号由探索系统监听——用于恢复地图控制
 - [新增] **调用方契约：连锁事件链中不消耗额外行动力**——此约束属探索系统（ADR-0014）范围，应在该系统 Story 的验收标准中作为 AC 出现（GDD §5）。EventSystem（Foundation 层）无 `consume_action_point` 方法，不在本 Story 验证范围。原 AC-012 已移除。
 - [新增] **push_warning 断言方案**：GUT 4.x 对 `push_warning` 无原生断言（`assert_printed` 仅覆盖 `print()`）。实现时需选定方案——注入 logger mock 或自定义断言辅助（如 `_last_warning` 捕获），并在三个测试文件中一致使用。实现前与主程序员确认方案。
+
+## Completion Notes
+**Completed**：2026-08-04
+**Criteria**：11/11 通过（AC-009/010(a)(b) 为调用方契约，按 AC 自身界定归属 Story 005 集成测试）
+**Deviations**：7 项 ADVISORY（LP-CODE-REVIEW）+ 1 项 ADVISORY（QL-TEST-COVERAGE），均不阻塞：
+  1. [ADVISORY] 选项不匹配时 `_chain_visited_ids` 残留风险——需在 Story 005 集成测试中验证：玩家选了不触发连锁的选项后，新事件链不误报循环
+  2. [ADVISORY][已修复] AC-011 标签在 `test_chain_event_depth.gd` 中错配——`test_ac011a_no_chain_next_clears_visited_ids` 已修正为 `test_ac011b_no_chain_next_clears_visited_ids`（场景 b 正常结束）
+  3. [ADVISORY] AC-009 `chain_triggered` 信号连通性缺少明确单元测试（watch_signals + 手动 emit 断言）——信号已声明，模式已被 `chain_ended` 测试证明有效，缺失的是 3 行平凡测试，Story 005 集成测试将覆盖完整触发链
+  4. [ADVISORY] `event_system.gd` 497 行 > 300 行软限制——既有债务（Story 002/003/004 累积），建议后续按职责拆分（条件判定引擎/连锁事件/模板加载）
+  5. [ADVISORY] `check_chain_cycle` 命名与 ADR-0003 §循环检测算法 `_check_chain_cycle` 不一致——合理修正（下划线前缀与"调用方调用"矛盾），建议后续通过 ADR 修订同步命名
+  6. [ADVISORY][已修复] `test_chain_event_cycle.gd` L286 测试命名 `testcheck_chain_cycle_accumulates_visited_ids` 缺下划线——已修正为 `test_check_chain_cycle_accumulates_visited_ids`
+  7. [ADVISORY] `class_name EventSystem` 与 Autoload 冲突——已尝试添加后回退（Autoload 全局单例与 class_name 冲突，导致 ES_SCRIPT.new() 测试实例解析为 Nil，402/486 测试失败）。保留 `extends Node` + `var es: Node` 动态分派模式（同 GSM/InputManager），Foundation Autoload 固有权衡
+  8. [ADVISORY] push_warning 断言方案：实现注意事项曾担忧 GUT 4.x 无原生 push_warning 断言，但测试实际使用了 GUT 内置的 `assert_push_warning` / `assert_push_warning_count` 方法并成功通过（486/487），该担忧已解决
+**Test Evidence**：Logic——3 个单元测试文件 35 测试函数（test_chain_event_depth.gd 15 + test_chain_event_cycle.gd 13 + test_chain_event_option_filter.gd 7），486/487 通过（1 pending 为 save_load 的 migration_chain，与本故事无关）
+**Code Review**：已完成——LP-CODE-REVIEW APPROVED WITH CONCERNS（7 ADVISORY）+ QL-TEST-COVERAGE ADEQUATE（1 ADVISORY）。已修复 2 项（#2 标签错配 + #6 命名缺下划线），其余 6 项保留为 ADVISORY，其中 #1（选项不匹配残留风险）须在 Story 005 集成测试 AC 中明确覆盖

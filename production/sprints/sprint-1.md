@@ -35,8 +35,8 @@
 | 19 | event-system | EventTemplate Resource 数据模型 | `event-system/story-001-event-template-resource-model.md` | Logic | 3h | ✅ Done |
 | 20 | event-system | EventInstance + 触发/判定/结算 | `event-system/story-002-event-instance-trigger-resolve.md` | Logic | 4h | ✅ Done |
 | 21 | event-system | story_flags 写入契约 | `event-system/story-003-story-flags-ownership-delegation.md` | Logic+Integration | 3h | ✅ Done |
-| 22 | event-system | 连锁事件 + 循环检测 | `event-system/story-004-chain-events-depth-cycle-detection.md` | Logic | 2.5h | — |
-| 23 | event-system | 结果执行器 + ADD_CARD 信号委托 | `event-system/story-005-outcome-executor-add-card-delegation.md` | Integration | 4h | — |
+| 22 | event-system | 连锁事件 + 循环检测 | `event-system/story-004-chain-events-depth-cycle-detection.md` | Logic | 2.5h | ✅ Done |
+| 23 | event-system | 结果执行器 + ADD_CARD 信号委托 | `event-system/story-005-outcome-executor-add-card-delegation.md` | Integration | 4h | ✅ Done |
 
 **总计**：23 个 Story — 14 Logic, 9 Integration — ~74h |
 

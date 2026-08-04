@@ -150,12 +150,13 @@ func test_option_filter_does_not_push_warning() -> void:
 
 
 # ============================================================================
-# 补充：选项过滤不清空 _chain_visited_ids（非链结束场景）
+# 补充：选项过滤清空 _chain_visited_ids（场景 d——Story 004 ADVISORY #1 收尾）
 # ============================================================================
 
-func test_option_filter_does_not_clear_visited_ids() -> void:
-	# Arrange —— chain_on_option=1，选了选项 0（不触发连锁）
-	# 预填充 visited_ids，验证选项过滤不清空（链未结束）
+func test_option_filter_clears_visited_ids() -> void:
+	# 场景：chain_on_option=1，选了选项 0（不触发连锁）
+	# Story 004 ADVISORY #1 修复：选项不匹配视为链结束，清空 visited_ids
+	# 防止残留 ID 污染下一条独立事件链
 	_make_chain_template(&"event_root", &"event_next", 1)
 	es._chain_visited_ids.append(&"event_a")
 	var inst := _make_instance(&"event_root")
@@ -163,6 +164,6 @@ func test_option_filter_does_not_clear_visited_ids() -> void:
 	# Act
 	es.get_chain_event(inst, 0)
 
-	# Assert —— 选项不匹配不是链结束，visited 不清空
-	assert_eq(es._chain_visited_ids.size(), 1,
-			"选项过滤不清空 _chain_visited_ids（非链结束）")
+	# Assert —— 选项不匹配是链结束场景 (d)，visited 应清空
+	assert_eq(es._chain_visited_ids.size(), 0,
+			"选项过滤应清空 _chain_visited_ids（场景 d——防止残留 ID 污染新链）")

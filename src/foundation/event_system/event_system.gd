@@ -34,6 +34,13 @@ signal chain_triggered(from_event: StringName, to_event: StringName)
 ## 连锁事件链结束时发射。[param final_event_id] 为链中最后一个事件 ID。
 signal chain_ended(final_event_id: StringName)
 
+## 卡牌奖励请求——ADD_CARD 结果通过信号委托给 CardSystem（Cat 2c fire-and-forget）。[br]
+## [br][b]Foundation 层原则 #3 合规[/b]：EventSystem（Foundation）不直接调用 CardSystem（Core）。[br]
+## [b]消费者[/b]：CardSystem——监听后执行 [code]create_instance()[/code] + [code]serialize_instance()[/code]
+## + [code]GSM.add_card_to_collection()[/code] 完整流程。[br]
+## [b]信号语义[/b]：EventSystem 发射后不等待响应——如果 CardSystem 未连接，卡牌奖励静默丢失。
+signal card_reward_requested(template_id: StringName)
+
 
 ## 连锁事件最大深度——调优参数（安全范围 1-5）。
 ## ADR-0003 决策 5：MAX_CHAIN_DEPTH=3 硬限制 + visited_ids 循环检测。
@@ -431,14 +438,14 @@ func select_event(candidates: Array[StringName], realm: int) -> StringName:
 ## [br][b]查询方法（CQS——命令查询分离）[/b]：本方法不发射 [signal chain_triggered] 信号，
 ## 也不修改 [member _chain_visited_ids]。调用方在确认连锁跳转后自行发射 [signal chain_triggered]
 ## 并调用 [method check_chain_cycle] 进行循环检测。[br]
-## [br][b]算法[/b]（Story 004 §1）：[br]
-##   1. 模板不存在或 [member EventTemplate.chain_next] == [code]&""[/code] → 返回 [code]&""[/code]（链结束，清空 visited_ids）[br]
-##   2. [member EventTemplate.chain_on_option] >= 0 且 != [param option_index] → 返回 [code]&""[/code]（仅指定选项触发）[br]
-##   3. [member EventInstance.chain_depth] >= [constant MAX_CHAIN_DEPTH] → [method @GlobalScope.push_warning] + 返回 [code]&""[/code]（深度截断，清空 visited_ids）[br]
+## [br][b]算法[/b]（Story 004 §1 + Story 005 ADVISORY #1 收尾）：[br]
+##   1. 模板不存在或 [member EventTemplate.chain_next] == [code]&""[/code] → 返回 [code]&""[/code]（场景 a：链结束，清空 visited_ids）[br]
+##   2. [member EventTemplate.chain_on_option] >= 0 且 != [param option_index] → 返回 [code]&""[/code]（场景 d：选项不匹配，清空 visited_ids）[br]
+##   3. [member EventInstance.chain_depth] >= [constant MAX_CHAIN_DEPTH] → [method @GlobalScope.push_warning] + 返回 [code]&""[/code]（场景 b：深度截断，清空 visited_ids）[br]
 ##   4. 返回 [member EventTemplate.chain_next][br]
-## [br][b]链结束清空契约[/b]：场景 (a) 无 chain_next 与场景 (b) 深度截断两条返回 [code]&""[/code] 的分支
-## 均清空 [member _chain_visited_ids]——防止残留 ID 污染下一条独立事件链。场景 (c) 循环检测命中
-## 由 [method check_chain_cycle] 内部清空。[br]
+## [br][b]链结束清空契约[/b]：场景 (a) 无 chain_next、场景 (b) 深度截断、场景 (d) 选项不匹配
+## 三条返回 [code]&""[/code] 的分支均清空 [member _chain_visited_ids]——防止残留 ID 污染下一条独立事件链。
+## 场景 (c) 循环检测命中由 [method check_chain_cycle] 内部清空。[br]
 ## [br][param instance]: 当前 EventInstance——读取 [member EventInstance.template_id] 和 [member EventInstance.chain_depth][br]
 ## [param option_index]: 玩家选中的选项索引——用于 [member EventTemplate.chain_on_option] 过滤[br]
 ## [br][b]返回[/b]: 下一个连锁事件模板 ID，或空 StringName（无连锁 / 选项不匹配 / 深度截断）。[br]
@@ -460,11 +467,11 @@ func get_chain_event(instance: EventInstance, option_index: int) -> StringName:
 		_chain_visited_ids.clear()
 		return &""
 
-	# 选项过滤——仅指定选项触发连锁。选项不匹配不视为"链结束"
-	# （不属 Story 004 §实现注意事项三场景之一），不清空 _chain_visited_ids。
-	# 调用方在 get_chain_event 返回 &"" 时统一按链结束处理（场景 a/b 由
-	# 本方法清空，场景 c 由 _check_chain_cycle 清空）。
+	# 选项过滤——仅指定选项触发连锁。选项不匹配视为链结束，
+	# 清空 _chain_visited_ids（场景 d：选项不匹配——Story 004 ADVISORY #1 收尾），
+	# 防止残留 ID 污染下一条独立事件链。
 	if tmpl.chain_on_option >= 0 and tmpl.chain_on_option != option_index:
+		_chain_visited_ids.clear()
 		return &""
 
 	# 场景 (b)：深度截断 → push_warning + 链结束，清空 visited_ids
@@ -495,3 +502,57 @@ func check_chain_cycle(instance: EventInstance, next_id: StringName) -> bool:
 		return false
 	_chain_visited_ids.append(next_id)
 	return true
+
+
+# === 结果执行器 ===================================================================
+
+## 执行已结算的结果——通过 GSM 第二层原子方法或信号委托。[br]
+## [br][b]Foundation 层原则 #3 合规[/b]：ADD_CARD → 信号委托，非直接调用 CardSystem。[br]
+## [br][b]处理流程[/b]：[br]
+##   - 跳过 [code]triggered=false[/code] 的 outcome（chance 判定失败项）[br]
+##   - [code]ADD_RESOURCE[/code] 检查返回值，失败时 [method @GlobalScope.push_error][br]
+##   - [code]ADD_CARD[/code] 发射 [signal card_reward_requested]（fire-and-forget）[br]
+##   - [code]TRIGGER_BATTLE[/code] / [code]HEAL[/code] / [code]DAMAGE[/code] 不执行——由调用方检查 [member EventInstance.resolved_outcomes] 后自行处理[br]
+##   - [code]NOTHING[/code] 不执行——仅叙事文本[br]
+##   - 未知 OutcomeType 触发 [method @GlobalScope.push_warning][br]
+## [br][b]信号发射[/b]：所有 outcome 处理完成后发射 [signal event_resolved]，[br]
+## SaveLoad 监听以判定是否触发自动存档。[br]
+## [br][param instance] 已通过 [method resolve_option] 结算的 EventInstance——读取 [member EventInstance.resolved_outcomes]。
+func apply_outcomes(instance: EventInstance) -> void:
+	for oc in instance.resolved_outcomes:
+		if not oc["triggered"]:
+			continue
+		match oc["type"]:
+			EventEnums.OutcomeType.ADD_RESOURCE:
+				# oc["target"] 为 String（Resource 名），GSM.add_resource 接受 StringName
+				var ok := GameStateManager.add_resource(StringName(oc["target"]), int(oc["value"]))
+				if not ok:
+					push_error("EventSystem.apply_outcomes: add_resource('%s', %d) 失败" % [oc["target"], int(oc["value"])])
+			EventEnums.OutcomeType.ADD_CULTIVATION:
+				# add_cultivation 返回 void——不检查返回值（Story §4 文本"返回 bool"是事实错误）
+				GameStateManager.add_cultivation(int(oc["value"]))
+			EventEnums.OutcomeType.ADD_CARD:
+				# ⚠️ 信号委托——Foundation 层不直接依赖 Core 层（ADR-0003 决策 6 / ADR-0007 Cat 2c）
+				card_reward_requested.emit(StringName(oc["target"]))
+			EventEnums.OutcomeType.REMOVE_CARD:
+				# oc["value"] 为 card_instance_id（int）；忽略返回值（未找到时 GSM 已 push_warning）
+				GameStateManager.remove_card_from_collection(int(oc["value"]))
+			EventEnums.OutcomeType.SET_FLAG:
+				set_flag(oc["target"], oc["value_str"])
+			EventEnums.OutcomeType.RESTORE_AP:
+				GameStateManager.restore_action_points(int(oc["value"]))
+			EventEnums.OutcomeType.GAIN_TALENT:
+				GameStateManager.unlock_talent(StringName(oc["target"]))
+			EventEnums.OutcomeType.ADVANCE_CHAPTER:
+				GameStateManager.advance_chapter(StringName(oc["target"]))
+			EventEnums.OutcomeType.TRIGGER_BATTLE:
+				pass  # 由探索系统检查 resolved_outcomes 后自行处理
+			EventEnums.OutcomeType.HEAL, EventEnums.OutcomeType.DAMAGE:
+				pass  # 战斗上下文中由战斗系统处理
+			EventEnums.OutcomeType.NOTHING:
+				pass  # 无效果——仅叙事文本
+			_:
+				push_warning("EventSystem: unhandled outcome type %d" % oc["type"])
+
+	# 结算完毕后发射——SaveLoad 监听以判定自动存档
+	event_resolved.emit(instance.template_id, instance.selected_option_index, instance.resolved_outcomes)

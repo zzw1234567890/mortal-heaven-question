@@ -1,5 +1,55 @@
 # 活跃会话状态
 
+## Session Extract — /story-done 2026-08-04 (Story 005 event-system)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/event-system/story-005-outcome-executor-add-card-delegation.md` — 结果执行器 + ADD_CARD 信号委托（Foundation 原则 #3 合规）
+- Code Review：code-review 技能并行 3 专家（godot-gdscript-specialist + godot-specialist + qa-tester）。
+  - Godot 架构 APPROVED WITH SUGGESTIONS——7 维度全 CLEAN/COMPLIANT（Foundation 原则 #3 / Autoload 顺序 / 三层 API 契约 / 信号分类 / GSM 域归属 / 生命周期 / get_chain_event 修复），3 MEDIUM（均已知债务）+ 4 LOW
+  - GDScript 代码质量 APPROVED WITH SUGGESTIONS——新增代码质量高，5 MEDIUM（测试隔离性 + 既有行数超标）+ 5 LOW
+  - QA 可测试性 TESTABLE——21/21 AC 全覆盖，2 HIGH（GSM 4 新方法独立单测 + instance_id 兼容路径）属 GSM 责任域 + 4 LOW 边缘情况
+  - 已修复 3 项 MEDIUM 测试隔离性：#1 test_card_reward_delegation `_reset_gsm_state` 补全 + #2 test_apply_outcomes validation_enabled 移入 after_each + #3 test_ac019 补 event_resolved 计数断言
+- QA Review：QL-TEST-COVERAGE ADEQUATE（复用 code-review 的 qa-tester 结果）——21 条 AC 全覆盖，Story 004 ADVISORY #1（选项不匹配残留）+ #3（chain_triggered 连通性）已由 AC-020/021 收尾
+- Changes：
+  - `src/foundation/game_state_manager.gd` — 新增 4 个第二层原子方法（remove_card_from_collection / restore_action_points / unlock_talent / advance_chapter）+ _emit_domain_signal 新增 exploration.action_points 路由
+  - `src/foundation/event_system/event_system.gd` — 新增 card_reward_requested 信号 + apply_outcomes()（12 OutcomeType 分发）+ 修复 get_chain_event 场景 d（选项不匹配清空 visited_ids）
+  - `tests/unit/event_system/test_apply_outcomes.gd` — 新建 27 测试（AC-001~018）+ 3 项 MEDIUM 修复
+  - `tests/integration/event_system/test_card_reward_delegation.gd` — 新建 3 测试（AC-015）+ _reset_gsm_state 补全
+  - `tests/integration/event_system/test_full_event_flow.gd` — 新建 4 测试（AC-019/020/021）+ event_resolved 计数断言
+  - `production/epics/event-system/story-005-outcome-executor-add-card-delegation.md` — Status: Complete + Completion Notes（13 ADVISORY）
+  - `production/sprints/sprint-1.md` — Story #23 标记 ✅ Done
+- 测试结果：520/521 通过（新增 34 测试：487→521），1 pending（migration_chain 既有，与本故事无关），1763 断言，零失败
+- Tech debt logged：None（13 项 ADVISORY 记录在 Completion Notes，其中 #8/#9 GSM 4 新方法独立单测 + instance_id 兼容路径属 GSM Epic 后续，#4/#5/#6 文件行数超标 + #7 ADR-0003 visited_ids 生命周期为后续技术债务）
+- Next recommended：**Sprint 1 全部 23 个 Story 完成**——进入冲刺关闭流程：`/smoke-check sprint` → `/team-qa sprint` → `/retrospective` → `/gate-check`
+
+<!-- STATUS -->
+Epic: event-system
+Feature: Sprint 1 - Foundation 层
+Task: Story 005 已完成——Sprint 1 全部 23 Story 完成，进入冲刺关闭流程
+<!-- /STATUS -->
+
+## Session Extract — /story-done 2026-08-04 (Story 004 event-system)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/event-system/story-004-chain-events-depth-cycle-detection.md` — 连锁事件 MAX_CHAIN_DEPTH=3 + visited_ids 循环检测
+- Code Review：LP-CODE-REVIEW APPROVED WITH CONCERNS（7 ADVISORY，均不阻塞）+ QL-TEST-COVERAGE ADEQUATE（1 ADVISORY）。已修复 2 项：#2 AC-011 标签错配（depth.gd `test_ac011a` → `test_ac011b`）+ #6 测试命名缺下划线（cycle.gd L286 `testcheck_` → `test_check_`）。其余 6 项保留为 ADVISORY。
+- QA Review：QL-TEST-COVERAGE ADEQUATE——35 测试函数实质覆盖 AC-001~011 核心逻辑。AC-009 `chain_triggered` 信号连通性测试缺失（ADVISORY，建议 Story 005 补）；AC-010(a)(b) 为调用方契约，AC 自身界定归属 Story 005 集成测试。
+- Changes：
+  - `src/foundation/event_system/event_system.gd` — 新增 MAX_CHAIN_DEPTH 常量 + _chain_visited_ids 成员 + get_chain_event() + check_chain_cycle()（方案A 混合信号归属）
+  - `tests/unit/event_system/test_chain_event_depth.gd` — 15 测试（AC-001/002/003/007/008/011b/c + 边界）+ #2 标签修复
+  - `tests/unit/event_system/test_chain_event_cycle.gd` — 13 测试（AC-004/010c/011a/011b + 拋留防护）+ #6 命名修复
+  - `tests/unit/event_system/test_chain_event_option_filter.gd` — 7 测试（AC-005/006 + 正向）
+  - `production/epics/event-system/story-004-chain-events-depth-cycle-detection.md` — Status: Complete + Completion Notes（8 ADVISORY）
+  - `production/sprints/sprint-1.md` — Story #22 标记 ✅ Done
+  - **目录合并**：`src/event_system/` → `src/foundation/event_system/`（6 .gd + 6 .uid，git mv 保留历史）+ 10 测试文件 preload 路径 + 3 数据类内联注释 + Story 001/002 文档路径 + active.md 历史摘录路径；删除过时 `.godot/global_script_class_cache.cfg` 后重扫
+- 测试结果：486/487 通过（新增 35 测试：452→487），1 pending（migration_chain 既有，与本故事无关），1685 断言，零失败
+- Tech debt logged：None（8 项 ADVISORY 记录在 Completion Notes，其中 #1 选项不匹配残留风险须在 Story 005 集成测试 AC 中明确覆盖，#4 event_system.gd 497 行超标 + #5 check_chain_cycle 命名待后续 ADR 同步为后续技术债务）
+- Next recommended：`production/epics/event-system/story-005-outcome-executor-add-card-delegation.md`（结果执行器 + ADD_CARD 信号委托，Integration，4h）——Event System Epic 最后一个 Story
+
+<!-- STATUS -->
+Epic: event-system
+Feature: Sprint 1 - Foundation 层
+Task: Story 004 已完成——下一个 Story 005 结果执行器 + ADD_CARD 信号委托
+<!-- /STATUS -->
+
 ## 会话摘录——/dev-story 2026-08-03
 - 故事：`production/epics/event-system/story-004-chain-events-depth-cycle-detection.md` — 连锁事件 MAX_CHAIN_DEPTH=3 + visited_ids 循环检测
 - 更改的文件：

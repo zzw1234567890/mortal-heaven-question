@@ -415,6 +415,95 @@ func set_narrative_flag(flag: StringName, value: Variant) -> void:
 	narrative.story_flags[flag] = value
 	_buffer_change("narrative.story_flags.%s" % flag, old, value)
 
+
+## 移除卡牌实例——按 card_instance_id 查找并从 collection.owned_cards 移除。[br]
+## [br][b]校验跳过模式[/b]：若 [member validation_enabled] 为 false，拒绝写入并返回 false。[br]
+## [br]兼容 [code]card_instance_id[/code]（ADR-0006 权威字段）与 [code]instance_id[/code] 两种字段命名。[br]
+## [br][param card_instance_id] 卡牌实例 ID。[br]
+## [br][b]返回[/b]: [code]true[/code] 成功移除，[code]false[/code] 未找到或校验未开启。[br]
+## [br][b]示例[/b]: [code]var ok := GameStateManager.remove_card_from_collection(42)[/code]
+func remove_card_from_collection(card_instance_id: int) -> bool:
+	if not validation_enabled:
+		push_warning("GSM.remove_card_from_collection: 校验未开启——请先调用 GSM.enable_validation()")
+		return false
+
+	var cards: Array = collection.owned_cards
+	var idx_to_remove: int = -1
+	for i: int in range(cards.size()):
+		var inst: Dictionary = cards[i]
+		# 兼容 card_instance_id（ADR-0006 权威）与 instance_id 两种字段命名
+		var stored_id: Variant = inst.get("card_instance_id", inst.get("instance_id", -1))
+		if stored_id == card_instance_id:
+			idx_to_remove = i
+			break
+
+	if idx_to_remove == -1:
+		push_warning("GSM.remove_card_from_collection: 未找到 card_instance_id=%d" % card_instance_id)
+		return false
+
+	var old_cards: Array = collection.owned_cards.duplicate()
+	var old_count: int = collection.total_count
+
+	cards.remove_at(idx_to_remove)
+	collection.total_count = cards.size()
+
+	_buffer_change("collection.owned_cards", old_cards, collection.owned_cards)
+	_buffer_change("collection.total_count", old_count, collection.total_count)
+
+	card_collection_changed.emit(card_instance_id, &"removed")
+	return true
+
+
+## 恢复行动力——写入 exploration.action_points。[br]
+## [br]行动力属探索系统（ADR-0014），AP 上限由 ExplorationSystem 管理——本方法不 clamp。[br]
+## [br][param amount] 恢复量（必须为正值）。[br]
+## [br][b]示例[/b]: [code]GameStateManager.restore_action_points(2)[/code]
+func restore_action_points(amount: int) -> void:
+	if amount <= 0:
+		push_error("GSM.restore_action_points: amount 必须为正值（收到: %d）" % amount)
+		return
+
+	var old_val: int = exploration.action_points
+	exploration.action_points = old_val + amount
+	_buffer_change("exploration.action_points", old_val, exploration.action_points)
+
+
+## 解锁天赋——写入 player.talents（去重 append）。[br]
+## [br][param talent_id] 天赋 ID。[br]
+## [br][b]示例[/b]: [code]GameStateManager.unlock_talent(&"talent_003")[/code]
+func unlock_talent(talent_id: StringName) -> void:
+	var talents: Array = player.talents
+	if talents.has(talent_id):
+		return  # 已拥有——去重
+
+	var old_talents: Array = talents.duplicate()
+	talents.append(talent_id)
+	_buffer_change("player.talents", old_talents, talents)
+
+
+## 推进章节——写入 narrative.current_chapter + completed_chapters。[br]
+## [br]若 [code]narrative.current_chapter[/code] 非空且与新章节不同，将旧章节 append 到 [code]completed_chapters[/code]。[br]
+## [br][param chapter_id] 新章节 ID。[br]
+## [br][b]示例[/b]: [code]GameStateManager.advance_chapter(&"chapter_2")[/code]
+func advance_chapter(chapter_id: StringName) -> void:
+	var chapter_str: String = str(chapter_id)
+	if chapter_str.is_empty():
+		push_warning("GSM.advance_chapter: chapter_id 为空，拒绝写入")
+		return
+
+	var old_current: String = narrative.current_chapter
+	if old_current == chapter_str:
+		return  # 相同章节——去重
+
+	var old_completed: Array = narrative.completed_chapters.duplicate()
+	if not old_current.is_empty():
+		narrative.completed_chapters.append(old_current)
+
+	narrative.current_chapter = chapter_str
+	_buffer_change("narrative.current_chapter", old_current, chapter_str)
+	_buffer_change("narrative.completed_chapters", old_completed, narrative.completed_chapters)
+
+
 ## === 第三层：信号订阅 API ====================================================
 
 ## 有效信号名列表——subscribe/unsubscribe 的白名单。
@@ -618,6 +707,9 @@ func _emit_domain_signal(path: String, data: Dictionary) -> void:
 	elif path.begins_with("player.resources."):
 		var res_type: StringName = StringName(path.get_slice(".", 2))
 		resource_changed.emit(res_type, delta, new_val)
+	elif path == "exploration.action_points":
+		# max_val=0：AP 上限由 ExplorationSystem 管理（ADR-0014），GSM 不跟踪
+		action_points_changed.emit(delta, new_val, 0)
 
 ## 通过 "." 分隔路径写入嵌套字典中的值（无声，不发射信号）。
 func _set_by_path(path: String, value: Variant) -> bool:
