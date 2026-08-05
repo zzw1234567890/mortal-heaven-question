@@ -3,8 +3,8 @@
 > **Layer**: Core
 > **GDD**: design/gdd/realm-system.md
 > **Architecture Module**: 静态数据表 + 查询接口 — Autoload #11
-> **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories realm-system`
+> **Status**: In Progress
+> **Stories**: 3 stories created — see table below
 
 ## Overview
 
@@ -35,4 +35,12 @@ This epic is complete when:
 
 ## Next Step
 
-Run `/create-stories realm-system` to break this epic into implementable stories.
+All 3 stories created. Run `/story-readiness production/epics/realm-system/story-001-realm-system-autoload-realm-table-query.md` to verify, then `/dev-story` to implement.
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | RealmSystem Autoload + realm_table 数据表 + 查询接口 | Logic | Ready | ADR-0010 |
+| 002 | 境界压制计算 + 地图境界压制 + 稀有度权重 | Logic | Ready | ADR-0010 |
+| 003 | realm_up() 突破编排 + realm_upgraded 信号 + GSM 集成 | Integration | Ready | ADR-0010 |

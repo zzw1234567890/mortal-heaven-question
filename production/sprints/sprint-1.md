@@ -2,8 +2,8 @@
 
 > **Sprint**: 1
 > **Start Date**: 2026-07-27
-> **End Date**: 2026-08-10（2 周时间盒）
-> **Status**: Planned
+> **End Date**: 2026-08-05（实际完成，原计划 2026-08-10）
+> **Status**: Done
 > **Focus**: Foundation 层全部 5 个系统——游戏运行的根基
 
 ## Sprint Goal

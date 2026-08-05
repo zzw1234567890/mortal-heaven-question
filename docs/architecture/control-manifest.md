@@ -1,8 +1,8 @@
 # 控制清单 (Control Manifest)
 
 > **引擎**: Godot 4.6
-> **最后更新**: 2026-07-26
-> **清单版本**: 2026-07-26
+> **最后更新**: 2026-08-05
+> **清单版本**: 2026-08-05
 > **覆盖的 ADR**: ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013, ADR-0014, ADR-0015, ADR-0016, ADR-0017, ADR-0018, ADR-0019, ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024, ADR-0025, ADR-0026, ADR-0027, ADR-0028, ADR-0029, ADR-0030
 > **状态**: 活跃 —— 当 ADR 变更时通过 `/create-control-manifest` 重新生成
 
@@ -44,6 +44,8 @@
 - **信号命名：snake_case 过去式**（pre/post 配对除外） —— 来源: ADR-0007
 - **信号载荷：≤3 参数优先；>3 → 具名字典；展平路径字典仅限 GSM `batch_updated`** —— 来源: ADR-0007
 - **信号声明在语义归属系统——禁止 SignalBus Autoload** —— 来源: ADR-0007
+- **Foundation Autoload 测试用 `ES_SCRIPT.new()` + `var es: Node` 动态分派模式** —— 不调用 `_ready()`，不加载模板；同 GSM/InputManager 既有模式 —— 来源: Sprint 1 回顾行动项 #5
+- **动态分派返回值必须显式类型注解** —— `var x: Type = es.method()` 而非 `var x := es.method()`（`es: Node` 动态分派时 `:=` 无法推断返回类型，触发"Cannot infer the type"解析错误） —— 来源: Sprint 1 回顾行动项 #5
 
 ### 禁止方法 (Forbidden Approaches)
 
@@ -63,6 +65,7 @@
 - **绝不让业务系统直接连接 Godot 内置信号 (Cat 3)** —— 仅基础设施系统连接 —— 来源: ADR-0007
 - **绝不声明 `pre_` 信号而无配对的 `post_` 信号** —— 来源: ADR-0007
 - **绝不使用 `Callable.bind()` 而不在 `_exit_tree()` 中手动 `disconnect()`** —— 捕获的对象引用造成内存泄漏 —— 来源: ADR-0007
+- **Foundation Autoload 绝不声明 `class_name`** —— 与全局单例名冲突，导致 `ES_SCRIPT.new()` 创建的测试实例解析为 Nil（Story 004 曾因此导致 402/486 测试失败后回退） —— 来源: Sprint 1 回顾行动项 #5, Godot 4.6 固有权衡
 
 ### 性能护栏 (Performance Guardrails)
 

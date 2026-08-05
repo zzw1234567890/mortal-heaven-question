@@ -3,8 +3,8 @@
 > **Layer**: Core
 > **GDD**: design/gdd/resource-system.md
 > **Architecture Module**: 经济引擎 — Autoload #16
-> **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories resource-system`
+> **Status**: In Progress
+> **Stories**: 2 stories created — see table below
 
 ## Overview
 
@@ -26,4 +26,11 @@ This epic is complete when:
 
 ## Next Step
 
-Run `/create-stories resource-system` to break this epic into implementable stories.
+All 2 stories created. Run `/story-readiness production/epics/resource-system/story-001-resource-system-autoload-read-write-api.md` to verify, then `/dev-story` to implement.
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | ResourceSystem Autoload + LingCaiQuality 枚举 + GSM 第二层扩展 + 读写 API | Integration | Ready | ADR-0019 |
+| 002 | 资源公式纯函数（拆解/出售/删卡/境界惩罚/天赋加成） | Logic | Ready | ADR-0019 |

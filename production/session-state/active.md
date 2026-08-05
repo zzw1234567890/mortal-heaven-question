@@ -1,5 +1,37 @@
 # 活跃会话状态
 
+<!-- QA-PLAN：2026-08-05 | System：sprint-2 | Plan written：production/qa/qa-plan-sprint-2-2026-08-05.md -->
+
+## Session Extract — /qa-plan sprint 2026-08-05
+
+- **范围**: Sprint 2 — 12 个 Core 层编码 Story + 1 拆分 + 1 Autoload 验证
+- **产出**: `production/qa/qa-plan-sprint-2-2026-08-05.md`
+- **分类**: 6 Logic + 6 Integration + 1 Refactor + 1 Task
+- **测试预估**: ~169 测试函数，179 AC 全覆盖
+- **GDD 公式引用**: card-system（dismantle_value）/ realm-system（realm_penalty, DROP_POOL_WEIGHTS, max_cultivation）/ resource-system（7 公式 + 21 AC）/ faction-system（标签结构, alignment_relation）
+- **Story 测试用例校验**: 12 个 Story 文件 `## QA Test Cases` 章节均完整，AC 与测试用例一一对应，无需回填
+- **手动 QA**: project.godot Autoload 顺序验证（lead-programmer 签收）
+- **试玩要求**: 无（Core 层无面向玩家 UI）
+- **下一步**: Sprint 2 实现开始——`/story-readiness` 验证首个 Story，然后 `/dev-story`
+
+## Session Extract — /create-stories Core 层 4 Epic (2026-08-05)
+
+- **范围**: Sprint 2 Core 层 Story 创建——card-system / realm-system / resource-system / faction-system 4 个 Epic
+- **产出**: 12 个 Story 文件全部写入
+  - card-system: 5 stories（模板/实例/注册表/工厂GSM集成/序列化）—— TR-card-001/002
+  - realm-system: 3 stories（数据表+查询/压制+权重/realm_up编排）—— TR-realm-001/002/003
+  - resource-system: 2 stories（Autoload+读写API/6公式纯函数）—— TR-resource-001/002 待注册
+  - faction-system: 2 stories（标签库+查询/场上统计+判定）—— TR-faction-001/002 待注册
+- **关键设计点**:
+  - ADR-0019 §验证标准 + GDD §验收标准已通过 qa-lead 审查（ADR Accepted 时），测试用例直接引用，无需再启动 QL-STORY-READY gate
+  - 跨 Epic GSM 第二层扩展模式：card-system Story 004（4 方法）+ resource-system Story 001（2 方法 _set_resource_ling_shi/_set_resource_ling_cai）
+  - 跨 Epic 依赖：faction-system Story 002 依赖 card-system（get_field_characters + get_template_by_instance_id）—— Sprint 排序 card-system 优先
+  - Foundation 原则 #3 合规：CardSystem 主动调用 GSM.enable_validation（Core→Foundation 方向正确）
+  - 控制清单 2026-08-05 规则应用：所有 Core Autoload 不声明 class_name + 动态分派测试模式
+  - TR-ID 待注册：resource/faction 当前无 tr-registry.yaml 条目，不阻塞实现
+- **变更文件**: 12 Story 文件 + 4 EPIC.md + epics/index.md
+- **下一步**: 返回 `/sprint-plan new`——12 个 Core 层 Story 全部就绪，可规划 Sprint 2
+
 ## Session Extract — /story-done 2026-08-04 (Story 005 event-system)
 - Verdict：✅ COMPLETE WITH NOTES
 - Story：`production/epics/event-system/story-005-outcome-executor-add-card-delegation.md` — 结果执行器 + ADD_CARD 信号委托（Foundation 原则 #3 合规）
@@ -21,10 +53,12 @@
 - Tech debt logged：None（13 项 ADVISORY 记录在 Completion Notes，其中 #8/#9 GSM 4 新方法独立单测 + instance_id 兼容路径属 GSM Epic 后续，#4/#5/#6 文件行数超标 + #7 ADR-0003 visited_ids 生命周期为后续技术债务）
 - Next recommended：**Sprint 1 全部 23 个 Story 完成**——进入冲刺关闭流程：`/smoke-check sprint` → `/team-qa sprint` → `/retrospective` → `/gate-check`
 
+<!-- QA RUN: 2026-08-04 | Sprint: sprint-1 | Verdict: APPROVED | Report: production/qa/qa-signoff-sprint-1-2026-08-04.md -->
+
 <!-- STATUS -->
 Epic: event-system
 Feature: Sprint 1 - Foundation 层
-Task: Story 005 已完成——Sprint 1 全部 23 Story 完成，进入冲刺关闭流程
+Task: Sprint 1 QA 签收完成(APPROVED)——下一步 /retrospective 然后 /gate-check
 <!-- /STATUS -->
 
 ## Session Extract — /story-done 2026-08-04 (Story 004 event-system)

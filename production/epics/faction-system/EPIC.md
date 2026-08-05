@@ -3,8 +3,8 @@
 > **Layer**: Core
 > **GDD**: design/gdd/faction-system.md
 > **Architecture Module**: 静态数据表 + 查询接口 — Autoload #15
-> **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories faction-system`
+> **Status**: In Progress
+> **Stories**: 2 stories created — see table below
 
 ## Overview
 
@@ -26,4 +26,11 @@ This epic is complete when:
 
 ## Next Step
 
-Run `/create-stories faction-system` to break this epic into implementable stories.
+All 2 stories created. Run `/story-readiness production/epics/faction-system/story-001-faction-system-autoload-library-query-api.md` to verify, then `/dev-story` to implement.
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | FactionSystem Autoload + const FACTION_LIBRARY 标签库 + 标签查询 API | Logic | Ready | ADR-0018 |
+| 002 | 场上阵营实时统计 + 阵法条件判定 + 阵营关系判定 | Integration | Ready | ADR-0018 |

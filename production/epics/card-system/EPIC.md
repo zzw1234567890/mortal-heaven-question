@@ -3,8 +3,8 @@
 > **Layer**: Core
 > **GDD**: design/gdd/card-system.md
 > **Architecture Module**: 数据基础设施 — Autoload #6
-> **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories card-system`
+> **Status**: In Progress
+> **Stories**: 5 stories created — see table below
 
 ## Overview
 
@@ -33,4 +33,14 @@ This epic is complete when:
 
 ## Next Step
 
-Run `/create-stories card-system` to break this epic into implementable stories.
+All 5 stories created. Run `/story-readiness production/epics/card-system/story-001-card-template-resource-and-enums.md` to verify, then `/dev-story` to implement.
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | CardTemplate Resource + 枚举定义 | Logic | Ready | ADR-0006 |
+| 002 | CardInstance RefCounted 实例模型 | Logic | Ready | ADR-0006 |
+| 003 | CardSystem 模板注册表 + 异步加载 | Integration | Ready | ADR-0006 |
+| 004 | CardSystem 实例工厂 + GSM 集成 | Integration | Ready | ADR-0006 |
+| 005 | 实例序列化/反序列化 + reconstitute | Integration | Ready | ADR-0006 |
