@@ -6,7 +6,7 @@
 > **Type**: Integration（需集成测试）
 > **Estimate**: 3.5h
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-05
+> **Last Updated**: 2026-08-07
 
 ## Context
 
@@ -52,7 +52,10 @@
 - [ ] **AC-016**: GSM 第二层新增 `_set_resource_ling_shi(value: int) -> void` 原子写入方法（跨 Epic 修改，已批准——见下方 §跨 Epic 修改声明）
 - [ ] **AC-017**: GSM 第二层新增 `_set_resource_ling_cai(quality: int, value: int) -> void` 原子写入方法（跨 Epic 修改，已批准）
 - [ ] **AC-018**: `_set_resource_ling_shi` 内部 `max(0, value)` 非负守卫——即便绕过 ResourceSystem 也防止负数
-- [ ] **AC-019**: ResourceSystem 不直接发射 `resource_changed` 信号——资源变更是数据变更，属 GSM Cat 1 职责（ADR-0007 禁止模式 #11）
+- [ ] **AC-018b**: `_set_resource_ling_cai` 内部 `max(0, value)` 非负守卫——ling_cai 各品质同样防止负数（AC-018 对称覆盖）
+- [ ] **AC-019**: ResourceSystem 不发射自有 `resource_changed` 信号——`resource_changed` 是 GSM Cat 1 域信号（ADR-0001），由 GSM `_emit_domain_signal` 在帧末统一发射，ResourceSystem 仅通过 GSM 第二层方法间接触发它（ADR-0007 §决策矩阵"数据变更→Cat 1 GSM 信号"，ADR-0019 §信号传播路径）
+- [ ] **AC-020**: `spend_resource(&"ling_shi", 30)` 成功后，GSM 的 `resource_changed` Cat 1 域信号被触发，载荷 `(type=&"ling_shi", delta=-30, balance=20)`——正向覆盖 GDD AC-20
+- [ ] **AC-021**: `add_resource`/`spend_resource` 的 `amount < 0` → 返回 false 且不修改 GSM 状态（防 spend(-10) 变相增加资源——非负 amount 守卫）
 
 ### 跨 Epic 修改声明（AC-016/017）
 
@@ -80,9 +83,12 @@
    ```gdscript
    enum LingCaiQuality { LOW = 1, MEDIUM = 2, HIGH = 3, TOP = 4 }
    ```
-4. **add_resource 实现**（ADR-0019 §关键接口）:
+4. **add_resource 实现**（ADR-0019 §关键接口 + AC-021 非负 amount 守卫）:
    ```gdscript
    func add_resource(type: StringName, amount: int, quality: int = -1) -> bool:
+       if amount < 0:
+           push_error("ResourceSystem.add_resource: amount 不能为负数（%d）" % amount)
+           return false
        match type:
            &"ling_shi":
                var new_val: int = GSM.player.resources.ling_shi + amount
@@ -97,9 +103,12 @@
                return true
        return false
    ```
-5. **spend_resource 实现**（ADR-0019 §关键接口）:
+5. **spend_resource 实现**（ADR-0019 §关键接口 + AC-021 非负 amount 守卫）:
    ```gdscript
    func spend_resource(type: StringName, amount: int, quality: int = -1) -> bool:
+       if amount < 0:
+           push_error("ResourceSystem.spend_resource: amount 不能为负数（%d）" % amount)
+           return false
        if not can_spend(type, amount, quality):
            return false
        match type:
@@ -292,11 +301,29 @@
   - Then: `assert_eq(GSM.player.resources.ling_shi, 0)`（max(0, -50) = 0，非负守卫生效）
   - Edge cases: ADR-0019 §风险——即便绕过 ResourceSystem，GSM 层面防止负数
 
-- **AC-019**: ResourceSystem 不发射 resource_changed 信号
+- **AC-018b**: _set_resource_ling_cai 非负守卫（AC-018 对称覆盖）
+  - Given: GSM Autoload 已注册
+  - When: `GSM._set_resource_ling_cai(1, -50)`（尝试写入负数灵材）
+  - Then: `assert_eq(GSM.player.resources.ling_cai.low, 0)`（max(0, -50) = 0，非负守卫生效）
+  - Edge cases: quality=2/3/4 同处理
+
+- **AC-019**: ResourceSystem 不发射自有 resource_changed 信号
   - Given: ResourceSystem 脚本已加载
   - When: 读取 `rs.get_signal_list()`
-  - Then: 无 `resource_changed` 信号——资源变更通过 GSM Cat 1 batch_updated 传播（ADR-0007 禁止模式 #11）
+  - Then: 无 `resource_changed` 信号——该信号是 GSM Cat 1 域信号（ADR-0001），由 GSM `_emit_domain_signal` 帧末统一发射；ResourceSystem 仅通过 GSM 第二层方法间接触发它
   - Edge cases: 代码审查检查点——grep `signal` 在 resource_system.gd 中无数据变更信号
+
+- **AC-020**: GSM resource_changed 域信号正向触发
+  - Given: rs 已创建；GSM.player.resources.ling_shi = 50；连接 GSM.realm_changed... `var received := []`；`GameStateManager.resource_changed.connect(func(t, d, b): received.append([t, d, b]))`
+  - When: `rs.spend_resource(&"ling_shi", 30)`；`await get_tree().process_frame`（帧末 _emit_domain_signal 发射）
+  - Then: `assert_eq(received.size(), 1)`；`assert_eq(received[0][0], &"ling_shi")`；`assert_eq(received[0][1], -30)`；`assert_eq(received[0][2], 20)`——正向覆盖 GDD AC-20
+  - Edge cases: GDD AC-21 灵材变体同触发
+
+- **AC-021**: 负数 amount 拒绝
+  - Given: rs 已创建；GSM.player.resources.ling_shi = 50
+  - When: `rs.spend_resource(&"ling_shi", -10)`（尝试负数消费）
+  - Then: `assert_false(ok)`；`assert_eq(GSM.player.resources.ling_shi, 50)`（未变——防变相增加资源）
+  - Edge cases: `add_resource(&"ling_shi", -25)` 同返回 false 不修改；amount=0 允许（无操作返回 true）
 
 ---
 

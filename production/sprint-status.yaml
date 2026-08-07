@@ -14,7 +14,7 @@ goal: "完成 Core 层 4 系统 + 拆分 event_system.gd 技术债"
 start: "2026-08-06"
 end: "2026-08-19"
 generated: "2026-08-05"
-updated: "2026-08-05"
+updated: "2026-08-06"
 
 stories:
   # === card-system 关键路径 ===
@@ -22,82 +22,82 @@ stories:
     name: "CardTemplate + enums"
     file: "production/epics/card-system/story-001-card-template-resource-and-enums.md"
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.375
     blocker: ""
-    completed: ""
+    completed: "2026-08-05"
 
   - id: "2-2"
     name: "CardInstance RefCounted"
     file: "production/epics/card-system/story-002-card-instance-refcounted-model.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.3125
     blocker: ""
-    completed: ""
+    completed: "2026-08-06"
 
   - id: "2-3"
     name: "CardSystem Autoload + 注册表异步加载"
     file: "production/epics/card-system/story-003-card-system-template-registry-async-loading.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-08-06"
 
   - id: "2-4"
     name: "工厂 + GSM 集成"
     file: "production/epics/card-system/story-004-card-system-factory-gsm-integration.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.4375
     blocker: ""
-    completed: ""
+    completed: "2026-08-06"
 
   - id: "2-5"
     name: "实例序列化/重组"
     file: "production/epics/card-system/story-005-instance-serialization-reconstitution.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.375
     blocker: ""
-    completed: ""
+    completed: "2026-08-06"
 
   # === realm-system ===
   - id: "2-6"
     name: "realm_table + 查询接口"
     file: "production/epics/realm-system/story-001-realm-system-autoload-realm-table-query.md"
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.3125
     blocker: ""
-    completed: ""
+    completed: "2026-08-06"
 
   - id: "2-7"
     name: "压制计算 + 稀有度权重"
     file: "production/epics/realm-system/story-002-realm-penalty-map-suppression-rarity-weights.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.375
     blocker: ""
-    completed: ""
+    completed: "2026-08-06"
 
   - id: "2-8"
     name: "realm_up 编排 + 信号"
     file: "production/epics/realm-system/story-003-realm-up-orchestration-signal-gsm-integration.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.375
     blocker: ""
-    completed: ""
+    completed: "2026-08-06"
 
   # === resource-system ===
   - id: "2-9"

@@ -1,7 +1,7 @@
 # Story 002: 境界压制计算 + 地图境界压制 + 稀有度权重
 
 > **Epic**: realm-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic（需 GUT 单元测试）
 > **Estimate**: 3h
@@ -197,7 +197,21 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/realm_system/test_realm_calculation.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（23 测试，215 断言）
+
+---
+
+## Completion Notes
+
+**Completed**：2026-08-06
+**Criteria**：13/13 通过
+
+**Deviations**（全部 ADVISORY，已修复）：
+- **MEDIUM-1** get_rarity_weights 返回 const 内部引用——已修复。改为 `.duplicate()` 副本，消费者修改返回值不影响全局 DROP_POOL_WEIGHTS
+- **LOW-1** const 不可变性测试——已修复。补 test_ac009_get_rarity_weights_returns_copy_not_reference 验证副本语义
+
+**Test Evidence**：Logic — `tests/unit/realm_system/test_realm_calculation.gd`（23 测试，215 断言）
+**Code Review**：GDScript 专家 APPROVED + qa-tester PASS（MEDIUM-1 已修复）
 
 ---
 

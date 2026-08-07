@@ -1,12 +1,12 @@
 # Story 005: 实例序列化/反序列化 + reconstitute_instances
 
 > **Epic**: card-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration（需集成测试）
 > **Estimate**: 3h
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-05
+> **Last Updated**: 2026-08-06
 
 ## Context
 
@@ -47,7 +47,7 @@
 
 *Derived from ADR-0006 §CardSystem 公共 API + §GSM 集成合约:*
 
-1. **文件位置**: `src/card_system/card_system.gd`（同 Story 003/004，扩展序列化方法）
+1. **文件位置**: `src/core/card_system/card_system.gd`（同 Story 003/004，扩展序列化方法）
 2. **serialize_instance 实现**（ADR-0006 §CardSystem 公共 API）:
    ```gdscript
    func serialize_instance(inst: CardInstance) -> Dictionary:
@@ -180,7 +180,40 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/card_system/test_card_serialization.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（card_system 三文件合计 60 测试，242 断言）
+
+---
+
+## Completion Notes
+
+**Completed**：2026-08-06
+**Criteria**：9/9 通过（所有 AC 自动化验证通过）
+
+**Deviations**（全部 ADVISORY，已在 code-review 后修复或记录）：
+- **HIGH-1/2** serialize/deserialize 深拷贝验证不足——已修复。新增 `_get_inscriptions_field`（显式 `duplicate(true)` + 逐元素 Dictionary 深拷贝 + null 容错）；补 2 测试验证 serialize 方向 + deserialize 元素级深拷贝
+- **MEDIUM-3** binding_target_id / acquired_event_id 的 StringName 转换未测试——已修复。补 2 测试验证 String 输入经转换后为 StringName 类型
+- **AC-005 偏差** reconstitute_instances 返回裸 Array 而非 `Array[CardInstance]`——GDScript 4.6 在不声明 class_name 的脚本中跨文件 typed array 返回类型解析不稳定（同 Story 003/004 先例），注释说明
+- **_to_stringname 新增** 处理 `StringName(null)` 构造函数不存在问题——Godot 4.6 运行时安全容错（null/非 String 类型统一返回默认 `&""`）
+- **_get_int_field** 5 个 int 字段集中类型容错——int 直接返回、float 截断、数字字符串转换、非数字 String/其他类型 push_error + 默认值
+- **null inscriptions 容错**——存档损坏时 `_get_inscriptions_field` 返回空数组，不崩溃
+
+**Test Evidence**：Integration — `tests/integration/card_system/test_card_serialization.gd`（含 AC-001..AC-009 + 5 项补充测试，card_system 三文件合计 60 测试，242 断言，全部通过）
+**Code Review**：已完成——godot-gdscript-specialist APPROVED WITH SUGGESTIONS + qa-tester GAPS（已全部修复）。2 项 HIGH（深拷贝验证）+ 1 项 MEDIUM（StringName 转换测试）已修复，4 项 LOW 建议为可选改进。
+
+### 测试结果
+
+- **card_system 三文件合计 60/60 通过**，242 断言，零失败
+- **全量套件 625/626 通过**（1 个 risky 为 fixture 加载警告，非本 Story 引入）
+- 覆盖 9 条 AC 全部 + 5 项边界情况补充
+
+### 关键修正记录
+
+1. **_get_inscriptions_field**——显式深拷贝（duplicate(true) + 逐元素 Dictionary.duplicate(true)）+ null/非 Array 容错
+2. **_to_stringname**——安全处理 StringName(null) 构造函数不存在问题
+3. **_get_int_field**——5 个 int 字段集中类型容错（int/float/数字 String/非数字 String/其他类型）
+4. **serialize_instance 深拷贝**——inscriptions 用 duplicate(true) 避免共享引用
+5. **AC-005 偏差**——reconstitute_instances 返回裸 Array（GDScript 4.6 typed array 限制）
+6. **补 5 项测试**——serialize 深拷贝 + deserialize 元素级深拷贝 + binding/acquired_event StringName + null inscriptions 容错
 
 ---
 

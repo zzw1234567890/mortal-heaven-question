@@ -313,3 +313,13 @@ requirements:
     created: 2026-07-25
     status: active
     covered_by: ADR-0014
+
+  # === Resource Layer ===
+
+  - id: TR-resource-001
+    system: resource
+    gdd: design/gdd/resource-system.md
+    requirement: "资源读写 API——灵石/灵材（低/中/高/顶四级品质）的类型安全 add/spend/can_spend/get 方法，数据存储在 GSM player.resources 域，资源变更通过 GSM Cat 1 batch_updated 传播"
+    created: 2026-08-07
+    status: active
+    covered_by: ADR-0019

@@ -120,6 +120,11 @@ var validation_enabled: bool = false
 ## 卡牌模板数据库——enable_validation() 时注入，用于 add_card_to_collection() 引用完整性校验。
 var _card_template_database: Dictionary = {}
 
+## 卡牌实例 ID 分配计数器——单调递增，由 [method allocate_card_id] 推进。[br]
+## 初始为 1（0 保留为"未分配"哨兵值，见 CardInstance.card_instance_id 默认值）。[br]
+## 来源: ADR-0006 §GSM 集成合约——GSM 作为全局唯一 ID 分配者（跨系统单调递增）。
+var _next_card_instance_id: int = 1
+
 ## === 第一层：数据域（直接属性读取，O(1) ======================================
 
 ## 运行元数据：局ID、随机种子、时间戳。
@@ -281,6 +286,21 @@ func set_identity(identity_id: StringName) -> void:
 	if not _set_by_path("player.identity_id", id_str):
 		push_error("GSM.set_identity: 写入失败")
 
+## 原子写入境界等级——仅 RealmSystem.realm_up() 调用。[br]
+## [br][param new_level] 新境界等级（1-5）。[br]
+## [br][b]Cat 1 信号[/b]：写入后发射 [signal realm_changed]，携带 old/new int 载荷。[br]
+## [br][b]校验跳过模式[/b]：本方法不受 [member validation_enabled] 影响——境界写入与卡牌校验独立。[br]
+## [br]来源: ADR-0001 §三层 API + ADR-0010 §GSM 集成合约。
+func change_realm(new_level: int) -> void:
+	var old_realm: int = player.realm
+	if old_realm == new_level:
+		return  # 值无变化，去重
+	player.realm = new_level
+	_buffer_change("player.realm", old_realm, new_level)
+	# realm_changed 由帧末 _emit_domain_signal 统一发射——与 reincarnation_reset/add_cultivation 等
+	# 所有第二层方法一致，避免单帧重复发射（Cat 1 信号契约一致性）
+
+
 ## 死亡/轮回结算——仅 CombatSystem/StorySystem 调用。
 func reincarnation_reset() -> void:
 	# 修为归零
@@ -316,6 +336,17 @@ func reincarnation_reset() -> void:
 	player.max_cultivation = BASE_MAX
 	_buffer_change("player.max_cultivation", old_max, BASE_MAX)
 
+## 分配全局唯一的卡牌实例 ID——单调递增。[br]
+## [br]由 CardSystem.create_instance() 调用，确保每张卡牌实例拥有全局唯一 ID。[br]
+## [br][b]返回[/b]: 下一个未使用的卡牌实例 ID（从 1 开始，0 保留为"未分配"哨兵）。[br]
+## [br][b]示例[/b]: [code]var inst_id: int = GameStateManager.allocate_card_id()[/code][br]
+## [br]来源: ADR-0006 §GSM 集成合约——GSM 是卡牌实例 ID 的全局唯一分配者。
+func allocate_card_id() -> int:
+	var allocated: int = _next_card_instance_id
+	_next_card_instance_id += 1
+	return allocated
+
+
 ## 添加卡牌到收藏——仅 CardSystem 调用。
 ## [br][b]校验跳过模式[/b]：若 [member validation_enabled] 为 false，拒绝写入并返回 false。
 ## [br][b]校验开启后[/b]：检查 [param inst_dict] 的 [code]template_id[/code] 是否存在于模板数据库中。
@@ -338,7 +369,7 @@ func add_card_to_collection(inst_dict: Dictionary) -> bool:
 	_buffer_change("collection.owned_cards", old_cards.duplicate(), collection.owned_cards)
 	_buffer_change("collection.total_count", old_count, collection.total_count)
 
-	var card_id: int = inst_dict.get("id", 0)
+	var card_id: int = inst_dict.get("card_instance_id", inst_dict.get("instance_id", 0))
 	card_collection_changed.emit(card_id, &"added")
 	return true
 
@@ -808,10 +839,28 @@ func deserialize(data) -> bool:
 	for domain: String in ALL_DOMAINS:
 		_set_domain(domain, snapshot[domain])
 
+	# 4. 恢复卡牌实例 ID 计数器——_next_card_instance_id 不在持久化域中，
+	# 但读档后必须大于已存档卡牌的最大 ID，否则新建实例会与旧实例 ID 冲突。
+	_recover_card_id_counter()
+
 	return true
 
 
 ## === 私有：序列化辅助方法 ====================================================
+
+## 恢复卡牌实例 ID 计数器——从已存档卡牌的最大 card_instance_id 推导。[br]
+## [br]_next_card_instance_id 不在持久化域中，但读档后必须大于已存档卡牌的最大 ID，
+## 否则 [method allocate_card_id] 会返回与旧实例冲突的 ID。[br]
+## [br]兼容 [code]card_instance_id[/code]（ADR-0006 权威）与 [code]instance_id[/code] 两种字段命名。[br]
+## [br]无存档卡牌或所有 ID 为 0 时，重置为初始值 1。
+func _recover_card_id_counter() -> void:
+	var max_id: int = 0
+	for inst: Dictionary in collection.owned_cards:
+		var cid: int = int(inst.get("card_instance_id", inst.get("instance_id", 0)))
+		if cid > max_id:
+			max_id = cid
+	_next_card_instance_id = max(1, max_id + 1)
+
 
 ## 递归深拷贝——返回与 GSM 内部状态完全解耦的拷贝。
 ## Dictionary 和 Array 递归拷贝，其他类型（int/float/String/bool/null）直接返回。

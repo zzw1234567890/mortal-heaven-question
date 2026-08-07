@@ -399,7 +399,7 @@ card_name = template.name                              # String
 
 ### 风险
 - **222 个 .tres 文件的加载失败**：`load_threaded_request()` 返回错误——文件缺失/损坏。缓解：CardSystem 对加载失败的模板记录错误并跳过，允许游戏无此张卡牌继续运行。缺失模板的 instance 在尝试使用时显示占位符卡牌+"模板缺失"提示。
-- **template_id 与文件名不同步**：策划复制 .tres 文件后忘记更新 `card_id` 字段——导致注册表中有两个不同文件名但相同 card_id 的模板。缓解：CardSystem 在加载时检测重复 `card_id`，以 EDITOR 构建中止并报错，RELEASE 构建以第一个为准并记录警告。
+- **template_id 与文件名不同步**：策划复制 .tres 文件后忘记更新 `card_id` 字段——导致注册表中有两个不同文件名但相同 card_id 的模板。缓解：CardSystem 在加载时检测重复 `card_id`，统一调用 `push_error` 并跳过后续重复项（第一个胜出策略）。此决策偏离原 EDITOR/RELEASE 区分方案——理由：统一 `push_error` 保证 GUT headless 模式下可通过 `assert_push_error_count` 验证，且 EDITOR/RELEASE 双路径维护成本高于收益。详见 Story 003 AC-009 偏差声明（2026-08-06 修订）。
 - **CardSystem._ready() 在 GSM 之前执行**：Godot Autoload 顺序如果错误（CardSystem 在 GSM 之前），`create_instance()` 调用 `GSM.allocate_card_id()` 将导致空引用。缓解：CardSystem 在 Project Settings → Autoload 中列在 GSM 之后。启动时 `_ready()` 断言 `GSM != null && GSM._initialized`。这是 ADR-0001 中已识别的 Autoload 顺序风险的具体实例。
 - **CardInstance ID 溢出**：32-bit 整数——上限约为 21 亿。假设每局游戏分配 200 个实例，玩家打 1000 万局才会溢出。实际不构成威胁。若需要，可升级为 64-bit。
 - **StringName 反序列化隐式转换**：从存档 JSON 反序列化时，`template_id` 以 String 形式返回，但 `CardSystem.templates` 字典以 StringName 为键。Godot 4.x 使用值比较（`hash()` + `==`），使得 `templates.get(String(template_id))` 可以正确工作。为提高可见性，`deserialize_instance()` 执行显式 `StringName(data["template_id"])` 转换。缓解：GUT 测试验证 `templates.has(StringName(deserialized_id))` 返回 true。风险：Godot 未来版本可能改变 Dictionary 键比较语义。

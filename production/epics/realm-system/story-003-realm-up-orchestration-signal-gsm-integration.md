@@ -1,12 +1,12 @@
 # Story 003: realm_up() 突破编排 + realm_upgraded 信号 + GSM 集成
 
 > **Epic**: realm-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration（需集成测试）
 > **Estimate**: 3h
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-05
+> **Last Updated**: 2026-08-06
 
 ## Context
 
@@ -34,16 +34,16 @@
 
 *From ADR-0010 §关键接口 + §验证标准 + GDD §4 境界提升流程 + §验收标准:*
 
-- [ ] **AC-001**: `realm_up(current_level: int) -> void` 方法签名
-- [ ] **AC-002**: `realm_up(2)` 后 GSM.player.realm_level 变为 3
-- [ ] **AC-003**: `realm_up(2)` 后发射 `realm_upgraded(2, 3)` 信号（old=2, new=3）
-- [ ] **AC-004**: `realm_up(5)`（已是最高境界）→ `push_error` + 不修改 GSM
-- [ ] **AC-005**: `realm_up` 内部调用 `GSM.change_realm(new_level)` 原子写入
-- [ ] **AC-006**: `signal realm_upgraded(old_level: int, new_level: int)` 信号声明（Cat 2b）
-- [ ] **AC-007**: `realm_upgraded` 信号载荷为 2 个 int 参数（old_level, new_level）
-- [ ] **AC-008**: `realm_up` 不直接调用 CultivationSystem/ExplorationSystem/CardSystem/TribulationSystem 方法（信号委托——代码审查 grep 验证）
-- [ ] **AC-009**: 突破后 GSM.player.cultivation 保留不变（如 800/1000 → 800/1500，由 GSM 管理非 RealmSystem 职责）
-- [ ] **AC-010**: `realm_up` 调用前 GSM.change_realm 可被观察（通过 GSM.realm_changed Cat 1 信号间接验证）
+- [x] **AC-001**: `realm_up(current_level: int) -> void` 方法签名
+- [x] **AC-002**: `realm_up(2)` 后 GSM.player.realm_level 变为 3
+- [x] **AC-003**: `realm_up(2)` 后发射 `realm_upgraded(2, 3)` 信号（old=2, new=3）
+- [x] **AC-004**: `realm_up(5)`（已是最高境界）→ `push_error` + 不修改 GSM
+- [x] **AC-005**: `realm_up` 内部调用 `GSM.change_realm(new_level)` 原子写入
+- [x] **AC-006**: `signal realm_upgraded(old_level: int, new_level: int)` 信号声明（Cat 2b）
+- [x] **AC-007**: `realm_upgraded` 信号载荷为 2 个 int 参数（old_level, new_level）
+- [x] **AC-008**: `realm_up` 不直接调用 CultivationSystem/ExplorationSystem/CardSystem/TribulationSystem 方法（信号委托——代码审查 grep 验证）
+- [x] **AC-009**: 突破后 GSM.player.cultivation 保留不变（如 800/1000 → 800/1500，由 GSM 管理非 RealmSystem 职责）
+- [x] **AC-010**: `realm_up` 调用前 GSM.change_realm 可被观察（通过 GSM.realm_changed Cat 1 信号间接验证）
 
 ---
 
@@ -178,7 +178,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/realm_system/test_realm_up.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（14 测试，覆盖 AC-001..AC-012）
 
 ---
 
@@ -186,3 +186,24 @@
 
 - Depends on: Story 001（realm_table + realm_table.size() 用于上限检查）、Story 002（同文件基础结构）、Sprint 1 GSM（change_realm + realm_changed 信号已实现）
 - Unlocks: CultivationSystem Epic（监听 realm_upgraded）、TribulationSystem Epic（调用 realm_up + 监听信号）、ExplorationSystem Epic（监听信号解锁地图）、CardSystem Epic（监听信号扩展掉落池）
+
+---
+
+## Completion Notes
+
+**Completed**：2026-08-06
+**Criteria**：10/10 通过（AC-001..AC-010 故事定义全部 COVERED + 新增 AC-011 边界/AC-012 参数校验）
+
+**Deviations**（全部 ADVISORY，已修复）：
+- **BLOCKER**（已修复）`GSM.change_realm` 重复发射 `realm_changed`——立即 emit + 帧末 `_emit_domain_signal` 各一次。修复为统一走 `_buffer_change` 帧末发射，与 `add_cultivation`/`reincarnation_reset` 等所有第二层方法一致（Cat 1 信号契约一致性）。AC-010 测试同步改为 `await get_tree().process_frame` 后断言。
+- **HIGH**（已修复）测试中 `GameStateManager.realm_changed` 连接未断开（Autoload 持久信号泄漏）。`after_each` 补 `disconnect`。
+- **LOW**（已修复）`realm_up` 信任外部传入 `current_level` 不校验——新增 `current_level == GSM.player.realm` 校验，防 Cat 2b 信号载荷与 GSM 状态漂移。新增 AC-012 测试覆盖。
+- **LOW**（已修复）AC-009 未断言 `max_cultivation` 不被修改——已补断言。
+- **LOW**（已修复）`_reset_gsm_state` 清理不彻底——补 `cultivation`/`max_cultivation`/`overflow_pool`/`cultivation_full` 重置。
+- **LOW**（已修复）AC-008 grep 逻辑无法识别行内注释——改为基于 `#` 与 `forbidden` 位置关系判断。
+- **MINOR DEVIATION**（信息性）实现新增 `current_level != GSM.player.realm` 校验，ADR-0010 §关键接口示例中未包含——属 ADR 契约增强，非偏离。可选后续将校验补入 ADR-0010。
+
+**Test Evidence**：Integration — `tests/integration/realm_system/test_realm_up.gd`（14 测试，覆盖 AC-001..AC-012）
+**Code Review**：已完成——godot-gdscript-specialist CHANGES REQUIRED→修复后 lead-programmer APPROVED + qa-lead ADEQUATE + qa-tester PASS
+
+**测试结果**：realm_system 三文件合计 56 测试通过；全量套件 684 测试 / 683 通过 / 1 pending（save_load 多步迁移占位，与本 Story 无关）

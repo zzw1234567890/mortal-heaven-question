@@ -1,12 +1,12 @@
 # Story 004: CardSystem 实例工厂 + GSM 集成
 
 > **Epic**: card-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration（需集成测试）
 > **Estimate**: 3.5h
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-05
+> **Last Updated**: 2026-08-06
 
 ## Context
 
@@ -62,7 +62,7 @@
 
 *Derived from ADR-0006 §CardSystem Autoload + §GSM 集成合约:*
 
-1. **文件位置**: `src/card_system/card_system.gd`（同 Story 003，扩展实例工厂方法）
+1. **文件位置**: `src/core/card_system/card_system.gd`（同 Story 003，扩展实例工厂方法）
 2. **create_instance 实现**（ADR-0006 §CardSystem 公共 API）:
    ```gdscript
    func create_instance(template_id: StringName) -> CardInstance:
@@ -182,7 +182,43 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/card_system/test_card_system_factory.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing (21 tests, 134 assertions)
+
+---
+
+## Completion Notes
+
+**Completed**：2026-08-06
+**Criteria**：11/11 通过（所有 AC 自动化验证通过）
+
+**Deviations**（全部 ADVISORY，已在 code-review 后修复或记录）：
+- **HIGH-1**：`_next_card_instance_id` 未持久化——已修复。GSM.deserialize 后调 `_recover_card_id_counter()` 从 `collection.owned_cards` 恢复最大 ID（兼容 card_instance_id / instance_id 两种字段命名），避免读档后新建实例 ID 冲突
+- **HIGH-2**：`add_card_to_collection` 信号载荷用 `"id"` 而非 `"card_instance_id"`——已修复。统一为 `inst_dict.get("card_instance_id", inst_dict.get("instance_id", 0))`，与 remove_card_from_collection 一致
+- **AC-006 偏差**：CardSystem 主动调 `enable_validation` 而非 GSM 监听 templates_loaded 信号——符合 Core→Foundation 依赖方向（Foundation 原则 #3）。故事已声明，建议后续修订 ADR-0006 §启动合约同步
+- **AC-003 章节类型冲突**：方案 A——`CHAPTER_NUMBER_MAP` 常量映射（chapter_1→1...chapter_5→5），`_resolve_chapter_number` 解析 String→int。空/未知章节→0。GDD 定义 acquired_chapter 为 int，GSM 存 String，需此映射桥接
+- **GSM 新增 allocate_card_id**：Story 004 前置依赖修复——原假设 Sprint 1 已实现 `GSM.allocate_card_id()`，实际未实现。方案 A：在 GSM 添加该方法 + `_next_card_instance_id` 计数器（初始 1，单调递增，0 保留为"未分配"哨兵）
+- **LOW-1**：DirAccess 失败路径统一走 `_on_all_templates_loaded()`——已修复。两条失败路径（空目录 + DirAccess 失败）行为一致
+- **MEDIUM**：`_on_all_templates_loaded` 幂等性测试——已补 2 测试（validation 幂等 + 信号每次发射）
+- **MEDIUM**：create_instance 不入库语义验证——已补 1 测试（enable_validation 后调用，collection 仍为空，区分"未调用 add" vs "调用了但被拒绝"）
+- **LOW**：CHAPTER_NUMBER_MAP 边界值——已补 1 测试（chapter_1..chapter_5 全覆盖）
+
+**Test Evidence**：Integration — `tests/integration/card_system/test_card_system_factory.gd`（21 测试函数，134 断言，全部通过）
+**Code Review**：已完成——godot-gdscript-specialist CHANGES REQUIRED（2 HIGH 已修复）+ qa-tester PASS（缺口已补）。2 项 HIGH 已修复，4 项 MEDIUM/LOW 缺口测试已补，1 项 ADR-0006 §启动合约偏差建议后续修订。
+
+### 测试结果
+
+- **card_system 工厂测试 21/21 通过**，134 断言，零失败
+- **全量套件 599/600 通过**（1 个 risky 为 fixture 加载警告，非本 Story 引入）
+- 覆盖 11 条 AC 全部 + 4 项边界情况补充
+
+### 关键修正记录
+
+1. **GSM.allocate_card_id 新增**——_next_card_instance_id 计数器（初始 1，单调递增）
+2. **_recover_card_id_counter**——deserialize 后从 owned_cards 恢复最大 ID，避免读档后 ID 冲突
+3. **add_card_to_collection 信号载荷修正**——card_instance_id 替代 id，与 remove 一致
+4. **_on_all_templates_loaded 重构**——先 enable_validation 后 emit templates_loaded，统一 DirAccess 失败 + 空目录 + 正常完成三条路径
+5. **CHAPTER_NUMBER_MAP**——章节 String→int 映射桥接 GDD int 与 GSM String
+6. **AC-006 偏差**——CardSystem 主动调 enable_validation，符合 Core→Foundation 方向
 
 ---
 

@@ -1,7 +1,7 @@
 # Story 001: CardTemplate Resource + 枚举定义
 
 > **Epic**: card-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic（需 GUT 单元测试）
 > **Estimate**: 3h
@@ -72,7 +72,7 @@
 
 *Derived from ADR-0006 §CardTemplate（模板层）—— Resource, `.tres` 文件:*
 
-1. **文件位置**: `src/card_system/card_template.gd`
+1. **文件位置**: `src/core/card_system/card_template.gd`
 2. **类声明**: `class_name CardTemplate` + `extends Resource`
 3. **枚举定义**: CardType 和 Rarity 枚举声明在 CardTemplate 脚本内（同文件，供 CardInstance 引用 `CardTemplate.CardType`）
 4. **@export 规范**: 所有字段使用 `@export` 装饰器 + 类型注解。类型化数组用 `@export var faction_tags: Array[StringName] = []`
@@ -99,8 +99,8 @@
 *Written by qa-lead at story creation. The developer implements against these — do not invent new test cases during implementation.*
 
 - **AC-001**: CardTemplate extends Resource，声明 class_name CardTemplate
-  - Given: 项目中存在 `src/card_system/card_template.gd`
-  - When: 执行 `var script: GDScript = load("res://src/card_system/card_template.gd")`
+  - Given: 项目中存在 `src/core/card_system/card_template.gd`
+  - When: 执行 `var script: GDScript = load("res://src/core/card_system/card_template.gd")`
   - Then: `assert_eq(script.get_instance_base_type(), "Resource")`；`assert_true(CardTemplate.new() is Resource)`
   - Edge cases: 确认无重复 class_name 冲突；确认 `class_name` 声明在文件顶部
 
@@ -164,7 +164,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/card_system/test_card_template.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing (23/23 tests, 222 assertions)
 
 ---
 
@@ -172,3 +172,34 @@
 
 - Depends on: None（Core 层第一个 Story，Foundation 层 GSM 已在 Sprint 1 完成）
 - Unlocks: Story 002（CardInstance 引用 CardType 枚举）、Story 003（CardSystem 加载 CardTemplate .tres 文件）
+
+---
+
+## Completion Notes
+
+**Completed**：2026-08-05
+**Criteria**：10/10 通过（所有 AC 自动化验证通过）
+**Deviations**：
+- ADVISORY：Rarity 枚举改为 1-based（WHITE=1...DARK_GOLD=5）——与 ResourceSystem 公式契约 `DISMANTLE_BASE[rarity-1]` 一致，Story 创建时 0-based，实现时修正。建议后续修订 ADR-0006 同步此决策。
+- ADVISORY：源码路径从 `src/card_system/` 移至 `src/core/card_system/`——与其他 Core 层系统（resource/faction/realm）保持一致，5 个 card-system Story 文件路径声明已同步更新。
+- ADVISORY：测试文件 312 行略超 300 行软限制——可按 AC 拆分为 enums + fields 两个文件，非阻塞。
+- ADVISORY：AC-001 class_name 冲突检测难以自动化——当前仅断言 class_name 声明存在，未验证无其他 class_name CardTemplate 声明。建议未来编写 grep 静态检查脚本。
+- ADVISORY：CardType 枚举可补充类似 Rarity 的"0-based——无公式依赖"文档说明，保持两个枚举文档风格一致。
+
+**Test Evidence**：Logic — `tests/unit/card_system/test_card_template.gd`（23 测试函数，222 断言，全部通过）
+**Code Review**：已完成——godot-gdscript-specialist APPROVED WITH SUGGESTIONS + qa-tester TESTABLE，无阻塞项。5 项建议已修复 2 项（PROPERTY_USAGE_STORAGE 断言 + 无多余字段反向断言），其余 3 项记录为 ADVISORY。
+
+### 测试结果
+
+- **23/23 测试通过**，222 断言，0.878s
+- 覆盖 10 条 AC 全部
+- 修复 2 项 qa-tester 建议：
+  1. 补充 `PROPERTY_USAGE_STORAGE` 断言（AC-009 双标志——确保 .tres 序列化）
+  2. 补充"无多余 @export 字段"反向断言（AC-004 Edge cases——声明字段数 == 27）
+
+### 关键修正记录
+
+1. **Rarity 1-based**（WHITE=1...DARK_GOLD=5）——匹配 ResourceSystem `dismantle_value(rarity, level)` 的 `DISMANTLE_BASE[rarity-1]` 数组索引契约
+2. **路径统一**——`src/card_system/` → `src/core/card_system/`，card-system 5 个 Story 文件路径声明同步更新
+3. **GUT bool 断言**——`assert_true(usage & FLAG)` 改为 `assert_true((usage & FLAG) != 0)`（Godot 4.6 严格要求 bool）
+4. **类型化数组断言**——`hint_string` 实际为 `"21:"`（元素类型 ID 前缀），用 `begins_with(str(TYPE_STRING_NAME) + ":")` 动态校验

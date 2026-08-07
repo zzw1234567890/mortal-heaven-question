@@ -1,6 +1,30 @@
 # 活跃会话状态
 
-<!-- QA-PLAN：2026-08-05 | System：sprint-2 | Plan written：production/qa/qa-plan-sprint-2-2026-08-05.md -->
+## Session Extract — /story-done 2026-08-05 (Story 001 card-system)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/card-system/story-001-card-template-resource-and-enums.md` — CardTemplate Resource + 枚举定义
+- **Code Review**：godot-gdscript-specialist APPROVED WITH SUGGESTIONS + qa-tester TESTABLE，无阻塞项。5 项建议已修复 2 项（PROPERTY_USAGE_STORAGE 断言 + 无多余字段反向断言），其余 3 项记录为 ADVISORY。
+- **Changes**：
+  - `src/core/card_system/card_template.gd` — 新建 121 行：CardTemplate Resource + CardType（0-based）/Rarity（1-based）枚举 + 27 个 @export 类型化字段 + @export_group 五层分层
+  - `tests/unit/card_system/test_card_template.gd` — 新建 ~330 行：23 测试覆盖 10 AC（含 PROPERTY_USAGE_STORAGE + 无多余字段反向断言）
+  - `production/epics/card-system/story-001~005-*.md` — 路径声明 `src/card_system/` → `src/core/card_system/`（5 个 Story 文件同步）
+  - `production/epics/card-system/story-001-*.md` — Status: Complete + Completion Notes（5 ADVISORY）
+  - `production/sprint-status.yaml` — Story 2-1 status: done + completed: 2026-08-05
+- **测试结果**：23/23 通过，222 断言，0.878s，零失败
+- **Tech debt logged**：None（5 项 ADVISORY 记录在 Completion Notes）
+  - #1 Rarity 1-based 修正——建议后续修订 ADR-0006 同步
+  - #2 源码路径迁移至 src/core/card_system/
+  - #3 测试文件 312 行略超 300 软限制
+  - #4 AC-001 class_name 冲突检测难自动化
+  - #5 CardType 枚举文档风格建议补充
+- **Next recommended**：`production/epics/card-system/story-002-card-instance-refcounted-model.md`（CardInstance RefCounted + AcquiredMethod 枚举，Logic，2.5h）
+
+<!-- STATUS -->
+Epic: card-system
+Feature: Sprint 2 - Core 层
+Task: Story 001 完成——下一个 Story 002 CardInstance RefCounted
+<!-- /STATUS -->
 
 ## Session Extract — /qa-plan sprint 2026-08-05
 
@@ -614,3 +638,79 @@ Task: GSM Epic 全部完成——Story 001-005，98/98 测试通过
 - **测试结果**：221/221 通过，1000 断言，零失败
 - **Tech debt logged**：None（2 项 LOW ADVISORY 记录在 Completion Notes）
 - **Next recommended**：`production/epics/scene-manager/story-004-loading-screen-async-error-recovery.md`（加载画面 + 异步加载 + 错误恢复）
+
+## Session Extract — /story-done 2026-08-06 (Story 003 card-system)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/card-system/story-003-card-system-template-registry-async-loading.md` — CardSystem 模板注册表 + 异步加载
+- **Code Review**：GDScript 专家 APPROVED WITH SUGGESTIONS + qa-tester TESTABLE with GAPS（缺口已处理）
+- **Fixes**：5 项建议项已修复（LOW-1/3/4/7 + R1/R2/S1），2 项保留并文档化（LOW-2 typed array 限制 + S2 回归清单）
+- **Changes**：
+  - `src/core/card_system/card_system.gd` — THREAD_LOAD_INVALID_RESOURCE 纳入失败分支 + _process 入口防御性注释 + get_templates_by_type 文档化
+  - `tests/integration/card_system/test_card_system_loading.gd` — .tres.uid 清理 + 超时断言 + 正则多行模式 + AC-009 语义验证增强
+  - `docs/decisions/ADR-0006-card-data-model-template-instance-separation.md` — L402 修订为统一 push_error
+  - `production/qa/regression-checklist.md` — 新建，记录 AC-010 FAILED 路径手动 QA 验证步骤
+- **测试结果**：13/13 通过，74 断言，零失败
+- **Tech debt logged**：None（2 项 ADVISORY 记录在 Completion Notes + regression-checklist.md）
+- **Next recommended**：`production/epics/card-system/story-004-card-system-factory-gsm-integration.md`（CardSystem 工厂 + GSM 集成，Story 003 解锁）
+
+## Session Extract — /story-done 2026-08-06 (Story 004 card-system)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/card-system/story-004-card-system-factory-gsm-integration.md` — CardSystem 实例工厂 + GSM 集成
+- **Code Review**：GDScript 专家 CHANGES REQUIRED（2 HIGH 已修复）+ qa-tester PASS（缺口已补）
+- **Fixes**：2 HIGH 已修复（_next_card_instance_id 持久化 + add_card_to_collection 信号载荷），4 MEDIUM/LOW 缺口测试已补
+- **Changes**：
+  - `src/foundation/game_state_manager.gd` — 新增 allocate_card_id + _next_card_instance_id + _recover_card_id_counter（deserialize 后恢复）；修正 add_card_to_collection 信号载荷字段名
+  - `src/core/card_system/card_system.gd` — 新增 create_instance + _on_all_templates_loaded + _resolve_chapter_number + CHAPTER_NUMBER_MAP；重构 _process/_load_templates_from 统一收尾路径
+  - `tests/integration/card_system/test_card_system_factory.gd` — 新建 21 测试覆盖 AC-001..AC-011 + 边界情况
+  - `production/epics/card-system/story-004-*.md` — Status: Complete + Completion Notes
+  - `production/sprint-status.yaml` — Story 2-4 status: done + completed: 2026-08-06
+- **测试结果**：card_system 工厂 21/21 通过，134 断言；全量套件 599/600
+- **Tech debt logged**：None（1 项 ADR-0006 §启动合约偏差建议后续修订）
+- **Next recommended**：`production/epics/card-system/story-005-instance-serialization-reconstitution.md`（实例序列化/重组，Story 004 解锁）
+
+## Session Extract — /story-done 2026-08-06 (Story 005 card-system)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/card-system/story-005-instance-serialization-reconstitution.md` — 实例序列化/反序列化 + reconstitute_instances
+- **Code Review**：GDScript 专家 APPROVED WITH SUGGESTIONS + qa-tester GAPS（已全部修复）
+- **Fixes**：2 HIGH（深拷贝验证）+ 1 MEDIUM（StringName 转换测试）已修复，补 5 项测试
+- **Changes**：
+  - `src/core/card_system/card_system.gd` — 新增 serialize_instance + deserialize_instance + reconstitute_instances + _get_int_field + _get_inscriptions_field + _to_stringname
+  - `tests/integration/card_system/test_card_serialization.gd` — 新建测试覆盖 AC-001..AC-009 + 5 项补充
+  - `production/epics/card-system/story-005-*.md` — Status: Complete + Completion Notes
+  - `production/sprint-status.yaml` — Story 2-5 status: done + completed: 2026-08-06
+- **测试结果**：card_system 三文件 60/60 通过，242 断言；全量套件 625/626
+- **Tech debt logged**：None
+- **Next recommended**：card-system Epic ✅ 全部完成（5/5 Story）。转向 realm-system Story 2-6（realm_table + 查询接口）
+
+## Session Extract — /story-done 2026-08-06 (Story 2-6 realm-system)
+
+- **Verdict**：✅ COMPLETE WITH NOTES
+- **Story**：`production/epics/realm-system/story-001-realm-system-autoload-realm-table-query.md` — RealmSystem Autoload + realm_table + 查询接口
+- **Code Review**：GDScript 专家 APPROVED WITH SUGGESTIONS（1 HIGH 已修复）+ qa-tester PASS WITH GAPS（1 MEDIUM 已修复）
+- **Fixes**：HIGH-1（player==null 守卫）+ MEDIUM（L2/L4 基准值断言）已修复
+- **Changes**：
+  - `src/core/realm_system.gd` — 新建：realm_table const + get_realm_property + get_current_property（含 player==null 双重守卫）
+  - `tests/unit/realm_system/test_realm_table_query.gd` — 新建 21 测试覆盖 AC-001..AC-015 + L2/L4 基准值
+  - `production/epics/realm-system/story-001-*.md` — Status: Complete + Completion Notes
+  - `production/sprint-status.yaml` — Story 2-6 status: done + completed: 2026-08-06
+- **测试结果**：realm_system 21/21 通过，143 断言；全量套件 644/645
+- **Tech debt logged**：None（1 项 ADR-0010 文档字段名 realm_level→realm 建议后续修订）
+- **Next recommended**：realm-system Story 2-7（压制计算 + 稀有度权重）
+
+## Session Extract — /story-done 2026-08-06 (Story 2-8 realm_up)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/realm-system/story-003-realm-up-orchestration-signal-gsm-integration.md` — realm_up() 突破编排 + realm_upgraded 信号 + GSM 集成
+- Code Review：gdscript-specialist CHANGES REQUIRED→修复后 lead-programmer APPROVED + qa-lead ADEQUATE + qa-tester PASS
+- Fixes：BLOCKER(change_realm 重复发射 realm_changed) + HIGH(测试信号泄漏) + LOW-3(realm_up 参数校验) + LOW(AC-009 max_cultivation 断言/_reset_gsm_state 清理/AC-008 grep 行内注释)
+- Changes：
+  - `src/foundation/game_state_manager.gd` — change_realm 改为统一走 _buffer_change 帧末发射 realm_changed
+  - `src/core/realm_system.gd` — realm_up 新增 current_level==GSM.player.realm 校验
+  - `tests/integration/realm_system/test_realm_up.gd` — 14 测试覆盖 AC-001..AC-012（含 await process_frame 时序修正 + after_each disconnect + _reset_gsm_state 深清理）
+  - `production/epics/realm-system/story-003-*.md` — Status: Complete + Completion Notes
+  - `production/sprint-status.yaml` — Story 2-8 status: done + completed: 2026-08-06
+- 测试结果：realm_system 三文件 56 测试通过；全量套件 684/683+1pending
+- Tech debt logged：None（1 项 ADR-0010 §关键接口示例可补 current_level 校验，信息性）
+- Next recommended：resource-system Story 2-9（Autoload + 读写 API + GSM 第二层）
