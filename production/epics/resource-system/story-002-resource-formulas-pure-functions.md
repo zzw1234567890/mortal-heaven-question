@@ -6,7 +6,7 @@
 > **Type**: Logic（需 GUT 单元测试）
 > **Estimate**: 3h
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-05
+> **Last Updated**: 2026-08-08
 
 ## Context
 
@@ -313,3 +313,24 @@
 
 - Depends on: Story 001（同文件 resource_system.gd 的基础结构 + LingCaiQuality 枚举——sell_ling_cai_value 可复用品质校验逻辑）
 - Unlocks: DeckEditingSystem Epic（dismantle_value + dismantle_crafted_value + delete_card_cost）、ShopSystem/ExplorationSystem Epic（sell_ling_cai_value）、ExplorationSystem Epic（realm_gap_penalty）、CombatSystem/ExplorationSystem Epic（apply_ling_shi_bonus）
+
+---
+
+## Completion Notes
+
+**Completed**：2026-08-08
+**Criteria**：22/22 通过（AC-001..AC-022 全部 COVERED + 8 项边缘情况补强测试）
+
+**Deviations**（全部 ADVISORY，已修复）：
+- **MEDIUM**（已修复）负 quantity 守卫无测试——补 test_sell_ling_cai_negative_quantity_returns_zero
+- **LOW**（已修复）dismantle_crafted_value 无效 rarity 传递路径无测试——补 test_dismantle_crafted_value_invalid_rarity_returns_zero
+- **LOW**（已修复）gap=1（0.7）未测试——补 test_realm_gap_one_level_partial_penalty
+- **LOW**（已修复）REALM_PENALTY_FLOOR_EXPECTED 常量定义位置夹在方法间——移至文件顶部与 RS_SCRIPT 并列
+- **LOW**（已修复）RS_SCRIPT 未显式类型注解——改为 `const RS_SCRIPT: GDScript = preload(...)`
+- **LOW**（已修复）delete_card_cost 守卫返回 DELETE_BASE 而非 0 缺说明——文档注释补"保守默认费用，避免低估扣减"
+- **正向偏离**（表扬）const 用 PackedInt32Array 替代 Array——值类型语义（传递即复制）、类型安全、内存紧凑
+
+**Test Evidence**：Logic — `tests/unit/resource_system/test_resource_formulas.gd`（33 测试覆盖 22 条 AC + 8 项边缘情况）
+**Code Review**：已完成——gdscript-specialist APPROVED WITH SUGGESTIONS（修复后）+ qa-tester PASS（22/22 AC COVERED）
+
+**测试结果**：全量套件 756/755 通过（1 pending 是与本 Story 无关的 save_load 多步迁移占位），2666 断言

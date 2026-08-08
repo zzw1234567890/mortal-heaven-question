@@ -41,6 +41,13 @@ signal chain_ended(final_event_id: StringName)
 ## [b]信号语义[/b]：EventSystem 发射后不等待响应——如果 CardSystem 未连接，卡牌奖励静默丢失。
 signal card_reward_requested(template_id: StringName)
 
+## 资源增加请求——Foundation 层委托 Core 层 ResourceSystem。[br]
+## Cat 2c 跨层委托信号（ADR-0007）——EventSystem 不直接依赖 ResourceSystem。[br]
+## [br][param type] 资源类型（StringName）。[br]
+## [br][param amount] 增加数量。[br]
+## [br][b]消费者[/b]：ResourceSystem 监听并执行 add_resource。
+signal resource_add_requested(type: StringName, amount: int)
+
 
 ## 连锁事件最大深度——调优参数（安全范围 1-5）。
 ## ADR-0003 决策 5：MAX_CHAIN_DEPTH=3 硬限制 + visited_ids 循环检测。
@@ -291,7 +298,14 @@ func _check_resource_condition(cond: EventCondition) -> bool:
 	var resources: Dictionary = GameStateManager.get_state("player.resources")
 	if resources == null:
 		return false
-	var amount: int = resources.get(cond.target, 0)
+	var amount: int = 0
+	var raw: Variant = resources.get(cond.target, 0)
+	# ling_cai 是嵌套字典 {low,medium,high,top}——条件判定时求四品质总和
+	if raw is Dictionary:
+		var lc: Dictionary = raw
+		amount = int(lc.get("low", 0)) + int(lc.get("medium", 0)) + int(lc.get("high", 0)) + int(lc.get("top", 0))
+	else:
+		amount = int(raw)
 	match cond.operator:
 		EventEnums.ConditionOperator.GE:
 			return amount >= cond.value_int
@@ -524,10 +538,8 @@ func apply_outcomes(instance: EventInstance) -> void:
 			continue
 		match oc["type"]:
 			EventEnums.OutcomeType.ADD_RESOURCE:
-				# oc["target"] 为 String（Resource 名），GSM.add_resource 接受 StringName
-				var ok := GameStateManager.add_resource(StringName(oc["target"]), int(oc["value"]))
-				if not ok:
-					push_error("EventSystem.apply_outcomes: add_resource('%s', %d) 失败" % [oc["target"], int(oc["value"])])
+				# 信号委托——Foundation 层不直接依赖 Core 层 ResourceSystem（ADR-0003 决策 6 / ADR-0007 Cat 2c）
+				resource_add_requested.emit(StringName(oc["target"]), int(oc["value"]))
 			EventEnums.OutcomeType.ADD_CULTIVATION:
 				# add_cultivation 返回 void——不检查返回值（Story §4 文本"返回 bool"是事实错误）
 				GameStateManager.add_cultivation(int(oc["value"]))

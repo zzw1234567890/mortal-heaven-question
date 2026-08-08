@@ -22,9 +22,14 @@ func before_each() -> void:
 	es = ES_SCRIPT.new()
 	# 清理 GSM 全局状态——Autoload 单例跨测试持续存在
 	_reset_gsm_state()
+	# es 是 ES_SCRIPT.new() 实例（不调 _ready），其 resource_add_requested 信号无监听者——
+	# 手动连接到 ResourceSystem Autoload 的处理方法（ADD_RESOURCE 信号委托模式）
+	es.resource_add_requested.connect(ResourceSystem._on_resource_add_requested)
 
 
 func after_each() -> void:
+	if es != null and es.resource_add_requested.is_connected(ResourceSystem._on_resource_add_requested):
+		es.resource_add_requested.disconnect(ResourceSystem._on_resource_add_requested)
 	if es != null:
 		es.free()
 		es = null
@@ -41,7 +46,7 @@ func _reset_gsm_state() -> void:
 	GameStateManager.player.overflow_pool = 0
 	GameStateManager.player.resources = {
 		"ling_shi": 0,
-		"ling_cai": 0,
+		"ling_cai": {"low": 0, "medium": 0, "high": 0, "top": 0},
 		"dan_yao_sui_pian": 0,
 	}
 	GameStateManager.player.talents.clear()
@@ -547,7 +552,7 @@ func test_ac016_add_card_branch_only_emits_signal_no_direct_call() -> void:
 
 func test_ac017_add_resource_failure_records_push_error() -> void:
 	# Arrange —— 使用不存在的资源类型触发 add_resource 返回 false
-	# GSM.add_resource 对未知类型 push_error 1 次 + EventSystem apply_outcomes 再 push_error 1 次
+	# ADD_RESOURCE 走信号委托 → ResourceSystem.add_resource 对未知类型 push_error 1 次
 	var inst := _make_instance_with_outcomes([
 		_make_triggered_outcome(EventEnumsClass.OutcomeType.ADD_RESOURCE, "nonexistent_resource", 100),
 	])
@@ -555,9 +560,9 @@ func test_ac017_add_resource_failure_records_push_error() -> void:
 	# Act
 	es.apply_outcomes(inst)
 
-	# Assert —— 应触发 push_error（GSM 1 次 + EventSystem 1 次 = 2 次）
-	assert_push_error_count(2,
-			"add_resource 失败时 GSM 和 EventSystem 应各 push_error 1 次（共 2 次）")
+	# Assert —— ResourceSystem.add_resource 失败时 push_error 1 次（信号委托模式，EventSystem 不再直接 push_error）
+	assert_push_error_count(1,
+			"add_resource 失败时 ResourceSystem 应 push_error 1 次（未知资源类型）")
 
 
 # ============================================================================

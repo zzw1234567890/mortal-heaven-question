@@ -323,3 +323,11 @@ requirements:
     created: 2026-08-07
     status: active
     covered_by: ADR-0019
+
+  - id: TR-resource-002
+    system: resource
+    gdd: design/gdd/resource-system.md
+    requirement: "6 个资源公式纯函数——拆解价值（dismantle_value）、炼制物拆折价（dismantle_crafted_value）、出售灵材价值（sell_ling_cai_value）、删卡费用（delete_card_cost）、境界差额惩罚（realm_gap_penalty）、灵石天赋加成（apply_ling_shi_bonus）。无副作用纯函数，接受原始类型参数，调用方负责通过 add/spend_resource 应用结果"
+    created: 2026-08-08
+    status: active
+    covered_by: ADR-0019

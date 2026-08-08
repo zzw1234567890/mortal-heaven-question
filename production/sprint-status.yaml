@@ -14,7 +14,7 @@ goal: "完成 Core 层 4 系统 + 拆分 event_system.gd 技术债"
 start: "2026-08-06"
 end: "2026-08-19"
 generated: "2026-08-05"
-updated: "2026-08-06"
+updated: "2026-08-08"
 
 stories:
   # === card-system 关键路径 ===
@@ -104,21 +104,21 @@ stories:
     name: "Autoload + 读写 API + GSM 第二层"
     file: "production/epics/resource-system/story-001-resource-system-autoload-read-write-api.md"
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.5625
     blocker: ""
-    completed: ""
+    completed: "2026-08-08"
 
   - id: "2-10"
     name: "6 资源公式纯函数"
     file: "production/epics/resource-system/story-002-resource-formulas-pure-functions.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-08-08"
 
   # === faction-system ===
   - id: "2-11"

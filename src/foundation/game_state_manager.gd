@@ -39,7 +39,9 @@ signal cultivation_changed(delta: int, current: int, max_val: int)
 ## Cat 1：修为已满通知。[param current] 为当前值，[param max_val] 为上限。
 signal cultivation_full(current: int, max_val: int)
 
-## Cat 1：资源变更。[param type] 为资源名，[param delta] 为变化量，[param balance] 为当前余额。
+## Cat 1：资源变更。[param type] 为资源名，[param delta] 为变化量，[param balance] 为当前余额。[br]
+## [br][b]balance 语义[/b]：ling_shi 为总余额；ling_cai 为变更品质的单品质余额（非四品质总和）——[br]
+## 消费者如需 ling_cai 总和应调用 [method ResourceSystem.get_resource](&"ling_cai")。
 signal resource_changed(type: StringName, delta: int, balance: int)
 
 ## Cat 1：行动力变更。[param delta] 为变化量，[param current] 为当前值，[param max_val] 为上限。
@@ -215,37 +217,36 @@ func add_cultivation(amount: int, source: String = "") -> void:
 		_buffer_change("player.cultivation_full", old_full, true)
 		_buffer_change("player.overflow_pool", old_overflow, player.overflow_pool)
 
-## 资源消耗——仅 ResourceSystem 调用。
-func spend_resource(type: StringName, amount: int) -> bool:
-	if amount <= 0:
-		push_error("GSM.spend_resource: amount 必须为正值（收到: %d, type: '%s'）" % [amount, type])
-		return false
-	if not _validate_resource_type(type):
-		push_error("GSM.spend_resource: 未知资源类型 '%s'" % type)
-		return false
+## 原子写入灵石——仅 ResourceSystem 调用。[br]
+## [br][param value] 新值。[br]
+## [br][b]非负守卫[/b]：[code]maxi(0, value)[/code]——即便绕过 ResourceSystem 也防止负数。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0019 §GSM 第二层扩展方法。
+func _set_resource_ling_shi(value: int) -> void:
+	value = maxi(0, value)
+	var old_val: int = player.resources.ling_shi
+	if old_val == value:
+		return
+	player.resources.ling_shi = value
+	_buffer_change("player.resources.ling_shi", old_val, value)
 
-	var old_val: int = player.resources[type]
-	if old_val < amount:
-		push_warning("GSM.spend_resource: 余额不足（type: '%s', 需要: %d, 持有: %d）" % [type, amount, old_val])
-		return false
-
-	player.resources[type] = old_val - amount
-	_buffer_change("player.resources.%s" % type, old_val, player.resources[type])
-	return true
-
-## 资源增加——仅 ResourceSystem 调用。
-func add_resource(type: StringName, amount: int) -> bool:
-	if amount <= 0:
-		push_error("GSM.add_resource: amount 必须为正值（收到: %d, type: '%s'）" % [amount, type])
-		return false
-	if not _validate_resource_type(type):
-		push_error("GSM.add_resource: 未知资源类型 '%s'" % type)
-		return false
-
-	var old_val: int = player.resources[type]
-	player.resources[type] = old_val + amount
-	_buffer_change("player.resources.%s" % type, old_val, player.resources[type])
-	return true
+## 原子写入灵材指定品质——仅 ResourceSystem 调用。[br]
+## [br][param quality] 品质（1=low, 2=medium, 3=high, 4=top）。[br]
+## [br][param value] 新值。[br]
+## [br][b]非负守卫[/b]：[code]maxi(0, value)[/code]——各品质同样防止负数。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0019 §GSM 第二层扩展方法。
+func _set_resource_ling_cai(quality: int, value: int) -> void:
+	if quality < 1 or quality > 4:
+		push_error("GSM._set_resource_ling_cai: 无效品质 %d（有效 1-4）" % quality)
+		return
+	value = maxi(0, value)
+	var key: String = ["low", "medium", "high", "top"][quality - 1]
+	var old_val: int = player.resources.ling_cai[key]
+	if old_val == value:
+		return
+	player.resources.ling_cai[key] = value
+	_buffer_change("player.resources.ling_cai.%s" % key, old_val, value)
 
 ## 战斗开始——仅 CombatSystem 调用。Cat 2a 生命周期信号，立即发射不缓冲。
 func battle_start(config: Dictionary) -> void:
@@ -325,11 +326,23 @@ func reincarnation_reset() -> void:
 
 	# 资源重置
 	var resources: Dictionary = player.resources
-	for res_key: String in resources.keys():
-		var old_res: int = resources[res_key]
-		if old_res != 0:
-			resources[res_key] = 0
-			_buffer_change("player.resources.%s" % res_key, old_res, 0)
+	# 灵石重置
+	var old_ls: int = resources.ling_shi
+	if old_ls != 0:
+		resources.ling_shi = 0
+		_buffer_change("player.resources.ling_shi", old_ls, 0)
+	# 灵材四品质重置
+	var lc: Dictionary = resources.ling_cai
+	for q_key: String in ["low", "medium", "high", "top"]:
+		var old_q: int = lc[q_key]
+		if old_q != 0:
+			lc[q_key] = 0
+			_buffer_change("player.resources.ling_cai.%s" % q_key, old_q, 0)
+	# 丹药碎片重置
+	var old_dysp: int = resources.dan_yao_sui_pian
+	if old_dysp != 0:
+		resources.dan_yao_sui_pian = 0
+		_buffer_change("player.resources.dan_yao_sui_pian", old_dysp, 0)
 
 	# 重置 max_cultivation 为基准值
 	var old_max: int = player.max_cultivation
@@ -619,7 +632,7 @@ func _init_all_domains() -> void:
 		"overflow_pool": 0,
 		"resources": {
 			"ling_shi": 0,
-			"ling_cai": 0,
+			"ling_cai": {"low": 0, "medium": 0, "high": 0, "top": 0},
 			"dan_yao_sui_pian": 0,
 		},
 		"identity_id": "",
@@ -674,10 +687,6 @@ func _get_domain(domain_name: String) -> Variant:
 		"narrative":   return narrative
 		"session":     return session
 		_:             return null
-
-## 校验资源类型是否存在于 [code]player.resources[/code] 中。
-func _validate_resource_type(type: StringName) -> bool:
-	return player.resources.has(type)
 
 ## === 信号缓冲层私有方法 ======================================================
 
@@ -910,6 +919,9 @@ func _deserialize_domain(snapshot: Dictionary, domain: String, input: Dictionary
 		if input.has(key):
 			var default_val = defaults[key]
 			var input_val = input[key]
+			# 向前兼容：旧存档 player.resources.ling_cai 为扁平 int，迁移为嵌套 Dictionary
+			if domain == "player" and key == "resources" and input_val is Dictionary:
+				input_val = _migrate_resources_dict(input_val)
 			if not _type_check(domain, key, input_val, default_val):
 				return false
 			result[key] = _deep_copy(input_val)
@@ -918,6 +930,29 @@ func _deserialize_domain(snapshot: Dictionary, domain: String, input: Dictionary
 			result[key] = _deep_copy(defaults[key])
 	snapshot[domain] = result
 	return true
+
+
+## 迁移 resources 字典——将旧扁平 int ling_cai 迁移为嵌套 Dictionary。[br]
+## [br][b]向前兼容[/b]：旧存档 ling_cai 为 int（无品质区分），新存档为 [code]{low, medium, high, top}[/code]。[br]
+## [br]旧 int 值被丢弃（旧格式未区分品质，无法可靠映射到任一品质）；缺失品质键填充 0。[br]
+## [br][param input] 原始 resources 字典。[br]
+## [br][b]返回[/b]: 迁移后的 resources 字典（新格式）。[br]
+## [br]来源: ADR-0019 §GSM 第二层扩展方法——向前兼容旧存档。
+func _migrate_resources_dict(input: Dictionary) -> Dictionary:
+	var result: Dictionary = input.duplicate(true)
+	if result.has("ling_cai"):
+		var lc: Variant = result["ling_cai"]
+		if lc is int:
+			# 旧扁平格式——丢弃旧值（无法区分品质），填充为四品质零值
+			result["ling_cai"] = {"low": 0, "medium": 0, "high": 0, "top": 0}
+		elif lc is Dictionary:
+			# 新格式——确保四品质齐全，缺失或类型不匹配填充 0
+			var new_lc: Dictionary = {"low": 0, "medium": 0, "high": 0, "top": 0}
+			for q_key: String in ["low", "medium", "high", "top"]:
+				if lc.has(q_key) and lc[q_key] is int:
+					new_lc[q_key] = lc[q_key]
+			result["ling_cai"] = new_lc
+	return result
 
 
 ## 类型校验——新值的类型必须与默认值匹配。
@@ -967,7 +1002,7 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"max_cultivation": BASE_MAX,
 				"cultivation_full": false,
 				"overflow_pool": 0,
-				"resources": {"ling_shi": 0, "ling_cai": 0, "dan_yao_sui_pian": 0},
+				"resources": {"ling_shi": 0, "ling_cai": {"low": 0, "medium": 0, "high": 0, "top": 0}, "dan_yao_sui_pian": 0},
 				"identity_id": "",
 				"talents": [],
 			}

@@ -76,29 +76,32 @@ func test_ac003_add_cultivation_zero_positive_only() -> void:
 
 
 func test_ac004_spend_resource_success() -> void:
+	# Story 001 迁移：GSM 第二层方法 _set_resource_ling_shi 直接测试（不依赖 ResourceSystem）
 	gsm.player.resources["ling_shi"] = 100
-	var result: bool = gsm.spend_resource(&"ling_shi", 30)
-	assert_true(result, "余额充足时应返回 true")
-	assert_eq(gsm.player.resources["ling_shi"], 70, "灵石应从 100 扣除到 70")
+	gsm._set_resource_ling_shi(70)
+	assert_eq(gsm.player.resources["ling_shi"], 70, "灵石应从 100 写入到 70")
 
 
 func test_ac004_spend_resource_exact_balance() -> void:
-	gsm.player.resources["ling_cai"] = 50
-	var result: bool = gsm.spend_resource(&"ling_cai", 50)
-	assert_true(result, "恰好余额=消费额时应返回 true")
-	assert_eq(gsm.player.resources["ling_cai"], 0, "灵石应扣至 0")
+	# Story 001 迁移：_set_resource_ling_cai 写入指定品质
+	gsm._set_resource_ling_cai(1, 50)
+	assert_eq(gsm.player.resources["ling_cai"]["low"], 50, "low 品质应写入 50")
+	gsm._set_resource_ling_cai(1, 0)
+	assert_eq(gsm.player.resources["ling_cai"]["low"], 0, "low 品质应扣至 0")
 
 
-func test_ac004_spend_resource_positive_only() -> void:
-	assert_false(gsm.spend_resource(&"ling_shi", 0), "amount=0 应返回 false")
-	assert_false(gsm.spend_resource(&"ling_shi", -10), "负 amount 应返回 false")
+func test_ac004_set_resource_non_negative_guard() -> void:
+	# Story 001 迁移：GSM 第二层方法不校验 amount，但有非负守卫
+	gsm.player.resources["ling_shi"] = 100
+	gsm._set_resource_ling_shi(-10)
+	assert_eq(gsm.player.resources["ling_shi"], 0, "负值应被非负守卫钳为 0")
 
 
-func test_ac005_spend_resource_insufficient_funds() -> void:
+func test_ac005_set_resource_insufficient_funds_no_concept() -> void:
+	# Story 001 迁移：GSM 第二层方法无余额校验概念——直接写入新值
 	gsm.player.resources["ling_shi"] = 20
-	var result: bool = gsm.spend_resource(&"ling_shi", 30)
-	assert_false(result, "余额不足时应返回 false")
-	assert_eq(gsm.player.resources["ling_shi"], 20, "余额不足时灵石应不变")
+	gsm._set_resource_ling_shi(0)
+	assert_eq(gsm.player.resources["ling_shi"], 0, "_set_resource_ling_shi 直接写入新值")
 
 
 func test_ac006_nonexistent_resource_type_add_rejected() -> void:

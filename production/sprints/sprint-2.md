@@ -3,7 +3,7 @@
 > **Sprint**: 2
 > **Start Date**: 2026-08-06
 > **End Date**: 2026-08-19
-> **Status**: Planning
+> **Status**: In Progress
 > **Focus**: Core 层 4 个数据/经济系统 + event_system.gd 技术债拆分
 > **Milestone**: core-layer-complete（Active，目标 2026-08-19）
 > **Review Mode**: full
@@ -28,15 +28,15 @@
 
 | # | Epic | Story | 文件 | 类型 | 预估 | 依赖 | 状态 |
 |:--|------|:--|------|:--:|:--:|:--:|:--:|
-| 1 | card-system | CardTemplate + enums | `card-system/story-001-card-template-resource-and-enums.md` | Logic | 3h | GSM✅ | Ready |
-| 2 | card-system | CardInstance RefCounted | `card-system/story-002-card-instance-refcounted-model.md` | Logic | 2.5h | #1 | Ready |
-| 3 | card-system | CardSystem Autoload + 注册表异步加载 | `card-system/story-003-card-system-template-registry-async-loading.md` | Integration | 4h | #2 | Ready |
-| 4 | card-system | 工厂 + GSM 集成 | `card-system/story-004-card-system-factory-gsm-integration.md` | Integration | 3.5h | #3 | Ready |
-| 5 | card-system | 实例序列化/重组 | `card-system/story-005-instance-serialization-reconstitution.md` | Integration | 3h | #4 | Ready |
-| 6 | realm-system | realm_table + 查询接口 | `realm-system/story-001-realm-system-autoload-realm-table-query.md` | Logic | 2.5h | GSM✅ | Ready |
-| 7 | realm-system | 压制计算 + 稀有度权重 | `realm-system/story-002-realm-penalty-map-suppression-rarity-weights.md` | Logic | 3h | #6 | Ready |
-| 8 | realm-system | realm_up 编排 + 信号 | `realm-system/story-003-realm-up-orchestration-signal-gsm-integration.md` | Integration | 3h | #7 | Ready |
-| 9 | resource-system | Autoload + 读写 API + GSM 第二层 | `resource-system/story-001-resource-system-autoload-read-write-api.md` | Integration | 4.5h | GSM✅ | Ready |
+| 1 | card-system | CardTemplate + enums | `card-system/story-001-card-template-resource-and-enums.md` | Logic | 3h | GSM✅ | ✅ Done (08-05) |
+| 2 | card-system | CardInstance RefCounted | `card-system/story-002-card-instance-refcounted-model.md` | Logic | 2.5h | #1 | ✅ Done (08-06) |
+| 3 | card-system | CardSystem Autoload + 注册表异步加载 | `card-system/story-003-card-system-template-registry-async-loading.md` | Integration | 4h | #2 | ✅ Done (08-06) |
+| 4 | card-system | 工厂 + GSM 集成 | `card-system/story-004-card-system-factory-gsm-integration.md` | Integration | 3.5h | #3 | ✅ Done (08-06) |
+| 5 | card-system | 实例序列化/重组 | `card-system/story-005-instance-serialization-reconstitution.md` | Integration | 3h | #4 | ✅ Done (08-06) |
+| 6 | realm-system | realm_table + 查询接口 | `realm-system/story-001-realm-system-autoload-realm-table-query.md` | Logic | 2.5h | GSM✅ | ✅ Done (08-06) |
+| 7 | realm-system | 压制计算 + 稀有度权重 | `realm-system/story-002-realm-penalty-map-suppression-rarity-weights.md` | Logic | 3h | #6 | ✅ Done (08-06) |
+| 8 | realm-system | realm_up 编排 + 信号 | `realm-system/story-003-realm-up-orchestration-signal-gsm-integration.md` | Integration | 3h | #7 | ✅ Done (08-06) |
+| 9 | resource-system | Autoload + 读写 API + GSM 第二层 | `resource-system/story-001-resource-system-autoload-read-write-api.md` | Integration | 4.5h | GSM✅ | 🔄 In Progress |
 | 10 | resource-system | 6 资源公式纯函数 | `resource-system/story-002-resource-formulas-pure-functions.md` | Logic | 4h | #9 | Ready |
 | 11 | faction-system | FACTION_LIBRARY + 标签查询 | `faction-system/story-001-faction-system-autoload-library-query-api.md` | Logic | 4h | #3 | Ready |
 | 12 | faction-system | 场上统计 + 判定 | `faction-system/story-002-field-stats-condition-judgment.md` | Integration | 4h | #4,#11 | Ready |

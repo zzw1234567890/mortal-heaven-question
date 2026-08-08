@@ -714,3 +714,35 @@ Task: GSM Epic 全部完成——Story 001-005，98/98 测试通过
 - 测试结果：realm_system 三文件 56 测试通过；全量套件 684/683+1pending
 - Tech debt logged：None（1 项 ADR-0010 §关键接口示例可补 current_level 校验，信息性）
 - Next recommended：resource-system Story 2-9（Autoload + 读写 API + GSM 第二层）
+
+## Session Extract — /story-done 2026-08-08 (Story 2-9 ResourceSystem)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/resource-system/story-001-resource-system-autoload-read-write-api.md` — ResourceSystem Autoload + LingCaiQuality 枚举 + GSM 第二层扩展 + 读写 API
+- Code Review：gdscript-specialist CHANGES REQUIRED→修复 3 HIGH + 5 LOW 后 lead-programmer APPROVED + qa-tester PASS
+- Fixes：HIGH-1(GSM _set_resource_ling_cai quality 守卫) + HIGH-2(EventSystem _check_resource_condition ling_cai 嵌套字典适配) + HIGH-3(spend_resource quality 检查对称) + LOW-2/3/4(信号文档/刷新方式统一/信号连接追踪) + 旧存档迁移测试
+- Changes：
+  - `src/foundation/game_state_manager.gd` — ling_cai 重构为嵌套字典；删除旧 add/spend_resource + _validate_resource_type；新增 _set_resource_ling_shi/_set_resource_ling_cai（含 quality + max(0,value) 双守卫）；reincarnation_reset/_init_all_domains/_get_default_for_domain 同步；_migrate_resources_dict 旧格式迁移；resource_changed 信号文档补 ling_cai 语义
+  - `src/core/resource_system.gd` — 新建 Autoload + LingCaiQuality 枚举 + add/spend/can_spend/get_resource + 非负 amount 守卫 + _ready 监听 EventSystem.resource_add_requested
+  - `src/foundation/event_system/event_system.gd` — 新增 resource_add_requested Cat 2c 信号；ADD_RESOURCE 改信号委托；_check_resource_condition 适配 ling_cai 嵌套字典
+  - `project.godot` — 注册 ResourceSystem Autoload
+  - `tests/integration/resource_system/test_resource_read_write_api.gd` — 40 测试覆盖 22 条 AC
+  - `tests/unit/gsm/serialize_deserialize_test.gd` + `atomic_write_methods_test.gd` + `test_apply_outcomes.gd` + `test_full_event_flow.gd` — 迁移适配
+  - `production/epics/resource-system/story-001-*.md` — Status: Complete + Completion Notes
+  - `production/sprint-status.yaml` — Story 2-9 done + completed: 2026-08-08
+- 测试结果：全量套件 723/722 通过（1 pending 无关），2626 断言
+- Tech debt logged：None（2 项 GDD/ADR 文档修订待办，非阻塞）
+- Next recommended：resource-system Story 2-10（6 资源公式纯函数）
+
+## Session Extract — /story-done 2026-08-08 (Story 2-10 资源公式)
+- Verdict：✅ COMPLETE WITH NOTES
+- Story：`production/epics/resource-system/story-002-resource-formulas-pure-functions.md` — 6 资源公式纯函数
+- Code Review：gdscript-specialist APPROVED WITH SUGGESTIONS + qa-tester PASS（修复后）
+- Fixes：MEDIUM(负 quantity 测试) + LOW(dismantle_crafted 无效 rarity/gap=1/常量位置/RS_SCRIPT 类型注解/delete_card_cost 文档)
+- Changes：
+  - `src/core/resource_system.gd` — 新增 8 个 const 调参旋钮（PackedInt32Array）+ 6 个纯函数公式
+  - `tests/unit/resource_system/test_resource_formulas.gd` — 新建 33 测试覆盖 22 条 AC + 边缘情况
+  - `production/epics/resource-system/story-002-*.md` — Status: Complete + Completion Notes
+  - `production/sprint-status.yaml` — Story 2-10 done + completed: 2026-08-08
+- 测试结果：全量套件 756/755 通过（1 pending 无关），2666 断言
+- Tech debt logged：None
+- Next recommended：faction-system Story 2-11（FACTION_LIBRARY + 标签查询）

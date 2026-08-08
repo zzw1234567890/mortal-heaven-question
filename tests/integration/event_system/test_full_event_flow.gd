@@ -50,9 +50,14 @@ func before_each() -> void:
 	es._chain_visited_ids.clear()
 	chain_listener = ChainListener.new(es)
 	_reset_gsm_state()
+	# es 是 ES_SCRIPT.new() 实例（不调 _ready），resource_add_requested 信号无监听者——
+	# 手动连接到 ResourceSystem Autoload（ADD_RESOURCE 信号委托模式）
+	es.resource_add_requested.connect(ResourceSystem._on_resource_add_requested)
 
 
 func after_each() -> void:
+	if es != null and es.resource_add_requested.is_connected(ResourceSystem._on_resource_add_requested):
+		es.resource_add_requested.disconnect(ResourceSystem._on_resource_add_requested)
 	chain_listener.disconnect_signals()
 	chain_listener = null
 	if es != null:
@@ -68,7 +73,7 @@ func _reset_gsm_state() -> void:
 	GameStateManager.player.max_cultivation = 1000
 	GameStateManager.player.resources = {
 		"ling_shi": 0,
-		"ling_cai": 0,
+		"ling_cai": {"low": 0, "medium": 0, "high": 0, "top": 0},
 		"dan_yao_sui_pian": 0,
 	}
 	GameStateManager.narrative.story_flags.clear()

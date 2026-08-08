@@ -185,14 +185,40 @@ func test_round_trip_player_values_preserved() -> void:
 
 func test_round_trip_nested_resources() -> void:
 	gsm.player.resources.ling_shi = 100
-	gsm.player.resources.ling_cai = 50
+	gsm.player.resources.ling_cai = {"low": 2, "medium": 3, "high": 1, "top": 0}
 	gsm.player.resources.dan_yao_sui_pian = 25
 	var data: Dictionary = gsm.serialize()
 	var ok: bool = gsm.deserialize(data)
 	assert_true(ok)
 	assert_eq(gsm.player.resources.ling_shi, 100)
-	assert_eq(gsm.player.resources.ling_cai, 50)
+	assert_eq(gsm.player.resources.ling_cai.low, 2)
+	assert_eq(gsm.player.resources.ling_cai.medium, 3)
+	assert_eq(gsm.player.resources.ling_cai.high, 1)
+	assert_eq(gsm.player.resources.ling_cai.top, 0)
 	assert_eq(gsm.player.resources.dan_yao_sui_pian, 25)
+
+
+## 旧扁平 int 格式 ling_cai 存档向前兼容——_migrate_resources_dict 转为四品质零值字典。
+func test_deserialize_migrates_legacy_flat_ling_cai() -> void:
+	var legacy_data: Dictionary = {
+		"meta": {"game_id": "", "seed": 0, "timestamp": 0},
+		"player": {
+			"realm": 1, "cultivation": 0, "max_cultivation": 1000,
+			"cultivation_full": false, "overflow_pool": 0,
+			"resources": {"ling_shi": 0, "ling_cai": 50, "dan_yao_sui_pian": 0},
+			"identity_id": "", "talents": [],
+		},
+		"collection": {"owned_cards": [], "total_count": 0},
+		"deck": {"character_slots": [null, null, null, null, null, null], "current_deck": [], "presets": []},
+		"exploration": {"current_map_id": "", "node_position": 0, "action_points": 0, "revealed_nodes": [], "map_state": {}},
+		"narrative": {"current_chapter": "", "completed_chapters": [], "story_flags": {}},
+	}
+	var ok: bool = gsm.deserialize(legacy_data)
+	assert_true(ok, "旧扁平 ling_cai 存档应反序列化成功")
+	assert_eq(gsm.player.resources.ling_cai.low, 0, "旧 int 值丢弃——low 归零")
+	assert_eq(gsm.player.resources.ling_cai.medium, 0, "medium 归零")
+	assert_eq(gsm.player.resources.ling_cai.high, 0, "high 归零")
+	assert_eq(gsm.player.resources.ling_cai.top, 0, "top 归零")
 
 
 func test_round_trip_collection_and_deck() -> void:

@@ -1,12 +1,12 @@
 # Story 001: ResourceSystem Autoload + LingCaiQuality 枚举 + GSM 第二层扩展 + 读写 API
 
 > **Epic**: resource-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration（需集成测试）
 > **Estimate**: 3.5h
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-07
+> **Last Updated**: 2026-08-08
 
 ## Context
 
@@ -339,3 +339,26 @@
 
 - Depends on: Sprint 1 GSM（player.resources 域 + _buffer_change + batch_updated 已实现）；本 Story 跨 Epic 新增 GSM 2 个第二层方法
 - Unlocks: Story 002（同文件扩展公式方法）、所有消费 ResourceSystem 的 Epic（DeckEditingSystem、AlchemySystem、ExplorationSystem、CombatSystem 等）
+
+---
+
+## Completion Notes
+
+**Completed**：2026-08-08
+**Criteria**：22/22 通过（AC-001..AC-021 + AC-018b，含 code-review 新增 AC-020/021 + 补充无效 type/dan_yao_sui_pian/余额不足不发射信号/quality 越界守卫测试）
+
+**Deviations**（全部 ADVISORY，已修复）：
+- **HIGH-1**（已修复）GSM `_set_resource_ling_cai` 缺 quality 范围守卫——quality=0 负索引静默写入 "top"。修复为入口 `if quality < 1 or quality > 4: push_error + return`。
+- **HIGH-2**（已修复）EventSystem `_check_resource_condition` 未适配 ling_cai 嵌套字典——`resources.get("ling_cai")` 返回 Dictionary 赋给 int 触发类型错误。修复为 Dictionary 分支求四品质总和。
+- **HIGH-3**（已修复）ResourceSystem `spend_resource` ling_cai 分支缺显式 quality 检查（与 add_resource 不对称）。修复为补 `if quality < 1 or quality > 4: push_error + return false`。
+- **LOW-2**（已修复）`resource_changed` 信号文档补充 ling_cai balance 语义（单品质余额 vs 总和）。
+- **LOW-3**（已修复）AC-015 与 AC-020 统一刷新方式——改用直接同步 `_flush_pending_changes()` 替代 await process_frame。
+- **LOW-4**（已修复）`after_each` 改为仅断开本套件创建的信号连接（`_track_gsm_signal` + `_signal_callables` 追踪），避免清除其他套件持久连接。
+- **MEDIUM**（已修复）旧存档向前兼容——`_migrate_resources_dict` 已实现，补 `test_deserialize_migrates_legacy_flat_ling_cai` 测试验证旧扁平 int 格式迁移为四品质零值字典。
+- **设计决策**（用户批准）ling_cai 重构为嵌套字典 {low,medium,high,top}；删除 GSM 旧 add/spend_resource（ADR-0019 禁止后门）；EventSystem ADD_RESOURCE 改用 resource_add_requested Cat 2c 信号委托；负数 amount 拒绝（AC-021）。
+- **遗留待办**（非阻塞）GDD §5 `add_resource → void` 需同步修订为 `→ bool`；ADR-0019 第 265 行对 ADR-0007 #11 的错误引用需 design-doc 修订。
+
+**Test Evidence**：Integration — `tests/integration/resource_system/test_resource_read_write_api.gd`（40 测试覆盖 22 条 AC）+ `tests/unit/gsm/serialize_deserialize_test.gd`（旧存档迁移测试）+ `tests/unit/gsm/atomic_write_methods_test.gd`（迁移为 GSM 第二层方法测试）+ `tests/unit/event_system/test_apply_outcomes.gd` + `tests/integration/event_system/test_full_event_flow.gd`（ling_cai 嵌套字典适配 + resource_add_requested 信号连接）
+**Code Review**：已完成——gdscript-specialist CHANGES REQUIRED→修复 3 HIGH + 5 LOW 后 lead-programmer APPROVED + qa-tester PASS（22/22 AC COVERED）
+
+**测试结果**：全量套件 723/722 通过（1 pending 是与本 Story 无关的 save_load 多步迁移占位），2626 断言
