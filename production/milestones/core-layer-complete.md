@@ -1,20 +1,20 @@
 # 里程碑：Core Layer Complete
 
 > **目标日期**：2026-08-19
-> **状态**：Active
+> **状态**：Completed（2026-08-09）
 > **依赖里程碑**：foundation-layer-complete（已 Completed，2026-08-05）
 > **完成冲刺**：Sprint 2（2026-08-06 至 2026-08-19）
 
 ## 交付物
 
-- [ ] CardSystem（Autoload #6）实现并通过测试——卡牌模板/实例/注册表/工厂/序列化 5 Story
-- [ ] RealmSystem（Autoload #11）实现并通过测试——境界数据表/压制计算/realm_up 编排 3 Story
-- [ ] ResourceSystem（Autoload #16）实现并通过测试——读写 API + GSM 第二层 + 6 公式纯函数 2 Story
-- [ ] FactionSystem（Autoload #15）实现并通过测试——标签库查询 + 场上统计判定 2 Story
-- [ ] Autoload #15/#16 初始化顺序验证（CardSystem #6 先于 FactionSystem/ResourceSystem）
-- [ ] event_system.gd 拆分（558→≤300 行）——提取条件判定引擎到独立文件
-- [ ] 所有 Core 层 Logic/Integration Story 有通过的单元/集成测试
-- [ ] 回顾行动项 #1（拆分 event_system.gd）已完成
+- [x] CardSystem（Autoload #6）实现并通过测试——卡牌模板/实例/注册表/工厂/序列化 5 Story
+- [x] RealmSystem（Autoload #11）实现并通过测试——境界数据表/压制计算/realm_up 编排 3 Story
+- [x] ResourceSystem（Autoload #16）实现并通过测试——读写 API + GSM 第二层 + 6 公式纯函数 2 Story
+- [x] FactionSystem（Autoload #15）实现并通过测试——标签库查询 + 场上统计判定 2 Story
+- [x] Autoload #15/#16 初始化顺序验证（CardSystem #6 先于 FactionSystem/ResourceSystem）
+- [x] event_system.gd 拆分（558→≤300 行）——提取条件判定引擎到独立文件
+- [x] 所有 Core 层 Logic/Integration Story 有通过的单元/集成测试
+- [x] 回顾行动项 #1（拆分 event_system.gd）已完成
 
 ## 完成标准
 

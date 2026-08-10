@@ -9,171 +9,132 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 
-sprint: 2
-goal: "完成 Core 层 4 系统 + 拆分 event_system.gd 技术债"
-start: "2026-08-06"
-end: "2026-08-19"
-generated: "2026-08-05"
-updated: "2026-08-08"
+sprint: 3
+goal: "完成 Core 层剩余 3 系统（CostSystem / StatusEffectSystem / SchoolSystem）+ 偿还 game_state_manager.gd 技术债"
+start: "2026-08-10"
+end: "2026-08-23"
+generated: "2026-08-10"
+updated: "2026-08-10"
 
 stories:
-  # === card-system 关键路径 ===
-  - id: "2-1"
-    name: "CardTemplate + enums"
-    file: "production/epics/card-system/story-001-card-template-resource-and-enums.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.375
-    blocker: ""
-    completed: "2026-08-05"
-
-  - id: "2-2"
-    name: "CardInstance RefCounted"
-    file: "production/epics/card-system/story-002-card-instance-refcounted-model.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.3125
-    blocker: ""
-    completed: "2026-08-06"
-
-  - id: "2-3"
-    name: "CardSystem Autoload + 注册表异步加载"
-    file: "production/epics/card-system/story-003-card-system-template-registry-async-loading.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-08-06"
-
-  - id: "2-4"
-    name: "工厂 + GSM 集成"
-    file: "production/epics/card-system/story-004-card-system-factory-gsm-integration.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.4375
-    blocker: ""
-    completed: "2026-08-06"
-
-  - id: "2-5"
-    name: "实例序列化/重组"
-    file: "production/epics/card-system/story-005-instance-serialization-reconstitution.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.375
-    blocker: ""
-    completed: "2026-08-06"
-
-  # === realm-system ===
-  - id: "2-6"
-    name: "realm_table + 查询接口"
-    file: "production/epics/realm-system/story-001-realm-system-autoload-realm-table-query.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.3125
-    blocker: ""
-    completed: "2026-08-06"
-
-  - id: "2-7"
-    name: "压制计算 + 稀有度权重"
-    file: "production/epics/realm-system/story-002-realm-penalty-map-suppression-rarity-weights.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.375
-    blocker: ""
-    completed: "2026-08-06"
-
-  - id: "2-8"
-    name: "realm_up 编排 + 信号"
-    file: "production/epics/realm-system/story-003-realm-up-orchestration-signal-gsm-integration.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.375
-    blocker: ""
-    completed: "2026-08-06"
-
-  # === resource-system ===
-  - id: "2-9"
-    name: "Autoload + 读写 API + GSM 第二层"
-    file: "production/epics/resource-system/story-001-resource-system-autoload-read-write-api.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.5625
-    blocker: ""
-    completed: "2026-08-08"
-
-  - id: "2-10"
-    name: "6 资源公式纯函数"
-    file: "production/epics/resource-system/story-002-resource-formulas-pure-functions.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-08-08"
-
-  # === faction-system ===
-  - id: "2-11"
-    name: "FACTION_LIBRARY + 标签查询"
-    file: "production/epics/faction-system/story-001-faction-system-autoload-library-query-api.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-08-08"
-
-  - id: "2-12"
-    name: "场上统计 + 判定"
-    file: "production/epics/faction-system/story-002-field-stats-condition-judgment.md"
-    priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-08-09"
-
-  # === 技术债 + 基础设施 ===
-  - id: "2-13"
-    name: "拆分 event_system.gd（558→≤300 行）"
+  # === /create-stories（关键路径根节点）===
+  - id: "3-1"
+    name: "create-stories cost + status-effect + school（含跨 Epic 接口契约盘点）"
     file: ""
     priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.375
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 1.0
     blocker: ""
-    completed: "2026-08-09"
+    completed: ""
 
-  - id: "2-15"
-    name: "project.godot Autoload 顺序验证（第 1 天）"
+  # === cost-system ===
+  - id: "3-2"
+    name: "CostSystem Autoload #7：费用上限 + 全额恢复 + 临时加成"
     file: ""
     priority: must-have
-    status: done
-    owner: "gameplay-programmer"
-    estimate_days: 0.0625
-    blocker: ""
-    completed: "2026-08-09"
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "依赖 #3-1 create-stories 完成"
+    completed: ""
 
-  # === 可以完成 ===
-  - id: "2-14"
+  - id: "3-3"
+    name: "双重信号路径（cost_changed + batch_updated）"
+    file: ""
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "依赖 #3-2"
+    completed: ""
+
+  # === status-effect ===
+  - id: "3-4"
+    name: "StatusTemplate/Instance + 8 阶段管线核心"
+    file: ""
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: "依赖 #3-1 create-stories 完成"
+    completed: ""
+
+  - id: "3-5"
+    name: "3 叠加规则 + 免疫多级检查 + 20 活跃上限"
+    file: ""
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: "依赖 #3-4"
+    completed: ""
+
+  - id: "3-6"
+    name: "战斗结束 snapshot 导出 GSM + 暂挂/恢复排序"
+    file: ""
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "依赖 #3-5"
+    completed: ""
+
+  # === school-system ===
+  - id: "3-7"
+    name: "SchoolSystem Autoload #19：SCHOOL_LIBRARY const + 纯查询接口"
+    file: ""
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "依赖 #3-1 create-stories 完成"
+    completed: ""
+
+  - id: "3-8"
+    name: "5 流派增益公式 + 不可驱散约束"
+    file: ""
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "依赖 #3-7 和 #3-5（不可驱散约束测试需 StatusEffectSystem）"
+    completed: ""
+
+  # === 技术债 ===
+  - id: "3-9"
+    name: "拆分 game_state_manager.gd → gsm_serializer.gd（1016→≤300 行）"
+    file: ""
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 1.0
+    blocker: ""
+    completed: ""
+
+  # === 应该完成 ===
+  - id: "3-10"
+    name: "GSM 第二层方法独立单测补齐"
+    file: ""
+    priority: should-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "依赖 #3-9"
+    completed: ""
+
+  - id: "3-11"
     name: "ADR-0003 §visited_ids 生命周期文档补充"
     file: ""
-    priority: nice-to-have
+    priority: should-have
     status: backlog
     owner: ""
     estimate_days: 0.125
     blocker: ""
     completed: ""
 
-  - id: "2-16"
+  # === 可以完成 ===
+  - id: "3-12"
     name: "Feature 层 Epic Story 预创建"
     file: ""
     priority: nice-to-have

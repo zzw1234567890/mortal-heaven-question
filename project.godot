@@ -27,6 +27,7 @@ EventSystem="*res://src/foundation/event_system/event_system.gd"
 CardSystem="*res://src/core/card_system/card_system.gd"
 ResourceSystem="*res://src/core/resource_system.gd"
 FactionSystem="*res://src/core/faction_system.gd"
+StatusEffectSystem="*res://src/core/status_effect/status_effect_system.gd"
 
 [display]
 

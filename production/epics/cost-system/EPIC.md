@@ -4,7 +4,14 @@
 > **GDD**: design/gdd/cost-system.md
 > **Architecture Module**: 战斗子模块 — Autoload #7
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories cost-system`
+> **Stories**: 2 stories created — see table below
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | CostSystem Autoload + 内部状态 + 查询/变异 API | Integration | Ready | ADR-0015 |
+| 002 | 双重信号路径（cost_changed + batch_updated） | Logic | Ready | ADR-0015 |
 
 ## Overview
 

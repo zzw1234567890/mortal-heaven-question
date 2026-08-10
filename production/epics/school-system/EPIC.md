@@ -4,7 +4,14 @@
 > **GDD**: design/gdd/school-system.md
 > **Architecture Module**: 静态数据表 + 查询接口 — Autoload #19
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories school-system`
+> **Stories**: 2 stories created — see table below
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | SchoolSystem Autoload #19 + SCHOOL_LIBRARY const + 纯查询接口 | Logic | Ready | ADR-0025 |
+| 002 | 5 流派增益公式 + 不可驱散约束 + 流派切换清空 | Logic | Ready | ADR-0025 |
 
 ## Overview
 
@@ -16,6 +23,13 @@
 |-----|------------------|-------------|
 | ADR-0025: 流派系统 | const Dictionary + 纯查询接口 + 系统级增益（不可驱散） | LOW |
 
+## GDD Requirements
+
+| TR-ID | Requirement | ADR Coverage |
+|-------|-------------|--------------|
+| TR-school-001 | 5 流派定义库 + 优先级检测 + 匹配度计算（待 `/architecture-review` 注册） | ADR-0025 ✅ |
+| TR-school-002 | 5 流派增益效果数值 + 系统级不可驱散 + 切换清空（待 `/architecture-review` 注册） | ADR-0025 ✅ |
+
 ## Definition of Done
 
 This epic is complete when:
@@ -26,4 +40,4 @@ This epic is complete when:
 
 ## Next Step
 
-Run `/create-stories school-system` to break this epic into implementable stories.
+Run `/story-readiness [story-001-path]` then `/dev-story [story-001-path]` to begin implementation.

@@ -4,7 +4,15 @@
 > **GDD**: design/gdd/status-system.md
 > **Architecture Module**: 战斗子模块 — Autoload #8
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories status-effect`
+> **Stories**: 3 stories created — see table below
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | StatusTemplate/Instance 双层模型 + 8 阶段管线核心 | Integration | Ready | ADR-0011 |
+| 002 | 3 叠加规则 + 免疫多级检查 + 20 活跃上限 | Logic | Ready | ADR-0011 |
+| 003 | 战斗结束 snapshot 导出 GSM + 暂挂/恢复排序 | Integration | Ready | ADR-0011 |
 
 ## Overview
 
@@ -34,4 +42,4 @@ This epic is complete when:
 
 ## Next Step
 
-Run `/create-stories status-effect` to break this epic into implementable stories.
+Run `/story-readiness [story-001-path]` then `/dev-story [story-001-path]` to begin implementation.
