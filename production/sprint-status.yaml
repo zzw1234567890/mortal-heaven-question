@@ -125,42 +125,42 @@ stories:
     name: "FACTION_LIBRARY + 标签查询"
     file: "production/epics/faction-system/story-001-faction-system-autoload-library-query-api.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-08-08"
 
   - id: "2-12"
     name: "场上统计 + 判定"
     file: "production/epics/faction-system/story-002-field-stats-condition-judgment.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.5
-    blocker: "依赖 card-system get_field_characters（跨 Epic）"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-09"
 
   # === 技术债 + 基础设施 ===
   - id: "2-13"
     name: "拆分 event_system.gd（558→≤300 行）"
     file: ""
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.375
     blocker: ""
-    completed: ""
+    completed: "2026-08-09"
 
   - id: "2-15"
     name: "project.godot Autoload 顺序验证（第 1 天）"
     file: ""
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: done
+    owner: "gameplay-programmer"
     estimate_days: 0.0625
     blocker: ""
-    completed: ""
+    completed: "2026-08-09"
 
   # === 可以完成 ===
   - id: "2-14"

@@ -4,8 +4,9 @@ extends GutTest
 ## 验证 Foundation 层 5 个 Autoload 按 project.godot 中声明的顺序正确初始化。
 ## 覆盖 gate-check B6 —— 25 Autoload 初始化顺序在 Godot 4.6 实际运行验证。
 ##
-## 当前 Foundation 层 Autoload 链（project.godot [autoload] 顺序）：
+## 当前已注册 Autoload 链（project.godot [autoload] 顺序）：
 ##   #1 GameStateManager → #2 InputManager → #3 SceneManager → #4 SaveLoadSystem → #5 EventSystem
+##   → #6 CardSystem → #7 ResourceSystem → #8 FactionSystem
 ##
 ## 每个 Autoload 测试通过 preload + .new() 创建独立实例并验证初始化完整性。
 
@@ -50,6 +51,9 @@ func test_all_five_foundation_autoloads_registered_in_project_godot() -> void:
 		"SceneManager",
 		"SaveLoadSystem",
 		"EventSystem",
+		"CardSystem",
+		"ResourceSystem",
+		"FactionSystem",
 	]
 
 	for name in expected_autoloads:
@@ -63,7 +67,7 @@ func test_foundation_autoloads_in_correct_order() -> void:
 	config.load("res://project.godot")
 
 	var keys := config.get_section_keys("autoload")
-	assert_true(keys.size() >= 5, "project.godot [autoload] 至少包含 5 个 Foundation 层 Autoload")
+	assert_true(keys.size() >= 8, "project.godot [autoload] 至少包含 8 个已注册 Autoload")
 
 	# 按 project.godot 中的出现顺序获取 Autoload 键
 	var registered_order: Array[String] = []
@@ -76,11 +80,18 @@ func test_foundation_autoloads_in_correct_order() -> void:
 	var scene_idx := registered_order.find("SceneManager")
 	var save_idx := registered_order.find("SaveLoadSystem")
 	var event_idx := registered_order.find("EventSystem")
+	var card_idx := registered_order.find("CardSystem")
+	var resource_idx := registered_order.find("ResourceSystem")
+	var faction_idx := registered_order.find("FactionSystem")
 
 	assert_true(gsm_idx < input_idx, "#1 GSM 必须在 #2 InputManager 之前")
 	assert_true(input_idx < scene_idx, "#2 InputManager 必须在 #3 SceneManager 之前")
 	assert_true(scene_idx < save_idx, "#3 SceneManager 必须在 #4 SaveLoadSystem 之前")
 	assert_true(save_idx < event_idx, "#4 SaveLoadSystem 必须在 #5 EventSystem 之前")
+	# Core 层依赖 Foundation 层——必须在 EventSystem 之后初始化
+	assert_true(event_idx < card_idx, "#5 EventSystem 必须在 #6 CardSystem 之前")
+	assert_true(card_idx < resource_idx, "#6 CardSystem 必须在 #7 ResourceSystem 之前")
+	assert_true(resource_idx < faction_idx, "#7 ResourceSystem 必须在 #8 FactionSystem 之前")
 
 
 # ────────────────────────────────────────────

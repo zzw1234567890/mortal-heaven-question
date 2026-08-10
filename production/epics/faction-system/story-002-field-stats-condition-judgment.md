@@ -1,12 +1,29 @@
 # Story 002: 场上阵营实时统计 + 阵法条件判定 + 阵营关系判定
 
 > **Epic**: faction-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration（需集成测试——依赖 CardSystem 场上角色列表）
 > **Estimate**: 3h
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-05
+> **Last Updated**: 2026-08-09
+
+## Completion Notes
+
+- **Code Review**: 主会话审查 APPROVED WITH SUGGESTIONS（0 BLOCKER / 0 HIGH）
+- **Fixes**: 4 项修复
+  - Fix-1: CardSystem 新增 `field_characters` 成员 + `get_field_characters()` 方法（DeploymentSystem 未实现前由测试注入）
+  - Fix-2: CardSystem 新增 `get_template_by_instance_id()` + `_extract_instance_id/_extract_template_id`（跨 Epic 查询接缝）
+  - Fix-3: FactionSystem 新增 `_test_card_system` 注入点（避免测试用 CardSystem 加入场景树触发 _ready 清空夹具）
+  - Fix-4: 测试 `_inject_template` 构建类型化 `Array[StringName]` 赋值（裸 Array 赋值类型化字段报 Invalid assignment）
+- **Changes**:
+  - `src/core/faction_system.gd` — 新增 6 个方法：count_on_field / get_field_faction_distribution / check_condition / is_hostile_to / get_alignment_relation / _first_major_alignment + _get_field_characters/_get_instance_id 内部辅助 + _test_card_system 注入点
+  - `src/core/card_system/card_system.gd` — 新增 field_characters 成员 + get_field_characters + get_template_by_instance_id + _extract_instance_id/_extract_template_id 辅助
+  - `tests/integration/faction_system/test_faction_field_stats_judgment.gd` — 新建 26 测试覆盖 AC-001~020（20 条 AC）+ 6 边缘情况补强
+  - `production/sprint-status.yaml` — Story 2-12 done + completed: 2026-08-09
+- **测试结果**: 全量套件 808/809 通过（1 pending 无关），2933 断言，0 失败
+- **Tech debt logged**: None（1 项 LOW ADVISORY）
+  - LOW-1: `field_characters` 当前为公开 Array——DeploymentSystem（ADR-0016）实现后应改为内部管理 + 仅通过 get_field_characters 暴露副本
 
 ## Context
 

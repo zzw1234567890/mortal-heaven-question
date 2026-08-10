@@ -36,12 +36,12 @@
 | 6 | realm-system | realm_table + 查询接口 | `realm-system/story-001-realm-system-autoload-realm-table-query.md` | Logic | 2.5h | GSM✅ | ✅ Done (08-06) |
 | 7 | realm-system | 压制计算 + 稀有度权重 | `realm-system/story-002-realm-penalty-map-suppression-rarity-weights.md` | Logic | 3h | #6 | ✅ Done (08-06) |
 | 8 | realm-system | realm_up 编排 + 信号 | `realm-system/story-003-realm-up-orchestration-signal-gsm-integration.md` | Integration | 3h | #7 | ✅ Done (08-06) |
-| 9 | resource-system | Autoload + 读写 API + GSM 第二层 | `resource-system/story-001-resource-system-autoload-read-write-api.md` | Integration | 4.5h | GSM✅ | 🔄 In Progress |
-| 10 | resource-system | 6 资源公式纯函数 | `resource-system/story-002-resource-formulas-pure-functions.md` | Logic | 4h | #9 | Ready |
-| 11 | faction-system | FACTION_LIBRARY + 标签查询 | `faction-system/story-001-faction-system-autoload-library-query-api.md` | Logic | 4h | #3 | Ready |
-| 12 | faction-system | 场上统计 + 判定 | `faction-system/story-002-field-stats-condition-judgment.md` | Integration | 4h | #4,#11 | Ready |
-| 13 | tech-debt | 拆分 event_system.gd（558→≤300 行） | （Sprint 1 回顾行动项 #1） | Refactor | 3h | — | Ready |
-| 15 | infra | project.godot Autoload 顺序验证（第 1 天） | — | Task | 0.5h | — | Ready |
+| 9 | resource-system | Autoload + 读写 API + GSM 第二层 | `resource-system/story-001-resource-system-autoload-read-write-api.md` | Integration | 4.5h | GSM✅ | ✅ Done (08-08) |
+| 10 | resource-system | 6 资源公式纯函数 | `resource-system/story-002-resource-formulas-pure-functions.md` | Logic | 4h | #9 | ✅ Done (08-08) |
+| 11 | faction-system | FACTION_LIBRARY + 标签查询 | `faction-system/story-001-faction-system-autoload-library-query-api.md` | Logic | 4h | #3 | ✅ Done (08-08) |
+| 12 | faction-system | 场上统计 + 判定 | `faction-system/story-002-field-stats-condition-judgment.md` | Integration | 4h | #4,#11 | ✅ Done (08-09) |
+| 13 | tech-debt | 拆分 event_system.gd（558→≤300 行） | （Sprint 1 回顾行动项 #1） | Refactor | 3h | — | ✅ Done (08-09) |
+| 15 | infra | project.godot Autoload 顺序验证（第 1 天） | — | Task | 0.5h | — | ✅ Done (08-09) |
 
 ### 可以完成 —— 9h
 

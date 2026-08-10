@@ -54,6 +54,12 @@ var _pending_paths: Array[StringName] = []
 ## 测试可通过反射读取以验证节流上限（同 EventSystem._chain_visited_ids 先例）。
 var _frame_processed_count: int = 0
 
+## 场上存活角色列表——由 DeploymentSystem（ADR-0016）维护上场/阵亡状态。[br]
+## 元素为 CardInstance 或含 [code]card_instance_id[/code] 的 Dictionary。[br]
+## FactionSystem.[method count_on_field] 通过 [method get_field_characters] 查询此列表。[br]
+## DeploymentSystem 未实现前默认为空——测试可直接赋值注入夹具。
+var field_characters: Array = []
+
 
 # === 内置虚方法 ===================================================================
 
@@ -115,6 +121,58 @@ func get_templates_by_type(type: int) -> Array:
 		if tpl.type == type:
 			result.append(tpl)
 	return result
+
+
+## 获取场上存活角色列表——返回 [member field_characters] 的副本。[br]
+## [br]场上角色由 DeploymentSystem（ADR-0016）维护——角色上场时 append，阵亡时 remove。[br]
+## [br][b]返回[/b]: [Array] 含 CardInstance 或 Dictionary 元素；DeploymentSystem 未接入时为空数组。[br]
+## [br][b]来源[/b]: ADR-0006 §场上角色查询——供 FactionSystem.count_on_field 等跨 Epic 消费者使用。
+func get_field_characters() -> Array:
+	return field_characters.duplicate()
+
+
+## 通过卡牌实例 ID 查询其模板——跨 Epic 查询接缝（FactionSystem.get_tags_of_character 依赖）。[br]
+## [br][b]查找顺序[/b]:[br]
+##   1. [member field_characters]（场上角色——热路径，FactionSystem 实时统计用）[br]
+##   2. [code]GameStateManager.collection.owned_cards[/code]（收藏中的卡——非场上角色查询）[br]
+## [br][b]复杂度[/b]: O(n) 遍历——场上 ≤6 角色，收藏遍历仅在非场上查询时触发。[br]
+## [br][param card_instance_id] 卡牌实例 ID。[br]
+## [br][b]返回[/b]: [CardTemplate] 或 [code]null[/code]（ID 不存在时）。
+func get_template_by_instance_id(card_instance_id: int) -> CardTemplate:
+	# 1. 场上角色列表——优先（FactionSystem 热路径）
+	for char_inst: Variant in field_characters:
+		var inst_id: int = _extract_instance_id(char_inst)
+		if inst_id == card_instance_id:
+			var tid: StringName = _extract_template_id(char_inst)
+			return get_template(tid)
+	# 2. GSM 收藏——非场上角色（如卡组编辑、效果引擎查询收藏中的卡）
+	var owned_cards: Array = GameStateManager.collection.owned_cards
+	for card_dict: Variant in owned_cards:
+		if card_dict is Dictionary and int(card_dict.get("card_instance_id", 0)) == card_instance_id:
+			return get_template(_to_stringname(card_dict.get("template_id", &"")))
+	return null
+
+
+## 从角色实例对象提取 card_instance_id——兼容 CardInstance 对象与 Dictionary。[br]
+## [br][param char_inst] CardInstance 对象或含 [code]card_instance_id[/code] 的 Dictionary。[br]
+## [br][b]返回[/b]: 实例 ID，或 0（无法提取）。
+func _extract_instance_id(char_inst: Variant) -> int:
+	if char_inst is Object and "card_instance_id" in char_inst:
+		return int(char_inst.card_instance_id)
+	if char_inst is Dictionary and char_inst.has("card_instance_id"):
+		return int(char_inst["card_instance_id"])
+	return 0
+
+
+## 从角色实例对象提取 template_id——兼容 CardInstance 对象与 Dictionary。[br]
+## [br][param char_inst] CardInstance 对象或含 [code]template_id[/code] 的 Dictionary。[br]
+## [br][b]返回[/b]: 模板 ID，或 [code]&""[/code]（无法提取）。
+func _extract_template_id(char_inst: Variant) -> StringName:
+	if char_inst is Object and "template_id" in char_inst:
+		return char_inst.template_id as StringName
+	if char_inst is Dictionary and char_inst.has("template_id"):
+		return _to_stringname(char_inst["template_id"])
+	return &""
 
 
 ## 创建卡牌实例——CardSystem 实例工厂。[br]

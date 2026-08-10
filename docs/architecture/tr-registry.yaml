@@ -331,3 +331,13 @@ requirements:
     created: 2026-08-08
     status: active
     covered_by: ADR-0019
+
+  # === Faction Layer ===
+
+  - id: TR-faction-001
+    system: faction
+    gdd: design/gdd/faction-system.md
+    requirement: "阵营标签库 + 纯查询 API——FactionSystem 作为 Core 层 Autoload 持有 const FACTION_LIBRARY（18 标签：2 大阵营 + 12 门派 + 4 跨阵营）+ FactionRelation 枚举，提供 get_tag_info / get_major_alignments / derive_major_alignment / get_tags_of_character / belongs_to_alignment 纯查询接口。阵营标签数据的运行时来源是 CardTemplate.faction_tags（ADR-0006），FactionSystem 不持有副本。纯查询接口不发射任何信号，消费者通过 Deployment/Combat 信号驱动重新查询"
+    created: 2026-08-08
+    status: active
+    covered_by: ADR-0018
