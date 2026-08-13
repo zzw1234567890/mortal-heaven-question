@@ -1,7 +1,7 @@
 # Story 001: CostSystem Autoload + 内部状态 + 查询/变异 API
 
 > **Epic**: cost-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration
 > **Estimate**: 0.5d
@@ -208,3 +208,14 @@
 
 - Depends on: 无（CostSystem 仅依赖 GSM + RealmSystem 查询，均已就绪；RealmSystem 查询由调用方 CombatSystem 完成，传入 max_cost）
 - Unlocks: Story 002（双重信号路径——依赖 001 的内部状态和变异 API）；战斗 Epic（CombatSystem 集成）；卡牌效果 Epic（`can_afford`/`add_temp_bonus`）
+
+## Completion Notes
+**Completed**：2026-08-10
+**Criteria**：18/18 通过
+**Deviations**：无
+**Test Evidence**：`tests/integration/cost_system/test_cost_system_basic.gd` — 60 个测试函数，覆盖 18 条 AC + 8 个补充边界测试
+**Code Review**：
+- GDScript 专家：通过（无阻塞项，静态类型全面、无已弃用 API、O(1) 热路径）
+- QA 可测试性：ADEQUATE（60 tests，18/18 AC 映射）
+- QA Lead 关卡：ADEQUATE（QL-TEST-COVERAGE 通过）
+- 主程序员：PASS（ADR-0015 精确一致、控制清单合规、架构 CLEAN、SOLID 合规）

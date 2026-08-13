@@ -248,6 +248,47 @@ func _set_resource_ling_cai(quality: int, value: int) -> void:
 	player.resources.ling_cai[key] = value
 	_buffer_change("player.resources.ling_cai.%s" % key, old_val, value)
 
+## 原子写入战斗费用——仅 CostSystem 调用（从 CombatSystem 委托写入权）。[br]
+## [br][b]窄范围[/b]：仅写入 battle.current_cost / battle.max_cost——不操作 battle 域其他字段。[br]
+## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值不写入，避免无意义 [signal batch_updated]。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0015 §GSM 第二层扩展。
+func _set_battle_cost(current_cost: int, max_cost: int) -> void:
+	if battle == null:
+		push_warning("GSM._set_battle_cost: 无活跃战斗，拒绝写入")
+		return
+
+	var old_current: int = battle.get("current_cost", 0)
+	var old_max: int = battle.get("max_cost", 0)
+
+	if old_current == current_cost and old_max == max_cost:
+		return  # 值无变化——去重
+
+	battle.current_cost = current_cost
+	battle.max_cost = max_cost
+
+	_buffer_change("battle.current_cost", old_current, current_cost)
+	_buffer_change("battle.max_cost", old_max, max_cost)
+
+## 原子写入战斗状态快照——仅 StatusEffectSystem 调用（战斗结束导出）。[br]
+## [br][b]窄范围[/b]：仅写入 battle.status_snapshot——不操作 battle 域其他字段。[br]
+## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值（深层相等）不写入，避免无意义 [signal batch_updated]。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal batch_updated] 帧末传播（展平路径 [code]"battle.status_snapshot"[/code]）。[br]
+## [br]来源: ADR-0011 §snapshot 导出 §GSM 例外模式。
+func _set_battle_status_snapshot(snapshot: Array) -> void:
+	if battle == null:
+		push_warning("GSM._set_battle_status_snapshot: 无活跃战斗，拒绝写入")
+		return
+
+	var old_snapshot: Array = battle.get("status_snapshot", [])
+	if _deep_equal(old_snapshot, snapshot):
+		return  # 值无变化——去重
+
+	battle.status_snapshot = snapshot
+	_buffer_change("battle.status_snapshot", old_snapshot, snapshot)
+
 ## 战斗开始——仅 CombatSystem 调用。Cat 2a 生命周期信号，立即发射不缓冲。
 func battle_start(config: Dictionary) -> void:
 	if battle != null:
@@ -886,6 +927,29 @@ func _deep_copy(value: Variant) -> Variant:
 		return result
 	else:
 		return value
+
+
+## 深层相等比较——两个 Variant 递归比较（用于快照去重）。[br]
+## [br]Dictionary/Array 递归比较；其他类型直接 [code]==[/code] 比较。
+func _deep_equal(a: Variant, b: Variant) -> bool:
+	if a is Dictionary and b is Dictionary:
+		if a.size() != b.size():
+			return false
+		for key: Variant in a.keys():
+			if not b.has(key):
+				return false
+			if not _deep_equal(a[key], b[key]):
+				return false
+		return true
+	elif a is Array and b is Array:
+		if a.size() != b.size():
+			return false
+		for i: int in range(a.size()):
+			if not _deep_equal(a[i], b[i]):
+				return false
+		return true
+	else:
+		return a == b
 
 
 ## 校验存档结构的合法性。

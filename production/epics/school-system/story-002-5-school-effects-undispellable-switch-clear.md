@@ -1,12 +1,12 @@
 # Story 002: 5 流派增益公式 + 不可驱散约束 + 流派切换清空
 
 > **Epic**: school-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-10
+> **Last Updated**: 2026-08-13
 
 ## Context
 
@@ -32,24 +32,24 @@
 
 *From ADR-0025 §解决的 GDD 需求 + GDD school-system.md §验收标准 §调优参数:*
 
-- [ ] **AC-001**: 正道发育流 effects 含——regen(value=2, trigger=turn_end) + damage_reduce(value=1, floor=1) + formation_ease(value=-1)
-- [ ] **AC-002**: 魔道快攻流 effects 含——attack_boost(value=2, trigger=first_3_turns) + draw_on_kill(value=1) + cost_boost(turn_1, value=1)
-- [ ] **AC-003**: 正邪混合流 effects 含——stat_boost(target=mixed, atk=1, def=1) + cost_discount(chance=0.3, value=1) + formation_ease(value=-1)
-- [ ] **AC-004**: 归墟真灵流 effects 含——stat_boost(target=spirit, hp=3, atk=1) + immune_debuff(debuffs=[fear, confusion]) + aura_hp(value=1, per_unit=spirit)
-- [ ] **AC-005**: 百艺炼丹流 effects 含——pill_boost(value=0.2) + cost_reduce(target=alchemy_material, value=1, floor=1) + action_recover(per_pills=3, value=1, max_triggers=3) + pill_breakthrough(chance=0.1)
-- [ ] **AC-006**: 正道 damage_reduce floor=1——伤害最低 1，不归零
-- [ ] **AC-007**: 魔道 attack_boost 仅前 3 回合生效——第 4 回合失效
-- [ ] **AC-008**: 归墟 aura_hp 叠加——3 归墟角色在场 → 全体友方 +3HP（每人 +1×3）
-- [ ] **AC-009**: 百艺 pill_boost——回复 100HP 丹药实际回复 120HP（+20%）
-- [ ] **AC-010**: 百艺 action_recover——每 3 张丹药回 1AP，每局最多触发 3 次
-- [ ] **AC-011**: 流派增益不可被 `StatusEffectSystem.remove_status` 移除——系统级效果独立于 buff 系统
-- [ ] **AC-012**: 流派增益不占用 StatusEffect 20 槽位
-- [ ] **AC-013**: 流派切换时旧增益立即清空——从 A 切换到 B，A 的增益不再生效
-- [ ] **AC-014**: 切换无重叠期——同一时刻仅一个流派增益生效
-- [ ] **AC-015**: `school_changed` 信号在切换时发射（old_id, new_id）
-- [ ] **AC-016**: 魔道首回合 +1 费与魔修遗孤天赋叠加——基础 +1（天赋）+1（流派）= +2
-- [ ] **AC-017**: 流派增益在战斗开始时锁定——战中角色阵亡导致阵营条件不满足时增益仍生效（战后重新检测）
-- [ ] **AC-018**: 无流派激活时无增益——`detect()` 返回 `&""` 时 CombatSystem 不注册任何流派增益
+- [x] **AC-001**: 正道发育流 effects 含——regen(value=2, trigger=turn_end) + damage_reduce(value=1, floor=1) + formation_ease(value=-1)
+- [x] **AC-002**: 魔道快攻流 effects 含——attack_boost(value=2, trigger=first_3_turns) + draw_on_kill(value=1) + cost_boost(turn_1, value=1)
+- [x] **AC-003**: 正邪混合流 effects 含——stat_boost(target=mixed, atk=1, def=1) + cost_discount(chance=0.3, value=1) + formation_ease(value=-1)
+- [x] **AC-004**: 归墟真灵流 effects 含——stat_boost(target=spirit, hp=3, atk=1) + immune_debuff(debuffs=[fear, confusion]) + aura_hp(value=1, per_unit=spirit)
+- [x] **AC-005**: 百艺炼丹流 effects 含——pill_boost(value=0.2) + cost_reduce(target=alchemy_material, value=1, floor=1) + action_recover(per_pills=3, value=1, max_triggers=3) + pill_breakthrough(chance=0.1)
+- [x] **AC-006**: 正道 damage_reduce floor=1——伤害最低 1，不归零
+- [x] **AC-007**: 魔道 attack_boost 仅前 3 回合生效——第 4 回合失效
+- [x] **AC-008**: 归墟 aura_hp 叠加——3 归墟角色在场 → 全体友方 +3HP（每人 +1×3）
+- [x] **AC-009**: 百艺 pill_boost——回复 100HP 丹药实际回复 120HP（+20%）
+- [x] **AC-010**: 百艺 action_recover——每 3 张丹药回 1AP，每局最多触发 3 次
+- [x] **AC-011**: 流派增益不可被 `StatusEffectSystem.remove_status` 移除——系统级效果独立于 buff 系统
+- [x] **AC-012**: 流派增益不占用 StatusEffect 20 槽位
+- [x] **AC-013**: 流派切换时旧增益立即清空——从 A 切换到 B，A 的增益不再生效
+- [x] **AC-014**: 切换无重叠期——同一时刻仅一个流派增益生效
+- [x] **AC-015**: `school_changed` 信号在切换时发射（old_id, new_id）
+- [x] **AC-016**: 魔道首回合 +1 费与魔修遗孤天赋叠加——基础 +1（天赋）+1（流派）= +2
+- [x] **AC-017**: 流派增益在战斗开始时锁定——战中角色阵亡导致阵营条件不满足时增益仍生效（战后重新检测）
+- [x] **AC-018**: 无流派激活时无增益——`detect()` 返回 `&""` 时 CombatSystem 不注册任何流派增益
 
 ---
 
@@ -197,7 +197,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/school_system/test_school_effects.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 20 test functions, all passing (53/53 total across school_system suite)
 
 ---
 

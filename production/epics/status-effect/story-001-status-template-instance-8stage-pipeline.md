@@ -1,12 +1,12 @@
 # Story 001: StatusTemplate/Instance 双层模型 + 8 阶段管线核心
 
 > **Epic**: status-effect
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration
 > **Estimate**: 1d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-10
+> **Last Updated**: 2026-08-11
 
 ## Context
 
@@ -33,24 +33,24 @@
 
 *From ADR-0011 §验证标准 + GDD status-system.md §验收标准:*
 
-- [ ] **AC-001**: StatusEffectSystem extends Node，不声明 `class_name`
-- [ ] **AC-002**: StatusTemplate Resource 类——@export 字段：template_id、type、stack_rule、max_stacks、base_duration、base_value、icon_path、description_tmpl、default_priority、metadata
-- [ ] **AC-003**: StatusInstance RefCounted 类——运行时字段：id、template_id、target_id、duration、applied_turn、value、base_value、current_stacks、source_card_instance_id、priority、is_hidden、is_expired、metadata
-- [ ] **AC-004**: `_instances: Dictionary[int, StatusInstance]`（key=status_id）+ `_by_target: Dictionary[int, Array[int]]`（key=target_id）内部注册表
-- [ ] **AC-005**: `apply_status(target_id, template_id, source_card_instance_id, overrides={})` 返回 ApplyResult（applied/status_id/reason）
-- [ ] **AC-006**: 目标无状态时施加 `template_id="poison_3"`（duration=3, stack_rule=刷新）→ 获得状态，current_stacks=1，duration=3，reason="new"
-- [ ] **AC-007**: `get_active_statuses(target_id)` 返回该角色所有活跃 status_id 列表
-- [ ] **AC-008**: `has_status(target_id, template_id)` 检查是否存在指定模板的状态
-- [ ] **AC-009**: `remove_status(status_id)` 移除指定状态实例，返回 bool；不存在返回 false（不报错）
-- [ ] **AC-010**: `tick_all(field_characters)` 倒计时——duration>0 的状态 -1，duration==0 标记 is_expired
-- [ ] **AC-011**: 永久状态（duration=-1）不参与倒计时——`tick_all` 后保持 -1
-- [ ] **AC-012**: 同回合新施加的状态不在当回合倒计时（下一己方回合 Phase 0 才减）
-- [ ] **AC-013**: `tick_all` 的 duration 递减不发射 `status_updated`（递减非用户可见事件）
-- [ ] **AC-014**: 过期状态在 Phase 0 结算后统一移除（延迟移除——确保"回合开始触发"效果仍能看到 duration=1 的状态）
-- [ ] **AC-015**: 4 个 Cat 2b 信号声明：`status_applied`、`status_removed`、`status_updated`、`status_immunity_blocked`
-- [ ] **AC-016**: `apply_status` 成功后发射 `status_applied`（载荷含 target_id/status_id/template_id/stacks/reason）
-- [ ] **AC-017**: `remove_status` 成功后发射 `status_removed`（载荷含 target_id/status_id/template_id/reason）
-- [ ] **AC-018**: `get_status_template(template_id)` 只读访问器封装 `_templates` 注册表
+- [x] **AC-001**: StatusEffectSystem extends Node，不声明 `class_name`
+- [x] **AC-002**: StatusTemplate Resource 类——@export 字段：template_id、type、stack_rule、max_stacks、base_duration、base_value、icon_path、description_tmpl、default_priority、metadata
+- [x] **AC-003**: StatusInstance RefCounted 类——运行时字段：id、template_id、target_id、duration、applied_turn、value、base_value、current_stacks、source_card_instance_id、priority、is_hidden、is_expired、metadata
+- [x] **AC-004**: `_instances: Dictionary[int, StatusInstance]`（key=status_id）+ `_by_target: Dictionary[int, Array[int]]`（key=target_id）内部注册表
+- [x] **AC-005**: `apply_status(target_id, template_id, source_card_instance_id, overrides={})` 返回 ApplyResult（applied/status_id/reason）
+- [x] **AC-006**: 目标无状态时施加 `template_id="poison_3"`（duration=3, stack_rule=刷新）→ 获得状态，current_stacks=1，duration=3，reason="new"
+- [x] **AC-007**: `get_active_statuses(target_id)` 返回该角色所有活跃 status_id 列表
+- [x] **AC-008**: `has_status(target_id, template_id)` 检查是否存在指定模板的状态
+- [x] **AC-009**: `remove_status(status_id)` 移除指定状态实例，返回 bool；不存在返回 false（不报错）
+- [x] **AC-010**: `tick_all(field_characters)` 倒计时——duration>0 的状态 -1，duration==0 标记 is_expired
+- [x] **AC-011**: 永久状态（duration=-1）不参与倒计时——`tick_all` 后保持 -1
+- [x] **AC-012**: 同回合新施加的状态不在当回合倒计时（下一己方回合 Phase 0 才减）
+- [x] **AC-013**: `tick_all` 的 duration 递减不发射 `status_updated`（递减非用户可见事件）
+- [x] **AC-014**: 过期状态在 Phase 0 结算后统一移除（延迟移除——确保"回合开始触发"效果仍能看到 duration=1 的状态）
+- [x] **AC-015**: 4 个 Cat 2b 信号声明：`status_applied`、`status_removed`、`status_updated`、`status_immunity_blocked`
+- [x] **AC-016**: `apply_status` 成功后发射 `status_applied`（载荷含 target_id/status_id/template_id/stacks/reason）
+- [x] **AC-017**: `remove_status` 成功后发射 `status_removed`（载荷含 target_id/status_id/template_id/reason）
+- [x] **AC-018**: `get_status_template(template_id)` 只读访问器封装 `_templates` 注册表
 
 ---
 
@@ -200,7 +200,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/status_effect/test_status_lifecycle.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（25 个测试函数，覆盖 AC-001 到 AC-018 + 边缘情况补强）
 
 ---
 

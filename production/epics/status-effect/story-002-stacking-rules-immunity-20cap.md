@@ -1,12 +1,12 @@
 # Story 002: 3 叠加规则 + 免疫多级检查 + 20 活跃上限
 
 > **Epic**: status-effect
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: 1d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-10
+> **Last Updated**: 2026-08-12
 
 ## Context
 
@@ -32,26 +32,26 @@
 
 *From ADR-0011 §叠加规则 §免疫机制 §活跃上限 + GDD status-system.md §验收标准:*
 
-- [ ] **AC-001**: `stack_rule=独立`（independent）——同名状态可并存，各自独立 duration/层数
-- [ ] **AC-002**: `stack_rule=刷新`（refresh）——同名施加刷新 duration 至 base_duration，current_stacks 不变
-- [ ] **AC-003**: `stack_rule=叠加上限`（cumulative）——同名施加 current_stacks+1，至 max_stacks 封顶，不刷新 duration
-- [ ] **AC-004**: 独立规则施加 3 次同名状态 → 3 个独立 status_id，各自 duration 倒计时
-- [ ] **AC-005**: 刷新规则施加 2 次同名状态 → 1 个 status_id，duration=base_duration（重置），current_stacks=1
-- [ ] **AC-006**: 叠加上限规则（max_stacks=3）施加 4 次 → 1 个 status_id，current_stacks=3（封顶），第 4 次返回 reason="max_stacks"
-- [ ] **AC-007**: 叠加上限封顶后第 4 次施加 applied=false，不发射 status_applied
-- [ ] **AC-008**: 免疫检查 3 级短路：type → template → element
-- [ ] **AC-009**: 目标对 `StatusType.POISON` 免疫 → 施加 poison_3 返回 reason="immune"，applied=false
-- [ ] **AC-010**: 目标对 `template_id="poison_3"` 免疫（但不对 POISON type 免疫）→ 施加返回 reason="immune"
-- [ ] **AC-011**: 目标对 `element=FIRE` 免疫 → 施加火元素状态返回 reason="immune"（模板标记 element）
-- [ ] **AC-012**: 免疫命中时不发射 `status_applied`，改发射 `status_immunity_blocked`（载荷含 target_id/template_id/immune_level）
-- [ ] **AC-013**: `set_immunity(target_id, level, key)` 设置免疫标志——level ∈ {"type","template","element"}，key 为对应值
-- [ ] **AC-014**: `clear_immunity(target_id, level, key)` 清除指定免疫标志
-- [ ] **AC-015**: 单目标活跃状态达 20 个上限——第 21 次施加触发驱逐
-- [ ] **AC-016**: 驱逐策略：按 priority 升序（最低优先级）+ applied_turn 升序（最旧）选首个驱逐
-- [ ] **AC-017**: 驱逐被移除状态发射 `status_removed`（reason="overflow"）
-- [ ] **AC-018**: 驱逐后新状态成功注册，applied=true，reason="new"
-- [ ] **AC-019**: 永久状态（duration=-1）同样受 20 上限约束——可被驱逐
-- [ ] **AC-020**: `get_active_count(target_id)` 返回该目标活跃状态数（含 is_expired 未移除的）
+- [x] **AC-001**: `stack_rule=独立`（independent）——同名状态可并存，各自独立 duration/层数
+- [x] **AC-002**: `stack_rule=刷新`（refresh）——同名施加刷新 duration 至 base_duration，current_stacks 不变
+- [x] **AC-003**: `stack_rule=叠加上限`（cumulative）——同名施加 current_stacks+1，至 max_stacks 封顶，不刷新 duration
+- [x] **AC-004**: 独立规则施加 3 次同名状态 → 3 个独立 status_id，各自 duration 倒计时
+- [x] **AC-005**: 刷新规则施加 2 次同名状态 → 1 个 status_id，duration=base_duration（重置），current_stacks=1
+- [x] **AC-006**: 叠加上限规则（max_stacks=3）施加 4 次 → 1 个 status_id，current_stacks=3（封顶），第 4 次返回 reason="max_stacks"
+- [x] **AC-007**: 叠加上限封顶后第 4 次施加 applied=false，不发射 status_applied
+- [x] **AC-008**: 免疫检查 3 级短路：type → template → element
+- [x] **AC-009**: 目标对 `StatusType.POISON` 免疫 → 施加 poison_3 返回 reason="immune"，applied=false
+- [x] **AC-010**: 目标对 `template_id="poison_3"` 免疫（但不对 POISON type 免疫）→ 施加返回 reason="immune"
+- [x] **AC-011**: 目标对 `element=FIRE` 免疫 → 施加火元素状态返回 reason="immune"（模板标记 element）
+- [x] **AC-012**: 免疫命中时不发射 `status_applied`，改发射 `status_immunity_blocked`（载荷含 target_id/template_id/immune_level）
+- [x] **AC-013**: `set_immunity(target_id, level, key)` 设置免疫标志——level ∈ {"type","template","element"}，key 为对应值
+- [x] **AC-014**: `clear_immunity(target_id, level, key)` 清除指定免疫标志
+- [x] **AC-015**: 单目标活跃状态达 20 个上限——第 21 次施加触发驱逐
+- [x] **AC-016**: 驱逐策略：按 priority 升序（最低优先级）+ applied_turn 升序（最旧）选首个驱逐
+- [x] **AC-017**: 驱逐被移除状态发射 `status_removed`（reason="overflow"）
+- [x] **AC-018**: 驱逐后新状态成功注册，applied=true，reason="new"
+- [x] **AC-019**: 永久状态（duration=-1）同样受 20 上限约束——可被驱逐
+- [x] **AC-020**: `get_active_count(target_id)` 返回该目标活跃状态数（含 is_expired 未移除的）
 
 ---
 
@@ -211,7 +211,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/status_effect/test_stacking_immunity.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（25 个测试函数，25 passed / 0 failed / 84 assertions，覆盖 AC-001 到 AC-020 + 边缘情况补强）
 
 ---
 

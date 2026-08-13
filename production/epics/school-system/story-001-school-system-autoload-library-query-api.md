@@ -1,12 +1,12 @@
 # Story 001: SchoolSystem Autoload #19 + SCHOOL_LIBRARY const + 纯查询接口
 
 > **Epic**: school-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-10
+> **Last Updated**: 2026-08-12
 
 ## Context
 
@@ -32,24 +32,24 @@
 
 *From ADR-0025 §关键接口 §验证标准 + GDD school-system.md §验收标准:*
 
-- [ ] **AC-001**: SchoolSystem extends Node，不声明 `class_name`
-- [ ] **AC-002**: `const SCHOOL_LIBRARY: Dictionary` 含 5 流派 entry——`righteous_dev`/`demonic_aggro`/`mixed_alignment`/`spirit_realm_beast`/`alchemy_mastery`
-- [ ] **AC-003**: 每个流派 entry 含字段——`id`/`name`/`tagline`/`description`/`priority`/`detection`/`effects`/`weakness`/`visual_theme`
-- [ ] **AC-004**: 优先级数值——归墟真灵流=1、正道发育流=2、魔道快攻流=3、正邪混合流=4、百艺炼丹流=5
-- [ ] **AC-005**: `detect(state: Dictionary) -> StringName`——按 priority 升序遍历，返回首个全部条件满足的流派 ID（或 `&""`）
-- [ ] **AC-006**: `calculate_match(school_id, state) -> Dictionary`——返回 `{score: float, missing: Array[String]}`
-- [ ] **AC-007**: `get_school_info(school_id) -> Dictionary`——返回流派元数据（name/tagline/description/effects/weakness/visual_theme）
-- [ ] **AC-008**: `get_school_effects(school_id) -> Array[Dictionary]`——返回增益效果列表
-- [ ] **AC-009**: `get_all_schools() -> Array[StringName]`——返回 5 流派 ID 列表
-- [ ] **AC-010**: `signal school_changed(old_school_id, new_school_id)` Cat 2b 信号声明
-- [ ] **AC-011**: `detect()` 优先级——同时满足正道+正邪混合 → 返回正道（priority 2 < 4）
-- [ ] **AC-012**: `detect()` 优先级——同时满足归墟+正道 → 返回归墟（priority 1 最高）
-- [ ] **AC-013**: `detect()` 无流派满足 → 返回 `&""`（空 StringName）
-- [ ] **AC-014**: `calculate_match` 权重——阵营人数 40、必备角色 30、卡牌类型占比 20、境界 10
-- [ ] **AC-015**: `calculate_match` score 范围 [0, 100]——round 加权平均
-- [ ] **AC-016**: `calculate_match` missing 列表——未满足条件含人类可读描述（如"需 3 个正道角色（当前 2/3）"）
-- [ ] **AC-017**: `get_school_info`/`get_school_effects` 未知 school_id 返回空（`{}`/`[]`），不报错
-- [ ] **AC-018**: `const SCHOOL_LIBRARY` 运行时不可变性——GUT 冒烟测试验证流派模板内容未被运行时修改
+- [x] **AC-001**: SchoolSystem extends Node，不声明 `class_name`
+- [x] **AC-002**: `const SCHOOL_LIBRARY: Dictionary` 含 5 流派 entry——`righteous_dev`/`demonic_aggro`/`mixed_alignment`/`spirit_realm_beast`/`alchemy_mastery`
+- [x] **AC-003**: 每个流派 entry 含字段——`id`/`name`/`tagline`/`description`/`priority`/`detection`/`effects`/`weakness`/`visual_theme`
+- [x] **AC-004**: 优先级数值——归墟真灵流=1、正道发育流=2、魔道快攻流=3、正邪混合流=4、百艺炼丹流=5
+- [x] **AC-005**: `detect(state: Dictionary) -> StringName`——按 priority 升序遍历，返回首个全部条件满足的流派 ID（或 `&""`）
+- [x] **AC-006**: `calculate_match(school_id, state) -> Dictionary`——返回 `{score: float, missing: Array[String]}`
+- [x] **AC-007**: `get_school_info(school_id) -> Dictionary`——返回流派元数据（name/tagline/description/effects/weakness/visual_theme）
+- [x] **AC-008**: `get_school_effects(school_id) -> Array[Dictionary]`——返回增益效果列表
+- [x] **AC-009**: `get_all_schools() -> Array[StringName]`——返回 5 流派 ID 列表
+- [x] **AC-010**: `signal school_changed(old_school_id, new_school_id)` Cat 2b 信号声明
+- [x] **AC-011**: `detect()` 优先级——同时满足正道+正邪混合 → 返回正道（priority 2 < 4）
+- [x] **AC-012**: `detect()` 优先级——同时满足归墟+正道 → 返回归墟（priority 1 最高）
+- [x] **AC-013**: `detect()` 无流派满足 → 返回 `&""`（空 StringName）
+- [x] **AC-014**: `calculate_match` 权重——阵营人数 40、必备角色 30、卡牌类型占比 20、境界 10
+- [x] **AC-015**: `calculate_match` score 范围 [0, 100]——round 加权平均
+- [x] **AC-016**: `calculate_match` missing 列表——未满足条件含人类可读描述（如"需 3 个正道角色（当前 2/3）"）
+- [x] **AC-017**: `get_school_info`/`get_school_effects` 未知 school_id 返回空（`{}`/`[]`），不报错
+- [x] **AC-018**: `const SCHOOL_LIBRARY` 运行时不可变性——GUT 冒烟测试验证流派模板内容未被运行时修改
 
 ---
 
@@ -199,7 +199,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/school_system/test_school_library_query.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（33 个测试函数，33 passed / 0 failed / 124 assertions，覆盖 AC-001 到 AC-018 + 边缘情况补强）
 
 ---
 

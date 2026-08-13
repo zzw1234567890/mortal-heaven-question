@@ -1,7 +1,7 @@
 # Story 002: 双重信号路径（cost_changed Cat 2b + GSM batch_updated Cat 1）
 
 > **Epic**: cost-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: 0.5d
@@ -158,3 +158,11 @@
 
 - Depends on: Story 001（CostSystem 内部状态 + 变异 API + `_write_cost_to_gsm` 桩）
 - Unlocks: 战斗 UI Epic（CombatUI 费用栏订阅信号刷新）
+
+## Completion Notes
+**Completed**：2026-08-10
+**Criteria**：12/12 通过
+**Deviations**：Story 001 `init_for_battle()` 遗漏 `cost_changed.emit`——本 Story 修复（追加至 L118）
+**Test Evidence**：`tests/unit/cost_system/test_cost_signals.gd` — 15 个测试函数，覆盖 AC-001 到 AC-012
+**Code Review**：APPROVED — ADR-0015 合规，GSM `_set_battle_cost` 遵循 `_buffer_change` 管线模式，信号时序 `await get_tree().process_frame` 验证 Cat 1 帧末延迟
+**Crash Risk Addressed**：`_set_battle_cost` 包含 `battle == null` 守卫（L258-260）

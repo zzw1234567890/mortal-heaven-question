@@ -6,7 +6,7 @@
 **引擎**：Godot 4.6.3  
 **Sprint 文件**：`production/sprints/sprint-3.md`
 
-> **注**：Sprint 3 story 文件尚未创建（3-1 `/create-stories` 是第一步）。本计划基于 GDD 验收标准 + 公式 + 边界情况 + ADR 推导测试用例。3-1 完成后，story 文件的 `## QA Test Cases` 章节将回填本计划内容。
+> **注**：7 个 story 文件已全部创建，`## QA Test Cases` 章节已回填完毕（18+12+18+20+18+18+18 = 122 个测试用例）。3-1 `/create-stories` 步骤已完成，story 文件状态见 `production/sprint-status.yaml`。
 
 ---
 

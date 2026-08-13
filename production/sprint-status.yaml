@@ -14,7 +14,7 @@ goal: "完成 Core 层剩余 3 系统（CostSystem / StatusEffectSystem / School
 start: "2026-08-10"
 end: "2026-08-23"
 generated: "2026-08-10"
-updated: "2026-08-10"
+updated: "2026-08-13"
 
 stories:
   # === /create-stories（关键路径根节点）===
@@ -22,84 +22,84 @@ stories:
     name: "create-stories cost + status-effect + school（含跨 Epic 接口契约盘点）"
     file: ""
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-08-10"
 
   # === cost-system ===
   - id: "3-2"
     name: "CostSystem Autoload #7：费用上限 + 全额恢复 + 临时加成"
-    file: ""
+    file: "production/epics/cost-system/story-001-cost-system-autoload-query-mutation-api.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "依赖 #3-1 create-stories 完成"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-10"
 
   - id: "3-3"
     name: "双重信号路径（cost_changed + batch_updated）"
-    file: ""
+    file: "production/epics/cost-system/story-002-dual-signal-path-cost-changed-batch-updated.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "依赖 #3-2"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-10"
 
   # === status-effect ===
   - id: "3-4"
     name: "StatusTemplate/Instance + 8 阶段管线核心"
-    file: ""
+    file: "production/epics/status-effect/story-001-status-template-instance-8stage-pipeline.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 1.0
-    blocker: "依赖 #3-1 create-stories 完成"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-10"
 
   - id: "3-5"
     name: "3 叠加规则 + 免疫多级检查 + 20 活跃上限"
-    file: ""
+    file: "production/epics/status-effect/story-002-stacking-rules-immunity-20cap.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 1.0
-    blocker: "依赖 #3-4"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-12"
 
   - id: "3-6"
     name: "战斗结束 snapshot 导出 GSM + 暂挂/恢复排序"
-    file: ""
+    file: "production/epics/status-effect/story-003-snapshot-export-suspend-restore.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "依赖 #3-5"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-12"
 
   # === school-system ===
   - id: "3-7"
     name: "SchoolSystem Autoload #19：SCHOOL_LIBRARY const + 纯查询接口"
-    file: ""
+    file: "production/epics/school-system/story-001-school-system-autoload-library-query-api.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "依赖 #3-1 create-stories 完成"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-11"
 
   - id: "3-8"
     name: "5 流派增益公式 + 不可驱散约束"
-    file: ""
+    file: "production/epics/school-system/story-002-5-school-effects-undispellable-switch-clear.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "依赖 #3-7 和 #3-5（不可驱散约束测试需 StatusEffectSystem）"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-13"
 
   # === 技术债 ===
   - id: "3-9"

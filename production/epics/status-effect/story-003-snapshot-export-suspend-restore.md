@@ -1,12 +1,12 @@
 # Story 003: 战斗结束 snapshot 导出 GSM + 暂挂/恢复排序
 
 > **Epic**: status-effect
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration
 > **Estimate**: 1d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-10
+> **Last Updated**: 2026-08-12
 
 ## Context
 
@@ -32,24 +32,24 @@
 
 *From ADR-0011 §snapshot 导出 §暂挂/恢复 §GSM 例外 + GDD status-system.md §验收标准:*
 
-- [ ] **AC-001**: `export_snapshot()` 返回 Array[Dictionary]，每个字典含 id/template_id/target_id/duration/applied_turn/value/current_stacks/source_card_instance_id/priority/is_hidden
-- [ ] **AC-002**: snapshot 仅含活跃状态（is_expired=true 的排除）
-- [ ] **AC-003**: snapshot 按目标分组——同 target_id 的状态连续排列
-- [ ] **AC-004**: `write_snapshot_to_gsm()` 调用 `GSM._set_battle_status_snapshot(snapshot)` 写入 battle 域
-- [ ] **AC-005**: GSM 不可用时 `write_snapshot_to_gsm` 不崩溃（`is_instance_valid` + `has_method` 守卫）
-- [ ] **AC-006**: `GSM._set_battle_status_snapshot(snapshot)` 通过 `_buffer_change` 管线 + 帧末 `batch_updated` 发射
-- [ ] **AC-007**: `batch_updated` 载荷含 `battle.status_snapshot: {old, new}` 展平字典
-- [ ] **AC-008**: `suspend_status(status_id)` 将实例从 `_instances`/`_by_target` 迁入 `_suspended`——倒计时冻结
-- [ ] **AC-009**: 暂挂状态不在 `get_active_statuses` 中返回
-- [ ] **AC-010**: 暂挂状态 `tick_all` 不递减 duration
-- [ ] **AC-011**: `restore_status(status_id)` 将实例从 `_suspended` 迁回 `_instances`/`_by_target`——倒计时恢复
-- [ ] **AC-012**: 恢复后状态在 `get_active_statuses` 中重新出现
-- [ ] **AC-013**: `restore_all_suspended(target_id)` 按 priority 降序 + applied_turn 升序恢复（稳定性保证）
-- [ ] **AC-014**: 恢复时若目标已达 20 上限——触发驱逐（复用 Story 002 _evict_lowest）后恢复
-- [ ] **AC-015**: 与 BindingManager 排序契约：恢复后的状态激活顺序与 BindingManager 计算的 effect_order 一致
-- [ ] **AC-016**: `get_suspended_statuses(target_id)` 返回该目标暂挂状态列表
-- [ ] **AC-017**: snapshot 序列化 round-trip——export 后 import（`import_snapshot(arr)`）重建状态，字段一致
-- [ ] **AC-018**: import_snapshot 跳过 is_expired 条目（不恢复已过期状态）
+- [x] **AC-001**: `export_snapshot()` 返回 Array[Dictionary]，每个字典含 id/template_id/target_id/duration/applied_turn/value/current_stacks/source_card_instance_id/priority/is_hidden
+- [x] **AC-002**: snapshot 仅含活跃状态（is_expired=true 的排除）
+- [x] **AC-003**: snapshot 按目标分组——同 target_id 的状态连续排列
+- [x] **AC-004**: `write_snapshot_to_gsm()` 调用 `GSM._set_battle_status_snapshot(snapshot)` 写入 battle 域
+- [x] **AC-005**: GSM 不可用时 `write_snapshot_to_gsm` 不崩溃（`is_instance_valid` + `has_method` 守卫）
+- [x] **AC-006**: `GSM._set_battle_status_snapshot(snapshot)` 通过 `_buffer_change` 管线 + 帧末 `batch_updated` 发射
+- [x] **AC-007**: `batch_updated` 载荷含 `battle.status_snapshot: {old, new}` 展平字典
+- [x] **AC-008**: `suspend_status(status_id)` 将实例从 `_instances`/`_by_target` 迁入 `_suspended`——倒计时冻结
+- [x] **AC-009**: 暂挂状态不在 `get_active_statuses` 中返回
+- [x] **AC-010**: 暂挂状态 `tick_all` 不递减 duration
+- [x] **AC-011**: `restore_status(status_id)` 将实例从 `_suspended` 迁回 `_instances`/`_by_target`——倒计时恢复
+- [x] **AC-012**: 恢复后状态在 `get_active_statuses` 中重新出现
+- [x] **AC-013**: `restore_all_suspended(target_id)` 按 priority 降序 + applied_turn 升序恢复（稳定性保证）
+- [x] **AC-014**: 恢复时若目标已达 20 上限——触发驱逐（复用 Story 002 _evict_lowest）后恢复
+- [x] **AC-015**: 与 BindingManager 排序契约：恢复后的状态激活顺序与 BindingManager 计算的 effect_order 一致
+- [x] **AC-016**: `get_suspended_statuses(target_id)` 返回该目标暂挂状态列表
+- [x] **AC-017**: snapshot 序列化 round-trip——export 后 import（`import_snapshot(arr)`）重建状态，字段一致
+- [x] **AC-018**: import_snapshot 跳过 is_expired 条目（不恢复已过期状态）
 
 ---
 
@@ -198,7 +198,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/status_effect/test_snapshot_suspend.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（23 个测试函数，23 passed / 0 failed / 覆盖 AC-001 到 AC-018 + 边缘情况补强）
 
 ---
 
