@@ -104,17 +104,26 @@ func test_ac005_set_resource_insufficient_funds_no_concept() -> void:
 	assert_eq(gsm.player.resources["ling_shi"], 0, "_set_resource_ling_shi 直接写入新值")
 
 
-func test_ac006_nonexistent_resource_type_add_rejected() -> void:
-	assert_false(gsm.add_resource(&"nonexistent_type", 100), "不存在的资源类型应返回 false")
+func test_set_resource_ling_cai_invalid_quality_rejected() -> void:
+	## _set_resource_ling_cai 无效品质（0/5）应被拒绝且不写入（GSM 第二层真实表面）
+	gsm._set_resource_ling_cai(0, 50)
+	assert_eq(gsm.player.resources["ling_cai"]["low"], 0, "品质 0 应被拒绝，low 不变")
+	gsm._set_resource_ling_cai(5, 50)
+	assert_eq(gsm.player.resources["ling_cai"]["top"], 0, "品质 5 应被拒绝，top 不变")
 
 
-func test_ac006_nonexistent_resource_type_spend_rejected() -> void:
-	assert_false(gsm.spend_resource(&"nonexistent_type", 10), "不存在的资源类型应返回 false")
+func test_set_resource_ling_shi_same_value_dedup() -> void:
+	## 同值写入应去重——不进入帧末缓冲
+	gsm.player.resources["ling_shi"] = 100
+	gsm._set_resource_ling_shi(100)
+	assert_true(gsm._pending_changes.is_empty(), "同值写入不应缓冲变更")
 
 
-func test_ac006_add_resource_positive_only() -> void:
-	assert_false(gsm.add_resource(&"ling_shi", 0), "amount=0 应返回 false")
-	assert_false(gsm.add_resource(&"ling_shi", -5), "负 amount 应返回 false")
+func test_set_resource_ling_cai_same_value_dedup() -> void:
+	## 同品质同值写入应去重
+	gsm.player.resources["ling_cai"]["low"] = 30
+	gsm._set_resource_ling_cai(1, 30)
+	assert_true(gsm._pending_changes.is_empty(), "同品质同值写入不应缓冲变更")
 
 
 func test_ac007_battle_start_initializes_domain() -> void:
@@ -184,9 +193,11 @@ func test_ac011_reincarnation_resets_player_state() -> void:
 	gsm.player.cultivation = 800
 	gsm.player.realm = GSM_SCRIPT.RealmLevel.FOUNDATION
 	gsm.player.resources["ling_shi"] = 500
-	gsm.player.resources["ling_cai"] = 30
+	gsm.player.resources["ling_cai"] = {"low": 10, "medium": 20, "high": 30, "top": 40}
+	gsm.player.resources["dan_yao_sui_pian"] = 999
 	gsm.player.overflow_pool = 100
 	gsm.player.max_cultivation = 1500
+	gsm.player.cultivation_full = true
 	gsm.collection.owned_cards = ["card_001", "card_002"]
 
 	gsm.reincarnation_reset()
@@ -194,7 +205,8 @@ func test_ac011_reincarnation_resets_player_state() -> void:
 	assert_eq(gsm.player.cultivation, 0, "修为应归零")
 	assert_eq(gsm.player.realm, GSM_SCRIPT.RealmLevel.QI_REFINING, "境界应重置为炼气")
 	assert_eq(gsm.player.resources["ling_shi"], 0, "灵石应归零")
-	assert_eq(gsm.player.resources["ling_cai"], 0, "灵材应归零")
+	assert_eq(gsm.player.resources["ling_cai"], {"low": 0, "medium": 0, "high": 0, "top": 0}, "灵材四品质应归零")
+	assert_eq(gsm.player.resources["dan_yao_sui_pian"], 0, "丹药碎片应归零")
 	assert_eq(gsm.player.overflow_pool, 0, "溢出池应归零")
 	assert_false(gsm.player.cultivation_full, "cultivation_full 应重置为 false")
 	assert_eq(gsm.player.max_cultivation, gsm.BASE_MAX, "max_cultivation 应重置为 BASE_MAX")
@@ -232,10 +244,14 @@ func test_ac012_set_identity_overwrite() -> void:
 	assert_eq(gsm.player.identity_id, "identity_second", "身份应可被覆盖")
 
 
-func test_add_resource_to_existing_type() -> void:
-	gsm.player.resources["dan_yao_sui_pian"] = 10
-	assert_true(gsm.add_resource(&"dan_yao_sui_pian", 30), "add_resource 应返回 true")
-	assert_eq(gsm.player.resources["dan_yao_sui_pian"], 40, "丹药碎片应从 10 增加到 40")
+func test_set_resource_ling_cai_multi_quality_write() -> void:
+	## 多品质灵材独立写入（GSM 第二层真实表面）
+	gsm._set_resource_ling_cai(1, 10)  # low
+	gsm._set_resource_ling_cai(4, 40)  # top
+	assert_eq(gsm.player.resources["ling_cai"]["low"], 10, "low 品质应写入 10")
+	assert_eq(gsm.player.resources["ling_cai"]["top"], 40, "top 品质应写入 40")
+	assert_eq(gsm.player.resources["ling_cai"]["medium"], 0, "medium 品质应保持默认 0")
+	assert_eq(gsm.player.resources["ling_cai"]["high"], 0, "high 品质应保持默认 0")
 
 
 # =========================================================================
@@ -259,7 +275,7 @@ func test_batch_updated_signal_emitted_on_spend_resource() -> void:
 	gsm.player.resources["ling_shi"] = 100
 	gsm.batch_updated.connect(_on_batch_updated)
 
-	gsm.spend_resource(&"ling_shi", 30)
+	gsm._set_resource_ling_shi(70)
 	await get_tree().process_frame
 
 	assert_true(_caught_changes.has("player.resources.ling_shi"), "batch_updated 应包含资源路径")
@@ -271,7 +287,7 @@ func test_resource_changed_signal_emitted_on_add() -> void:
 	gsm.player.resources["ling_shi"] = 50
 	gsm.resource_changed.connect(_on_resource_changed)
 
-	gsm.add_resource(&"ling_shi", 25)
+	gsm._set_resource_ling_shi(75)
 	await get_tree().process_frame
 
 	assert_eq(_caught_resource_type, &"ling_shi", "type 应为 ling_shi")
@@ -280,10 +296,10 @@ func test_resource_changed_signal_emitted_on_add() -> void:
 
 
 func test_resource_changed_signal_emitted_on_spend() -> void:
-	gsm.player.resources["ling_cai"] = 80
+	gsm.player.resources["ling_cai"]["low"] = 80
 	gsm.resource_changed.connect(_on_resource_changed)
 
-	gsm.spend_resource(&"ling_cai", 30)
+	gsm._set_resource_ling_cai(1, 50)
 	await get_tree().process_frame
 
 	assert_eq(_caught_resource_delta, -30, "消耗时 delta 应为 -30")

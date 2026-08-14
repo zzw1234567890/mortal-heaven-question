@@ -446,6 +446,11 @@ func _load_templates() -> void:
 
 #### 循环检测算法
 
+> **[b]2026-08-14 更新[/b]（Story 3-11）**：下述 `_check_chain_cycle` 伪代码为 ADR 初版设计。
+> 实现中此职责已提取至 `ChainHandler`（`src/foundation/event_system/chain_handler.gd`），
+> 由 `EventSystem.get_chain_event()` / `EventSystem.check_chain_cycle()` 薄转发。
+> 实际签名与行为见下方「visited_ids 生命周期」小节，以代码为准。
+
 ```gdscript
 const MAX_CHAIN_DEPTH: int = 3
 
@@ -470,6 +475,32 @@ func _check_chain_cycle(instance: EventInstance, next_id: StringName) -> bool:
 ##     new_inst.chain_depth = inst.chain_depth + 1
 ##     ...
 ```
+
+#### visited_ids 生命周期（Story 3-11 补充）
+
+> 初版 ADR 将循环检测描述为「调用方维护 `_chain_visited_ids` 集合」，
+> 但未明确集合的**所有权、初始化时机与清空语义**。实现（`Story 2-13` 拆分后）将这些契约固化如下，本小节为权威记录。
+
+**所有权与存储**：
+- `visited_ids` 的唯一数据所有者是 [b]EventSystem[/b]，声明为实例成员 `_chain_visited_ids: Array[StringName]`（`event_system.gd:81`）。
+- `ChainHandler`（`chain_handler.gd`）**不持有**此数据——它仅通过 `init(templates, visited_ids)` 接收一个**引用**（`Array` 是引用类型，两处修改同步可见），避免副本同步问题，并保留测试白盒访问点 `es._chain_visited_ids`。
+
+**初始化时机**：
+- `EventSystem._init()` 中，`_chain_visited_ids` 随实例构造为**空数组**（成员默认值），并经 `_chain_handler.init(templates, _chain_visited_ids)` 注入共享引用。
+- 由于 `_init()` 在 `Object.new()`（含测试实例 `ES_SCRIPT.new()`）时即执行，链处理器在无场景树/无 `_ready()` 的测试环境下即可用。
+
+**清空语义（链结束契约）**——所有链结束分支均清空 `visited_ids`，确保下一次 `trigger_event()` 从干净状态开始：
+1. **场景 (a)** 无 `chain_next` → `get_chain_event()` 返回 `&""` 并 `clear()`；
+2. **场景 (b)** 深度截断（`chain_depth >= MAX_CHAIN_DEPTH`）→ `push_warning` + 返回 `&""` 并 `clear()`；
+3. **场景 (d)** `chain_on_option` 不匹配 → 返回 `&""` 并 `clear()`；
+4. **循环命中** → `check_chain_cycle()` 检测 `has(next_id)` → `push_warning` + 发射 `chain_ended` + `clear()` 并返回 `false`。
+
+**追加语义**：仅 `check_chain_cycle()` 在确认无循环时执行 `append(next_id)`；`get_chain_event()` 是纯查询（CQS——命令查询分离），**不修改** visited_ids、不发射信号。
+
+**边界行为**：
+- `visited_ids` 的生命周期**与单条事件链对齐，而非单个事件**——清空发生在「链结束」而非「事件结算完毕」。因此同一链内跨多个事件累积检测，跨链自动复位。
+- 深度截断与循环命中都走 `push_warning`（非静默），保留可观测性（ADR-0003 决策「非静默日志」）。
+- 因 Array 为引用共享，任何测试或外部消费者**不得**在链进行中直接改写 `_chain_visited_ids`——仅 `check_chain_cycle`/`get_chain_event` 两个方法拥有写权限。
 
 ### 版本兼容性策略
 

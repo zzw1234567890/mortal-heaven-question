@@ -1,29 +1,96 @@
-## Session Extract — /story-done 2026-08-10
+## Session Extract — /story-done 2026-08-13
 
 - Verdict：COMPLETE
-- Story：`production/epics/cost-system/story-001-cost-system-autoload-query-mutation-api.md` — CostSystem Autoload + 内部状态 + 查询/变异 API
-- Implementation：`src/core/cost_system.gd`（215 行）、`tests/integration/cost_system/test_cost_system_basic.gd`（608 行，60 tests）
-- Tech debt logged：None
-- Next recommended：Story 3-3（cost-system 双重信号路径）或 3-4（status-effect 8 阶段管线）
+- Story：`production/epics/school-system/story-002-5-school-effects-undispellable-switch-clear.md` — 5 流派增益公式 + 不可驱散约束 + 切换清空
+- Implementation：`src/core/school_system/school_system.gd`（5 个 effects 数组字段名/数值重写匹配 AC-001~005）
+- Tests：`tests/unit/school_system/test_school_effects.gd`（20 测试，覆盖 AC-001~018），school_system 套件 53/53 passed
+- Next recommended：Story 3-9（拆分 game_state_manager.gd）
 
 ---
 
-## Session Extract — /story-done 2026-08-10
+## Session Extract — Story 3-9 拆分 GSM 2026-08-13
 
-- Verdict：COMPLETE
-- Story：`production/epics/cost-system/story-002-dual-signal-path-cost-changed-batch-updated.md` — 双重信号路径（cost_changed Cat 2b + GSM batch_updated Cat 1）
-- Implementation：`src/core/cost_system.gd`（修复 init_for_battle 遗漏 cost_changed.emit）、`src/foundation/game_state_manager.gd`（新增 _set_battle_cost 方法）
-- Tests：`tests/unit/cost_system/test_cost_signals.gd`（15 个测试函数，覆盖 AC-001 到 AC-012）
-- Tech debt logged：None
-- Deviations：Story 001 init_for_battle() 遗漏 cost_changed.emit——本 Story 修复（追加至 L118）
-- Next recommended：Story 3-4（status-effect 8 阶段管线）或 3-7（school-system 基础框架）
+- Verdict：COMPLETE（game_state_manager.gd 1080 → 282 行，达成 ≤300 目标）
+- 拆分结构（4 文件）：
+  - `src/foundation/game_state_manager.gd`（282 行）——信号/枚举/数据域/生命周期 + 薄转发 wrapper
+  - `src/foundation/gsm/gsm_atomic_writes.gd`（429 行）——22 个第二层原子写入方法 + 卡牌校验
+  - `src/foundation/gsm/gsm_signal_router.gd`（141 行）——信号缓冲/帧末刷新/域信号路由/订阅
+  - `src/foundation/gsm/gsm_serializer.gd`（311 行）——序列化/反序列化/域访问/深拷贝/默认值
+- 委托模式：同 event_system 拆分先例（RefCounted delegate + init(gsm) + _init 装配）
+- 回归：全量 53 scripts / 1003 tests，993 passed / 8 failing——与拆分前基线一致（8 个既有失败：cost_system 6 + realm 1 + event 1），零新增失败
+- 注意：`tests/unit/gsm/` 下 4 个 `*_test.gd` 后缀文件名不以 `test_` 开头，GUT 未发现（孤儿测试）——既有问题，本 Story 未处理（属 3-10 范畴）
+- Next recommended：Story 3-10（GSM 第二层方法独立单测补齐）或 3-11（ADR-0003 文档）
 
 ---
 
-## Session Extract — 状态同步 2026-08-11
+## 状态同步 2026-08-14
 
-- 操作：检查 sprint-3 状态一致性并更新
-- 更新内容：
-  - `sprint-status.yaml`：Story 3-4 `in-progress` → `done`（completed: 2026-08-10），Story 3-5 blocker 清空
-  - `story-001-status-template-instance-8stage-pipeline.md`：Status → Complete，AC 全部打勾，Test Evidence 打勾
-- 当前 sprint 进度：4/12 done（3-1, 3-2, 3-3, 3-4），2 个 ready-for-dev（3-7, 3-9），其余 backlog
+- sprint 进度：12/12 done（3-1~3-12）——Sprint 3 全部完成 ✅
+- 剩余：无
+
+---
+
+## Session Extract — Story 3-12 Feature 层 Epic Story 预创建 2026-08-14
+
+- Verdict：COMPLETE
+- 范围（用户决策）：全部 18 个 Feature 系统 + 标题级骨架
+- 产物：18 个 `production/epics/<name>/EPIC.md`（标题级 story 拆分表，AC 留待 `/dev-story` 填充）+ 更新 `production/epics/index.md`
+- 18 个 Epic（Layer=Feature，Status=Backlog）：
+  - 战斗子系统 6：combat-system(4) / card-effect-engine(5) / deployment-system(4) / binding-system(4) / formation-system(4) / ai-system(4)
+  - 探索经济 6：exploration-system(5) / cultivation-system(4) / tribulation-system(4) / deck-editing-system(4) / alchemy-crafting-system(4) / inscription-system(3)
+  - 成长元进度 3：identity-selection-system(3) / reincarnation-talent-system(3) / achievement-system(3)
+  - 叙事 3：story-system(4) / dialogue-system(3) / ending-branch-system(3)
+  - 合计 67 个 story 标题
+- 关键架构事实（写入各 EPIC.md 的 ADR 引用）：
+  - Autoload 编号与层定位从各 ADR 的「排序说明」提取
+  - 非 Autoload 系统：alchemy/inscription/dialogue 为 RefCounted 服务类；ending 嵌入 StorySystem；reincarnation/achievement 经 ProgressionSystem(ADR-0012) 直写
+- Next：Sprint 3 全部 12 个 story 完成。下一步建议用 `/dev-story` 从 combat-system 起逐条填充 AC 并实现 Feature 层（战斗子系统为 MVP 关键路径）。
+
+---
+
+## Session Extract — Story 3-11 ADR-0003 §visited_ids 生命周期文档补充 2026-08-14
+
+- Verdict：COMPLETE
+- 文件：`docs/decisions/ADR-0003-event-system-story-flags-owner-resource-templates.md`
+- 变更：§循环检测算法 顶部加「2026-08-14 更新」标注（初版 `_check_chain_cycle` 伪代码已提取至 ChainHandler）；新增 §visited_ids 生命周期 小节，权威记录：
+  - 所有权：`_chain_visited_ids` 唯一所有者 = EventSystem（`event_system.gd:81`），ChainHandler 经 `init(templates, visited_ids)` 注入引用（Array 引用类型，无副本同步）
+  - 初始化：`_init()` 中空数组构造 + 注入共享引用（测试实例 `ES_SCRIPT.new()` 亦可用）
+  - 清空语义：4 条链结束分支（无 chain_next / 深度截断 / 选项不匹配 / 循环命中）均 `clear()`
+  - 追加语义：仅 `check_chain_cycle()` append；`get_chain_event()` 为纯查询（CQS）不修改
+  - 边界：生命周期对齐「事件链」而非「单个事件」；Array 引用共享 → 外部不得在链中直接改写
+- Next recommended：Story 3-12（Feature 层 Epic Story 预创建，nice-to-have，1 天）
+
+---
+
+## Session Extract — Story 3-10 GSM 第二层方法独立单测补齐 2026-08-14
+
+- Verdict：COMPLETE
+- 完成内容：
+  1. **重命名 5 个孤儿测试**（`_test.gd` → `test_*.gd` + `.uid`，git mv）——GUT 前缀规则 `test_` 未匹配导致此前不被发现：
+     - `tests/unit/gsm/atomic_write_methods_test.gd` → `test_atomic_write_methods.gd`
+     - `tests/unit/gsm/autoload_and_tier1_read_test.gd` → `test_autoload_and_tier1_read.gd`
+     - `tests/unit/gsm/serialize_deserialize_test.gd` → `test_serialize_deserialize.gd`
+     - `tests/unit/gsm/signal_layer_and_batch_updated_test.gd` → `test_signal_layer_and_batch_updated.gd`
+     - `tests/integration/gsm/validation_skip_and_enable_test.gd` → `test_validation_skip_and_enable.gd`
+  2. **修复既有失效断言**（零覆盖原因：断言针对拆分前/旧数据模型）：
+     - `test_autoload_and_tier1_read.gd`：`ling_cai == 0` → 四品质嵌套字典 `{low,medium,high,top}` 断言
+     - `test_atomic_write_methods.gd`：7 个 `gsm.add_resource/spend_resource`（GSM 无此方法，属 ResourceSystem）重写为真实 GSM 第二层方法 `_set_resource_ling_shi`/`_set_resource_ling_cai`；reincarnation_reset 的 ling_cai 字典断言
+     - `test_serialize_deserialize.gd`：`owned_cards = [1,2,3]`（int 数组）→ 卡牌实例字典数组（`_recover_card_id_counter` 期望 Dictionary 元素，int 触发类型赋值崩溃）
+     - `test_validation_skip_and_enable.gd`：`id: 42` → `card_instance_id: 42`（`add_card_to_collection` 发射信号时读取 `card_instance_id`，非 `id`）
+  3. **新增 6 个零覆盖方法独立单测**：`tests/unit/gsm/test_second_layer_methods.gd`（15 测试）
+     - `_set_battle_status_snapshot`（写入/null 守卫/同值去重）
+     - `set_session_scene`（写入 + 缓冲两条路径）
+     - `remove_card_from_collection`（成功/校验跳过拒绝/未找到拒绝）
+     - `restore_action_points`（增量/非正拒绝）
+     - `unlock_talent`（append/去重）
+     - `advance_chapter`（首章/旧章入 completed/同章去重/空拒绝）
+- 回归：GSM 套件（unit + integration）119/119 全通过
+- 全量：59 scripts / 1118 tests，1108 passing / 8 failing——8 个失败均为 **cost_system 既有失败**（拆分前基线已存在，非本次引入）
+  - 6 个 `test_cost_signals.gd`（cost_changed 信号计数）+ 2 个 `test_cost_system_basic.gd`（push_warning 计数）：根源是 `_write_cost_to_gsm` 的 `has_method("_set_battle_cost")` 在动态分派 `GSM_SCRIPT.new()` 实例下返回 false，属 CostSystem↔GSM 接口既有缺陷，非 GSM 拆分/单测改动引入
+- Next recommended：Story 3-11（ADR-0003 §visited_ids 生命周期文档补充）或 3-12（Feature 层预创建）
+
+<!-- STATUS -->
+Epic: feature-precreate
+Feature: Feature 层 Epic Story 预创建
+Task: 18 个 Feature Epic 标题级骨架完成，Sprint 3 全部 12 个 story 完成
+<!-- /STATUS -->

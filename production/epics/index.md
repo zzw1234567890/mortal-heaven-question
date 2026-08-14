@@ -1,6 +1,6 @@
 # Epics Index
 
-Last Updated: 2026-08-10
+Last Updated: 2026-08-14
 Engine: Godot 4.6.3
 
 | Epic | Layer | System | GDD | Stories | Status |
@@ -17,3 +17,21 @@ Engine: Godot 4.6.3
 | faction-system | Core | 阵营系统 | faction-system.md | 2 stories | Complete |
 | resource-system | Core | 资源系统 | resource-system.md | 2 stories | Complete |
 | school-system | Core | 流派系统 | school-system.md | 2 stories | Ready |
+| combat-system | Feature | 战斗系统 | combat-system.md | 4 stories | Backlog |
+| card-effect-engine | Feature | 卡牌效果解析引擎 | card-effect-engine.md | 5 stories | Backlog |
+| deployment-system | Feature | 角色上场与阵位系统 | deployment-system.md | 4 stories | Backlog |
+| binding-system | Feature | 功法/法宝绑定系统 | binding-system.md | 4 stories | Backlog |
+| formation-system | Feature | 阵法系统 | formation-system.md | 4 stories | Backlog |
+| ai-system | Feature | AI系统（敌方AI） | ai-system.md | 4 stories | Backlog |
+| exploration-system | Feature | 探索系统 | exploration-system.md | 5 stories | Backlog |
+| cultivation-system | Feature | 修为养成系统 | cultivation-system.md | 4 stories | Backlog |
+| tribulation-system | Feature | 渡劫突破系统 | tribulation-system.md | 4 stories | Backlog |
+| deck-editing-system | Feature | 卡组编辑系统 | deck-editing-system.md | 4 stories | Backlog |
+| alchemy-crafting-system | Feature | 炼丹炼器系统 | alchemy-crafting-system.md | 4 stories | Backlog |
+| inscription-system | Feature | 法宝铭刻系统 | inscription-system.md | 3 stories | Backlog |
+| identity-selection-system | Feature | 开局身份选择系统 | identity-selection-system.md | 3 stories | Backlog |
+| reincarnation-talent-system | Feature | 轮回天赋系统 | reincarnation-talent-system.md | 3 stories | Backlog |
+| achievement-system | Feature | 成就系统 | achievement-system.md | 3 stories | Backlog |
+| story-system | Feature | 剧情系统 | story-system.md | 4 stories | Backlog |
+| dialogue-system | Feature | 对话系统 | dialogue-system.md | 3 stories | Backlog |
+| ending-branch-system | Feature | 结局分支系统 | ending-branch-system.md | 3 stories | Backlog |

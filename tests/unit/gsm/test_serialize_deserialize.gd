@@ -222,14 +222,22 @@ func test_deserialize_migrates_legacy_flat_ling_cai() -> void:
 
 
 func test_round_trip_collection_and_deck() -> void:
-	gsm.collection.owned_cards = [1, 2, 3]
+	## owned_cards 为卡牌实例字典数组（_recover_card_id_counter 期望 Dictionary 元素）
+	gsm.collection.owned_cards = [
+		{"card_instance_id": 1, "template_id": "card_001"},
+		{"card_instance_id": 2, "template_id": "card_002"},
+		{"card_instance_id": 3, "template_id": "card_003"},
+	]
 	gsm.collection.total_count = 3
 	gsm.deck.current_deck = [4, 5]
 	gsm.deck.character_slots = [null, "char_1", null, null, null, null]
 	var data: Dictionary = gsm.serialize()
 	var ok: bool = gsm.deserialize(data)
 	assert_true(ok)
-	assert_eq(gsm.collection.owned_cards, [1, 2, 3])
+	assert_eq(gsm.collection.owned_cards.size(), 3)
+	assert_eq(gsm.collection.owned_cards[0].card_instance_id, 1)
+	assert_eq(gsm.collection.owned_cards[1].card_instance_id, 2)
+	assert_eq(gsm.collection.owned_cards[2].card_instance_id, 3)
 	assert_eq(gsm.collection.total_count, 3)
 	assert_eq(gsm.deck.current_deck, [4, 5])
 	assert_eq(gsm.deck.character_slots[1], "char_1")

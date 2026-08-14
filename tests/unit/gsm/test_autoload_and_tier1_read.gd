@@ -42,10 +42,11 @@ func test_ac002_initial_ling_shi_is_non_negative() -> void:
 
 
 func test_ac002_initial_resources_all_zero() -> void:
-	## AC-002 补充: 所有三项资源默认值均为 0
+	## AC-002 补充: 灵石/丹药碎片默认 0；灵材为四品质嵌套字典且各品质默认 0
 	assert_eq(gsm.player.resources.ling_shi, 0, "ling_shi 默认应为 0")
-	assert_eq(gsm.player.resources.ling_cai, 0, "ling_cai 默认应为 0")
 	assert_eq(gsm.player.resources.dan_yao_sui_pian, 0, "dan_yao_sui_pian 默认应为 0")
+	var ling_cai: Dictionary = gsm.player.resources.ling_cai
+	assert_eq(ling_cai, {"low": 0, "medium": 0, "high": 0, "top": 0}, "ling_cai 默认应为四品质零值字典")
 
 
 # ── 验收标准 AC-003 ──────────────────────────────────────────────────────

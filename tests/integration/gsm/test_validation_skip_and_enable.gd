@@ -155,7 +155,7 @@ func test_add_card_signals_card_collection_changed() -> void:
 		captured[1] = action
 	)
 
-	gsm.add_card_to_collection({"template_id": "card_001", "id": 42})
+	gsm.add_card_to_collection({"template_id": "card_001", "card_instance_id": 42})
 	assert_eq(captured[0], 42)
 	assert_eq(captured[1], &"added")
 

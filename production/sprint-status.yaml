@@ -14,7 +14,7 @@ goal: "完成 Core 层剩余 3 系统（CostSystem / StatusEffectSystem / School
 start: "2026-08-10"
 end: "2026-08-23"
 generated: "2026-08-10"
-updated: "2026-08-13"
+updated: "2026-08-14"
 
 stories:
   # === /create-stories（关键路径根节点）===
@@ -106,40 +106,40 @@ stories:
     name: "拆分 game_state_manager.gd → gsm_serializer.gd（1016→≤300 行）"
     file: ""
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-08-13"
 
   # === 应该完成 ===
   - id: "3-10"
     name: "GSM 第二层方法独立单测补齐"
     file: ""
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "依赖 #3-9"
-    completed: ""
+    blocker: ""
+    completed: "2026-08-14"
 
   - id: "3-11"
     name: "ADR-0003 §visited_ids 生命周期文档补充"
     file: ""
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.125
     blocker: ""
-    completed: ""
+    completed: "2026-08-14"
 
   # === 可以完成 ===
   - id: "3-12"
     name: "Feature 层 Epic Story 预创建"
     file: ""
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-08-14"
