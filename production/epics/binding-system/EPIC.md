@@ -3,17 +3,17 @@
 > **Layer**: Feature
 > **GDD**: `design/gdd/binding-system.md`
 > **Architecture Module**: 战斗子系统 — BindingManager Autoload #13
-> **Status**: Backlog
-> **Stories**: 4 stories（标题级预创建——AC 待 `/dev-story` 填充）
+> **Status**: Ready
+> **Stories**: 4 stories（AC 已由 `/create-stories` 填充）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | BindingRecord RefCounted 实例模型 + 内部注册表 | Logic | Not Started | ADR-0013 |
-| 002 | bind / unbind / get_bindings 查询 API | Logic | Not Started | ADR-0013 |
-| 003 | 绑定生命周期信号总线（7 个 Cat 2b 信号） | Integration | Not Started | ADR-0013 |
-| 004 | serialize_all 快照导出 + persistent effect 接口 | Integration | Not Started | ADR-0013 |
+| 001 | BindingRecord RefCounted 实例模型 + 内部注册表 | Logic | Ready | ADR-0013 |
+| 002 | bind / unbind / get_bindings 查询 API | Logic | Ready | ADR-0013 |
+| 003 | 绑定生命周期信号总线（7 个 Cat 2b 信号） | Integration | Ready | ADR-0013 |
+| 004 | serialize_all 快照导出 + persistent effect 接口 | Integration | Ready | ADR-0013 |
 
 ## Overview
 

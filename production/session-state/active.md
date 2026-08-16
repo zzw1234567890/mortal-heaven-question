@@ -124,9 +124,43 @@
 - Next recommended：Story 3-11（ADR-0003 §visited_ids 生命周期文档补充）或 3-12（Feature 层预创建）
 
 <!-- STATUS -->
-Epic: sprint-3
-Feature: Sprint 3 完成（QA 签收 APPROVED + 代码已合并）
-Task: commit 472288d，Sprint 3 完成定义 12/12 全勾选
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: QA 计划已生成，待 /dev-story 从 4-0（Autoload 注册）起实现
 <!-- /STATUS -->
 
+## Session Extract — Sprint 4 计划（/sprint-plan new）2026-08-16
+
+- Verdict：COMPLETE（sprint-4.md + sprint-status.yaml 已写入）
+- 范围（用户决策）：战斗子系统 6 Epic，25 story + 1 task = 26 项，**全部 must-have**（拒绝了制作人推荐的 must 17 / should 4 / nice 4 分层，接受"Feature 层压缩率可能衰减"的风险）
+- 时间盒：7-8 日历日（2026-08-16 至 2026-08-23，8 天，缓冲 1.5d，可用 6.5d）
+- 速度基准：改用**日历日**（Sprint 3 回顾行动项 #3）——Sprint 2/3 连续 4 天完成 14 天计划
+- PR-SPRINT 关卡（review mode full）：producer 裁决 CONCERNS，三项结构性建议均已采纳：
+  1. ai-system 提 must（原误归 should）——Phase 5 敌方行动直接调用 AISystem，无 AI 则回合无法闭环
+  2. 新增 4-0 Autoload 注册任务——RealmSystem(#11)/SchoolSystem(#19) 已实现但未注册，combat Phase 4 依赖 get_suppression()
+  3. 4-22 预估 1d → 1.5-2d（7 阶段状态机是最高复杂度单故事）
+- 依赖排序：card-effect-engine(#10)→deployment(#17)/binding(#13)/formation(#23)→ai(#18)→combat(#9 编排器最后)
+- 关键前置：落实 Sprint 3 回顾行动项 #1/#2（/story-done 门禁强化 + 测试清单完整性检查）
+- Next recommended：`/qa-plan sprint`（实现前必需）→ `/dev-story` 从 4-0（Autoload 注册）起逐条填充 AC 并实现
+
+---
+
+## Session Extract — Sprint 4 QA 计划（/qa-plan sprint）2026-08-16
+
+- Verdict：COMPLETE（`production/qa/qa-plan-sprint-4-2026-08-16.md` 已写入）
+- 分类：25 story 全 Logic/Integration——**Logic 18（BLOCKING）+ Integration 7（BLOCKING）**，无 UI/Visual/Config；+ 4-0 task（冒烟范围）
+- 预估测试数：约 **314 个测试函数**（Logic ~194 + Integration ~120），测试数最高 binding 4-11（~22）
+- 7 个缺口（qa-lead 标记）：
+  - **缺口 #1（已修复）**：9 个测试文件名 `_test.gd` 后缀 → 孤儿测试。已在 9 个 story 文件 `## Test Evidence` 修正为 `test_` 前缀（card-effect-engine 5 + binding 4，与 `.gutconfig.json` `prefix: "test_"` 一致）。实现时按修正后路径创建测试文件
+  - **缺口 #5（已解决）**：AI Story 4-20 AC-011 语义冲突——GDD §公式4（AND）vs §边缘情况（OR）。game-designer 裁决 **OR 语义 + 显式哨兵（0=禁用）**：`(hp_below>0 AND hp_pct<=hp_below) OR (turn_after>0 AND turn>=turn_after)`；§公式4 的 `and` 为笔误；「最高难度回合兜底」降为配置层分级（`turn_after>0`）。已同步 GDD（7 处）+ story AC-010/011 + QA 计划。ADR-0017 无公式冲突未改（第 448 行 HP 触发为 OR 子集）
+  - 缺口 #2：PRD 累加常数 C 未校准（4-4 AC-002 区间脆弱）
+  - 缺口 #3：性能断言 CI/无头波动（建议宽松阈值 ×3 容差）
+  - 缺口 #4：assert 守卫仅 debug 生效（4-10）
+  - 缺口 #6：call_deferred 帧调度测试需 GUT await（4-22）
+  - 缺口 #7（非阻塞）：formation GDD §公式编号错乱
+- 冒烟关键点：**4-0 Autoload 顺序矛盾**——控制清单 CombatSystem 列 #9 但其 `_ready()` 依赖 9 子系统（#10~#23 均在 #9 后）；sprint-4.md 已声明「CombatSystem 最后注册」，4-0b 需终验（调顺序 or `_ready()` `_initialized` 延迟初始化）
+- Next recommended：`/dev-story` 从 4-0（Autoload 注册）起逐条实现；先裁决缺口 #5（game-designer）+ 落实 Sprint 3 回顾行动项 #1/#2（/story-done 门禁强化）
+
 <!-- QA RUN: 2026-08-15 | Sprint: sprint-3 | Verdict: APPROVED | Report: production/qa/qa-signoff-sprint-3-2026-08-15.md -->
+<!-- QA-PLAN: 2026-08-16 | Sprint: sprint-4 | 25 story (Logic 18 / Integration 7) + 1 task | 约 314 测试 | Report: production/qa/qa-plan-sprint-4-2026-08-16.md | 缺口 #1 已修复；缺口 #5 已裁决（OR 语义） -->
+<!-- GDD 修订: 2026-08-16 | design/gdd/ai-system.md | Boss 阶段转换触发 OR 语义 + 0=禁用哨兵（game-designer 裁决） -->

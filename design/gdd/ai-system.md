@@ -2,7 +2,7 @@
 
 > **状态 (Status)**：设计中 (In Design)
 > **作者 (Author)**：Claude Code + 用户
-> **最后更新 (Last Updated)**：2026-07-22
+> **最后更新 (Last Updated)**：2026-08-16
 > **最后验证 (Last Verified)**：—
 > **实现的支柱 (Implements Pillar)**：支柱1「自由组牌，策略为王」、支柱2「苟道成长，步步为营」
 
@@ -187,8 +187,8 @@ Boss战斗特有机制——当Boss生命值低于特定阈值时触发阶段转
 ```
 BossPhaseTransition {
   trigger: {
-    hp_below: float    # 生命值低于此比例时触发（如 0.5 = 50%HP）
-    turn_after: int    # 或在此回合数后触发（如 turn >= 5）
+    hp_below: float    # HP阈值触发器：生命值低于此比例时触发（如 0.5 = 50%HP）。0 = 不按HP触发
+    turn_after: int    # 回合兜底触发器：达到此回合数后强制转阶段（如 8 = 第8回合）。0 = 不按回合兜底
   }
   effects: {
     behavior_override: BehaviorProfile  # 替换当前行为配置
@@ -203,6 +203,7 @@ BossPhaseTransition {
 
 转换规则：
 - 每个Boss最多3个阶段（起始阶段 + 2个转换）
+- 触发条件为 OR 语义：`hp_below` 与 `turn_after` 两个触发器任一满足即触发（精确算法见 §公式 4）
 - 转换触发瞬间Boss免疫所有伤害（动画播放期间无敌）
 - 转换完成后，新的行为配置立即生效
 - 转换动画是强制播放的（不可跳过），给玩家一个节奏缓冲
@@ -268,7 +269,7 @@ scale_enemy(template, player_realm):
 Boss阶段转换状态机：
 
 ```
-阶段1（起始） → HP<50% （或回合条件） → 阶段转换动画 → 阶段2（强化）
+阶段1（起始） → HP<50% （或回合兜底，可选） → 阶段转换动画 → 阶段2（强化）
 阶段2 → HP<20% → 阶段转换动画 → 阶段3（狂暴）
 阶段3 → HP=0 → 阵亡
 ```
@@ -334,11 +335,24 @@ retreat_probability(ally_hp_ratio, threshold) =
 ```
 should_transition(boss, turn, hp_pct) → int:
   for each phase in boss.phase_transitions:
-    if hp_pct <= phase.hp_below and turn >= phase.turn_after:
-      if not phase.triggered:
-        return phase.index
+    hp_triggered   = phase.hp_below > 0.0 and hp_pct <= phase.hp_below
+    turn_triggered = phase.turn_after > 0 and turn >= phase.turn_after
+    if (hp_triggered or turn_triggered) and not phase.triggered:
+      return phase.index
   return -1  # 不触发
 ```
+
+| 变量 | 类型 | 范围 | 描述 |
+|------|------|------|------|
+| hp_below | float | [0.0, 1.0] | HP阈值触发器，0 = 禁用（不按HP触发） |
+| turn_after | int | [0, ∞) | 回合兜底触发器，0 = 禁用（不按回合触发） |
+| hp_triggered | bool | true/false | HP阈值是否满足（hp_below > 0 且 hp_pct <= hp_below） |
+| turn_triggered | bool | true/false | 回合兜底是否满足（turn_after > 0 且 turn >= turn_after） |
+
+**示例：**
+- 通用Boss `{hp_below: 0.5, turn_after: 0}`，turn=3, hp_pct=0.4 → hp_triggered=true, turn_triggered=false → 触发
+- 极高难度Boss `{hp_below: 0.5, turn_after: 8}`，turn=9, hp_pct=0.7 → hp_triggered=false, turn_triggered=true → 触发（回合兜底）
+- 同一Boss，turn=3, hp_pct=0.7 → 两者皆false → 不触发（返回 -1）
 
 ### 5. 难度缩放
 
@@ -367,7 +381,8 @@ scaled_stat(base, player_realm, enemy_realm):
 - **敌方精英死亡后绑定如何处理**：绑定随角色阵亡直接移除（不走玩家的绑定链销毁流程）
 - **敌方角色被送到后排后前排空缺**：敌方AI在阶段6优先判断前排状态——如果前排无人且后排有人，AI会将部分后排角色移动到前排（布阵调整由AI在阶段6自动执行，不占用出牌机会）
 - **敌方使用阵法覆盖时**：走标准覆盖流程（弹窗由AI自动确认，无玩家操作）
-- **超高难度下Boss三阶段全部触发**：设计上Boss最多3个阶段（含起始），在最高难度下Boss可能在回合数到达时自动进入下一阶段（即使血量未到阈值），防止玩家拖回合磨死Boss
+- **超高难度下Boss三阶段全部触发**：设计上Boss最多3个阶段（含起始）。极高难度地图的Boss可配置回合兜底触发器（turn_after > 0）——回合数到达时即使血量未到阈值也自动进入下一阶段，防止玩家拖回合磨死Boss。通用难度Boss通常不配置turn_after（=0），仅按HP阈值转换
+- **阶段触发器配置错误**：若某阶段 hp_below 与 turn_after 均为 0，则该阶段永不触发（配置无效）——策划配置时须保证每个阶段至少一个触发器非 0
 - **玩家境界远高于地图敌人基准**：敌人按难度缩放提升属性，但技能池和智能层级不变——打低级图不会变成无脑碾压，但优势明显可接受
 
 ## 依赖关系
@@ -436,6 +451,7 @@ scaled_stat(base, player_realm, enemy_realm):
 - **GIVEN** 精英敌人，**WHEN** 战前配置，**THEN** 有预配置绑定、可部署1个阵法
 - **GIVEN** Boss敌人，**WHEN** 战前配置，**THEN** 有预配置绑定、可部署最多2个阵法、有阶段转换定义
 - **GIVEN** Boss血量降到50%以下，**WHEN** 检查阶段转换，**THEN** 触发转换动画，新技能解锁
+- **GIVEN** Boss配置了回合兜底触发器（turn_after=8）且血量未到阈值，**WHEN** 回合数达到8，**THEN** 触发阶段转换（OR语义，防拖回合）
 - **GIVEN** Boss在阶段转换期间受到致命伤害，**WHEN** 结算，**THEN** Boss阵亡，转换不触发
 - **GIVEN** 敌方总血量低于撤退阈值（0.2），**WHEN** AI决策，**THEN** 有50%概率撤退
 - **GIVEN** 敌方撤退，**WHEN** 战斗结束，**THEN** 判定为玩家胜利，奖励减半

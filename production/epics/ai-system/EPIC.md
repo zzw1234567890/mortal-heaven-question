@@ -4,16 +4,16 @@
 > **GDD**: `design/gdd/ai-system.md`
 > **Architecture Module**: 战斗子系统 — AISystem Autoload #18
 > **Status**: Backlog
-> **Stories**: 4 stories（标题级预创建——AC 待 `/dev-story` 填充）
+> **Stories**: 4 stories（AC/实现说明/测试用例已由 `/create-stories` 填充——待 `/dev-story` 实现）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | EnemyTemplate Resource + EnemyFactory + EnemyBattleState | Logic | Not Started | ADR-0017 |
-| 002 | execute_turn 决策主循环（普通/精英/Boss 分支） | Logic | Not Started | ADR-0017 |
-| 003 | BossPhaseMgr 阶段转换内部状态机 | Logic | Not Started | ADR-0017 |
-| 004 | 难度缩放 + register_preconfigured_bindings | Logic | Not Started | ADR-0017 |
+| 001 | EnemyTemplate Resource + EnemyFactory + EnemyBattleState | Logic | Ready | ADR-0017 |
+| 002 | execute_turn 决策主循环（普通/精英/Boss 分支） | Logic | Ready | ADR-0017 |
+| 003 | BossPhaseMgr 阶段转换内部状态机 | Logic | Ready | ADR-0017 |
+| 004 | 难度缩放 + register_preconfigured_bindings | Logic | Ready | ADR-0017 |
 
 ## Overview
 

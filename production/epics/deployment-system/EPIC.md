@@ -3,17 +3,17 @@
 > **Layer**: Feature
 > **GDD**: `design/gdd/deployment-system.md`
 > **Architecture Module**: 战斗子系统 — DeploymentSystem Autoload #17
-> **Status**: Backlog
-> **Stories**: 4 stories（标题级预创建——AC 待 `/dev-story` 填充）
+> **Status**: Ready
+> **Stories**: 4 stories（AC 已由 `/create-stories` 填充）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | 内部状态机 + 阵位数据管理（STANDBY→READY→ACTED） | Logic | Not Started | ADR-0016 |
-| 002 | deploy / remove / is_targetable 前后排保护 O(1) | Logic | Not Started | ADR-0016 |
-| 003 | 战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot | Integration | Not Started | ADR-0016 |
-| 004 | clear_standby_state + mark_unavailable + revive_character | Logic | Not Started | ADR-0016 |
+| 001 | 内部状态机 + 阵位数据管理（STANDBY→READY→ACTED） | Logic | Ready | ADR-0016 |
+| 002 | deploy / remove / is_targetable 前后排保护 O(1) | Logic | Ready | ADR-0016 |
+| 003 | 战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot | Integration | Ready | ADR-0016 |
+| 004 | clear_standby_state + mark_unavailable + revive_character | Logic | Ready | ADR-0016 |
 
 ## Overview
 

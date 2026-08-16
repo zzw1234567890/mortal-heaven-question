@@ -17,11 +17,11 @@ Engine: Godot 4.6.3
 | faction-system | Core | 阵营系统 | faction-system.md | 2 stories | Complete |
 | resource-system | Core | 资源系统 | resource-system.md | 2 stories | Complete |
 | school-system | Core | 流派系统 | school-system.md | 2 stories | Ready |
-| combat-system | Feature | 战斗系统 | combat-system.md | 4 stories | Backlog |
-| card-effect-engine | Feature | 卡牌效果解析引擎 | card-effect-engine.md | 5 stories | Backlog |
-| deployment-system | Feature | 角色上场与阵位系统 | deployment-system.md | 4 stories | Backlog |
-| binding-system | Feature | 功法/法宝绑定系统 | binding-system.md | 4 stories | Backlog |
-| formation-system | Feature | 阵法系统 | formation-system.md | 4 stories | Backlog |
+| combat-system | Feature | 战斗系统 | combat-system.md | 4 stories | Ready |
+| card-effect-engine | Feature | 卡牌效果解析引擎 | card-effect-engine.md | 5 stories | Ready |
+| deployment-system | Feature | 角色上场与阵位系统 | deployment-system.md | 4 stories | Ready |
+| binding-system | Feature | 功法/法宝绑定系统 | binding-system.md | 4 stories | Ready |
+| formation-system | Feature | 阵法系统 | formation-system.md | 4 stories | Ready |
 | ai-system | Feature | AI系统（敌方AI） | ai-system.md | 4 stories | Backlog |
 | exploration-system | Feature | 探索系统 | exploration-system.md | 5 stories | Backlog |
 | cultivation-system | Feature | 修为养成系统 | cultivation-system.md | 4 stories | Backlog |

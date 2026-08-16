@@ -4,16 +4,16 @@
 > **GDD**: `design/gdd/combat-system.md`
 > **Architecture Module**: 战斗子系统 — CombatSystem Autoload #9
 > **Status**: Backlog
-> **Stories**: 4 stories（标题级预创建——AC 待 `/dev-story` 填充）
+> **Stories**: 4 stories（AC 已填充——待 `/story-readiness` 验证后 `/dev-story` 实现）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | 7 阶段回合状态机（advance_phase 确定性推进 + 阶段转换校验） | Logic | Not Started | ADR-0008 |
-| 002 | 战斗生命周期编排（battle_start / battle_end + GSM battle.* 域） | Integration | Not Started | ADR-0008 |
-| 003 | play_card 出牌 + 目标解析 + 自动推进调度 | Logic | Not Started | ADR-0008 |
-| 004 | 阶段转换 Cat 2b 信号通知 CombatUI | Integration | Not Started | ADR-0008 |
+| 001 | 7 阶段回合状态机（advance_phase 确定性推进 + 阶段转换校验） | Logic | Ready | ADR-0008 |
+| 002 | 战斗生命周期编排（battle_start / battle_end + GSM battle.* 域） | Integration | Ready | ADR-0008 |
+| 003 | play_card 出牌 + 目标解析 + 自动推进调度 | Logic | Ready | ADR-0008 |
+| 004 | 阶段转换 Cat 2b 信号通知 CombatUI | Integration | Ready | ADR-0008 |
 
 ## Overview
 

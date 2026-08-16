@@ -10,10 +10,10 @@
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | 内部条件状态机 + 阵法位管理 | Logic | Not Started | ADR-0024 |
-| 002 | 激活条件实时重判（订阅 deployment 信号） | Integration | Not Started | ADR-0024 |
-| 003 | get_aura_bonus O(1) 查询 + 梯度光环计算 | Logic | Not Started | ADR-0024 |
-| 004 | serialize_all 快照导出 GSM.battle.formation_snapshot | Integration | Not Started | ADR-0024 |
+| 001 | 内部条件状态机 + 阵法位管理 | Logic | Ready | ADR-0024 |
+| 002 | 激活条件实时重判（订阅 deployment 信号） | Integration | Ready | ADR-0024 |
+| 003 | get_aura_bonus O(1) 查询 + 梯度光环计算 | Logic | Ready | ADR-0024 |
+| 004 | serialize_all 快照导出 GSM.battle.formation_snapshot | Integration | Ready | ADR-0024 |
 
 ## Overview
 

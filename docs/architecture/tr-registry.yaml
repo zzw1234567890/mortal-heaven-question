@@ -24,8 +24,8 @@
 #
 # STATUS VALUES: active | deprecated | superseded-by: TR-[system]-NNN
 
-version: 2
-last_updated: "2026-07-25"
+version: 3
+last_updated: "2026-08-16"
 
 requirements:
   # === Foundation Layer ===
@@ -258,6 +258,14 @@ requirements:
     status: active
     covered_by: ADR-0009
 
+  - id: TR-effect-004
+    system: card-effect-engine
+    gdd: design/gdd/card-effect-engine.md
+    requirement: "AI 干跑评估接口——GameStateSnapshot 不可变快照 + evaluate_effect/simulate_chain 纯计算，不修改游戏状态"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0009
+
   - id: TR-progression-001
     system: meta-progression
     gdd: design/gdd/achievement-system.md
@@ -341,3 +349,77 @@ requirements:
     created: 2026-08-08
     status: active
     covered_by: ADR-0018
+
+  # === Battle Subsystems (Sprint 4) ===
+
+  - id: TR-deploy-001
+    system: deployment
+    gdd: design/gdd/deployment-system.md
+    requirement: "阵位布局与上场管理——6 格阵位（前 3 后 3）+ max_deploy = L + 1 + setup_field/deploy 上场流程"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0016
+
+  - id: TR-deploy-002
+    system: deployment
+    gdd: design/gdd/deployment-system.md
+    requirement: "待命规则与前后排保护——STANDBY→READY→ACTED 状态机 + is_targetable 前后排保护查询"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0016
+
+  - id: TR-deploy-003
+    system: deployment
+    gdd: design/gdd/deployment-system.md
+    requirement: "跨战斗死亡与不可用角色生命周期——mark_unavailable/revive/sync_to_gsm/is_game_over"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0016
+
+  - id: TR-formation-001
+    system: formation
+    gdd: design/gdd/formation-system.md
+    requirement: "阵法区与部署/覆盖流程——3 格阵法位 + 状态机激活/失效"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0024
+
+  - id: TR-formation-002
+    system: formation
+    gdd: design/gdd/formation-system.md
+    requirement: "激活条件实时重判与角色归属——recheck_all_conditions + 归属锁定"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0024
+
+  - id: TR-formation-003
+    system: formation
+    gdd: design/gdd/formation-system.md
+    requirement: "光环效果与梯度阵法——AuraScope + get_aura_bonus + 梯度公式"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0024
+
+  - id: TR-ai-001
+    system: ai
+    gdd: design/gdd/ai-system.md
+    requirement: "三级智能层级与决策主循环——普通/精英/Boss + 预定义技能池 + execute_turn"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0017
+
+  - id: TR-ai-002
+    system: ai
+    gdd: design/gdd/ai-system.md
+    requirement: "目标选择与敌方绑定/阵法部署——_select_target + register_preconfigured_bindings"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0017
+
+  - id: TR-ai-003
+    system: ai
+    gdd: design/gdd/ai-system.md
+    requirement: "Boss 阶段转换 + 撤退 + 难度缩放"
+    created: 2026-08-16
+    status: active
+    covered_by: ADR-0017
