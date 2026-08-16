@@ -97,7 +97,7 @@
 - [x] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
 - [x] 已交付特性中无 S1 或 S2 的 bug
 - [x] 任何偏差已更新设计文档
-- [ ] 代码已审查并合并
+- [x] 代码已审查并合并（/code-review APPROVED WITH SUGGESTIONS → commit 472288d）
 - [x] game_state_manager.gd 拆分零回归（Sprint 1 回顾行动项 #2）
 - [x] /create-stories 阶段跨 Epic 接口契约盘点完成（Sprint 2 回顾行动项 #2）
 

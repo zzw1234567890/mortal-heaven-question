@@ -125,8 +125,8 @@
 
 <!-- STATUS -->
 Epic: sprint-3
-Feature: Sprint 3 QA 验收
-Task: QA 签收 APPROVED（smoke PASS WITH WARNINGS，12/12 story 完成）
+Feature: Sprint 3 完成（QA 签收 APPROVED + 代码已合并）
+Task: commit 472288d，Sprint 3 完成定义 12/12 全勾选
 <!-- /STATUS -->
 
 <!-- QA RUN: 2026-08-15 | Sprint: sprint-3 | Verdict: APPROVED | Report: production/qa/qa-signoff-sprint-3-2026-08-15.md -->
