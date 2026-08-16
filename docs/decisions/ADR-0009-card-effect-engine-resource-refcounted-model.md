@@ -54,7 +54,7 @@ Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号�
 
 - 4 种效果类型的 `RefCounted` 子类层级：`InstantEffect`、`PersistentEffect`、`TriggeredEffect`、`ReplacementEffect`（均继承 `EffectBase`）
 - 效果模板使用 `Resource` 子类（`.tres` 文件，`@export` 字段）——策划在 Inspector 中编辑
-- 运行时效果实例由 `EffectFactory` 从 Resource 创建——轻量级 `RefCounted` 对象，不持有 Resource 引用
+- 运行时效果实例由 `EffectFactory` 从 Resource 创建——轻量级 `RefCounted` 对象，不持有 Resource 引用（注册表查询在 Autoload 层 `CardEffectEngine`，工厂本身不持有注册表——见 §双层对象模型）
 - 栈式结算引擎：`ResolutionStack` 管理队列 + `_resolve_stack()` LIFO 出栈 + 中分辨率插入
 - 5 级优先级排序（主动出牌 > 先发己方 > 普通己方 > 敌方 > instance_id）+ 次级 priority 字段决胜
 - 触发链管理：深度计数器 + `visited_card_ids: Dictionary`（`Dictionary[int, bool]`——GDScript 无 `Set` 类型，使用字典键 O(1) 查找）循环检测 + 第 11 层截断 + WARN 日志
@@ -96,7 +96,7 @@ Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号�
 
 **模板与实例分离的设计理由**：
 - **Resource 模板**：策划在 Godot Inspector 中创建和编辑（`@export` 字段 = 可视化编辑）。存储在 `assets/cards/effects/` 目录。`card-system.md` 的 `CardTemplate` 通过 `effect_template_ids: Array[StringName]` 引用效果模板。
-- **RefCounted 实例**：运行时由 `EffectFactory.create_instance(template_id, source_card_instance_id) → EffectInstance` 创建。轻量级——只含结算所需的最小字段集，不持有 Resource 引用（避免共享引用污染——模式与 ADR-0006 的 Template/Instance 分离一致）。
+- **RefCounted 实例**：运行时由 `EffectFactory.create_instance(template: EffectTemplate, source_card_instance_id: int) → EffectBase` 创建（纯构造——接受模板，不查注册表）。`template_id → EffectTemplate` 的注册表查询在高层 `CardEffectEngine.create_instance(template_id: StringName, source_card_instance_id: int)` 完成（查注册表 → 委托低层工厂）——两层职责分离（technical-director 裁决 2026-08-16）。实例轻量级——只含结算所需的最小字段集，不持有 Resource 引用（避免共享引用污染——模式与 ADR-0006 的 Template/Instance 分离一致）。
 - **为什么不用纯 Dictionary**：类型安全（编译时检查枚举值、参数类型）、`@abstract` 虚函数派发（避免 `match`/`if` 链的性能开销）、与 Godot Inspector 集成（Resource 天然支持 `@export` 编辑）。
 
 ### 栈式结算引擎 (ResolutionStack)
@@ -306,8 +306,8 @@ _ready():
   1. 等待 gsm_initialized 信号（ADR-0001）——确保 GSM 可读
   2. Godot 按 Autoload 顺序同步调用所有 `_ready()`——CardEffectEngine 的 `_ready()` 执行时，
      CombatSystem 的 `_ready()` 已完成，`resolve_phase_effects()` API 可调用
-  3. 初始化效果模板注册表：
-     a. EffectFactory 扫描 assets/cards/effects/ 目录
+  3. 初始化效果模板注册表（由 CardEffectEngine 负责——非 EffectFactory，工厂不持有注册表）：
+     a. CardEffectEngine 扫描 assets/cards/effects/ 目录
      b. 加载所有 .tres EffectTemplate Resource
      c. 注册到 Dictionary[StringName, EffectTemplate] templates
      d. 发射 effect_templates_loaded 信号（Cat 2b——CardSystem 可能等待此信号以验证效果引用完整性）

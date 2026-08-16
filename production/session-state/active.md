@@ -126,7 +126,7 @@
 <!-- STATUS -->
 Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: QA 计划已生成，待 /dev-story 从 4-0（Autoload 注册）起实现
+Task: 4-0 已注册 RealmSystem+SchoolSystem，待 /dev-story 4-1（card-effect-engine story-001）
 <!-- /STATUS -->
 
 ## Session Extract — Sprint 4 计划（/sprint-plan new）2026-08-16
@@ -164,3 +164,31 @@ Task: QA 计划已生成，待 /dev-story 从 4-0（Autoload 注册）起实现
 <!-- QA RUN: 2026-08-15 | Sprint: sprint-3 | Verdict: APPROVED | Report: production/qa/qa-signoff-sprint-3-2026-08-15.md -->
 <!-- QA-PLAN: 2026-08-16 | Sprint: sprint-4 | 25 story (Logic 18 / Integration 7) + 1 task | 约 314 测试 | Report: production/qa/qa-plan-sprint-4-2026-08-16.md | 缺口 #1 已修复；缺口 #5 已裁决（OR 语义） -->
 <!-- GDD 修订: 2026-08-16 | design/gdd/ai-system.md | Boss 阶段转换触发 OR 语义 + 0=禁用哨兵（game-designer 裁决） -->
+
+---
+
+## Session Extract — Story 4-0 Autoload 注册 2026-08-16
+
+- Verdict：PARTIAL（RealmSystem+SchoolSystem 已注册；6 Feature Autoload 待各系统实现时注册）
+- 变更：`project.godot` `[autoload]` 段在 StatusEffectSystem(#10) 后追加 RealmSystem(#11) + SchoolSystem(#19)
+- 验证：headless 启动退出码 0（仅 CardSystem 模板目录缺失/GSM 校验空库两个既有 advisory，非本次引入）；全量 GUT 62 scripts / 1146 tests / 1145 passing / 1 pending / 0 failing——与 Sprint 3 QA 基线完全一致，零回归
+- 说明：RealmSystem/SchoolSystem 均 `extends Node` 无 `_ready()` 依赖（RealmSystem 有 `get_current_property` GSM 守卫，无 `_ready` 强依赖），注册安全
+- 剩余（4-0b 终验）：6 Feature Autoload（CombatSystem#9/CardEffectEngine#10/BindingManager#13/DeploymentSystem#17/AISystem#18/FormationSystem#23）待各系统代码实现时注册，届时终验「CombatSystem 最后注册」顺序矛盾（QA 计划 §四）
+- Next：/dev-story 4-1（card-effect-engine story-001 EffectTemplate/EffectInstance 双层对象模型）
+---
+
+## Session Extract — Story 4-1 EffectTemplate/EffectInstance 双层对象模型 2026-08-16
+
+- Verdict：COMPLETE（4-1 done，零回归）
+- 变更：`src/feature/card_effect_engine/` 新建 8 文件（effect_template.gd / effect_base.gd @abstract / instant_effect.gd / persistent_effect.gd / triggered_effect.gd / replacement_effect.gd / effect_factory.gd / card_effect_engine.gd 5 信号声明，未注册 project.godot）；`event_enums.gd` OutcomeType 扩展 12→17（追加 APPLY_STATUS=12/MODIFY_STAT=13/TRIGGER_CHAIN=14/ACTIVATE_FORMATION=15/MODIFY_COST=16）；`event_outcome.gd` @export_enum 同步 12→17
+- 测试：`tests/unit/card_effect_engine/test_template_instance_model.gd` 29 测试 / 71 断言全通过；全量 63 scripts / 1175 tests / 1174 passing / 1 pending / 0 failing——零回归（修正了 event_system 2 个既有断言 12→17）
+- 关键裁决：qa-lead GAPS（专属字段存在性 + 未知 type 拒绝 + conditions 深拷贝隔离）→ 补齐 5 测试升 ADEQUATE；lead-programmer CONCERNS（C1 factory 签名 drift）→ technical-director 裁决「两层 API 分离」——低层 `EffectFactory.create_instance(template: EffectTemplate, ...)`（纯构造不查注册表）+ 高层 `CardEffectEngine.create_instance(template_id: StringName, ...)`（查注册表→委托低层，Story 002 实现）
+- ADR 回写：ADR-0009 §双层对象模型（L99）、§需求（L57）、§对象生命周期（L309-313）已同步签名，消除 57/99 内部矛盾 + EffectInstance→EffectBase 命名漂移
+- Godot 4.6 quirk 记录：`@abstract` 类 `.new()` 是编译期 parse error；`GDScript.can_instantiate()` 对 abstract 返回 true（误），`GDScript.is_abstract()` 正确——测试用 `is_abstract()`
+- 清理：删除 12 个 `_scratch_*` 探针文件（首轮 4-1 agent 遗留）
+- Next：/dev-story 4-2（ResolutionStack 栈式结算引擎，blocker 4-1 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-1 完成（card-effect-engine 对象模型），待 /dev-story 4-2（ResolutionStack）
+<!-- /STATUS -->

@@ -4,7 +4,7 @@
 ## - EventType: 6 种事件类型（灵脉采掘/坊市交易/洞府奇遇/杀人夺宝/炼丹炼器/斜月三星洞）
 ## - ConditionType: 6 种条件类型（realm/faction/resource/card_owned/flag_set/flag_not_set）
 ## - ConditionOperator: 3 种比较运算符（GE/EQ/LT）
-## - OutcomeType: 12 种结果类型——ADR-0003 决策，为 ADR-0009 卡牌效果引擎的共享词汇表权威来源。
+## - OutcomeType: 17 种结果类型——ADR-0003 决策的 12 值 + ADR-0009 追加 5 值（效果引擎共享词汇表权威来源）。
 ##
 ## [b]用法[/b]：其他文件通过 [code]EventEnums.EventType.LING_MAI_CAIJUE[/code] 引用枚举值。
 ## @export 类型提示使用 [code]EventEnums.EventType[/code] 在 Inspector 中显示下拉菜单。
@@ -45,11 +45,11 @@ enum ConditionOperator {
 }
 
 
-# === OutcomeType：12 种结果类型 ====================================================
+# === OutcomeType：17 种结果类型 ====================================================
 ##
-## [b]⚠️ 权威来源[/b]：此枚举是 ADR-0003 决策的权威来源。
-## ADR-0009（卡牌效果引擎）必须 [b]扩展[/b]（非复制）此枚举——在本文档中添加新值，
-## 而非在 ADR-0009 中定义独立的枚举。
+## [b]⚠️ 权威来源[/b]：此枚举是 ADR-0003 决策的权威来源（值 0-11）。
+## ADR-0009（卡牌效果引擎）[b]扩展[/b]（非复制）此枚举——值 12-16 追加来源 ADR-0009，
+## 非重排非删除（原 12 值保持稳定，避免破坏现有序列化数据）。
 enum OutcomeType {
 	ADD_RESOURCE = 0,    ## 添加资源——target=资源类型, value_int=数量
 	ADD_CULTIVATION = 1, ## 添加修为——value_int=修为量
@@ -63,4 +63,10 @@ enum OutcomeType {
 	ADVANCE_CHAPTER = 9, ## 推进章节——target=章节 ID
 	RESTORE_AP = 10,     ## 恢复行动力——value_int=行动力恢复量
 	NOTHING = 11,        ## 无效果——纯叙事文本
+	# === 以下 5 值由 ADR-0009 追加（卡牌效果引擎）================================
+	APPLY_STATUS = 12,      ## 施加状态——效果引擎委托 StatusSystem.apply_status
+	MODIFY_STAT = 13,       ## 修改属性——效果引擎临时属性修改（如 ATK+2）
+	TRIGGER_CHAIN = 14,     ## 触发链——效果触发另一效果链
+	ACTIVATE_FORMATION = 15, ## 激活阵法——阵法效果激活
+	MODIFY_COST = 16,       ## 修改费用——效果引擎临时费用修改
 }

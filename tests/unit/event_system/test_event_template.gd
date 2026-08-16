@@ -518,8 +518,7 @@ func test_condition_operator_has_three_values() -> void:
 
 func test_outcome_type_has_twelve_values() -> void:
 	## OutcomeType 必须包含全部 12 种结果类型，值 0-11
-	## 顺序不得重排——与 ADR-0003 完全一致
-	assert_eq(EventEnumsClass.OutcomeType.size(), 12, "OutcomeType 应有 12 个值")
+	## 顺序不得重排——与 ADR-0003 完全一致（ADR-0009 追加 12-16 值，不影响 0-11）
 	assert_eq(EventEnumsClass.OutcomeType.ADD_RESOURCE, 0)
 	assert_eq(EventEnumsClass.OutcomeType.ADD_CULTIVATION, 1)
 	assert_eq(EventEnumsClass.OutcomeType.ADD_CARD, 2)
@@ -698,5 +697,6 @@ func test_export_enum_condition_type_count_matches_event_enums() -> void:
 
 func test_export_enum_outcome_type_count_matches_event_enums() -> void:
 	## 验证 event_outcome.gd 的 @export_enum 结果类型数量与 EventEnums.OutcomeType 一致。
-	assert_eq(EventEnumsClass.OutcomeType.size(), 12,
-			"EventEnums.OutcomeType 应有 12 个值——若新增值，需同步更新 event_outcome.gd 的 @export_enum 字符串")
+	## ADR-0009 追加 5 值（12-16）后，完整枚举为 17 值。
+	assert_eq(EventEnumsClass.OutcomeType.size(), 17,
+			"EventEnums.OutcomeType 应有 17 个值（ADR-0003 12 值 + ADR-0009 追加 5 值）——若新增值，需同步更新 event_outcome.gd 的 @export_enum 字符串")

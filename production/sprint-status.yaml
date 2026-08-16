@@ -22,22 +22,22 @@ stories:
     name: "Autoload 注册：RealmSystem #11 + SchoolSystem #19 + 6 个 Feature Autoload 顺序验证"
     file: ""
     priority: must-have
-    status: ready-for-dev
+    status: in-progress
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-08-16 RealmSystem+SchoolSystem 已注册并验证（headless 启动 + 全量 1145 测试零回归）；6 Feature Autoload 待各系统实现时注册（4-0b 终验）"
 
   # === card-effect-engine（结算引擎，无下游依赖，最先做）===
   - id: "4-1"
     name: "EffectTemplate/EffectInstance 双层对象模型（4 种子类）"
     file: "production/epics/card-effect-engine/story-001-template-instance-model.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-08-16 双层对象模型 + 4 子类 + EffectFactory + 5 Cat 2b 信号声明；OutcomeType 扩展 12→17；29 单测全通过，全量 1174 passing 零回归；C1 factory 签名经 TD 裁决两层分离并回写 ADR-0009"
 
   - id: "4-2"
     name: "ResolutionStack 栈式结算引擎（优先级队列 + LIFO + 中断插入）"

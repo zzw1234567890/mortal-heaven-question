@@ -1,12 +1,20 @@
 # Story 001: EffectTemplate/EffectInstance 双层对象模型（4 种子类）
 
 > **Epic**: 卡牌效果解析引擎 (Card Effect Engine)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-16
+
+## Completion Notes
+**Completed**：2026-08-16
+**Criteria**：4/4 通过（AC-001~004 全部由单元测试覆盖）
+**Deviations**：C1 已解决——`EffectFactory.create_instance(template: EffectTemplate, source_card_instance_id) → EffectBase` 经 technical-director 裁决为「两层 API 分离」正解，ADR-0009 §双层对象模型（第 99 行）、§需求（第 57 行）、§对象生命周期（第 309-313 行）已回写同步
+**Test Evidence**：`tests/unit/card_effect_engine/test_template_instance_model.gd`（29 测试 / 71 断言全通过）；全量套件 63 scripts / 1175 tests / 1174 passing / 1 pending / 0 failing 零回归
+**Code Review**：已完成（lead-programmer CONCERNS→已解决 C1；qa-lead GAPS→已补齐 5 测试）
+**ADR 变更**：`docs/decisions/ADR-0009-card-effect-engine-resource-refcounted-model.md` 回写工厂接口签名（消除 57/99 行内部矛盾 + EffectInstance→EffectBase 命名漂移）
 
 ## Context
 
@@ -32,10 +40,10 @@
 
 *From GDD `design/gdd/card-effect-engine.md` §验收标准 → 基础效果结算，scoped to this story:*
 
-- [ ] **AC-001**: GIVEN 玩家打出伤害型符箓（base_value=3），AND 目标无任何伤害修正效果，AND 无本命绑定，WHEN 确认目标并结算，THEN 目标HP减少3点（精确匹配 effective_value）
-- [ ] **AC-002**: GIVEN 玩家打出伤害型符箓（base_value=3），AND 角色有本命绑定（binding_multiplier=1.5），WHEN 结算，THEN 目标HP减少 `floor(3×1.5)=4` 点
-- [ ] **AC-003**: GIVEN 玩家打出功法卡"铁布衫——绑定角色攻击+2"并选择己方角色A，WHEN 结算完成，THEN 角色A的ATK属性值增加2点（通过 `get_accumulated_value(target, "ATK")` 验证）
-- [ ] **AC-004**: GIVEN 角色有本命加成条件满足，WHEN 绑定对应功法/法宝，THEN `binding_multiplier` 锁定为 1.5（在绑定时预计算）且 UI 中效果数值旁显示"×1.5"标识
+- [x] **AC-001**: GIVEN 玩家打出伤害型符箓（base_value=3），AND 目标无任何伤害修正效果，AND 无本命绑定，WHEN 确认目标并结算，THEN 目标HP减少3点（精确匹配 effective_value）
+- [x] **AC-002**: GIVEN 玩家打出伤害型符箓（base_value=3），AND 角色有本命绑定（binding_multiplier=1.5），WHEN 结算，THEN 目标HP减少 `floor(3×1.5)=4` 点
+- [x] **AC-003**: GIVEN 玩家打出功法卡"铁布衫——绑定角色攻击+2"并选择己方角色A，WHEN 结算完成，THEN 角色A的ATK属性值增加2点（通过 `get_accumulated_value(target, "ATK")` 验证）
+- [x] **AC-004**: GIVEN 角色有本命加成条件满足，WHEN 绑定对应功法/法宝，THEN `binding_multiplier` 锁定为 1.5（在绑定时预计算）且 UI 中效果数值旁显示"×1.5"标识
 
 ---
 
@@ -105,7 +113,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/card_effect_engine/test_template_instance_model.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（29 测试函数 / 71 断言，全通过）
 
 ---
 
