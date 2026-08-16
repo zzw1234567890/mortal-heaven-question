@@ -67,9 +67,9 @@ func test_ac001_cost_changed_not_declared_in_gsm() -> void:
 # ============================================================================
 
 func test_ac002_spend_emits_cost_changed() -> void:
-	cs.init_for_battle(5)
 	var received: Array = []
 	_track_signal(func(c: int, m: int, t: int) -> void: received.append([c, m, t]))
+	cs.init_for_battle(5)
 
 	var ok: bool = cs.spend(3)
 	assert_true(ok, "spend 应成功")
@@ -86,9 +86,9 @@ func test_ac002_spend_emits_cost_changed() -> void:
 # ============================================================================
 
 func test_ac003_add_temp_bonus_emits_cost_changed_with_total_max() -> void:
-	cs.init_for_battle(5)
 	var received: Array = []
 	_track_signal(func(c: int, m: int, t: int) -> void: received.append([c, m, t]))
+	cs.init_for_battle(5)
 
 	cs.add_temp_bonus(2, "mid_pill")
 	assert_eq(received.size(), 2, "init + bonus → 2 次信号")
@@ -117,9 +117,9 @@ func test_ac004_reset_for_turn_emits_cost_changed_first_player() -> void:
 
 
 func test_ac004_reset_for_turn_second_player_first_turn_extra_one() -> void:
-	cs.init_for_battle(5)
 	var received: Array = []
 	_track_signal(func(c: int, m: int, t: int) -> void: received.append([c, m, t]))
+	cs.init_for_battle(5)
 
 	cs.reset_for_turn(false, true)  # 后手第 1 回合
 	assert_eq(received.size(), 2, "init + reset → 2 次信号")
@@ -148,10 +148,9 @@ func test_ac005_init_for_battle_emits_cost_changed() -> void:
 # ============================================================================
 
 func test_ac006_spend_insufficient_no_cost_changed() -> void:
-	cs.init_for_battle(1)  # 仅 1 费
-	var init_count: int = 0
 	var received: Array = []
 	_track_signal(func(c: int, m: int, t: int) -> void: received.append([c, m, t]))
+	cs.init_for_battle(1)  # 仅 1 费
 
 	var ok: bool = cs.spend(3)  # 费用不足
 	assert_false(ok, "spend 应失败")
@@ -238,13 +237,14 @@ func test_ac010_signal_timing_cost_changed_before_batch_updated() -> void:
 	GameStateManager.battle_start({})
 	cs.init_for_battle(5)
 
-	var cat2b_received: int = 0
+	# 用数组承载可变计数——GDScript lambda 按值捕获 int，按引用捕获 Array
+	var cat2b_received: Array = [0]
 	var cat1_received: Array = []
 
-	_track_signal(func(_c: int, _m: int, _t: int) -> void: cat2b_received += 1)  # cost_changed
+	_track_signal(func(_c: int, _m: int, _t: int) -> void: cat2b_received[0] += 1)  # cost_changed
 	var batch_callable: Callable = func(changes: Dictionary) -> void:
 		if changes.has("battle.current_cost"):
-			cat1_received.append(cat2b_received)  # 记录 batch_updated 发射时 Cat 2b 的计数
+			cat1_received.append(cat2b_received[0])  # 记录 batch_updated 发射时 Cat 2b 的计数
 
 	GameStateManager.batch_updated.connect(batch_callable)
 
@@ -253,7 +253,7 @@ func test_ac010_signal_timing_cost_changed_before_batch_updated() -> void:
 
 	await get_tree().process_frame  # 等待 batch_updated
 
-	assert_gt(cat2b_received, 0, "Cat 2b cost_changed 应已发射")
+	assert_gt(cat2b_received[0], 0, "Cat 2b cost_changed 应已发射")
 	assert_gt(cat1_received.size(), 0, "Cat 1 batch_updated 应已发射")
 	# Cat 2b 计数 > 0 表示在 batch_updated 帧末之前已发射
 	if not cat1_received.is_empty():
@@ -271,18 +271,18 @@ func test_ac011_combatui_subscribes_batch_updated_for_cost() -> void:
 	GameStateManager.battle_start({})
 	cs.init_for_battle(5)
 
-	var ui_cost_current: int = -1  # 模拟 CombatUI 的费用显示
+	var ui_cost_current: Array = [-1]  # 模拟 CombatUI 的费用显示（Array 承载可变值）
 	var callable: Callable = func(changes: Dictionary) -> void:
 		var cost_change = changes.get("battle.current_cost")
 		if cost_change != null:
-			ui_cost_current = cost_change.new
+			ui_cost_current[0] = cost_change.new
 
 	GameStateManager.batch_updated.connect(callable)
 
 	cs.spend(2)  # current = 3
 	await get_tree().process_frame
 
-	assert_eq(ui_cost_current, 3, "CombatUI 应通过 batch_updated 收到刷新后的 current_cost=3")
+	assert_eq(ui_cost_current[0], 3, "CombatUI 应通过 batch_updated 收到刷新后的 current_cost=3")
 
 	GameStateManager.batch_updated.disconnect(callable)
 	GameStateManager.battle_end({"result": "test"})

@@ -28,8 +28,8 @@ func init(templates: Dictionary, visited_ids: Array[StringName]) -> void:
 
 ## 查询当前事件结算后应跳转的下一个连锁事件模板 ID。[br]
 ## [br][b]查询方法（CQS——命令查询分离）[/b]：本方法不发射 [signal chain_triggered] 信号，
-## 也不修改 visited_ids。调用方在确认连锁跳转后自行发射 [signal chain_triggered]
-## 并调用 [method check_chain_cycle] 进行循环检测。[br]
+## 也不追加 visited_ids（但链结束分支 a/b/d 会 clear，见下）。调用方在确认连锁跳转后
+## 自行发射 [signal chain_triggered] 并调用 [method check_chain_cycle] 进行循环检测。[br]
 ## [br][b]算法[/b]：[br]
 ##   1. 模板不存在或 [member EventTemplate.chain_next] == [code]&""[/code] → 返回 [code]&""[/code]（场景 a）[br]
 ##   2. [member EventTemplate.chain_on_option] >= 0 且 != [param option_index] → 返回 [code]&""[/code]（场景 d）[br]

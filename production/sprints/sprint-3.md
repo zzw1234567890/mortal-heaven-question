@@ -3,12 +3,12 @@
 > **Sprint**: 3
 > **Start Date**: 2026-08-10
 > **End Date**: 2026-08-23
-> **Status**: In Progress
+> **Status**: Complete
 > **Focus**: Core 层剩余 3 系统（CostSystem / StatusEffectSystem / SchoolSystem）+ 偿还 game_state_manager.gd 技术债
 > **Milestone**: core-layer-complete（Active，目标 2026-08-19——里程碑交付物仅要求 4 系统，Sprint 2 已满足；Sprint 3 视为向 Feature 层过渡的准备）
 > **Review Mode**: full
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-12
+> **Last Updated**: 2026-08-14
 
 ## Sprint Goal
 
@@ -45,24 +45,24 @@
 | 2 | cost-system | CostSystem Autoload #7：费用上限 + 全额恢复 + 临时加成 | `cost-system/story-001-*.md` | Integration | 0.5d | #1 | Done |
 | 3 | cost-system | 双重信号路径（cost_changed + batch_updated） | `cost-system/story-002-*.md` | Logic | 0.5d | #2 | Done |
 | 4 | status-effect | StatusTemplate/Instance + 8 阶段管线核心 | `status-effect/story-001-*.md` | Integration | 1d | #1 | Done |
-| 5 | status-effect | 3 叠加规则 + 免疫多级检查 + 20 活跃上限 | `status-effect/story-002-*.md` | Logic | 1d | #4 | Backlog |
-| 6 | status-effect | 战斗结束 snapshot 导出 GSM + 暂挂/恢复排序 | `status-effect/story-003-*.md` | Integration | 0.5d | #5 | Backlog |
+| 5 | status-effect | 3 叠加规则 + 免疫多级检查 + 20 活跃上限 | `status-effect/story-002-*.md` | Logic | 1d | #4 | Done |
+| 6 | status-effect | 战斗结束 snapshot 导出 GSM + 暂挂/恢复排序 | `status-effect/story-003-*.md` | Integration | 0.5d | #5 | Done |
 | 7 | school-system | SchoolSystem Autoload #19：SCHOOL_LIBRARY const + 纯查询接口 | `school-system/story-001-*.md` | Logic | 0.5d | #1 | Done |
-| 8 | school-system | 5 流派增益公式 + 不可驱散约束 | `school-system/story-002-*.md` | Logic | 0.5d | #7, #5 | Backlog |
-| 9 | tech-debt | 拆分 game_state_manager.gd → gsm_serializer.gd（1016→≤300 行） | （Sprint 1 回顾行动项 #2） | Refactor | 1d | — | Ready |
+| 8 | school-system | 5 流派增益公式 + 不可驱散约束 | `school-system/story-002-*.md` | Logic | 0.5d | #7, #5 | Done |
+| 9 | tech-debt | 拆分 game_state_manager.gd → gsm_serializer.gd（1016→≤300 行） | （Sprint 1 回顾行动项 #2） | Refactor | 1d | — | Done |
 
 ### 应该完成 —— ~5h
 
 | # | Epic | Story | 类型 | 预估 | 依赖 | 状态 |
 |:--|------|:--|:--:|:--:|:--:|:--:|
-| 10 | tech-debt | GSM 第二层方法独立单测补齐（resource/faction 新增方法） | Task | 0.5d | #9 | Backlog |
-| 11 | docs | ADR-0003 §visited_ids 生命周期文档补充 | Doc | 0.125d | — | Backlog |
+| 10 | tech-debt | GSM 第二层方法独立单测补齐（resource/faction 新增方法） | Task | 0.5d | #9 | Done |
+| 11 | docs | ADR-0003 §visited_ids 生命周期文档补充 | Doc | 0.125d | — | Done |
 
 ### 可以完成 —— 8h
 
 | # | Epic | Story | 类型 | 预估 | 依赖 | 状态 |
 |:--|------|:--|:--:|:--:|:--:|:--:|
-| 12 | prep | Feature 层 Epic Story 预创建（为 Sprint 4 铺路） | Planning | 1d | — | Backlog |
+| 12 | prep | Feature 层 Epic Story 预创建（为 Sprint 4 铺路） | Planning | 1d | — | Done |
 
 **总计**：必须完成 44h + 应该完成 5h + 可以完成 8h = 57h（65% 利用率）
 
@@ -89,17 +89,17 @@
 
 ## 此冲刺的完成定义
 
-- [ ] 所有必须完成的任务已完成
-- [ ] 所有任务通过验收标准
-- [ ] QA 计划已存在 (`production/qa/qa-plan-sprint-3.md`)
-- [ ] 所有逻辑/集成类故事有通过的单元/集成测试
-- [ ] 冒烟检查已通过 (`/smoke-check sprint`)
-- [ ] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
-- [ ] 已交付特性中无 S1 或 S2 的 bug
-- [ ] 任何偏差已更新设计文档
+- [x] 所有必须完成的任务已完成
+- [x] 所有任务通过验收标准
+- [x] QA 计划已存在 (`production/qa/qa-plan-sprint-3-2026-08-10.md`)
+- [x] 所有逻辑/集成类故事有通过的单元/集成测试
+- [x] 冒烟检查已通过 (`/smoke-check sprint`)
+- [x] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
+- [x] 已交付特性中无 S1 或 S2 的 bug
+- [x] 任何偏差已更新设计文档
 - [ ] 代码已审查并合并
-- [ ] game_state_manager.gd 拆分零回归（Sprint 1 回顾行动项 #2）
-- [ ] /create-stories 阶段跨 Epic 接口契约盘点完成（Sprint 2 回顾行动项 #2）
+- [x] game_state_manager.gd 拆分零回归（Sprint 1 回顾行动项 #2）
+- [x] /create-stories 阶段跨 Epic 接口契约盘点完成（Sprint 2 回顾行动项 #2）
 
 ## 关键依赖链
 
@@ -109,21 +109,21 @@
 - **game_state_manager.gd 拆分**: 独立任务，可在任意空闲时段进行，但拆分后须重跑全部测试
 - ~~**3-1 /create-stories**: 阻塞 3-2~3-8 共 6 个任务，是关键路径根节点，必须最先完成~~ **已完成**
 
-## 进度摘要（2026-08-12）
+## 进度摘要（2026-08-14）
 
-已完成 5/12 故事（3-1, 3-2, 3-3, 3-4, 3-7），1 个就绪待开发（3-9），其余 backlog。
+**Sprint 3 全部 12/12 故事完成 ✅**
 
 - **cost-system**: 全部完成（3-2 + 3-3）
-- **status-effect**: 001 完成（3-4），002/003 待启动
-- **school-system**: 001 完成（3-7），002 待启动（blocker 部分解除——3-7 已 done，仅剩 3-5 依赖）
-- **技术债**: 未启动（3-9 Ready, 3-10/3-11 Backlog）
+- **status-effect**: 全部完成（3-4 + 3-5 + 3-6）
+- **school-system**: 全部完成（3-7 + 3-8）
+- **技术债**: 全部完成（3-9 GSM 拆分 + 3-10 单测补齐 + 3-11 ADR 文档）
+- **Feature 层预创建**: 完成（3-12——18 个 Feature Epic 标题级骨架）
 
 ## Next Steps
 
-1. 3-5（status-effect 叠加/免疫/溢出）—— 1d，bloacker 已解除，复杂度最高
-2. 3-9（拆分 GSM）—— 1d，ready-for-dev，独立任务
-3. 3-6（snapshot 导出）—— 0.5d，依赖 3-5
-4. 3-8（流派增益公式）—— 0.5d，依赖 3-5
+1. 启动 Sprint 4（Feature 层）——用 `/dev-story` 从 combat-system 起逐条填充 AC 并实现（战斗子系统为 MVP 关键路径）
+2. ~~修复 cost_system 既有失败~~ **已修复（2026-08-14）**：8 个失败全消除——6 个信号计数（`_track_signal` 连接晚于 `init_for_battle`，丢失 init 的 cost_changed）+ 2 个 push_warning 计数（`_write_cost_to_gsm` → `_set_battle_cost` 在 battle=null 时警告）。全量 1118 tests / 1117 passing / 1 pending（save_load 多步迁移，首版有意延后）
+3. 若需回顾，运行 `/retrospective` 生成 Sprint 3 回顾报告
 
 ## 范围检查
 

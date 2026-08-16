@@ -71,7 +71,7 @@ func test_ac014_chance_one_always_triggers() -> void:
 	# Act + Assert —— 100 次执行均 triggered=true
 	for i: int in range(100):
 		var inst := _make_instance()
-		var results := es.resolve_option(inst, 0)
+		var results: Array[Dictionary] = es.resolve_option(inst, 0)
 		assert_eq(results.size(), 1, "应返回 1 个结果")
 		assert_true(results[0]["triggered"], "chance=1.0 应必定触发 (第 %d 次)" % i)
 
@@ -92,7 +92,7 @@ func test_ac015_chance_zero_never_triggers() -> void:
 	# Act + Assert —— 100 次执行均 triggered=false
 	for i: int in range(100):
 		var inst := _make_instance()
-		var results := es.resolve_option(inst, 0)
+		var results: Array[Dictionary] = es.resolve_option(inst, 0)
 		assert_eq(results.size(), 1)
 		assert_false(results[0]["triggered"],
 				"chance=0.0 应永不触发 (第 %d 次)" % i)
@@ -119,7 +119,7 @@ func test_ac016_chance_half_trigger_rate_in_range() -> void:
 	var total: int = 1000
 	for i: int in range(total):
 		var inst := _make_instance()
-		var results := es.resolve_option(inst, 0)
+		var results: Array[Dictionary] = es.resolve_option(inst, 0)
 		if results[0]["triggered"]:
 			triggered_count += 1
 
@@ -147,7 +147,7 @@ func test_ac017_use_range_results_within_bounds() -> void:
 	# Act + Assert —— 100 次结果均在 [50, 150]
 	for i: int in range(100):
 		var inst := _make_instance()
-		var results := es.resolve_option(inst, 0)
+		var results: Array[Dictionary] = es.resolve_option(inst, 0)
 		var value: int = results[0]["value"]
 		assert_true(value >= 50 and value <= 150,
 				"use_range 结果应在 [50, 150]，第 %d 次实际: %d" % [i, value])
@@ -169,7 +169,7 @@ func test_ac018_use_range_false_returns_exact_value() -> void:
 
 	# Act + Assert
 	var inst := _make_instance()
-	var results := es.resolve_option(inst, 0)
+	var results: Array[Dictionary] = es.resolve_option(inst, 0)
 	assert_eq(results.size(), 1, "应返回 1 个结果")
 	assert_eq(results[0]["value"], 100, "use_range=false 应返回精确 value_int=100")
 
@@ -186,7 +186,7 @@ func test_ac018_use_range_false_ignores_min_max() -> void:
 
 	# Act + Assert
 	var inst := _make_instance()
-	var results := es.resolve_option(inst, 0)
+	var results: Array[Dictionary] = es.resolve_option(inst, 0)
 	assert_eq(results[0]["value"], 42, "use_range=false 应忽略 min/max，返回 value_int=42")
 
 
@@ -207,7 +207,7 @@ func test_resolve_option_result_dictionary_structure() -> void:
 
 	# Act
 	var inst := _make_instance()
-	var results := es.resolve_option(inst, 0)
+	var results: Array[Dictionary] = es.resolve_option(inst, 0)
 
 	# Assert —— 结构包含 triggered/type/target/value/value_str
 	assert_eq(results.size(), 1)
@@ -266,7 +266,7 @@ func test_resolve_option_invalid_index_returns_empty() -> void:
 	inst.available_option_indices = [0]  # 仅 0 可用
 
 	# Act
-	var results := es.resolve_option(inst, 5)  # 5 不在可用列表
+	var results: Array[Dictionary] = es.resolve_option(inst, 5)  # 5 不在可用列表
 
 	# Assert
 	assert_eq(results.size(), 0, "无效索引应返回空数组")

@@ -188,9 +188,11 @@ func test_ac006_spend_insufficient_no_signal_emitted() -> void:
 
 
 func test_ac006_spend_insufficient_push_warning() -> void:
+	GameStateManager.battle_start({})
 	cs.init_for_battle(1)
 	cs.spend(3)
 	assert_push_warning_count(1, "余额不足应 push_warning 1 次")
+	GameStateManager.battle_end({})
 
 
 # ============================================================================
@@ -416,11 +418,13 @@ func test_ac015_clear_then_spend_rejected() -> void:
 
 
 func test_ac015_clear_then_add_temp_bonus_rejected() -> void:
+	GameStateManager.battle_start({})
 	cs.init_for_battle(5)
 	cs.clear_for_battle_end()
 	cs.add_temp_bonus(2, "pill")
 	assert_eq(cs._temp_bonus, 0, "清理后 add_temp_bonus 不应生效")
 	assert_push_warning_count(1, "应 push_warning")
+	GameStateManager.battle_end({})
 
 
 # ============================================================================
@@ -482,15 +486,14 @@ func test_ac018_write_to_gsm_does_not_crash_when_gsm_available() -> void:
 	pass
 
 
-func test_ac018_write_to_gsm_silent_when_method_missing() -> void:
-	# 确保 has_method("_set_battle_cost") 返回 false 时不崩溃
-	var has_method: bool = GameStateManager.has_method("_set_battle_cost")
-	if not has_method:
-		# 当前 GSM 未实现 _set_battle_cost——桩模式必须不崩溃
-		cs.init_for_battle(5)
-		# 验证初始化成功（未因 _write_cost_to_gsm 异常而中断）
-		assert_eq(cs.get_max_cost(), 5, "初始化成功")
-		assert_true(cs._is_active, "is_active 为 true")
+func test_ac018_write_to_gsm_silent_when_battle_null() -> void:
+	# Story 002 已实现 GSM._set_battle_cost——Story 001 的桩模式（has_method 返回 false）已不存在。
+	# 本测试改为验证当前现实：GSM 就绪但 battle 域未初始化（null）时，
+	# _write_cost_to_gsm 经 _set_battle_cost 的 null 守卫静默跳过，不崩溃。
+	assert_true(GameStateManager.has_method(&"_set_battle_cost"), "Story 002 已实现 _set_battle_cost")
+	cs.init_for_battle(5)
+	assert_eq(cs.get_max_cost(), 5, "初始化成功（battle=null 时 GSM 写入被静默跳过）")
+	assert_true(cs._is_active, "is_active 为 true")
 
 
 func test_ac018_cost_changed_emitted_with_correct_payload() -> void:

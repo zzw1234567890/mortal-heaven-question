@@ -30,6 +30,40 @@
 
 ---
 
+## Session Extract — Sprint 3 QA 验收（smoke + team-qa）2026-08-15
+
+- Verdict：APPROVED（QA 签收通过）
+- 冒烟检查：PASS WITH WARNINGS（`production/qa/smoke-2026-08-15.md`）——1145/1146 通过，0 失败
+- QA 签收：APPROVED（`production/qa/qa-signoff-sprint-3-2026-08-15.md`）——12/12 story PASS，零 S1/S2 缺陷
+- 冒烟检查期间修复 3 个 EventSystem 测试文件 parse error（28 个哑测试解锁）：
+  - `test_event_trigger.gd`（10 处 `var instance := es.trigger_event(...)` → `var instance: EventInstance = ...`）
+  - `test_resolve_option.gd`（8 处 `var results := es.resolve_option(...)` → `var results: Array = ...`）
+  - `test_select_event.gd`（续行 `+` 卡方表达式缩进错误 → 拆 `heavy_term`/`light_term`）
+- 文档审查修复 1 处措辞矛盾：ADR-0003 与 `chain_handler.gd` docstring 中 `get_chain_event()`「不修改 visited_ids」→「不追加、不发射信号，但链结束分支 clear()」
+- 全量测试：62 scripts / 1146 tests / 1145 passing / 1 pending（save_load 多步迁移）/ 0 failing
+- sprint-3.md 完成定义更新：冒烟检查 ✅、QA 签收 ✅、无 S1/S2 bug ✅；剩「代码已审查并合并」一项未勾（待 /code-review + git 提交，需用户明确指示）
+- 3 项 ADVISORY（S3/S4，不阻塞）：orphan 测试内存泄漏 / RealmSystem·SchoolSystem 未注册 Autoload / CardSystem 模板目录缺失
+- Next recommended：/code-review 代码审查 → git 提交（需用户指示）→ 启动 Sprint 4（/dev-story combat-system）
+
+---
+
+## Session Extract — 修复 cost_system 既有 8 个测试失败 2026-08-14
+
+- Verdict：FIXED（全量 1118 tests → 1117 passing / 1 pending，0 failing）
+- 根因与修复（两类）：
+  1. **6 个信号计数失败**（`tests/unit/cost_system/test_cost_signals.gd`）：`_track_signal` 连接晚于 `init_for_battle`，丢失 init 发射的 cost_changed → 移 `_track_signal` 到 `init_for_battle` 之前（test_ac002/003/004/006）
+  2. **2 个 lambda 按值捕获 int 失效**（test_ac010/011）：GDScript lambda 对 int 按值捕获，闭包内 `+=`/`=` 不写回外部 → 改用 `Array` 承载可变值（`cat2b_received: Array = [0]`、`ui_cost_current: Array = [-1]`）
+  3. **2 个 push_warning 计数失败**（`tests/integration/cost_system/test_cost_system_basic.gd`）：`_write_cost_to_gsm` → `_set_battle_cost` 在 battle=null 时 push_warning，叠加原警告 → 补 `GameStateManager.battle_start({})` / `battle_end({})` 包裹（test_ac006_spend_insufficient_push_warning、test_ac015_clear_then_add_temp_bonus_rejected）
+  4. **1 个 risky 测试**（test_ac018_write_to_gsm_silent_when_method_missing）：Story 001 桩模式（has_method 返回 false）已过时，Story 002 已实现 `_set_battle_cost` → 改写为验证 battle=null 时 null 守卫静默跳过
+- 变更文件：
+  - `tests/unit/cost_system/test_cost_signals.gd`
+  - `tests/integration/cost_system/test_cost_system_basic.gd`
+- 回归：cost_system 套件 74/74 passed；全量 59 scripts / 1118 tests，1117 passing / 1 pending（save_load test_migration_chain 多步迁移，首版有意延后）
+- 附注：`test_event_trigger.gd` 的 parse error（此前发现）已确认不在当前失败列表——event_system 套件 162/162 passed，无需处理
+- Next recommended：启动 Sprint 4（Feature 层）——`/dev-story` 从 combat-system 起逐条填充 AC 并实现
+
+---
+
 ## Session Extract — Story 3-12 Feature 层 Epic Story 预创建 2026-08-14
 
 - Verdict：COMPLETE
@@ -90,7 +124,9 @@
 - Next recommended：Story 3-11（ADR-0003 §visited_ids 生命周期文档补充）或 3-12（Feature 层预创建）
 
 <!-- STATUS -->
-Epic: feature-precreate
-Feature: Feature 层 Epic Story 预创建
-Task: 18 个 Feature Epic 标题级骨架完成，Sprint 3 全部 12 个 story 完成
+Epic: sprint-3
+Feature: Sprint 3 QA 验收
+Task: QA 签收 APPROVED（smoke PASS WITH WARNINGS，12/12 story 完成）
 <!-- /STATUS -->
+
+<!-- QA RUN: 2026-08-15 | Sprint: sprint-3 | Verdict: APPROVED | Report: production/qa/qa-signoff-sprint-3-2026-08-15.md -->

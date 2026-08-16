@@ -91,7 +91,7 @@ func test_ac003_trigger_event_returns_instance_with_filtered_options() -> void:
 	GameStateManager.player.realm = 2  # 满足 REALM GE 2
 
 	# Act
-	var instance := es.trigger_event(&"test_event_001")
+	var instance: EventInstance = es.trigger_event(&"test_event_001")
 
 	# Assert
 	assert_not_null(instance, "trigger_event 应返回非 null 实例")
@@ -115,7 +115,7 @@ func test_ac003_trigger_event_filters_realm_condition() -> void:
 	GameStateManager.player.realm = 1  # 不满足 REALM GE 2
 
 	# Act
-	var instance := es.trigger_event(&"test_event_realm_filter")
+	var instance: EventInstance = es.trigger_event(&"test_event_realm_filter")
 
 	# Assert
 	assert_eq(instance.available_option_indices.size(), 1, "仅 1 个选项可见")
@@ -140,7 +140,7 @@ func test_ac004_faction_condition_filters_non_zhengdao() -> void:
 	GameStateManager.narrative.story_flags["player_faction"] = "modao"
 
 	# Act
-	var instance := es.trigger_event(&"test_event_faction")
+	var instance: EventInstance = es.trigger_event(&"test_event_faction")
 
 	# Assert
 	assert_true(instance.available_option_indices.has(0), "opt_open 应可见")
@@ -159,7 +159,7 @@ func test_ac004_faction_condition_matches_zhengdao() -> void:
 	GameStateManager.narrative.story_flags["player_faction"] = "zhengdao"
 
 	# Act
-	var instance := es.trigger_event(&"test_event_faction_match")
+	var instance: EventInstance = es.trigger_event(&"test_event_faction_match")
 
 	# Assert
 	assert_eq(instance.available_option_indices.size(), 1, "正道玩家应看到该选项")
@@ -182,7 +182,7 @@ func test_ac005_realm_condition_filters_low_realm() -> void:
 	GameStateManager.player.realm = 1
 
 	# Act
-	var instance := es.trigger_event(&"test_event_realm_gate")
+	var instance: EventInstance = es.trigger_event(&"test_event_realm_gate")
 
 	# Assert
 	assert_false(instance.available_option_indices.has(1),
@@ -202,7 +202,7 @@ func test_ac005_realm_condition_passes_when_meeting() -> void:
 	GameStateManager.player.realm = 3
 
 	# Act
-	var instance := es.trigger_event(&"test_event_realm_pass")
+	var instance: EventInstance = es.trigger_event(&"test_event_realm_pass")
 
 	# Assert
 	assert_true(instance.available_option_indices.has(0),
@@ -225,7 +225,7 @@ func test_ac006_all_options_hidden_when_none_meet_conditions() -> void:
 	GameStateManager.player.realm = 1
 
 	# Act
-	var instance := es.trigger_event(&"test_event_all_hidden")
+	var instance: EventInstance = es.trigger_event(&"test_event_all_hidden")
 
 	# Assert
 	assert_eq(instance.available_option_indices.size(), 0, "无可见选项")
@@ -248,7 +248,7 @@ func test_ac007_all_options_visible_when_all_meet_conditions() -> void:
 	es.templates[&"test_event_all_visible"] = tmpl
 
 	# Act
-	var instance := es.trigger_event(&"test_event_all_visible")
+	var instance: EventInstance = es.trigger_event(&"test_event_all_visible")
 
 	# Assert
 	assert_eq(instance.available_option_indices.size(), 3, "3 个选项应全部可见")
@@ -271,7 +271,7 @@ func test_ac022_event_triggered_signal_emitted_on_success() -> void:
 	watch_signals(es)
 
 	# Act
-	var instance := es.trigger_event(&"test_event_signal")
+	var instance: EventInstance = es.trigger_event(&"test_event_signal")
 
 	# Assert
 	assert_not_null(instance, "应返回有效实例")
@@ -283,7 +283,7 @@ func test_ac022_event_triggered_signal_not_emitted_on_unknown_id() -> void:
 	watch_signals(es)
 
 	# Act
-	var instance := es.trigger_event(&"nonexistent_event")
+	var instance: EventInstance = es.trigger_event(&"nonexistent_event")
 
 	# Assert
 	assert_null(instance, "未知 event_id 应返回 null")

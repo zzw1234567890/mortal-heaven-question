@@ -454,23 +454,22 @@ func _load_templates() -> void:
 ```gdscript
 const MAX_CHAIN_DEPTH: int = 3
 
-## 在 event_resolved 信号的消费者调用 get_chain_event() 之前，
-## 调用方负责维护 visited_ids 集合并传递给下一次 trigger_event()
-func _check_chain_cycle(instance: EventInstance, next_id: StringName) -> bool:
-    # 调用方维护的 _chain_visited_ids 集合
-    if _chain_visited_ids.has(next_id):
+## 循环检测（实现在 ChainHandler.check_chain_cycle，三参数——见下方「visited_ids 生命周期」）。
+## 初版设计为「调用方维护 visited_ids 集合」；实现已改为 EventSystem 拥有并注入共享引用。
+## 此伪代码仅保留历史意图，签名/所有权以代码为准。
+func check_chain_cycle(instance: EventInstance, next_id: StringName, chain_ended: Signal) -> bool:
+    if _visited_ids.has(next_id):
         push_warning("EventSystem: chain cycle detected at '%s'" % next_id)
         chain_ended.emit(instance.template_id)
-        _chain_visited_ids.clear()
+        _visited_ids.clear()
         return false  # 截断
-    _chain_visited_ids.append(next_id)
+    _visited_ids.append(next_id)
     return true
 
-## 调用方的标准模式：
-## var visited = []
+## 调用方的标准模式（EventSystem 内部薄转发，外部仅调 trigger_event/get_chain_event）：
 ## var next = event_system.get_chain_event(inst, opt_idx)
 ## while next != &"":
-##     if not _check_chain_cycle(inst, next): break
+##     if not event_system.check_chain_cycle(inst, next): break
 ##     var new_inst = event_system.trigger_event(next)
 ##     new_inst.chain_depth = inst.chain_depth + 1
 ##     ...
@@ -495,7 +494,7 @@ func _check_chain_cycle(instance: EventInstance, next_id: StringName) -> bool:
 3. **场景 (d)** `chain_on_option` 不匹配 → 返回 `&""` 并 `clear()`；
 4. **循环命中** → `check_chain_cycle()` 检测 `has(next_id)` → `push_warning` + 发射 `chain_ended` + `clear()` 并返回 `false`。
 
-**追加语义**：仅 `check_chain_cycle()` 在确认无循环时执行 `append(next_id)`；`get_chain_event()` 是纯查询（CQS——命令查询分离），**不修改** visited_ids、不发射信号。
+**追加语义**：仅 `check_chain_cycle(instance: EventInstance, next_id: StringName, chain_ended: Signal) -> bool` 在确认无循环时执行 `append(next_id)`；`get_chain_event()` 是纯查询（CQS——命令查询分离）——**不追加**、不发射信号，但链结束分支（场景 a/b/d）会 `clear()` visited_ids（见上方「清空语义」）。
 
 **边界行为**：
 - `visited_ids` 的生命周期**与单条事件链对齐，而非单个事件**——清空发生在「链结束」而非「事件结算完毕」。因此同一链内跨多个事件累积检测，跨链自动复位。

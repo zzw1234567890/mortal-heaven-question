@@ -64,8 +64,9 @@ func test_ac019_weighted_distribution_matches_expected_proportion() -> void:
 	# df=1, α=0.05 临界值 ≈ 3.841
 	var expected_heavy: float = total * 7.0 / 10.0
 	var expected_light: float = total * 3.0 / 10.0
-	var chi2: float = pow(float(counts[&"event_heavy"]) - expected_heavy, 2) / expected_heavy
-			+ pow(float(counts[&"event_light"]) - expected_light, 2) / expected_light
+	var heavy_term: float = pow(float(counts[&"event_heavy"]) - expected_heavy, 2) / expected_heavy
+	var light_term: float = pow(float(counts[&"event_light"]) - expected_light, 2) / expected_light
+	var chi2: float = heavy_term + light_term
 	var chi2_critical: float = 3.841  # df=1, α=0.05
 	assert_true(chi2 < chi2_critical,
 			"卡方统计量 %.3f 应小于临界值 %.3f（heavy=%d, light=%d）"
