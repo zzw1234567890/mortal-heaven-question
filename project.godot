@@ -29,6 +29,8 @@ CostSystem="*res://src/core/cost_system.gd"
 ResourceSystem="*res://src/core/resource_system.gd"
 FactionSystem="*res://src/core/faction_system.gd"
 StatusEffectSystem="*res://src/core/status_effect/status_effect_system.gd"
+RealmSystem="*res://src/core/realm_system.gd"
+SchoolSystem="*res://src/core/school_system/school_system.gd"
 
 [display]
 
