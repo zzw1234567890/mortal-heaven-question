@@ -222,12 +222,15 @@ PRDEngine 内部类（CardEffectEngine 持有单例）：
     var prng := RandomNumberGenerator.new()  # 独立 RNG 实例（不共享全局状态）
     # 初始化时：prng.seed = GsM.meta.seed
 
-  算法：
+  算法（标准 PRD——game-designer 裁决 2026-08-16 修订，替代原 P_base 起始 + P_base×C 累加）：
     P_base ∈ {0.05, 0.10, 0.15, ..., 0.95}  # 5% 步进
-    C: float（调优参数——控制收敛速度，默认待游戏测试校准）
-    P_current[card_instance_id] = P_base     # 每卡牌实例独立的状态
+    C: float = calibrate_C(P_base)  # 校准常数——对每个标示概率求解，使 E[N] = 1/P_base
+    P_current[card_instance_id] = C     # 起始 = 校准常数 C（恒 C < P_base，非 P_base 本身）
 
   next_random(card_instance_id, p_base) → bool:
+    if failure_streak >= ceil(1/p_base):      # 怜悯保护——连败达阈值强制触发（先于掷骰，不消耗 RNG）
+      P_current[card_instance_id] = C
+      return true
     if GsM.meta.prng_override_seed != null:  # 测试模式
       var test_prng := RandomNumberGenerator.new()
       test_prng.seed = prng_override_seed
@@ -235,18 +238,24 @@ PRDEngine 内部类（CardEffectEngine 持有单例）：
     else:
       roll = prng.randf()                    # 使用实例 RNG [0.0, 1.0)
     if roll < P_current[card_instance_id]:
-      P_current[card_instance_id] = P_base   # 触发——重置
+      P_current[card_instance_id] = C         # 触发——重置为 C
       return true
     else:
-      P_current[card_instance_id] += P_base × C  # 失败——累加概率
-      if failure_streak >= ceil(1/P_base):      # 怜悯保护
-        P_current[card_instance_id] = P_base
-        return true
+      P_current[card_instance_id] = min(1.0, P_current + C)  # 失败——累加 C（单一常数）
+      failure_streak += 1
       return false
+
+  calibrate_C(p_base) → float:
+    # 二分求解 C，使含怜悯截断的期望触发次数 E[N] = 1/p_base。
+    # 怜悯阈值 M = ceil(1/p_base)；P(N=k) = min(1,k·C)·Π_{j<k}(1-min(1,j·C))（k=1..M）
+    # P(N=M+1) = Π_{j≤M}(1-min(1,j·C))（怜悯强制）；E[N] = Σ k·P(N=k) + (M+1)·P(N=M+1)
+    # 参考值：p=0.30 → C≈0.108；p=0.20 → C≈0.032；p=0.50 → C≈0.293
 
 reset_prng_seed(seed: int) → void:
   # 测试模式：设置确定性种子——所有 randf() 调用可重现
 ```
+
+**为什么起始值是 C 而非 P_base**（game-designer 裁决）：原公式 `P_start = P_base` 且失败后 P 只增不减，长期均值必然 > P_base（实测 C=0.3 时触发率 40%），结构上无法收敛到标示值。标准 PRD 以「C < p 的起始值 + 等量累加 C」才使长期触发率收敛到 p。C 通过 calibrate_C 对每个 5% 步进的 p 预计算（含怜悯截断修正），30% 时 C≈0.108（纯标准 PRD 无怜悯为 0.11895；怜悯 `ceil(1/0.3)=4` 比自然上限 `ceil(1/C)≈9` 更严，故需下调）。
 
 **为什么 PRD 不是全局单例**：`P_current` 状态按 `card_instance_id` 独立追踪——不同卡牌的"30% 概率"不共享失败计数。玩家打出一张"30% 冰冻"失败后，下一次同卡牌的 P_current 累加——但另一张"30% 眩晕"从独立的 P_base 开始。
 
@@ -379,7 +388,7 @@ _ready():
 - **Godot 4.5 `@abstract` 稳定性**：`@abstract` 类在 Godot 4.5 中引入——可能存在未发现的边缘情况（如 `@abstract` 类在 `preload()` 循环引用下的行为、`@abstract` 虚函数与 `Callable.bind()` 的交互）。缓解措施：在引擎参考验证中优先测试——若发现阻塞问题，退回到基类 + `assert(false, "must override")` 守门模式（替代方案 A 的运行时检查版本）
 - **RefCounted GC 抖动**：Godot 4.5 优化了引用计数性能，但每帧 50+ `RefCounted` 创建/销毁的实际表现需在 60fps 目标下验证。缓解措施：对象池预分配 + 目标硬件上的性能测试
 - **触发链的不可预测性**：复杂效果交互（A 触发 B → B 触发 C → C 修改 A 的优先级）可能导致非直觉的结算顺序——即使符合规则。GDD 已定义优先级规则但玩家可能不理解"为什么我的效果在那个时候触发了"。缓解措施：战斗日志的可选详细模式——列出每次结算的优先级依据
-- **PRD 种子同步**：如果 `GsM.meta.seed` 在战斗中途因存档读档而改变——PRD 的内部状态 `P_current` 需重置（存档不保存概率累加值——"读档后重新掷骰"）。确保重播和回归测试中种子一致性。缓解措施：存档时仅保存 `meta.seed`，不保存 `P_current` 字典——读档后所有 PRD 状态从 P_base 重新开始
+- **PRD 种子同步**：如果 `GsM.meta.seed` 在战斗中途因存档读档而改变——PRD 的内部状态 `P_current` 需重置（存档不保存概率累加值——"读档后重新掷骰"）。确保重播和回归测试中种子一致性。缓解措施：存档时仅保存 `meta.seed`，不保存 `P_current` 字典——读档后所有 PRD 状态从校准常数 C 重新开始
 - **Autoload 扩容**：8 个 Autoload 增加了初始化顺序脆弱性——单次 init-order 错误可能导致难以诊断的启动崩溃。缓解措施：编写自动化初始化顺序验证测试（`test_autoload_order.gd`）——在 CI 中阻止顺序偏差
 - **StatusSystem 接口已确认**：本 ADR 定义的 StatusSystem API（`apply_status`、`remove_status`、`get_active_statuses`、`get_accumulated_value`、`remove_statuses_by_source`）已在 ADR-0011（状态效果系统，Accepted）中正式定义——接口签名详见 ADR-0011 §与 ADR-0009 的接口映射。两者保持一致，无需同步更新。
 - **EffectTemplate 资产管线缺口**：222 个 EffectTemplate `.tres` 文件需要创作。本 ADR 未指定创作工作流（手动 Godot Inspector？CSV 导入工具？编辑器内插件？）——这是一个必须在编码前解决的生产风险。缓解措施：编码前独立决策中解决——MVP 可使用脚本驱动的 CSV→`.tres` 批量导出。
@@ -391,7 +400,7 @@ _ready():
 | card-effect-engine.md | §1 效果类型体系——4 大类覆盖 222 张卡牌 | Resource 子类（`EffectTemplate`）+ RefCounted 子类层级（`InstantEffect` / `PersistentEffect` / `TriggeredEffect` / `ReplacementEffect`）——编译时类型安全保证每种效果的正确结算路径 |
 | card-effect-engine.md | §3 效果结算顺序——5 级优先级 + 中分辨率插入 | `ResolutionStack` 的优先级排序（主动出牌 > 先发己方 > 普通己方 > 敌方 > instance_id）+ `_resolve_stack()` 的 LIFO 出栈 + 队列中分辨率插入新效果 |
 | card-effect-engine.md | §8 效果描述规范化——描述模板与数据双向绑定 | `EffectTemplate.description_tmpl` 字段存储描述模板——自动生成器在效果数值变更时同步更新（未来功能——MVP 中描述为手写字符串） |
-| card-effect-engine.md | §9 概率效果 PRD——5% 步进 + 怜悯保护 | `PRDEngine` 内部类——`next_random()` 实现累加概率 + 连续失败 `ceil(1/P_base)` 次后强制触发 |
+| card-effect-engine.md | §9 概率效果 PRD——5% 步进 + 怜悯保护 | `PRDEngine` 内部类——`next_random()` 标准 PRD（起始=C，失败累加 C）+ `calibrate_C()` 二分求解校准常数 + 连续失败 `ceil(1/P_base)` 次后强制触发 |
 | card-effect-engine.md | §10 AI 评估接口——干跑评估 + 触发链模拟 | `evaluate_effect()` / `simulate_chain()` / `GameStateSnapshot`——在不可变快照上执行纯计算，不修改游戏状态 |
 | card-effect-engine.md | §触发链管理——深度 10 层 + 循环检测 | `visited_card_ids: Dictionary`（`Dictionary[int, bool]`——GDScript 4.x 无 `Set` 类型，字典键 O(1) 查找）+ `current_depth` 计数器——第 11 层截断 + WARN 日志 |
 | combat-system.md | 阶段触发——Phase 0/1/2/3/4/5/6 效果结算 | CombatSystem 在 `advance_phase()` 中直接调用 `CardEffectEngine.resolve_phase_effects(phase)`——编排器→子系统调用，每阶段收集并结算该阶段应触发的效果 |

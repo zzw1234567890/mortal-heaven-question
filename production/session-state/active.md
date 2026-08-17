@@ -228,3 +228,21 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-3 完成（触发链硬限制），待 /dev-story 4-4（PRD 伪随机分布引擎）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-4 PRD 伪随机分布引擎 2026-08-16
+
+- Verdict：COMPLETE（4-4 done，零回归）
+- 变更：`src/feature/card_effect_engine/prd_engine.gd`（class_name PRDEngine extends RefCounted）——标准 PRD：起始=C、失败累加 C、触发重置 C、怜悯 ceil(1/p) 连败强制触发、calibrate_C 二分求解（30%→C≈0.108）
+- 关键裁决：原 ADR-0009/GDD 公式「起始=P_base + 累加 P_base×C」结构错误（探针实测 C=0.3 长期触发率 40% > 标示 30%，任何 C∈[0.3,1.0] 均过度触发）→ game-designer 裁决改标准 PRD（起始=C<p，累加 C），runtime calibrate_C 使含怜悯截断的 E[N]=1/p
+- 同步：GDD §9 机制 + 调优表（C 恒<p 非 0.3-1.0）+ 待解决问题 #4（已解决）+ ADR-0009 §PRD 伪随机分布引擎 + QA 缺口 #2（已解决）
+- 测试：`tests/unit/card_effect_engine/test_prd_distribution.gd` 11 测试（AC-001 怜悯不变式/阈值/5次内触发 + AC-002 [24,36] + C 校准 + 确定性 + 每卡独立 + 非法拒绝 + 重置）；全量 66 scripts / 1208 tests / 1207 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer CONCERNS（C1 get_p_current 语义歧义已修正注释 + C2 ADR 伪代码顺序回写 + 二分常量注释）；qa-lead ADEQUATE
+- 关键经验：PRD 起始概率必须 < 标示值（业界标准），P_start=p 结构上必过度触发；GDScript lambda 捕获标量需 Array 包装
+- Next：/dev-story 4-5（AI 干跑评估接口 GameStateSnapshot 不可变纯计算，blocker 4-3+4-4 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-4 完成（PRD 引擎），待 /dev-story 4-5（AI 干跑评估接口）
+<!-- /STATUS -->

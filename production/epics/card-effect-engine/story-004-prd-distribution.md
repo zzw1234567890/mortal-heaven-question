@@ -1,12 +1,20 @@
 # Story 004: PRD 伪随机分布引擎（5% 步进 + 怜悯保护）
 
 > **Epic**: 卡牌效果解析引擎 (Card Effect Engine)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
 > **Last Updated**:
+
+## Completion Notes
+**Completed**：2026-08-16
+**Criteria**：2/2 通过（AC-001~002 由单元测试覆盖）
+**Deviations**：重大公式修订（game-designer 裁决）——原 ADR-0009/GDD 公式「起始=P_base + 失败累加 P_base×C」结构上无法收敛到标示值（实测 C=0.3 长期触发率 40%），改为**标准 PRD**：起始=校准常数 C（C<p），失败累加 C，触发重置 C，runtime `calibrate_C(p)` 二分求解使含怜悯截断的 E[N]=1/p（30%→C≈0.108）。已同步 GDD §9 + 调优表 + 待解决问题 #4 + ADR-0009 §PRD 伪随机分布引擎
+**Test Evidence**：`tests/unit/card_effect_engine/test_prd_distribution.gd`（11 测试全通过）；全量套件 66 scripts / 1208 tests / 1207 passing / 1 pending / 0 failing 零回归
+**Code Review**：已完成（lead-programmer CONCERNS→已采纳 C1 get_p_current 语义注释 + C2 ADR 伪代码顺序回写 + 二分常量注释；qa-lead ADEQUATE）
+**QA 缺口 #2 已解决**：C 校准完成，AC-002 的 [24,36] 区间在修正公式 + seed=42 下实测 31 次通过
 
 ## Context
 
@@ -31,8 +39,8 @@
 
 *From GDD `design/gdd/card-effect-engine.md` §验收标准 → 概率效果 (PRD):*
 
-- [ ] **AC-001**: GIVEN 效果配置为"30%概率冰冻"，WHEN 连续失败4次（PRD理论连续失败上限≈4），THEN 第5次必然触发（怜悯强制触发）
-- [ ] **AC-002**: GIVEN 同一PRNG种子执行100次30%PRD效果，WHEN 统计触发次数，THEN 触发次数在24-36次之间（99% CI区间近似值；PRD收敛后该区间比独立随机更紧）
+- [x] **AC-001**: GIVEN 效果配置为"30%概率冰冻"，WHEN 连续失败4次（PRD理论连续失败上限≈4），THEN 第5次必然触发（怜悯强制触发）
+- [x] **AC-002**: GIVEN 同一PRNG种子执行100次30%PRD效果，WHEN 统计触发次数，THEN 触发次数在24-36次之间（99% CI区间近似值；PRD收敛后该区间比独立随机更紧）
 
 ---
 
@@ -89,7 +97,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/card_effect_engine/test_prd_distribution.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（11 测试函数，全通过）
 
 ---
 

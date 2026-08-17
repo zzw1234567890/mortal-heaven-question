@@ -63,11 +63,11 @@ stories:
     name: "PRD 伪随机分布引擎（5% 步进 + 怜悯保护）"
     file: "production/epics/card-effect-engine/story-004-prd-distribution.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-1"
-    completed: ""
+    completed: "2026-08-16 标准 PRD（起始=C 累加 C）+ calibrate_C 二分求解 + 怜悯 ceil(1/p)；11 单测全通过，全量 1207 passing 零回归；公式经 game-designer 裁决修订（原公式无法收敛），已回写 GDD/ADR-0009/QA 缺口 #2"
 
   - id: "4-5"
     name: "AI 干跑评估接口（GameStateSnapshot 不可变纯计算）"
