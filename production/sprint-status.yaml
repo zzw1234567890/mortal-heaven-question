@@ -43,21 +43,21 @@ stories:
     name: "ResolutionStack 栈式结算引擎（优先级队列 + LIFO + 中断插入）"
     file: "production/epics/card-effect-engine/story-002-resolution-stack.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-1"
-    completed: ""
+    completed: "2026-08-16 5 级优先级 + 次级 priority 决胜 + 二分中分辨率插入 + LIFO 出栈；12 单测全通过，全量 1186 passing 零回归；lead-programmer APPROVE / qa-lead ADEQUATE"
 
   - id: "4-3"
     name: "触发链硬限制 10 层 + visited_card_ids 循环检测"
     file: "production/epics/card-effect-engine/story-003-trigger-chain-10-layer-cycle.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-2"
-    completed: ""
+    completed: "2026-08-16 TriggerChainState 纯逻辑类 + resolve_all 接入深度/循环检查；13 单测全通过，全量 1197 passing 零回归；lead-programmer APPROVE / qa-lead GAPS 已补 continue 语义用例"
 
   - id: "4-4"
     name: "PRD 伪随机分布引擎（5% 步进 + 怜悯保护）"

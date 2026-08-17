@@ -1,12 +1,20 @@
 # Story 002: ResolutionStack 栈式结算引擎（优先级队列 + LIFO + 中断插入）
 
 > **Epic**: 卡牌效果解析引擎 (Card Effect Engine)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
 > **Last Updated**:
+
+## Completion Notes
+**Completed**：2026-08-16
+**Criteria**：2/2 通过（AC-001~002 由单元测试覆盖）
+**Deviations**：无阻塞。排序上下文（先发/阵营/主动出牌）经 `set_sort_context` 按 `source_card_instance_id` 注入——因 EffectBase 无这些字段（Story 001 最小字段集），不污染对象模型（lead-programmer APPROVE 确认合理）
+**Test Evidence**：`tests/unit/card_effect_engine/test_resolution_stack.gd`（12 测试全通过）；全量套件 64 scripts / 1187 tests / 1186 passing / 1 pending / 0 failing 零回归
+**Code Review**：已完成（lead-programmer APPROVE；qa-lead ADEQUATE）；采纳 C3（tier 魔数提为命名常量 TIER_*）与 C1（补充二分插入 O(n) 移位成本注释）
+**Out of Scope（正确 defer）**：触发链深度限制与循环检测属 Story 003；`resolve_all` 无终止保护由 003 的深度截断兜住（lead-programmer C2 记录）
 
 ## Context
 
@@ -32,8 +40,8 @@
 
 *From GDD `design/gdd/card-effect-engine.md` §验收标准 → 结算顺序:*
 
-- [ ] **AC-001**: GIVEN 己方效果A（激活时间t=3，先发标记=关）和己方效果B（激活时间t=5，先发标记=关）在同一时机触发，WHEN 结算，THEN B先于A执行（较新的优先），最终数值反映B先于A的效果顺序
-- [ ] **AC-002**: GIVEN 效果A（先发标记=开，激活时间t=1）和效果B（先发标记=关，激活时间t=10）在同一时机触发，WHEN 结算，THEN A先于B执行（先发无视激活时间优先）
+- [x] **AC-001**: GIVEN 己方效果A（激活时间t=3，先发标记=关）和己方效果B（激活时间t=5，先发标记=关）在同一时机触发，WHEN 结算，THEN B先于A执行（较新的优先），最终数值反映B先于A的效果顺序
+- [x] **AC-002**: GIVEN 效果A（先发标记=开，激活时间t=1）和效果B（先发标记=关，激活时间t=10）在同一时机触发，WHEN 结算，THEN A先于B执行（先发无视激活时间优先）
 
 ---
 
@@ -90,7 +98,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/card_effect_engine/test_resolution_stack.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（12 测试函数，全通过）
 
 ---
 

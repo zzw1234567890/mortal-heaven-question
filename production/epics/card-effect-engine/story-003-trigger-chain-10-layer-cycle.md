@@ -1,12 +1,20 @@
 # Story 003: 触发链硬限制 10 层 + visited_card_ids 循环检测
 
 > **Epic**: 卡牌效果解析引擎 (Card Effect Engine)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
 > **Last Updated**:
+
+## Completion Notes
+**Completed**：2026-08-16
+**Criteria**：3/3 通过（AC-001~003 由单元测试覆盖）
+**Deviations**：无阻塞。采纳 lead-programmer C1（visited_card_ids 类型化 `Dictionary[int,bool]`）、C2（overflow 消息追加截断者 K 到 chain 尾）、C3（resolve_all 新增 cycle_skip_handler 注入点，对齐 AC-002 DEBUG 日志要求）；qa-lead GAP-1（continue vs break 语义）已补 12 效果用例锁定 continue
+**Test Evidence**：`tests/unit/card_effect_engine/test_trigger_chain_10_layer_cycle.gd`（13 测试全通过）；全量套件 65 scripts / 1198 tests / 1197 passing / 1 pending / 0 failing 零回归
+**Code Review**：已完成（lead-programmer APPROVE；qa-lead GAPS→补齐 continue 语义用例）
+**分层边界**：DEBUG/WARN 日志实际发射（引擎侧）属 CardEffectEngine 集成层（Story 005 后）——本 Story 交付决策返回 + overflow_handler/cycle_skip_handler 钩子
 
 ## Context
 
@@ -31,9 +39,9 @@
 
 *From GDD `design/gdd/card-effect-engine.md` §验收标准 → 触发链:*
 
-- [ ] **AC-001**: GIVEN 效果A→B→C触发链（深度3），WHEN 结算，THEN C先结算完，B其次，A最后（栈式LIFO）
-- [ ] **AC-002**: GIVEN 同一 card_instance_id 已经在触发链中出现过，WHEN 该实例的效果再次被触发，THEN 跳过不重复触发（循环检测），记录DEBUG日志
-- [ ] **AC-003**: GIVEN 触发链达到10层深度，WHEN 第11层试图触发，THEN 第11层终止，前10层正常结算，输出WARN级别日志：`"[CardEffectEngine] Trigger chain depth exceeded: max=10, root_card_id=<ID>, chain=<A→B→...→K>"`
+- [x] **AC-001**: GIVEN 效果A→B→C触发链（深度3），WHEN 结算，THEN C先结算完，B其次，A最后（栈式LIFO）
+- [x] **AC-002**: GIVEN 同一 card_instance_id 已经在触发链中出现过，WHEN 该实例的效果再次被触发，THEN 跳过不重复触发（循环检测），记录DEBUG日志
+- [x] **AC-003**: GIVEN 触发链达到10层深度，WHEN 第11层试图触发，THEN 第11层终止，前10层正常结算，输出WARN级别日志：`"[CardEffectEngine] Trigger chain depth exceeded: max=10, root_card_id=<ID>, chain=<A→B→...→K>"`
 
 ---
 
@@ -97,7 +105,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/card_effect_engine/test_trigger_chain_10_layer_cycle.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing（13 测试函数，全通过）
 
 ---
 

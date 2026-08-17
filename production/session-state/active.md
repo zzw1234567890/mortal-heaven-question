@@ -192,3 +192,39 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-1 完成（card-effect-engine 对象模型），待 /dev-story 4-2（ResolutionStack）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-2 ResolutionStack 栈式结算引擎 2026-08-16
+
+- Verdict：COMPLETE（4-2 done，零回归）
+- 变更：`src/feature/card_effect_engine/resolution_stack.gd`（class_name ResolutionStack extends RefCounted）——5 级主排序（TIER_ACTIVE_PLAY/FIRST_STRIKE/NORMAL/ENEMY 命名常量）+ 次级 priority 决胜 + 二分中分辨率插入 + LIFO pop_back 出栈 + resolve_all(resolver: Callable)
+- 设计决策：排序上下文（先发/阵营/主动出牌）经 `set_sort_context(active_card_id, first_strike_card_ids, player_side_card_ids)` 按 source_card_instance_id 注入——因 EffectBase 是 Story 001 最小字段集，不污染对象模型（lead-programmer APPROVE 确认）
+- 测试：`tests/unit/card_effect_engine/test_resolution_stack.gd` 12 测试（AC-001/002 + QA edges + 5 级全序 + 中分辨率插入 + LIFO + 空栈/null 防御）；全量 64 scripts / 1187 tests / 1186 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer APPROVE（C1 二分 O(n) 移位注释补充 + C3 tier 魔数→命名常量已采纳；C2 resolve_all 无终止保护由 Story 003 深度截断兜住）；qa-lead ADEQUATE
+- 关键经验：新增 class_name 需 `--headless --import` 重建全局类缓存，否则 GUT 报 "Could not find type ResolutionStack"
+- 测试修正：中分辨率插入测试初版把残留效果 C 设为「普通己方」导致 C(t 更大)先于 A 出栈——修正为 C=敌方（tier 3）才正确验证「A 触发 B 插入在残留前」
+- Next：/dev-story 4-3（触发链硬限制 10 层 + visited_card_ids 循环检测，blocker 4-2 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-2 完成（ResolutionStack），待 /dev-story 4-3（触发链硬限制）
+<!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-3 触发链硬限制 10 层 + 循环检测 2026-08-16
+
+- Verdict：COMPLETE（4-3 done，零回归）
+- 变更：`src/feature/card_effect_engine/trigger_chain_state.gd`（新类，纯逻辑：MAX_DEPTH=10 + CheckResult 枚举 + check_and_record + build_overflow_message）；`resolution_stack.gd` resolve_all 签名扩展（chain_state/overflow_handler/cycle_skip_handler 可选参数，截断/跳过均 continue 非 break）
+- 设计决策：TriggerChainState 纯逻辑无副作用（不日志不发射信号），日志/信号由调用方 CardEffectEngine Autoload 负责；overflow 消息追加截断者 K 到 chain 尾（AC-003 字面 A→B→...→K 为 11 节点）
+- 测试：`tests/unit/card_effect_engine/test_trigger_chain_10_layer_cycle.gd` 13 测试（纯状态单测 6 + resolve_all 集成 7）；全量 65 scripts / 1198 tests / 1197 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer APPROVE（C1 visited_card_ids→Dictionary[int,bool] 已采纳；C2 chain 追加 K 已采纳；C3 cycle_skip_handler 已加）；qa-lead GAPS→GAP-1 continue vs break 语义已补 12 效果用例锁定
+- 关键经验：GDScript lambda 按值捕获标量——overflow_count 需用 Array 包装才能被 lambda 闭包修改
+- 全量测试含 1 个 flaky（realm_system test_ac010 GSM.realm_changed 帧末信号，单独跑 14/14 全过，全量偶发 1 失败）——既有问题非本次引入，Sprint 3 回顾行动项 #1（/story-done 门禁强化）已记录
+- Next：/dev-story 4-4（PRD 伪随机分布引擎 5% 步进 + 怜悯保护，blocker 4-1 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-3 完成（触发链硬限制），待 /dev-story 4-4（PRD 伪随机分布引擎）
+<!-- /STATUS -->
