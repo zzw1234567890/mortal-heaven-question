@@ -263,3 +263,20 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-5 完成（AI 干跑评估接口），待 /dev-story 4-6（deployment-system 内部状态机）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-6 deployment-system 内部状态机 2026-08-17
+
+- Verdict：COMPLETE（4-6 done，零回归）
+- 变更：`src/feature/deployment_system.gd`（extends Node 不声明 class_name，Autoload #17）——FieldState 枚举（EMPTY/STANDBY/READY/ACTED/DEAD）+ _field 阵位模型 + setup_field（自动/手动分配 + 全部 STANDBY）+ 查询 API（get_field/get_character_slot/get_front_count/get_empty_slots/can_deploy/is_standby/set_acted）
+- 关键裁决：ADR-0016 原文阵位算法「顺序填充 [0,1,2,3,4,5]」与 GDD §2 矛盾（金丹 4 人会成前 3 后 1）→ 实现改用 FRONT_CAPACITY_BY_MAX_DEPLOY 表按境界前排配额（2/3/4→前2，5/6→前3），已回写 ADR-0016 retrofit
+- 测试：`tests/unit/deployment_system/test_internal_state_machine.gd` 22 测试（AC-001~018 + DEAD/EMPTY set_acted + get_front_count 全灭 0）；全量 68 scripts / 1247 tests / 1246 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer CONCERNS→采纳（C1 ADR 算法修正回写 + C2 FRONT_CAPACITY 硬编码上报裁决 + C3 FileAccess 正则测试移除 + C4 手动超配待 game-designer 澄清）；qa-lead GAPS→补齐（G1 DEAD/EMPTY set_acted + G2 全灭 0 + G3 get_character_slot(-1) 哨兵守卫）
+- 关键经验：Autoload 测试用 `DS_SCRIPT.new()` + 动态分派；`get_instance_base_type()` 是实例方法不能直接调 preload 类；境界阵位分布是「前排配额」非「顺序填充」
+- Next：/dev-story 4-7（deploy/remove/is_targetable 前后排保护 O(1)，blocker 4-6 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-6 完成（deployment-system 内部状态机），待 /dev-story 4-7（deploy/remove/is_targetable）
+<!-- /STATUS -->

@@ -84,11 +84,11 @@ stories:
     name: "内部状态机 + 阵位数据管理（STANDBY→READY→ACTED）"
     file: "production/epics/deployment-system/story-001-internal-state-machine.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-08-17 FieldState 枚举 + _field 阵位模型 + setup_field 自动/手动分配（前排配额表）+ 待命状态机 + 查询 API；22 单测全通过，全量 1246 passing 零回归；ADR-0016 阵位算法 retrofit 修正，lead-programmer CONCERNS + qa-lead GAPS 已补齐"
 
   - id: "4-7"
     name: "deploy / remove / is_targetable 前后排保护 O(1)"

@@ -338,20 +338,32 @@ func clear_standby_state() -> void:
 
 ### 阵位自动分配算法
 
+> **[b]修订 2026-08-17（Story 4-6 retrofit）[/b]**：原示例为「顺序填充 `[0,1,2,3,4,5]`」，
+> 按此算法金丹期 4 人会填成前 3 后 1、筑基期 3 人填成前 3 后 0——均与 GDD §2 阵位分布表
+> （筑基前 2 后 1、金丹前 2 后 2）矛盾。实现已修正为「按境界前排配额填满前排后转后排」，
+> 前排配额由 `FRONT_CAPACITY_BY_MAX_DEPLOY = {2:2, 3:2, 4:2, 5:3, 6:3}` 决定（与 GDD §2 一致）。
+> 本示例同步修正如下（Story 4-6 已实现并测试，全量 1244 passing）。
+
 ```gdscript
-## 自动阵位分配——前排优先填充
-func _auto_assign_slots(character_ids: Array[int]) -> Dictionary:
+## 境界上场上限 → 前排配额映射（GDD §2 境界阵位分布表）。
+const FRONT_CAPACITY_BY_MAX_DEPLOY: Dictionary = {2: 2, 3: 2, 4: 2, 5: 3, 6: 3}
+
+## 自动阵位分配——按境界前排配额填满前排后转后排（前1→前2→前3→后1→后2→后3）
+func _assign_slots(character_ids: Array[int], layout: Dictionary = {}) -> Dictionary:
     # 返回 {character_id: slot_index}
     var assignment: Dictionary = {}
-    var slot_order: Array[int] = [0, 1, 2, 3, 4, 5]  # 前1→前2→前3→后1→后2→后3
-    var slot_idx: int = 0
-
+    var used: Dictionary = {}
+    var max_deploy: int = _query_max_deploy()
+    var front_capacity: int = FRONT_CAPACITY_BY_MAX_DEPLOY.get(max_deploy, 3)
+    var front_assigned: int = 0
     for char_id in character_ids:
-        if slot_idx >= 6:
-            break
-        assignment[char_id] = slot_order[slot_idx]
-        slot_idx += 1
-
+        var slot: int
+        if front_assigned < front_capacity:
+            slot = _find_empty_in_row(true, used)   # 前排：0,1,2
+        else:
+            slot = _find_empty_in_row(false, used)  # 后排：3,4,5
+        assignment[char_id] = slot
+        used[slot] = true
     return assignment
 
 ## 空位查找——前排优先

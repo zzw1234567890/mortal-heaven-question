@@ -1,12 +1,22 @@
 # Story 001: 内部状态机 + 阵位数据管理（STANDBY→READY→ACTED）
 
 > **Epic**: deployment-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-17
+
+## Completion Notes
+**Completed**：2026-08-17
+**Criteria**：18/18 通过（AC-001~018 由单元测试覆盖）
+**Deviations**：
+1. **ADR-0016 阵位算法修正（retrofit）**：ADR 原文示例为顺序填充 `[0,1,2,3,4,5]`，与 GDD §2「前排队列填满后才填后排」矛盾（金丹 4 人会成前 3 后 1）。实现改用 `FRONT_CAPACITY_BY_MAX_DEPLOY` 表按境界前排配额分配，已同步回写 ADR-0016（retrofit 2026-08-17）。
+2. **`FRONT_CAPACITY_BY_MAX_DEPLOY` 硬编码**：境界→前排配额表位于 DeploymentSystem，而非 RealmSystem.realm_table。lead-programmer 裁决为「部署规则」而非「境界属性」——可接受，待 Story 002 集成时确认是否需要 RealmSystem 交叉校验。
+3. **max_deploy 实时查询**：ADR-0016 说「战斗开始时缓存」，本 Story 不含 battle_start 生命周期钩子，每次实时查询（O(1) 无性能影响，无缓存失效风险）。
+**Test Evidence**：`tests/unit/deployment_system/test_internal_state_machine.gd`（22 测试全通过）；全量套件 68 scripts / 1247 tests / 1246 passing / 1 pending / 0 failing 零回归
+**Code Review**：lead-programmer CONCERNS→已采纳（C1 ADR 算法修正回写 + C2 架构上报裁决 + C3 FileAccess 正则测试移除 + C4 手动超配行为待 game-designer 澄清）；qa-lead GAPS→已补齐（G1 DEAD/EMPTY set_acted 测试 + G2 get_front_count 全灭 0 测试 + G3 get_character_slot(-1) 哨兵守卫）
 
 ## Context
 
@@ -32,24 +42,24 @@
 
 *From GDD deployment-system.md §验收标准 + ADR-0016 §验证标准:*
 
-- [ ] **AC-001**: `setup_field(character_ids, {})` 炼气期（max_deploy=2）传入 2 人 → 自动分配为前 2 后 0（slot 0、1 前排，slot 2-5 空位）
-- [ ] **AC-002**: `setup_field(character_ids, {})` 金丹期（max_deploy=4）传入 4 人 → 自动分配为前 2 后 2
-- [ ] **AC-003**: `setup_field(character_ids, {})` 化神期（max_deploy=6）传入 6 人 → 全 6 阵位填满（前 3 后 3）
-- [ ] **AC-004**: `setup_field(character_ids, {})` 金丹期（max_deploy=4）只传 3 人 → 返回 true，允许以 3 人开始战斗（前 2 后 1）
-- [ ] **AC-005**: `setup_field([], {})` 空数组（一个角色都没选）→ 返回 false（"至少选择 1 个角色上场"）
-- [ ] **AC-006**: `setup_field(character_ids, layout)` 传入手动 layout（{char_id: is_front}）→ 手动分配覆盖自动填充
-- [ ] **AC-007**: `setup_field(character_ids, {})` 传入人数超过 max_deploy → 返回 false
-- [ ] **AC-008**: `is_front` 判定——slot_index ∈ [0,2] 为前排（true），slot_index ∈ [3,5] 为后排（false）
-- [ ] **AC-009**: `setup_field` 后所有上场角色 state == STANDBY（第 1 回合不可攻击）
-- [ ] **AC-010**: `is_standby(character_id)` 对 STANDBY 角色返回 true；对 READY 角色返回 false；对不在场上角色返回 false
-- [ ] **AC-011**: `set_acted(character_id)` 将 READY 角色 → ACTED（攻击后由 CombatSystem 调用）
-- [ ] **AC-012**: `get_field()` 返回按 slot_index 排序的 Array[Dictionary]，每个 Dictionary 含 slot_index/character_id/is_front/state/deploy_turn；空位为 character_id=-1 + state=EMPTY
-- [ ] **AC-013**: `get_character_slot(character_id)` 返回角色所在 slot_index；未上场返回 -1
-- [ ] **AC-014**: `get_front_count(true)` 返回前排存活角色数；`get_front_count(false)` 返回前排占用数（含阵亡）
-- [ ] **AC-015**: `get_empty_slots()` 返回空位 slot_index 列表——前排优先排序（0,1,2,3,4,5 顺序）
-- [ ] **AC-016**: `can_deploy()` 返回 {can_deploy: bool, empty_slots: int, max_deploy: int, reason: String}——有 2 个空位 + 未满 → can_deploy=true, empty_slots=2
-- [ ] **AC-017**: `setup_field` 时重置 `_front_line_breached_emitted = false`（战斗边界标志重置）
-- [ ] **AC-018**: DeploymentSystem extends Node，不声明 `class_name`（Autoload 固有权衡——同 CostSystem/StatusEffectSystem 模式）
+- [x] **AC-001**: `setup_field(character_ids, {})` 炼气期（max_deploy=2）传入 2 人 → 自动分配为前 2 后 0（slot 0、1 前排，slot 2-5 空位）
+- [x] **AC-002**: `setup_field(character_ids, {})` 金丹期（max_deploy=4）传入 4 人 → 自动分配为前 2 后 2
+- [x] **AC-003**: `setup_field(character_ids, {})` 化神期（max_deploy=6）传入 6 人 → 全 6 阵位填满（前 3 后 3）
+- [x] **AC-004**: `setup_field(character_ids, {})` 金丹期（max_deploy=4）只传 3 人 → 返回 true，允许以 3 人开始战斗（前 2 后 1）
+- [x] **AC-005**: `setup_field([], {})` 空数组（一个角色都没选）→ 返回 false（"至少选择 1 个角色上场"）
+- [x] **AC-006**: `setup_field(character_ids, layout)` 传入手动 layout（{char_id: is_front}）→ 手动分配覆盖自动填充
+- [x] **AC-007**: `setup_field(character_ids, {})` 传入人数超过 max_deploy → 返回 false
+- [x] **AC-008**: `is_front` 判定——slot_index ∈ [0,2] 为前排（true），slot_index ∈ [3,5] 为后排（false）
+- [x] **AC-009**: `setup_field` 后所有上场角色 state == STANDBY（第 1 回合不可攻击）
+- [x] **AC-010**: `is_standby(character_id)` 对 STANDBY 角色返回 true；对 READY 角色返回 false；对不在场上角色返回 false
+- [x] **AC-011**: `set_acted(character_id)` 将 READY 角色 → ACTED（攻击后由 CombatSystem 调用）
+- [x] **AC-012**: `get_field()` 返回按 slot_index 排序的 Array[Dictionary]，每个 Dictionary 含 slot_index/character_id/is_front/state/deploy_turn；空位为 character_id=-1 + state=EMPTY
+- [x] **AC-013**: `get_character_slot(character_id)` 返回角色所在 slot_index；未上场返回 -1
+- [x] **AC-014**: `get_front_count(true)` 返回前排存活角色数；`get_front_count(false)` 返回前排占用数（含阵亡）
+- [x] **AC-015**: `get_empty_slots()` 返回空位 slot_index 列表——前排优先排序（0,1,2,3,4,5 顺序）
+- [x] **AC-016**: `can_deploy()` 返回 {can_deploy: bool, empty_slots: int, max_deploy: int, reason: String}——有 2 个空位 + 未满 → can_deploy=true, empty_slots=2
+- [x] **AC-017**: `setup_field` 时重置 `_front_line_breached_emitted = false`（战斗边界标志重置）
+- [x] **AC-018**: DeploymentSystem extends Node，不声明 `class_name`（Autoload 固有权衡——同 CostSystem/StatusEffectSystem 模式）
 
 ---
 
@@ -204,7 +214,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/deployment_system/test_internal_state_machine.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing (22 tests)
 
 ---
 
