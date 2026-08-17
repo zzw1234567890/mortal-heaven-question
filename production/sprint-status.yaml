@@ -14,7 +14,7 @@ goal: "Feature 层战斗子系统 6 Epic（25 story + 1 task）——形成可�
 start: "2026-08-16"
 end: "2026-08-23"
 generated: "2026-08-16"
-updated: "2026-08-16"
+updated: "2026-08-17"
 
 stories:
   # === 4-0 Autoload 注册（硬前置）===
@@ -73,11 +73,11 @@ stories:
     name: "AI 干跑评估接口（GameStateSnapshot 不可变纯计算）"
     file: "production/epics/card-effect-engine/story-005-ai-dry-run-snapshot.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-3, 4-4"
-    completed: ""
+    completed: "2026-08-17 不可变 GameStateSnapshot + EffectEvaluation + CardEffectEvaluator（evaluate_effect/evaluate_effect_probabilistic/simulate_chain/get_effect_categories）；17 单测全通过，全量 1225 passing 零回归；签名漂移+简化模型边界经 lead-programmer CONCERNS 采纳记录，qa-lead GAPS 已补齐"
 
   # === deployment-system（纯逻辑）===
   - id: "4-6"

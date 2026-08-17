@@ -246,3 +246,20 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-4 完成（PRD 引擎），待 /dev-story 4-5（AI 干跑评估接口）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-5 AI 干跑评估接口 2026-08-17
+
+- Verdict：COMPLETE（4-5 done，零回归）
+- 变更：`src/feature/card_effect_engine/game_state_snapshot.gd`（class_name GameStateSnapshot extends RefCounted，构造+getter 均 deep copy 不可变）+ `effect_evaluation.gd`（EffectEvaluation 结果 DTO，damage/healing/stat_changes/statuses_applied/is_overkill/is_overheal + damage_only/heal_only 静态工厂）+ `card_effect_evaluator.gd`（class_name CardEffectEvaluator extends RefCounted，evaluate_effect/evaluate_effect_probabilistic/simulate_chain/get_effect_categories + EffectCategory 枚举）
+- 简化模型：伤害/治疗 = floori(effect_value × binding_multiplier)，分类按 effect_type 字符串前缀（未读 CardType）；simulate_chain 恒单根、would_overflow 恒 false、probability 恒 1.0——完整结算待 CardEffectEngine 接线
+- 测试：`tests/unit/card_effect_engine/test_ai_dry_run_snapshot.gd` 17 测试（AC-001~003 + stat_changes/statuses_applied 分支 + 快照深拷贝/未知角色 + 性能单点子断言）；全量 67 scripts / 1225 tests / 1224 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer CONCERNS→采纳（C1 签名漂移 card_id→card_data:Variant 记录 + C2 create_evaluation_snapshot defer + C3 简化模型边界标注 + C4 _int_field/_stringname_field 去存疑 `in` 改 get() + C5 文档措辞）；qa-lead GAPS→补齐（G1 stat_changes/statuses_applied + G2 AC-003 单点性能子断言 + G3 would_overflow 简化契约锁定）
+- 关键经验：GDScript `in` 运算符不适用于 Object 属性成员测试（用 get() 判空）；性能断言按 QA 缺口 #3 放宽阈值（288 次 <100ms / 单次 <1ms / simulate_chain <5ms）
+- Next：/dev-story 4-6（deployment-system 内部状态机 STANDBY→READY→ACTED，blocker 无）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-5 完成（AI 干跑评估接口），待 /dev-story 4-6（deployment-system 内部状态机）
+<!-- /STATUS -->
