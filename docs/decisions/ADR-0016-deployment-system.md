@@ -179,7 +179,7 @@ is_front = slot_index ∈ [0, 2]
 | `mark_unavailable` | `mark_unavailable(character_id: int, death_context: Dictionary) → void` | 战斗结算时标记角色不可用。death_context = {death_turn, death_battle_id}。发射 `character_unavailable` 信号 |
 | `revive_character` | `revive_character(character_id: int) → bool` | 复活不可用角色——从 `_unavailable_characters` 移除。角色属性保留但空载（无绑定卡）。返回 false = 角色不在不可用列表中 |
 | `get_unavailable_characters` | `get_unavailable_characters() → Array[int]` | 返回不可用角色 ID 列表——商店/事件系统查询复活道具可用性 |
-| `is_game_over` | `is_game_over() → bool` | 全部角色位角色均为不可用——触发游戏失败。判定时机：战斗开始前 |
+| `is_game_over` | `is_game_over(roster: Array) → bool` | 全部角色位角色均为不可用——触发游戏失败。判定时机：战斗开始前。**签名偏离**：ADR 原声明无参，实现改为必传 roster——DeploymentSystem 不持有角色位总列表（角色位属 CardSystem/CombatSystem 管理），由调用方传入角色位角色 ID 列表（retrofit 2026-08-18，见 Story 004 Completion Notes） |
 | `is_standby` | `is_standby(character_id: int) → bool` | O(1) 查询角色是否处于待命状态——CombatSystem 攻击声明阶段排除待命角色 |
 | `serialize_field` | `serialize_field() → Dictionary` | 战斗结束时序列化阵位 → GSM.battle.deployment_snapshot |
 | `deserialize_field` | `deserialize_field(data: Dictionary) → void` | 从快照恢复阵位（读档/战斗快照恢复） |

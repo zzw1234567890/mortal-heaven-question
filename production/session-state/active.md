@@ -314,3 +314,20 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-8 完成（serialize 快照导出），待 /dev-story 4-9（clear_standby_state + mark_unavailable + revive_character）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-9 deployment-system clear_standby_state + mark_unavailable + revive 2026-08-18
+
+- Verdict：COMPLETE（4-9 done，零回归）
+- 变更：`src/feature/deployment_system.gd` 增量扩展——clear_standby_state（STANDBY/ACTED→READY + standby_cleared 信号仅含待命角色）/ mark_unavailable（death_context 存储 + revival_methods 深拷贝）/ get_unavailable_characters / revive_character / is_game_over + 3 Cat 2b 信号（standby_cleared/character_unavailable/character_revived 经 _emit_signal_safe 路由）
+- 关键裁决：lead-programmer CONCERNS→is_game_over 签名偏离 ADR-0016（原无参→注入 roster 必传，DeploymentSystem 不持有角色位总列表，去默认参数消除「漏传→永不判负」静默失败）；revival_methods 深拷贝防外部 mutate；已回写 ADR-0016 retrofit
+- 测试：`tests/unit/deployment_system/test_standby_unavailable_revive.gd` 22 测试（AC-001~014 + 空 death_context + 空 roster + 复活闭环 + revival_methods 透传 + 重复标记覆盖 + 全空场）；全量 71 scripts / 1311 tests / 1310 passing / 1 pending / 0 failing 零回归
+- 关卡：qa-lead GAPS→补齐（G1 复活后重新上场闭环 + G2 revival_methods 非空透传 + G3 重复标记语义锁定 + G4 全空场 clear_standby_state）；lead-programmer CONCERNS→采纳（C1 is_game_over 必传 roster + ADR 回写 + C2 revival_methods 深拷贝）
+- 关键经验：is_game_over 用默认参数承载「数据为空」会混淆「没传数据」与「数据为空」——必传参数强制调用方显式提供角色位列表，缺失数据在编译期暴露
+- Next：/dev-story 4-10（binding-system BindingRecord RefCounted 实例模型 + 内部注册表，blocker 无）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-9 完成（deployment-system 收尾），待 /dev-story 4-10（binding-system 001）
+<!-- /STATUS -->

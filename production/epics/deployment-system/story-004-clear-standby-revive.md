@@ -1,12 +1,21 @@
 # Story 004: clear_standby_state + mark_unavailable + revive_character
 
 > **Epic**: deployment-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-18
+
+## Completion Notes
+**Completed**：2026-08-18
+**Criteria**：14/14 通过（AC-001~014 由单元测试覆盖）
+**Deviations**：
+1. **ADR-0016 `is_game_over` 签名偏离（retrofit）**：ADR 原声明 `is_game_over() → bool` 无参，实现改为 `is_game_over(roster: Array) → bool` 必传参数。原因：DeploymentSystem 不持有角色位总列表（角色位属 CardSystem/CombatSystem 管理，ADR-0016 本就在「角色位来源」上含糊），由调用方注入角色位角色 ID 列表。采用必传参数（非默认参数）消除「漏传 roster → 永远不判负」的静默失败模式（lead-programmer CONCERNS）。已回写 ADR-0016。
+2. **`revival_methods` 深拷贝**：`mark_unavailable` 存储 `revival_methods` 时用 `.duplicate(true)`，防止调用方事后 mutate 污染 DeploymentSystem 内部状态。
+**Test Evidence**：`tests/unit/deployment_system/test_standby_unavailable_revive.gd`（22 测试全通过）；全量套件 71 scripts / 1311 tests / 1310 passing / 1 pending / 0 failing 零回归
+**Code Review**：lead-programmer CONCERNS→已采纳（C1 is_game_over 必传 roster + ADR 回写 + C2 revival_methods 深拷贝）；qa-lead GAPS→已补齐（G1 复活后重新上场闭环 + G2 revival_methods 非空值透传 + G3 重复标记语义 + G4 全空场 clear_standby_state）
 
 ## Context
 
@@ -32,20 +41,20 @@
 
 *From ADR-0016 §验证标准 + GDD deployment-system.md §验收标准/§状态与转换:*
 
-- [ ] **AC-001**: `clear_standby_state()` STANDBY 角色 → READY（待命清除）
-- [ ] **AC-002**: `clear_standby_state()` ACTED 角色 → READY（已行动恢复，回合循环）
-- [ ] **AC-003**: `clear_standby_state()` READY 角色不变；DEAD 角色不变；空位跳过
-- [ ] **AC-004**: `clear_standby_state()` 有 STANDBY→READY 转换时发射 `standby_cleared` 信号，载荷 (character_ids: Array[int])——仅含待命清除的角色（不含 ACTED→READY）
-- [ ] **AC-005**: `clear_standby_state()` 无 STANDBY 角色时不发射 `standby_cleared` 信号
-- [ ] **AC-006**: `mark_unavailable(character_id, death_context)` 将角色加入 `_unavailable_characters`，发射 `character_unavailable` 信号
-- [ ] **AC-007**: `mark_unavailable` 的 death_context 正确存储 {death_turn, death_battle_id}
-- [ ] **AC-008**: `get_unavailable_characters()` 返回不可用角色 ID 列表
-- [ ] **AC-009**: `revive_character(character_id)` 从 `_unavailable_characters` 移除 → 返回 true；发射 `character_revived` 信号
-- [ ] **AC-010**: `revive_character(不在不可用列表的角色)` → 返回 false，不发射信号
-- [ ] **AC-011**: `is_game_over()` 全部角色位角色均不可用时 → true
-- [ ] **AC-012**: `is_game_over()` 有至少 1 个可用角色时 → false
-- [ ] **AC-013**: 不可用角色不可上场——`setup_field`/`deploy` 拒绝不可用角色（与 story-001/002 协同验证）
-- [ ] **AC-014**: 待命清除时序——`clear_standby_state` 在 Phase 6 END 由 CombatSystem 调用（本 story 验证调用点契约，实际调用属战斗 Epic）
+- [x] **AC-001**: `clear_standby_state()` STANDBY 角色 → READY（待命清除）
+- [x] **AC-002**: `clear_standby_state()` ACTED 角色 → READY（已行动恢复，回合循环）
+- [x] **AC-003**: `clear_standby_state()` READY 角色不变；DEAD 角色不变；空位跳过
+- [x] **AC-004**: `clear_standby_state()` 有 STANDBY→READY 转换时发射 `standby_cleared` 信号，载荷 (character_ids: Array[int])——仅含待命清除的角色（不含 ACTED→READY）
+- [x] **AC-005**: `clear_standby_state()` 无 STANDBY 角色时不发射 `standby_cleared` 信号
+- [x] **AC-006**: `mark_unavailable(character_id, death_context)` 将角色加入 `_unavailable_characters`，发射 `character_unavailable` 信号
+- [x] **AC-007**: `mark_unavailable` 的 death_context 正确存储 {death_turn, death_battle_id}
+- [x] **AC-008**: `get_unavailable_characters()` 返回不可用角色 ID 列表
+- [x] **AC-009**: `revive_character(character_id)` 从 `_unavailable_characters` 移除 → 返回 true；发射 `character_revived` 信号
+- [x] **AC-010**: `revive_character(不在不可用列表的角色)` → 返回 false，不发射信号
+- [x] **AC-011**: `is_game_over()` 全部角色位角色均不可用时 → true
+- [x] **AC-012**: `is_game_over()` 有至少 1 个可用角色时 → false
+- [x] **AC-013**: 不可用角色不可上场——`setup_field`/`deploy` 拒绝不可用角色（与 story-001/002 协同验证）
+- [x] **AC-014**: 待命清除时序——`clear_standby_state` 在 Phase 6 END 由 CombatSystem 调用（本 story 验证调用点契约，实际调用属战斗 Epic）
 
 ---
 
@@ -178,7 +187,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/deployment_system/test_standby_unavailable_revive.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing (22 tests)
 
 ---
 

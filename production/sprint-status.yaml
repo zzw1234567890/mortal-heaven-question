@@ -114,11 +114,11 @@ stories:
     name: "clear_standby_state + mark_unavailable + revive_character"
     file: "production/epics/deployment-system/story-004-clear-standby-revive.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-7"
-    completed: ""
+    completed: "2026-08-18 clear_standby_state（STANDBY/ACTED→READY + standby_cleared 信号仅含待命角色）+ mark_unavailable/get_unavailable_characters/revive_character/is_game_over + 3 Cat 2b 信号；22 单元测试全通过，全量 1311 tests / 1310 passing 零回归；is_game_over 签名偏离 ADR-0016（注入 roster 必传）已回写；lead-programmer CONCERNS + qa-lead GAPS 已补齐"
 
   # === binding-system ===
   - id: "4-10"

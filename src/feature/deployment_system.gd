@@ -5,14 +5,16 @@
 ## 采用与 ADR-0011 StatusEffectSystem / ADR-0013 BindingManager 相同的 GSM 边界先例。
 ##
 ## [b]Autoload 顺序[/b]：#1-#16 之后（RealmSystem #11 已就绪）。[br]
-## [b]本 Story 范围[/b]（4-6 + 4-7 + 4-8）：FieldState 枚举 + 阵位数据模型 + [method setup_field] 自动/手动分配
+## [b]本 Story 范围[/b]（4-6 + 4-7 + 4-8 + 4-9）：FieldState 枚举 + 阵位数据模型 + [method setup_field] 自动/手动分配
 ## + 待命状态机（STANDBY/READY/ACTED）+ 阵位查询 API + 战中补位 [method deploy] + 阵亡清位
 ## [method remove_character] + 前后排保护查询 [method is_targetable] + 战斗结束快照导出
 ## [method serialize_field] / [method deserialize_field] / [method sync_unavailable_to_gsm] /
-## [method load_unavailable_from_gsm] / [method write_snapshot_to_gsm]。[br]
+## [method load_unavailable_from_gsm] / [method write_snapshot_to_gsm] + 待命清除 [method clear_standby_state] +
+## 不可用生命周期 [method mark_unavailable] / [method revive_character] / [method get_unavailable_characters] /
+## [method is_game_over]。[br]
 ## [b]不注册进 project.godot[/b]——待 CombatSystem 接线（4-22）后统一注册（4-0b 终验）。[br]
-## [b]信号[/b]：本 Story 发射 character_deployed / character_removed / front_line_breached 三个 Cat 2b 信号
-## （经 GSM._emit_signal_safe 路由）；standby_cleared / character_unavailable / character_revived 属 Story 004。[br]
+## [b]信号[/b]：发射 6 个 Cat 2b 信号（character_deployed / character_removed / front_line_breached /
+## standby_cleared / character_unavailable / character_revived），均经 GSM._emit_signal_safe 路由。[br]
 ##
 ## 来源: ADR-0016 §决策 §阵位数据模型 §关键接口 / GDD deployment-system.md。
 extends Node
@@ -79,6 +81,18 @@ signal character_removed(character_id: int, slot_index: int, reason: String)
 ## 前排全灭→后排暴露时发射（仅一次，setup_field 重置标志）。[br]
 ## [br][b]载荷[/b]: 无参数。
 signal front_line_breached()
+
+## 回合结束时待命清除发射（Phase 6 END，CombatSystem 调用）。[br]
+## [br][b]载荷[/b]: [code](character_ids: Array[int])[/code]——仅含 STANDBY→READY 的角色（不含 ACTED→READY）。
+signal standby_cleared(character_ids: Array[int])
+
+## 角色标记为不可用时发射（战斗结算）。[br]
+## [br][b]载荷[/b]: [code](character_id: int)[/code]。
+signal character_unavailable(character_id: int)
+
+## 角色复活时发射。[br]
+## [br][b]载荷[/b]: [code](character_id: int)[/code]。
+signal character_revived(character_id: int)
 
 
 # === 构造 =========================================================================
@@ -227,6 +241,30 @@ func set_acted(character_id: int) -> void:
 		_field[slot]["state"] = FieldState.ACTED
 
 
+## 回合结束时清除待命状态——由 CombatSystem 在 Phase 6 END 调用。[br]
+## [br][b]状态转换[/b]（ADR-0016 §待命状态清除）：[br]
+##   - STANDBY → READY（加入 cleared_ids，待命清除）[br]
+##   - ACTED → READY（已行动恢复，回合循环——不计入 cleared_ids）[br]
+##   - READY / DEAD 不变；空位（character_id==-1）跳过[br]
+## [br][b]信号[/b]：有 STANDBY→READY 转换时发射 [signal standby_cleared]，载荷仅含待命清除角色。
+func clear_standby_state() -> void:
+	var cleared_ids: Array = []
+	for slot in range(SLOT_COUNT):
+		var entry: Dictionary = _field[slot]
+		if entry["character_id"] == -1:
+			continue  # 空位跳过
+		match entry["state"]:
+			FieldState.STANDBY:
+				entry["state"] = FieldState.READY
+				cleared_ids.append(entry["character_id"])
+			FieldState.ACTED:
+				entry["state"] = FieldState.READY  # ACTED→READY 不加入 cleared_ids
+			_:  # READY / DEAD 不变
+				pass
+	if not cleared_ids.is_empty():
+		_emit_standby_cleared(cleared_ids)
+
+
 # === 战中补位 / 阵亡清位 ============================================================
 
 ## 战中补位——检查空位→分配阵位→标记 STANDBY→发射 [signal character_deployed]。[br]
@@ -327,6 +365,60 @@ func is_targetable(character_id: int, attacker_has_penetration: bool = false) ->
 	return false  # 6. 后排受保护
 
 
+# === 不可用角色生命周期（ADR-0016 §跨战斗死亡持久）=================================
+
+## 战斗结算时标记角色不可用——加入 [member _unavailable_characters] 并发射 [signal character_unavailable]。[br]
+## [br][b]存储结构[/b]：[code]{death_turn, death_battle_id, revival_methods}[/code]——[param death_context]
+## 缺字段填充默认值（death_turn=0 / death_battle_id="" / revival_methods=[]）。[br]
+## [br][b]重复标记[/b]：同一角色重复标记时覆盖旧 context（战斗结算逻辑保证一个角色只标记一次）。[br]
+## [br][param character_id] 阵亡角色 ID。[br]
+## [br][param death_context] 死亡上下文 [code]{death_turn, death_battle_id, revival_methods?}[/code]。
+func mark_unavailable(character_id: int, death_context: Dictionary) -> void:
+	_unavailable_characters[character_id] = {
+		"death_turn": int(death_context.get("death_turn", 0)),
+		"death_battle_id": str(death_context.get("death_battle_id", "")),
+		"revival_methods": death_context.get("revival_methods", []).duplicate(true),
+	}
+	_emit_character_unavailable(character_id)
+
+
+## 返回不可用角色 ID 列表——商店/事件系统查询复活道具可用性。[br]
+## [br][b]返回[/b]: [code]Array[int][/code]——[member _unavailable_characters] 的键列表（可为空）。
+func get_unavailable_characters() -> Array:
+	return _unavailable_characters.keys()
+
+
+## 复活不可用角色——从 [member _unavailable_characters] 移除并发射 [signal character_revived]。[br]
+## [br]角色属性保留但空载（无绑定卡——绑定卡生命周期由 BindingManager 处理）。[br]
+## [br][param character_id] 待复活角色 ID。[br]
+## [br][b]返回[/b]: true = 成功复活；false = 角色不在不可用列表中（不发射信号）。
+func revive_character(character_id: int) -> bool:
+	if not _unavailable_characters.has(character_id):
+		return false
+	_unavailable_characters.erase(character_id)
+	_emit_character_revived(character_id)
+	return true
+
+
+## 全部角色位不可用判定——战斗开始前由 CombatSystem 调用（触发游戏失败）。[br]
+## [br][b]角色位数据来源[/b]：DeploymentSystem 不持有角色位总列表（角色位属 CardSystem/CombatSystem 管理），
+## 由调用方注入 [param roster]（角色位角色 ID 列表）。[br]
+## [br][b]必传参数[/b]：roster 为必传——去掉默认值，强制调用方显式传入，避免「漏传 roster → 永远不判负」
+## 的静默失败模式（lead-programmer CONCERNS）。[br]
+## [br][b]判定逻辑[/b]：roster 为空 → false（无角色位数据，不误判失败）；
+## roster 中存在任一角色不在 [member _unavailable_characters] 中 → false（有可用角色）；
+## roster 全部角色均不可用 → true。[br]
+## [br][param roster] 角色位角色 ID 列表（6 个角色位的当前持有角色）。[br]
+## [br][b]返回[/b]: true = 全部不可用（游戏失败）；false = 有可用角色或列表为空。
+func is_game_over(roster: Array) -> bool:
+	if roster.is_empty():
+		return false
+	for cid in roster:
+		if not _unavailable_characters.has(int(cid)):
+			return false  # 有至少 1 个可用角色
+	return true
+
+
 # === 信号发射包装（ADR-0007）=======================================================
 
 ## 发射 [signal character_deployed]——经 GSM._emit_signal_safe 路由（Cat 2b）。[br]
@@ -352,6 +444,30 @@ func _emit_front_line_breached() -> void:
 		GameStateManager.get_script()._emit_signal_safe(self, &"front_line_breached", [])
 	else:
 		front_line_breached.emit()
+
+
+## 发射 [signal standby_cleared]——经 GSM._emit_signal_safe 路由。
+func _emit_standby_cleared(character_ids: Array) -> void:
+	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
+		GameStateManager.get_script()._emit_signal_safe(self, &"standby_cleared", [character_ids])
+	else:
+		standby_cleared.emit(character_ids)
+
+
+## 发射 [signal character_unavailable]——经 GSM._emit_signal_safe 路由。
+func _emit_character_unavailable(character_id: int) -> void:
+	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
+		GameStateManager.get_script()._emit_signal_safe(self, &"character_unavailable", [character_id])
+	else:
+		character_unavailable.emit(character_id)
+
+
+## 发射 [signal character_revived]——经 GSM._emit_signal_safe 路由。
+func _emit_character_revived(character_id: int) -> void:
+	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
+		GameStateManager.get_script()._emit_signal_safe(self, &"character_revived", [character_id])
+	else:
+		character_revived.emit(character_id)
 
 
 # === 战斗结束快照导出 / 读档恢复（ADR-0016 §GSM 边界）=============================

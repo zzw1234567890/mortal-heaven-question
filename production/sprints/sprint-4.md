@@ -52,7 +52,7 @@
 | 6 | deployment-system | 内部状态机 + 阵位数据管理（STANDBY→READY→ACTED） | `deployment-system/story-001-*.md` | Logic | 0.5d | — | Complete |
 | 7 | deployment-system | deploy / remove / is_targetable 前后排保护 O(1) | `deployment-system/story-002-*.md` | Logic | 0.5d | #6 | Complete |
 | 8 | deployment-system | 战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot | `deployment-system/story-003-*.md` | Integration | 0.5d | #7 | Complete |
-| 9 | deployment-system | clear_standby_state + mark_unavailable + revive_character | `deployment-system/story-004-*.md` | Logic | 0.5d | #7 | Ready |
+| 9 | deployment-system | clear_standby_state + mark_unavailable + revive_character | `deployment-system/story-004-*.md` | Logic | 0.5d | #7 | Complete |
 | 10 | binding-system | BindingRecord RefCounted 实例模型 + 内部注册表 | `binding-system/story-001-*.md` | Logic | 0.5d | — | Ready |
 | 11 | binding-system | bind / unbind / get_bindings 查询 API | `binding-system/story-002-*.md` | Logic | 0.5d | #10 | Ready |
 | 12 | binding-system | 绑定生命周期信号总线（7 个 Cat 2b 信号） | `binding-system/story-003-*.md` | Integration | 0.5d | #11 | Ready |
