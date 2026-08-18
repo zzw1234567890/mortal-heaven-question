@@ -1,12 +1,21 @@
 # Story 002: deploy / remove / is_targetable 前后排保护 O(1)
 
 > **Epic**: deployment-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-17
+
+## Completion Notes
+**Completed**：2026-08-17
+**Criteria**：15/15 通过（AC-001~015 由单元测试覆盖）
+**Deviations**：
+1. **deploy 上限检查**：ADR 编排设计是 `can_deploy()` 先查上限再 `deploy()`，但实现按 lead-programmer CONCERNS 在 `deploy()` 内部补了 `deployed >= max_deploy → field_full` 防御检查（reason 值域仍 4 个），使 `deploy` 独立调用也安全。
+2. **deploy_turn=0 临时桩**：由 CombatSystem 传入真实回合数——本 Story 用硬编码 0，代码注释已标注待接入（Story Notes #10）。
+**Test Evidence**：`tests/unit/deployment_system/test_deploy_targetable.gd`（22 测试全通过）；全量套件 69 scripts / 1269 tests / 1268 passing / 1 pending / 0 failing 零回归
+**Code Review**：lead-programmer CONCERNS→已采纳（C1 deploy 补 max_deploy 上限检查 + C2 删 FileAccess 源码 contains 测试改运行时行为验证 + C3 deploy_turn 桩注释）；qa-lead GAPS→已补齐（G1 AC-001 前排优先场景修正 + G2 AC-015 源码 contains 移除 + G3 front_line_breached 运行时断言 + G4 deploy_turn 断言 + G5 哨兵/已在场/穿透短路/上限 4 分支回归）
 
 ## Context
 
@@ -33,21 +42,21 @@
 
 *From GDD deployment-system.md §验收标准 + ADR-0016 §验证标准:*
 
-- [ ] **AC-001**: `deploy(card_instance_id, character_id, -1)` 有 2 个空位时 → 自动分配到前排优先空位，返回 {success: true, slot_index, reason: "deployed"}
-- [ ] **AC-002**: `deploy(card_instance_id, character_id, -1)` 场上满员 6 人时 → 返回 {success: false, slot_index: -1, reason: "field_full"}
-- [ ] **AC-003**: `deploy(card_instance_id, character_id, invalid_slot)` 指定已占用槽位 → 返回 {success: false, slot_index: -1, reason: "invalid_slot"}
-- [ ] **AC-004**: `deploy(card_instance_id, unavailable_character_id, -1)` 不可用角色 → 返回 {success: false, slot_index: -1, reason: "character_unavailable"}
-- [ ] **AC-005**: `deploy` 成功后角色 state == STANDBY（本回合不可攻击）
-- [ ] **AC-006**: `deploy` 成功后发射 `character_deployed` 信号，载荷 (character_id, slot_index, is_front, deploy_turn)
-- [ ] **AC-007**: `remove_character(character_id)` 阵亡时清空阵位 → 该 slot 变为 character_id=-1 + EMPTY；发射 `character_removed` 信号
-- [ ] **AC-008**: `is_targetable(前排角色)` → 始终返回 true
-- [ ] **AC-009**: `is_targetable(后排角色, penetration=false)` 前排有存活角色时 → false（受保护）
-- [ ] **AC-010**: `is_targetable(后排角色, penetration=false)` 前排全灭时 → true + 发射 `front_line_breached` 信号（仅一次）
-- [ ] **AC-011**: `is_targetable(后排角色, penetration=true)` 前排有存活时 → true（穿透无视保护）
-- [ ] **AC-012**: `is_targetable(未上场角色)` → false
-- [ ] **AC-013**: `is_targetable(阵亡角色)` → false
-- [ ] **AC-014**: `is_targetable` 前排全灭后再补位前排角色 → 后排重新受保护（`front_line_breached` 不再重复发射）
-- [ ] **AC-015**: 6 个 Cat 2b 信号均通过 `_emit_signal_safe` 路由（character_deployed / character_removed / standby_cleared / character_unavailable / character_revived / front_line_breached 声明——本 story 实现 deployed/removed/front_line_breached 三个，其余属 story-004）
+- [x] **AC-001**: `deploy(card_instance_id, character_id, -1)` 有 2 个空位时 → 自动分配到前排优先空位，返回 {success: true, slot_index, reason: "deployed"}
+- [x] **AC-002**: `deploy(card_instance_id, character_id, -1)` 场上满员 6 人时 → 返回 {success: false, slot_index: -1, reason: "field_full"}
+- [x] **AC-003**: `deploy(card_instance_id, character_id, invalid_slot)` 指定已占用槽位 → 返回 {success: false, slot_index: -1, reason: "invalid_slot"}
+- [x] **AC-004**: `deploy(card_instance_id, unavailable_character_id, -1)` 不可用角色 → 返回 {success: false, slot_index: -1, reason: "character_unavailable"}
+- [x] **AC-005**: `deploy` 成功后角色 state == STANDBY（本回合不可攻击）
+- [x] **AC-006**: `deploy` 成功后发射 `character_deployed` 信号，载荷 (character_id, slot_index, is_front, deploy_turn)
+- [x] **AC-007**: `remove_character(character_id)` 阵亡时清空阵位 → 该 slot 变为 character_id=-1 + EMPTY；发射 `character_removed` 信号
+- [x] **AC-008**: `is_targetable(前排角色)` → 始终返回 true
+- [x] **AC-009**: `is_targetable(后排角色, penetration=false)` 前排有存活角色时 → false（受保护）
+- [x] **AC-010**: `is_targetable(后排角色, penetration=false)` 前排全灭时 → true + 发射 `front_line_breached` 信号（仅一次）
+- [x] **AC-011**: `is_targetable(后排角色, penetration=true)` 前排有存活时 → true（穿透无视保护）
+- [x] **AC-012**: `is_targetable(未上场角色)` → false
+- [x] **AC-013**: `is_targetable(阵亡角色)` → false
+- [x] **AC-014**: `is_targetable` 前排全灭后再补位前排角色 → 后排重新受保护（`front_line_breached` 不再重复发射）
+- [x] **AC-015**: 6 个 Cat 2b 信号均通过 `_emit_signal_safe` 路由（character_deployed / character_removed / standby_cleared / character_unavailable / character_revived / front_line_breached 声明——本 story 实现 deployed/removed/front_line_breached 三个，其余属 story-004）
 
 ---
 
@@ -184,7 +193,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/deployment_system/test_deploy_targetable.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing (22 tests)
 
 ---
 

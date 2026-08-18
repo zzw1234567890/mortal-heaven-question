@@ -94,11 +94,11 @@ stories:
     name: "deploy / remove / is_targetable 前后排保护 O(1)"
     file: "production/epics/deployment-system/story-002-deploy-remove-targetable.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-6"
-    completed: ""
+    completed: "2026-08-17 deploy/remove_character/is_targetable 6 步判断 + 3 个 Cat 2b 信号经 _emit_signal_safe 路由；22 单测全通过，全量 1268 passing 零回归；lead-programmer CONCERNS（deploy 补 max_deploy 上限）+ qa-lead GAPS 已补齐"
 
   - id: "4-8"
     name: "战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot"

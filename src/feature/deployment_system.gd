@@ -5,11 +5,12 @@
 ## 采用与 ADR-0011 StatusEffectSystem / ADR-0013 BindingManager 相同的 GSM 边界先例。
 ##
 ## [b]Autoload 顺序[/b]：#1-#16 之后（RealmSystem #11 已就绪）。[br]
-## [b]本 Story 范围[/b]（4-6）：FieldState 枚举 + 阵位数据模型 + [method setup_field] 自动/手动分配
-## + 待命状态机（STANDBY/READY/ACTED）+ 阵位查询 API（get_field/get_character_slot/get_front_count/
-## get_empty_slots/can_deploy/is_standby/set_acted）。[br]
+## [b]本 Story 范围[/b]（4-6 + 4-7）：FieldState 枚举 + 阵位数据模型 + [method setup_field] 自动/手动分配
+## + 待命状态机（STANDBY/READY/ACTED）+ 阵位查询 API + 战中补位 [method deploy] + 阵亡清位
+## [method remove_character] + 前后排保护查询 [method is_targetable]。[br]
 ## [b]不注册进 project.godot[/b]——待 CombatSystem 接线（4-22）后统一注册（4-0b 终验）。[br]
-## [b]信号[/b]：本 Story 不发射信号——6 个 Cat 2b 信号属 Story 002/004。[br]
+## [b]信号[/b]：本 Story 发射 character_deployed / character_removed / front_line_breached 三个 Cat 2b 信号
+## （经 GSM._emit_signal_safe 路由）；standby_cleared / character_unavailable / character_revived 属 Story 004。[br]
 ##
 ## 来源: ADR-0016 §决策 §阵位数据模型 §关键接口 / GDD deployment-system.md。
 extends Node
@@ -58,9 +59,24 @@ var _field: Dictionary = {}
 ## 本 Story 仅初始化空字典——mark_unavailable/revive_character 生命周期属 Story 004。
 var _unavailable_characters: Dictionary = {}
 
-## 前排破防信号已发射标志——防止 [method is_targetable] 重复发射 front_line_breached（Story 002 实现）。
+## 前排破防信号已发射标志——防止 [method is_targetable] 重复发射 front_line_breached。
 ## 在 [method setup_field] 中重置（ADR-0016 §风险缓解）。
 var _front_line_breached_emitted: bool = false
+
+
+# === 信号声明（Cat 2b）=============================================================
+
+## 角色上场时发射（备战/战中补位）。[br]
+## [br][b]载荷[/b]: [code](character_id, slot_index, is_front, deploy_turn)[/code]。
+signal character_deployed(character_id: int, slot_index: int, is_front: bool, deploy_turn: int)
+
+## 角色阵亡离场时发射。[br]
+## [br][b]载荷[/b]: [code](character_id, slot_index, reason)[/code]——reason 为离场原因字符串。
+signal character_removed(character_id: int, slot_index: int, reason: String)
+
+## 前排全灭→后排暴露时发射（仅一次，setup_field 重置标志）。[br]
+## [br][b]载荷[/b]: 无参数。
+signal front_line_breached()
 
 
 # === 构造 =========================================================================
@@ -207,6 +223,133 @@ func set_acted(character_id: int) -> void:
 		return
 	if _field[slot]["state"] == FieldState.READY:
 		_field[slot]["state"] = FieldState.ACTED
+
+
+# === 战中补位 / 阵亡清位 ============================================================
+
+## 战中补位——检查空位→分配阵位→标记 STANDBY→发射 [signal character_deployed]。[br]
+## [br][b]前置检查顺序[/b]（ADR-0016 §战中补位流程）：[br]
+##   1. 角色不可用检查（[member _unavailable_characters]）[br]
+##   2. 已在场上检查（防重复部署）[br]
+##   3. 境界上场上限检查（[code]deployed >= max_deploy[/code] → field_full）[br]
+##   4. 物理空位检查（[method get_empty_slots]）[br]
+##   5. 槽位合法性检查（越界/已占用）[br]
+## [br][param card_instance_id] 卡牌实例 ID（本 Story 仅透传，供后续 BindingManager 恢复绑定）。[br]
+## [br][param character_id] 上场角色 ID。[br]
+## [br][param slot_index] 目标阵位——-1 = 自动分配前排优先空位。[br]
+## [br][b]返回[/b]: [code]{success: bool, slot_index: int, reason: String}[/code]——
+## reason ∈ 'deployed' / 'field_full' / 'character_unavailable' / 'invalid_slot'。
+func deploy(card_instance_id: int, character_id: int, slot_index: int = -1) -> Dictionary:
+	if _unavailable_characters.has(character_id):
+		return {"success": false, "slot_index": -1, "reason": "character_unavailable"}
+	if get_character_slot(character_id) != -1:
+		return {"success": false, "slot_index": -1, "reason": "invalid_slot"}  # 已在场上
+
+	# 境界上场上限检查（max_deploy）——field_full 同时涵盖「境界上限满」与「物理满」
+	var deployed: int = SLOT_COUNT - get_empty_slots().size()
+	if deployed >= _query_max_deploy():
+		return {"success": false, "slot_index": -1, "reason": "field_full"}
+
+	var target_slot: int = slot_index
+	if slot_index == -1:
+		# 自动分配——前排优先第一个空位
+		var empty: Array = get_empty_slots()
+		if empty.is_empty():
+			return {"success": false, "slot_index": -1, "reason": "field_full"}
+		target_slot = empty[0]
+	else:
+		if slot_index < 0 or slot_index >= SLOT_COUNT:
+			return {"success": false, "slot_index": -1, "reason": "invalid_slot"}
+		if _field[slot_index]["character_id"] != -1:
+			return {"success": false, "slot_index": -1, "reason": "invalid_slot"}
+
+	# 写入阵位 + 标记 STANDBY（本回合不可攻击）
+	# deploy_turn=0 为临时桩——待 CombatSystem 接入真实回合计数（Story Notes #10）
+	_field[target_slot] = {
+		"character_id": character_id,
+		"is_front": _is_front(target_slot),
+		"deploy_turn": 0,
+		"state": FieldState.STANDBY,
+	}
+	_emit_character_deployed(character_id, target_slot, _is_front(target_slot), 0)
+	return {"success": true, "slot_index": target_slot, "reason": "deployed"}
+
+
+## 角色阵亡时调用——清空阵位 + 发射 [signal character_removed]。[br]
+## [br]绑定卡洗回由 BindingManager 处理——DeploymentSystem 不负责绑定卡生命周期（ADR-0016）。[br]
+## [br][param character_id] 阵亡角色 ID。[br]
+## [br][param reason] 离场原因字符串（默认 [code]"died"[/code]）。
+func remove_character(character_id: int, reason: String = "died") -> void:
+	var slot: int = get_character_slot(character_id)
+	if slot == -1:
+		return  # 不在场上——无操作
+	_field[slot] = {
+		"character_id": -1,
+		"is_front": _is_front(slot),
+		"deploy_turn": -1,
+		"state": FieldState.EMPTY,
+	}
+	_emit_character_removed(character_id, slot, reason)
+
+
+# === 前后排保护查询 ================================================================
+
+## O(1) 前后排保护查询——AI 目标选择时每帧调用。[br]
+## [br][b]6 步判断[/b]（ADR-0016 §前后排保护查询）：[br]
+##   1. 角色必须在场上（[method get_character_slot] ≠ -1）[br]
+##   2. 角色非 DEAD[br]
+##   3. 前排角色 → 始终可被攻击 true[br]
+##   4. 穿透效果 → 可被攻击 true[br]
+##   5. 后排 + 前排无存活 → 可被攻击 true + 发射 [signal front_line_breached]（仅一次）[br]
+##   6. 后排 + 前排有存活 → 受保护 false[br]
+## [br][param character_id] 被查询的目标角色。[br]
+## [br][param attacker_has_penetration] 攻击者是否有穿透效果（符箓/特殊功法）。[br]
+## [br][b]返回[/b]: 是否可被攻击。
+func is_targetable(character_id: int, attacker_has_penetration: bool = false) -> bool:
+	var slot: int = get_character_slot(character_id)
+	if slot == -1:
+		return false  # 1. 不在场上
+	var entry: Dictionary = _field[slot]
+	if entry["state"] == FieldState.DEAD:
+		return false  # 2. 已阵亡
+	if entry["is_front"]:
+		return true  # 3. 前排始终可攻击
+	if attacker_has_penetration:
+		return true  # 4. 穿透无视保护
+	if get_front_count(true) == 0:
+		# 5. 后排 + 前排无存活 → 可攻击 + 破防信号（仅一次）
+		if not _front_line_breached_emitted:
+			_front_line_breached_emitted = true
+			_emit_front_line_breached()
+		return true
+	return false  # 6. 后排受保护
+
+
+# === 信号发射包装（ADR-0007）=======================================================
+
+## 发射 [signal character_deployed]——经 GSM._emit_signal_safe 路由（Cat 2b）。[br]
+## GSM 不可用时（测试 mock）回退直接 emit。
+func _emit_character_deployed(character_id: int, slot_index: int, is_front: bool, deploy_turn: int) -> void:
+	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
+		GameStateManager.get_script()._emit_signal_safe(self, &"character_deployed", [character_id, slot_index, is_front, deploy_turn])
+	else:
+		character_deployed.emit(character_id, slot_index, is_front, deploy_turn)
+
+
+## 发射 [signal character_removed]——经 GSM._emit_signal_safe 路由。
+func _emit_character_removed(character_id: int, slot_index: int, reason: String) -> void:
+	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
+		GameStateManager.get_script()._emit_signal_safe(self, &"character_removed", [character_id, slot_index, reason])
+	else:
+		character_removed.emit(character_id, slot_index, reason)
+
+
+## 发射 [signal front_line_breached]——经 GSM._emit_signal_safe 路由。
+func _emit_front_line_breached() -> void:
+	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
+		GameStateManager.get_script()._emit_signal_safe(self, &"front_line_breached", [])
+	else:
+		front_line_breached.emit()
 
 
 # === 内部 =========================================================================

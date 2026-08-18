@@ -280,3 +280,20 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-6 完成（deployment-system 内部状态机），待 /dev-story 4-7（deploy/remove/is_targetable）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-7 deployment-system deploy/remove/is_targetable 2026-08-17
+
+- Verdict：COMPLETE（4-7 done，零回归）
+- 变更：`src/feature/deployment_system.gd` 增量扩展——deploy（战中补位，前置检查：不可用→已在场→max_deploy 上限→空位→槽位合法性）/ remove_character（阵亡清位，不负责绑定卡洗回）/ is_targetable（6 步前后排保护判断）+ 3 个 Cat 2b 信号（character_deployed/character_removed/front_line_breached 经 GSM._emit_signal_safe 路由）
+- 关键裁决：lead-programmer CONCERNS→deploy 内部补 `deployed >= max_deploy → field_full` 防御检查（原 ADR 编排靠 can_deploy 前置，独立调用不安全）；deploy_turn=0 临时桩注释标注
+- 测试：`tests/unit/deployment_system/test_deploy_targetable.gd` 22 测试（AC-001~015 + 哨兵守卫/已在场/穿透短路/上限 4 分支回归）；全量 69 scripts / 1269 tests / 1268 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer CONCERNS→采纳（C1 deploy 上限 + C2 删 FileAccess 源码 contains 改运行时 + C3 deploy_turn 桩注释）；qa-lead GAPS→补齐（G1 AC-001 前排优先修正 + G2 源码 contains 移除 + G3 front_line_breached 运行时 + G4 deploy_turn + G5 4 分支回归）
+- 关键经验：源码 contains 断言违反「单元测试不得依赖文件系统」+ 脆弱——改运行时行为验证；Cat 2b 信号经 `GameStateManager.get_script()._emit_signal_safe`（Script.has_method 识别 static 方法）
+- Next：/dev-story 4-8（战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot，blocker 4-7 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-7 完成（deploy/remove/is_targetable），待 /dev-story 4-8（serialize 快照导出）
+<!-- /STATUS -->
