@@ -119,6 +119,39 @@ func _set_battle_status_snapshot(snapshot: Array) -> void:
 	_gsm._buffer_change("battle.status_snapshot", old_snapshot, snapshot)
 
 
+## 原子写入战斗阵位快照——仅 DeploymentSystem 调用（战斗结束导出）。[br]
+## [br][b]窄范围[/b]：仅写入 battle.deployment_snapshot——不操作 battle 域其他字段。[br]
+## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值（深层相等）不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播（展平路径 [code]"battle.deployment_snapshot"[/code]）。[br]
+## [br]来源: ADR-0016 §GSM 边界 §snapshot 导出。
+func _set_battle_deployment_snapshot(snapshot: Dictionary) -> void:
+	if _gsm.battle == null:
+		push_warning("GSM._set_battle_deployment_snapshot: 无活跃战斗，拒绝写入")
+		return
+
+	var old_snapshot: Dictionary = _gsm.battle.get("deployment_snapshot", {})
+	if _gsm._deep_equal(old_snapshot, snapshot):
+		return  # 值无变化——去重
+
+	_gsm.battle.deployment_snapshot = snapshot
+	_gsm._buffer_change("battle.deployment_snapshot", old_snapshot, snapshot)
+
+
+## 原子写入不可用角色列表——仅 DeploymentSystem 调用（战斗结束存档持久化入口）。[br]
+## [br][b]窄范围[/b]：仅写入 player.unavailable_characters——不操作 player 域其他字段。[br]
+## [br][b]去重[/b]：同值（深层相等）不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播（展平路径 [code]"player.unavailable_characters"[/code]）。[br]
+## [br]来源: ADR-0016 §不可用角色生命周期 §跨战斗持久。
+func _set_player_unavailable_characters(data: Dictionary) -> void:
+	var old: Dictionary = _gsm.player.get("unavailable_characters", {})
+	if _gsm._deep_equal(old, data):
+		return  # 值无变化——去重
+
+	_gsm.player.unavailable_characters = data
+	_gsm._buffer_change("player.unavailable_characters", old, data)
+
+
 ## 战斗开始——仅 CombatSystem 调用。Cat 2a 生命周期信号，立即发射不缓冲。
 func battle_start(config: Dictionary) -> void:
 	if _gsm.battle != null:

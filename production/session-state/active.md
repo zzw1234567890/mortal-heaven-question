@@ -297,3 +297,20 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-7 完成（deploy/remove/is_targetable），待 /dev-story 4-8（serialize 快照导出）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-8 deployment-system serialize snapshot export 2026-08-18
+
+- Verdict：COMPLETE（4-8 done，零回归）
+- 变更：`src/feature/deployment_system.gd` 增量扩展——serialize_field（6 阵位，state 用 String 序列化）/ deserialize_field（键归一：int/String key 均接受 + 缺字段默认值填充 + 非法 state 回退 EMPTY）/ sync_unavailable_to_gsm / load_unavailable_from_gsm / write_snapshot_to_gsm + _get_gsm（SceneTree.root 查找，同 StatusEffectSystem 先例）+ _state_to_string/_state_from_string 枚举双向映射；GSM 第二层 `_set_battle_deployment_snapshot` + `_set_player_unavailable_characters`（null 守卫 + deep_equal 去重 + _buffer_change）+ player 默认域补 `unavailable_characters: {}`
+- 关键裁决：lead-programmer CONCERNS→C-1 是首要架构隐患（serialize_field int-key 快照 JSON round-trip 后 key 变 String，deserialize 若仅匹配 int key 会静默丢阵位）→ deserialize 键归一修复 + 补 JSON round-trip 回归测试；C-3 死守卫移除；C-4 测试清理直写属性加注释标注
+- 测试：`tests/integration/deployment_system/test_serialize_snapshot.gd` 20 测试（AC-001~011 + 双守卫 null/missing-method 子类覆盖 + 缺字段默认值 + 非法 state 回退 + JSON round-trip String key）；全量 70 scripts / 1289 tests / 1288 passing / 1 pending / 0 failing 零回归
+- 关卡：qa-lead GAPS→补齐（G1 _get_gsm 返回 null 双守卫路径 + G2 deserialize 缺字段默认值填充 + G3 _state_from_string 非法字符串回退）；lead-programmer CONCERNS→采纳（C-1 键归一 + C-3 死守卫 + C-4 注释）
+- 关键经验：Godot 4 JSON.stringify 会把 int-key Dictionary 转 String key——序列化/反序列化成对 API 必须做键归一防御，否则读档静默丢数据；测试子类 `class X extends "res://...gd"` 可覆盖 Autoload 脚本的 `_get_gsm()` 返回值以模拟 GSM 缺失分支
+- Next：/dev-story 4-9（clear_standby_state + mark_unavailable + revive_character，blocker 4-7 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-8 完成（serialize 快照导出），待 /dev-story 4-9（clear_standby_state + mark_unavailable + revive_character）
+<!-- /STATUS -->

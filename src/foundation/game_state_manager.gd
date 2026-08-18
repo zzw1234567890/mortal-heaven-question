@@ -170,6 +170,10 @@ func _set_battle_cost(current_cost: int, max_cost: int) -> void:
 	_atomic_writes._set_battle_cost(current_cost, max_cost)
 func _set_battle_status_snapshot(snapshot: Array) -> void:
 	_atomic_writes._set_battle_status_snapshot(snapshot)
+func _set_battle_deployment_snapshot(snapshot: Dictionary) -> void:
+	_atomic_writes._set_battle_deployment_snapshot(snapshot)
+func _set_player_unavailable_characters(data: Dictionary) -> void:
+	_atomic_writes._set_player_unavailable_characters(data)
 func battle_start(config: Dictionary) -> void:
 	_atomic_writes.battle_start(config)
 func battle_end(result: Dictionary) -> void:

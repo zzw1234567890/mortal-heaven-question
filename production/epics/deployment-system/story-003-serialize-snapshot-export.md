@@ -1,12 +1,21 @@
 # Story 003: 战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot
 
 > **Epic**: deployment-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-18
+
+## Completion Notes
+**Completed**：2026-08-18
+**Criteria**：11/11 通过（AC-001~011 由集成测试覆盖）
+**Deviations**：
+1. **JSON round-trip String key 防御（C-1 修复）**：`serialize_field()` 返回 int-key 快照 `{0: {...}, ...}`，Godot 4 JSON 序列化会把 int key 转 String，读回后 `deserialize_field()` 若仅匹配 int key 会静默丢阵位。实现 `deserialize_field` 键归一（`data.has(slot)` 或 `data.has(str(slot))` 均接受），并补 JSON round-trip 回归测试锁定该行为。
+2. **移除死守卫（C-3）**：`load_unavailable_from_gsm(data: Dictionary)` 内 `if not data is Dictionary: return` 为死代码（参数类型标注已保证非 null 入参为 Dictionary，null 在参数绑定阶段抛错）——移除该行。
+**Test Evidence**：`tests/integration/deployment_system/test_serialize_snapshot.gd`（20 测试全通过）；全量套件 70 scripts / 1289 tests / 1288 passing / 1 pending / 0 failing 零回归
+**Code Review**：lead-programmer CONCERNS→已采纳（C-1 int-key JSON round-trip 静默丢数据 → deserialize 键归一 + JSON round-trip 回归测试；C-3 死守卫移除；C-4 测试清理直写属性加注释标注）；qa-lead GAPS→已补齐（G1 _get_gsm 返回 null 双守卫路径 + G2 deserialize 缺字段默认值填充 + G3 _state_from_string 非法字符串回退 EMPTY）
 
 ## Context
 
@@ -32,17 +41,17 @@
 
 *From ADR-0016 §验证标准 + §GSM 边界 + GDD deployment-system.md §验收标准:*
 
-- [ ] **AC-001**: `serialize_field()` 返回 Dictionary，含所有 6 个阵位的序列化数据（每 slot 含 character_id/is_front/state/deploy_turn）
-- [ ] **AC-002**: `serialize_field()` 输出为纯 Dictionary 序列化结构——不含 RefCounted/Node 引用（可直接 JSON 序列化）
-- [ ] **AC-003**: 战斗结束时调用 `GSM._set_battle_deployment_snapshot(snapshot)` 写入 `battle.deployment_snapshot`
-- [ ] **AC-004**: GSM 不可用时写入不崩溃（`is_instance_valid` + `has_method` 双守卫）
-- [ ] **AC-005**: `deserialize_field(data)` 从快照恢复阵位——恢复后 `get_field()` 与原快照一致
-- [ ] **AC-006**: `deserialize_field(data)` 对空/无效 data 安全处理——不崩溃
-- [ ] **AC-007**: `sync_unavailable_to_gsm()` 将 `_unavailable_characters` 同步至 GSM（战斗结束存档持久化入口）
-- [ ] **AC-008**: `load_unavailable_from_gsm(data)` 从 GSM 恢复 `_unavailable_characters`（读档时）
-- [ ] **AC-009**: snapshot round-trip——serialize_field 后 deserialize_field，阵位分布 + 状态字段一致
-- [ ] **AC-010**: GSM 写委托走第二层原子方法——不直接写 `GSM.battle.deployment_snapshot` 属性
-- [ ] **AC-011**: 不可用角色序列化——`_unavailable_characters` 每个 entry 含 {death_turn, death_battle_id, revival_methods}
+- [x] **AC-001**: `serialize_field()` 返回 Dictionary，含所有 6 个阵位的序列化数据（每 slot 含 character_id/is_front/state/deploy_turn）
+- [x] **AC-002**: `serialize_field()` 输出为纯 Dictionary 序列化结构——不含 RefCounted/Node 引用（可直接 JSON 序列化）
+- [x] **AC-003**: 战斗结束时调用 `GSM._set_battle_deployment_snapshot(snapshot)` 写入 `battle.deployment_snapshot`
+- [x] **AC-004**: GSM 不可用时写入不崩溃（`is_instance_valid` + `has_method` 双守卫）
+- [x] **AC-005**: `deserialize_field(data)` 从快照恢复阵位——恢复后 `get_field()` 与原快照一致
+- [x] **AC-006**: `deserialize_field(data)` 对空/无效 data 安全处理——不崩溃
+- [x] **AC-007**: `sync_unavailable_to_gsm()` 将 `_unavailable_characters` 同步至 GSM（战斗结束存档持久化入口）
+- [x] **AC-008**: `load_unavailable_from_gsm(data)` 从 GSM 恢复 `_unavailable_characters`（读档时）
+- [x] **AC-009**: snapshot round-trip——serialize_field 后 deserialize_field，阵位分布 + 状态字段一致
+- [x] **AC-010**: GSM 写委托走第二层原子方法——不直接写 `GSM.battle.deployment_snapshot` 属性
+- [x] **AC-011**: 不可用角色序列化——`_unavailable_characters` 每个 entry 含 {death_turn, death_battle_id, revival_methods}
 
 ---
 
@@ -153,7 +162,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/deployment_system/test_serialize_snapshot.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing (20 tests)
 
 ---
 

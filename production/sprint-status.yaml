@@ -14,7 +14,7 @@ goal: "Feature 层战斗子系统 6 Epic（25 story + 1 task）——形成可�
 start: "2026-08-16"
 end: "2026-08-23"
 generated: "2026-08-16"
-updated: "2026-08-17"
+updated: "2026-08-18"
 
 stories:
   # === 4-0 Autoload 注册（硬前置）===
@@ -104,11 +104,11 @@ stories:
     name: "战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot"
     file: "production/epics/deployment-system/story-003-serialize-snapshot-export.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-7"
-    completed: ""
+    completed: "2026-08-18 serialize_field/deserialize_field/sync_unavailable_to_gsm/load_unavailable_from_gsm/write_snapshot_to_gsm + _state_to_string/_state_from_string 枚举双向映射；GSM 第二层 _set_battle_deployment_snapshot + _set_player_unavailable_characters + player 默认域补 unavailable_characters；20 集成测试全通过，全量 1289 tests / 1288 passing 零回归；lead-programmer CONCERNS（C-1 JSON int-key 丢数据→键归一修复）+ qa-lead GAPS 已补齐"
 
   - id: "4-9"
     name: "clear_standby_state + mark_unavailable + revive_character"

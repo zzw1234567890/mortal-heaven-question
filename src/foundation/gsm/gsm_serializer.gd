@@ -100,6 +100,7 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"resources": {"ling_shi": 0, "ling_cai": {"low": 0, "medium": 0, "high": 0, "top": 0}, "dan_yao_sui_pian": 0},
 				"identity_id": "",
 				"talents": [],
+				"unavailable_characters": {},
 			}
 		"collection":
 			return {"owned_cards": [], "total_count": 0}
