@@ -1,12 +1,23 @@
 # Story 001: BindingRecord RefCounted 实例模型 + 内部注册表
 
 > **Epic**: 功法/法宝绑定系统 (Binding System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-18
+
+## Completion Notes
+**Completed**：2026-08-18
+**Criteria**：8/8 通过（AC-001~008 由 19 个单元测试覆盖）
+**Deviations**：
+1. **文件位置修正**（story 实现注过时）：story Implementation Note #1 写 `src/core/binding/`，实际落地 `src/feature/binding/`。原因：ADR-0013 明确 BindingManager 是 **Feature 层** Autoload #13，且现有 Feature 层代码在 `src/feature/`（card_effect_engine/、deployment_system.gd）。ADR 权威，story 路径为过时错误——无需回写 ADR。
+2. **`_by_character` 声明为无类型 `Dictionary`**：ADR-0013 §需求 字面类型 `Dictionary[int, Array[int]]` 是嵌套类型化集合，Godot 4.6 GDScript 不支持（"Nested typed collections are not supported" 解析错误）。值仍为 `Array[int]`，类型保证由 `_register_binding` 构造路径维护。已回写 ADR-0013 §需求 一行 retrofit 注。
+3. **`get_binding` assert 守卫重构（lead-programmer C1）**：原实现 `var record: BindingRecord = _bindings[binding_id]` 的类型化赋值本身在运行时做类型校验，使后续 assert 对"非 null 非法注入"成为死代码。改为 `Variant` 读入 → null 检查 → assert → cast，使 assert 成为类型化赋值之前的第一道运行时守卫。注意：`_bindings` 为类型化 Dictionary，非 null 非法类型在写入侧即被拦截，唯一可存入的非法值是 null（提前返回）——故 assert 对非法注入运行时不可达，实为纵深防御层（覆盖未来 deserialize 非类型化写入路径）。
+4. **`_unregister_binding` 反查真实 character_id（lead-programmer C4）**：优先从 `_card_to_character`（权威映射）反查 character_id，而非信任 `record.bound_character_id` 快照——调用方若在 register 后修改 record 字段，信任快照会导致 `_by_character` 擦除静默 no-op、留下孤儿条目。缺失时回退到 record 快照。
+**Test Evidence**：`tests/unit/binding_system/test_binding_record_model.gd`（19 测试全通过）；全量套件 72 scripts / 1330 tests / 1329 passing / 1 pending / 0 failing 零回归
+**Code Review**：lead-programmer CONCERNS→已采纳（C1 assert 死代码 + C2 内部引用只读文档 + C3 _by_character 无类型 ADR 回写 + C4 反查 character_id + C5 孤儿跳过注释）；qa-lead GAPS→已补齐（G1 AC-005 语义 + G2 删最后一条清键 + G3 unregister 幂等 + G4 未绑定路径新分配语义 + G5 测试命名 system 前缀）
 
 ## Context
 
@@ -132,7 +143,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/binding_system/test_binding_record_model.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing (19 tests)
 
 ---
 

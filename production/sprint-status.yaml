@@ -125,11 +125,11 @@ stories:
     name: "BindingRecord RefCounted 实例模型 + 内部注册表"
     file: "production/epics/binding-system/story-001-refcounted-model.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-08-18 BindingRecord（class_name + 14 字段 + BindingSlot 枚举）+ BindingManager 三同步索引（_bindings/_by_character/_card_to_character）+ _register_binding/_unregister_binding 原子同步 + 4 查询 API；文件位置 story 过时路径 src/core/binding/→src/feature/binding/ 修正；_by_character 无类型 Dictionary（嵌套类型化集合不支持）回写 ADR-0013；19 单测全通过，全量 1330 passing 零回归；lead-programmer CONCERNS（C1 assert 死代码→Variant 读入 + C4 反查 character_id）+ qa-lead GAPS 已补齐"
 
   - id: "4-11"
     name: "bind / unbind / get_bindings 查询 API"

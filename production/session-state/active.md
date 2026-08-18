@@ -329,5 +329,22 @@ Task: 4-8 完成（serialize 快照导出），待 /dev-story 4-9（clear_standb
 <!-- STATUS -->
 Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-9 完成（deployment-system 收尾），待 /dev-story 4-10（binding-system 001）
+Task: 4-10 完成（binding-system 001 RefCounted 模型 + 三索引注册表），待 4-11
+<!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-10 binding-system BindingRecord RefCounted 实例模型 + 内部注册表 2026-08-18
+
+- Verdict：COMPLETE（4-10 done，零回归）
+- 变更：新建 `src/feature/binding/binding_record.gd`（class_name BindingRecord extends RefCounted + 14 字段 + BindingSlot 枚举 GONGFA/FABAO）+ `src/feature/binding/binding_manager.gd`（三同步索引 _bindings/_by_character/_card_to_character + _register_binding/_unregister_binding 原子同步 + get_binding_ids_by_character 零分配热路径 / get_bindings_by_character 非热路径 / get_character_by_card O(1) 反向 / get_binding 单条查询）
+- 关键裁决：文件位置 story 过时路径 src/core/binding/ → 修正为 src/feature/binding/（ADR-0013 明确 Feature 层 Autoload #13）；_by_character 声明为无类型 Dictionary（Godot 4.6 嵌套类型化集合 Dictionary[int, Array[int]] 解析错误 "Nested typed collections are not supported"），已回写 ADR-0013 retrofit；lead-programmer C1 → get_binding 改 Variant 读入 + null 检查 + assert + cast（原类型化赋值使 assert 成死代码）；C4 → _unregister_binding 反查 _card_to_character 权威映射而非信任 record 快照
+- 测试：`tests/unit/binding_system/test_binding_record_model.gd` 19 测试（AC-001~008 + null 注入优雅返回 + unregister 幂等 + 删最后一条清键 + 未绑定路径新分配语义）；全量 72 scripts / 1330 tests / 1329 passing / 1 pending / 0 failing 零回归
+- 关卡：qa-lead GAPS→补齐（G1 AC-005 assert 语义 + G2 删最后一条清键 + G3 unregister 幂等 + G4 未绑定新分配 + G5 命名 system 前缀）；lead-programmer CONCERNS→采纳（C1 assert 死代码 + C2 只读文档 + C3 ADR 回写 + C4 反查 character_id + C5 孤儿跳过注释）
+- 关键经验：类型化 Dictionary 的键类型提示非编译器强制，但值类型是运行时的——`var record: BindingRecord = _bindings[id]` 的类型化赋值会在读取时做类型校验，使后续 assert 成为死代码；应先 Variant 读入再 assert 再 cast。嵌套类型化集合（Dictionary[int, Array[int]]）Godot 4.6 不支持，需退化为无类型 Dictionary + 构造路径类型保证
+- Next：/dev-story 4-11（bind/unbind/get_bindings 查询 API，blocker 4-10 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-10 完成（binding-system 001），待 4-11（bind/unbind/get_bindings 查询 API）
 <!-- /STATUS -->

@@ -59,6 +59,8 @@ Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号�
 
 - RefCounted BindingRecord 数据结构：包含 binding_id、card_instance_id、card_template_id、slot_type、slot_index、bound_character_id、is_native、native_multiplier、activated_turn、is_suspended、stack_slots、stack_count——与 GDD §详细设计 §1 完全对齐
 - BindingManager Autoload 内部运行时注册表：`_bindings: Dictionary[int, BindingRecord]`（key=binding_id）+ `_by_character: Dictionary[int, Array[int]]`（key=character_id → binding_id 列表，快速查询某角色的所有绑定）+ `_card_to_character: Dictionary[int, int]`（key=card_instance_id → character_id，O(1) 反向查询）。三个索引结构必须在添加/移除绑定时保持同步——`bind_card()` / `remove_binding()` 中原子更新；Dictionary[int, BindingRecord] 键类型提示在 GDScript 中非编译器强制——在 `_bindings[id]` 访问处附加 `assert(_bindings[id] is BindingRecord)` 守卫
+
+> **实现注（4-10 retrofit，2026-08-18）**：`_by_character` 实现为**无类型 `Dictionary`**（而非 `Dictionary[int, Array[int]]`）——Godot 4.6 GDScript 不支持嵌套类型化集合（"Nested typed collections are not supported" 解析错误）。值仍为 `Array[int]`，类型保证由 `_register_binding` 构造路径维护。`_bindings` 与 `_card_to_character` 保持类型化。
 - 公共 API：`bind_card()` / `overwrite_binding()` / `stack_card()` / `remove_binding()` / `remove_all_bindings()` / `suspend_bindings()` / `restore_bindings()` / `get_bindings_by_character()` / `get_binding_ids_by_character()` / `get_character_by_card()` / `get_accumulated_bonus()` / `serialize_all()` / `deserialize_all()`
 - 本命判定逻辑：卡牌 `native_owner` 前缀匹配目标角色 card_id → 检查该角色同类型本命位是否未被占用 → 自动设置 is_native + native_multiplier
 - 同名叠加判定：目标角色已绑定同名卡 + stack_count < cardTemplate.stack_limit → 叠加（stack_count += 1，共享槽位，乘法叠加）
