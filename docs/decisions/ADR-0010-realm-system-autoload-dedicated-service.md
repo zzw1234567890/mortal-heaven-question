@@ -30,7 +30,7 @@ Accepted（2026-07-26——Core 层审查通过。修复：层归属 "Progressio
 
 ### 问题陈述
 
-境界系统定义 5 级大境界（炼气→筑基→金丹→元婴→化神），每个境界携带 15+ 项跨系统引用的属性（max_cultivation、max_deploy、cost_per_turn、deck_limit、action_points、base_speed、max_darkgold、card_pool_tier、map_unlock 等）。13 个以上的消费者系统需要查询境界属性：战斗系统（压制系数、基础速度、费用上限）、上场系统（max_deploy）、卡牌系统（card_pool_tier → 稀有度权重）、卡组编辑（deck_limit）、探索系统（map_unlock）、修为养成系统（max_cultivation）、渡劫突破系统（realm_up）、行动力系统（action_points）、AI 系统（敌方境界查询）、剧情系统（章节 entry_conditions 境界验证）、UI/HUD、地图系统（map_unlock 过滤）。
+境界系统定义 5 级大境界（炼气→筑基→金丹→元婴→化神），每个境界携带 15+ 项跨系统引用的属性（max_cultivation、max_deploy、cost_per_turn、deck_limit、action_points、base_speed、max_darkgold、card_pool_tier、map_unlock、gongfa_slots、fabao_slots 等）。13 个以上的消费者系统需要查询境界属性：战斗系统（压制系数、基础速度、费用上限）、上场系统（max_deploy）、卡牌系统（card_pool_tier → 稀有度权重）、卡组编辑（deck_limit）、探索系统（map_unlock）、修为养成系统（max_cultivation）、渡劫突破系统（realm_up）、行动力系统（action_points）、AI 系统（敌方境界查询）、剧情系统（章节 entry_conditions 境界验证）、UI/HUD、地图系统（map_unlock 过滤）、绑定系统（gongfa_slots/fabao_slots 绑定位上限）。
 
 设计问题：**境界数据的归属方式和访问模式是什么？** 这是一个核心架构决策，因为它直接影响了 GSM 的规模（如果将数据嵌入 GSM，player.* 域会膨胀）、13+ 个系统的耦合方式（它们都通过哪个接口查询境界属性？）、以及未来扩展性（新境界属性的添加成本）。
 

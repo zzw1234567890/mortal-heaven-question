@@ -65,6 +65,8 @@ realm_table = {
     max_darkgold: 0,       # 暗金卡上限（炼气不可获得暗金）
     card_pool_tier: 1,     # 卡牌掉落池等级（影响稀有度权重）
     map_unlock: "青云剑宗",  # 可进入的地图
+    gongfa_slots: 1,       # 每角色功法绑定位上限（来源 binding-system.md §2）
+    fabao_slots: 1,        # 每角色法宝绑定位上限（来源 binding-system.md §2）
   },
   2: {  # 筑基期
     name: "筑基期",
@@ -77,6 +79,8 @@ realm_table = {
     max_darkgold: 0,
     card_pool_tier: 2,
     map_unlock: "碎星群岛",
+    gongfa_slots: 2,
+    fabao_slots: 2,
   },
   3: {  # 金丹期
     name: "金丹期",
@@ -89,6 +93,8 @@ realm_table = {
     max_darkgold: 1,
     card_pool_tier: 3,
     map_unlock: "东域",
+    gongfa_slots: 2,
+    fabao_slots: 2,
   },
   4: {  # 元婴期
     name: "元婴期",
@@ -101,6 +107,8 @@ realm_table = {
     max_darkgold: 2,
     card_pool_tier: 4,
     map_unlock: "归墟之境",
+    gongfa_slots: 3,
+    fabao_slots: 3,
   },
   5: {  # 化神期
     name: "化神期",
@@ -113,6 +121,8 @@ realm_table = {
     max_darkgold: 2,
     card_pool_tier: 5,
     map_unlock: "最终战场",
+    gongfa_slots: 3,
+    fabao_slots: 3,
   },
 }
 ```

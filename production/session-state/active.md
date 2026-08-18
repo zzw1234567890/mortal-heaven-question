@@ -348,3 +348,20 @@ Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
 Task: 4-10 完成（binding-system 001），待 4-11（bind/unbind/get_bindings 查询 API）
 <!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-11 binding-system bind/stack/overwrite/can_bind 查询 API 2026-08-18
+
+- Verdict：COMPLETE（4-11 done，零回归）
+- 变更：`src/feature/binding/binding_manager.gd` 增量扩展——cache_slot_limits/_query_realm_slots/_get_slot_limit（RealmSystem 查询 gongfa/fabao slots）+ bind_card（card_already_bound/slot_full 拒绝 + 本命判定）/ stack_card（同名叠加共享槽位）/ overwrite_binding（覆盖严格顺序 + 覆盖叠加层 LIFO 移除末位）/ can_bind（四种着色状态）/ remove_binding/remove_all_bindings（叠层全洗回）/ suspend_bindings/restore_bindings（card 缺失删除变空位）/ get_accumulated_bonus/compute_effective_value（乘法公式）+ _determine_native（本命判定）+ 可注入 Callable 存根（effect_register/remove/suspend/restore + card_shuffle/discard/exists + stat_bonus）
+- RealmSystem 扩展：realm_table 10→12 键（+gongfa_slots/fabao_slots，炼气1/1、筑基2/2、金丹2/2、元婴3/3、化神3/3），回写 realm-system GDD 属性表 + ADR-0010 上下文 + smoke test 10→12 keys
+- 关键裁决（用户确认）：槽位数据扩展 RealmSystem（非 BindingManager 内部维护——AC-004 要求查询 RealmSystem）；本命判定/效果引擎/牌库集成用注入 + 存根策略（native_owner/character_card_id 注入参数，同 is_game_over roster 先例；CardEffectEngine 接口/牌库洗回/弃牌堆用 Callable 存根）
+- 关卡：lead-programmer CONCERNS→已处理（C1 stack/overwrite 补 card_already_bound 守卫 + C2 本命子串误匹配→下划线分段锚定 + C5 哨兵→push_error/-1 + C3/C4/C6 延后 Story 004 注释）；qa-lead GAPS→已补齐（G1 AC-006 主语义沿用 is_native + G2 覆盖叠加回调序列 remove→discard + G3 高倍率边界 240 + G4 remove_binding 多层叠层清理 + G5 覆盖本命后重占本命位 + G6 截断名不误配）
+- 测试：`tests/unit/binding_system/test_bind_unbind_query_api.gd` 37 测试 + `test_binding_record_model.gd` 19 测试（共 56）；全量 73 scripts / 1368 tests / 1367 passing / 1 pending / 0 failing 零回归
+- Next：/dev-story 4-12（绑定生命周期信号总线 7 个 Cat 2b 信号，blocker 4-11 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-11 完成（binding-system 002 绑定生命周期 API），待 4-12（信号总线）
+<!-- /STATUS -->

@@ -45,20 +45,20 @@ func test_ac001_realm_system_extends_node_no_class_name() -> void:
 
 
 # ============================================================================
-# AC-002：realm_table 含 5 境界 × 10 属性
+# AC-002：realm_table 含 5 境界 × 12 属性
 # ============================================================================
 
 func test_ac002_realm_table_has_five_realms_ten_properties() -> void:
 	var table: Dictionary = rs.realm_table
 	assert_eq(table.size(), 5, "realm_table 应含 5 个境界")
-	# 每个境界的属性 Dictionary 含 10 个键
+	# 每个境界的属性 Dictionary 含 12 个键
 	var expected_keys: Array = ["name", "max_cultivation", "max_deploy", "cost_per_turn",
 		"deck_limit", "action_points", "base_speed", "max_darkgold",
-		"card_pool_tier", "map_unlock"]
+		"card_pool_tier", "map_unlock", "gongfa_slots", "fabao_slots"]
 	for level: int in range(1, 6):
 		assert_true(table.has(level), "应含境界 %d" % level)
 		var realm_data: Dictionary = table[level]
-		assert_eq(realm_data.size(), 10, "境界 %d 应含 10 个属性" % level)
+		assert_eq(realm_data.size(), 12, "境界 %d 应含 12 个属性" % level)
 		for key: String in expected_keys:
 			assert_true(realm_data.has(key), "境界 %d 应含属性 '%s'" % [level, key])
 
@@ -79,6 +79,8 @@ func test_ac003_level1_qi_refining_values() -> void:
 	assert_eq(d["max_darkgold"], 0, "max_darkgold 应为 0")
 	assert_eq(d["card_pool_tier"], 1, "card_pool_tier 应为 1")
 	assert_eq(d["map_unlock"], "青云剑宗", "map_unlock 应为 青云剑宗")
+	assert_eq(d["gongfa_slots"], 1, "gongfa_slots 应为 1")
+	assert_eq(d["fabao_slots"], 1, "fabao_slots 应为 1")
 
 
 # ============================================================================
@@ -97,6 +99,8 @@ func test_ac004_level3_golden_core_values() -> void:
 	assert_eq(d["max_darkgold"], 1, "max_darkgold 应为 1")
 	assert_eq(d["card_pool_tier"], 3, "card_pool_tier 应为 3")
 	assert_eq(d["map_unlock"], "东域", "map_unlock 应为 东域")
+	assert_eq(d["gongfa_slots"], 2, "gongfa_slots 应为 2")
+	assert_eq(d["fabao_slots"], 2, "fabao_slots 应为 2")
 
 
 # ============================================================================
@@ -115,6 +119,8 @@ func test_ac005_level5_spirit_severing_values() -> void:
 	assert_eq(d["max_darkgold"], 2, "max_darkgold 应为 2")
 	assert_eq(d["card_pool_tier"], 5, "card_pool_tier 应为 5")
 	assert_eq(d["map_unlock"], "最终战场", "map_unlock 应为 最终战场")
+	assert_eq(d["gongfa_slots"], 3, "gongfa_slots 应为 3")
+	assert_eq(d["fabao_slots"], 3, "fabao_slots 应为 3")
 
 
 # ============================================================================
@@ -134,6 +140,8 @@ func test_ac002_level2_foundation_values() -> void:
 	assert_eq(d["max_darkgold"], 0, "L2 max_darkgold 应为 0")
 	assert_eq(d["card_pool_tier"], 2, "L2 card_pool_tier 应为 2")
 	assert_eq(d["map_unlock"], "碎星群岛", "L2 map_unlock 应为 碎星群岛")
+	assert_eq(d["gongfa_slots"], 2, "L2 gongfa_slots 应为 2")
+	assert_eq(d["fabao_slots"], 2, "L2 fabao_slots 应为 2")
 
 
 func test_ac002_level4_nascent_soul_values() -> void:
@@ -149,6 +157,8 @@ func test_ac002_level4_nascent_soul_values() -> void:
 	assert_eq(d["max_darkgold"], 2, "L4 max_darkgold 应为 2")
 	assert_eq(d["card_pool_tier"], 4, "L4 card_pool_tier 应为 4")
 	assert_eq(d["map_unlock"], "归墟之境", "L4 map_unlock 应为 归墟之境")
+	assert_eq(d["gongfa_slots"], 3, "L4 gongfa_slots 应为 3")
+	assert_eq(d["fabao_slots"], 3, "L4 fabao_slots 应为 3")
 
 
 # ============================================================================

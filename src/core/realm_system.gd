@@ -43,8 +43,10 @@ const DROP_POOL_WEIGHTS: Dictionary = {
 }
 
 
-## 境界属性表——编译时常量 Dictionary，5 个境界 × 10 项属性。
+## 境界属性表——编译时常量 Dictionary，5 个境界 × 12 项属性。
 ## 键为境界等级 [code]int[/code]（1=炼气 ~ 5=化神），值为属性 Dictionary。
+## [code]gongfa_slots[/code] / [code]fabao_slots[/code] 为每角色功法/法宝绑定位上限
+## （来源 ADR-0013 §绑定位随境界成长 / GDD binding-system.md §2 绑定位成长表）。
 ## NOTE: GDScript [code]const Dictionary[/code] 非真正不可变（嵌套内容可被修改）——
 ## 控制清单禁止运行时写入，GUT 冒烟测试验证基准值。
 const realm_table: Dictionary = {
@@ -59,6 +61,8 @@ const realm_table: Dictionary = {
 		"max_darkgold": 0,
 		"card_pool_tier": 1,
 		"map_unlock": "青云剑宗",
+		"gongfa_slots": 1,
+		"fabao_slots": 1,
 	},
 	2: {
 		"name": "筑基期",
@@ -71,6 +75,8 @@ const realm_table: Dictionary = {
 		"max_darkgold": 0,
 		"card_pool_tier": 2,
 		"map_unlock": "碎星群岛",
+		"gongfa_slots": 2,
+		"fabao_slots": 2,
 	},
 	3: {
 		"name": "金丹期",
@@ -83,6 +89,8 @@ const realm_table: Dictionary = {
 		"max_darkgold": 1,
 		"card_pool_tier": 3,
 		"map_unlock": "东域",
+		"gongfa_slots": 2,
+		"fabao_slots": 2,
 	},
 	4: {
 		"name": "元婴期",
@@ -95,6 +103,8 @@ const realm_table: Dictionary = {
 		"max_darkgold": 2,
 		"card_pool_tier": 4,
 		"map_unlock": "归墟之境",
+		"gongfa_slots": 3,
+		"fabao_slots": 3,
 	},
 	5: {
 		"name": "化神期",
@@ -107,6 +117,8 @@ const realm_table: Dictionary = {
 		"max_darkgold": 2,
 		"card_pool_tier": 5,
 		"map_unlock": "最终战场",
+		"gongfa_slots": 3,
+		"fabao_slots": 3,
 	},
 }
 

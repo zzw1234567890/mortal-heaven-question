@@ -135,11 +135,11 @@ stories:
     name: "bind / unbind / get_bindings 查询 API"
     file: "production/epics/binding-system/story-002-bind-unbind-query-api.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-10"
-    completed: ""
+    completed: "2026-08-18 bind/stack/overwrite/can_bind/remove/suspend/restore/get_accumulated_bonus + 本命判定 + 叠加公式 + RealmSystem 10→12 键（gongfa/fabao_slots）；37 单测全通过，全量 1368 tests / 1367 passing 零回归；lead-programmer CONCERNS（C1 stack/overwrite 补 card_already_bound 守卫 + C2 本命子串误匹配→分段锚定 + C5 哨兵→push_error/-1 + C3/C4/C6 延后 Story 004 记录）+ qa-lead GAPS（G1 AC-006 主语义 + G2 回调序列 + G3 高倍率 240 + G4 叠层清理 + G5 本命位重占 + G6 命名）已补齐"
 
   - id: "4-12"
     name: "绑定生命周期信号总线（7 个 Cat 2b 信号）"

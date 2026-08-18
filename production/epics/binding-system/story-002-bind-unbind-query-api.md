@@ -1,12 +1,35 @@
 # Story 002: bind / unbind / get_bindings 查询 API
 
 > **Epic**: 功法/法宝绑定系统 (Binding System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-18
+
+## Completion Notes
+**Completed**：2026-08-18
+**Criteria**：18/18 通过（AC-001~018 由 37 个单元测试覆盖）
+**Deviations**：
+1. **槽位数据扩展 RealmSystem（而非 BindingManager 内部维护）**：AC-004 要求查询 RealmSystem，原 RealmSystem 缺 `gongfa_slots`/`fabao_slots` 两键。扩展 realm_table 10→12 键（炼气1/1、筑基2/2、金丹2/2、元婴3/3、化神3/3），回写 realm-system GDD 属性表 + ADR-0010 上下文 + smoke test 10→12 keys。用户裁决确认。
+2. **本命判定 / 效果引擎 / 牌库集成走注入 + 存根**：无 Character 系统、CardEffectEngine 接口未落地、CardSystem 弃牌堆未建。采用可注入 Callable 存根（effect_register/remove/suspend/restore + card_shuffle/discard/exists + stat_bonus），本命判定经 `bind_card` 注入 `native_owner`/`character_card_id` 参数（同 is_game_over roster 先例）。用户裁决确认。
+**Lead-Programmer CONCERNS（已处理）**：
+- C1（已修复）：`stack_card`/`overwrite_binding` 缺 `card_already_bound` 守卫——已绑定卡可静默重映射致三索引失同步。已在两方法首行加 `_card_to_character.has()` 守卫，reason 补 `card_already_bound`。
+- C2（已修复）：`_native_matches` 用 `contains` 子串匹配与 ADR-0013"前缀匹配"漂移 + 误匹配风险（native_owner="lin_yu" 或 "yuan" 误配）。改为下划线分段锚定（`"_" + owner + "_"` in `"_" + card_id + "_"`），消除子串误匹配，与 card_id `{type}_{name}_{variant}` 命名对齐。
+- C3（延后 Story 004，已注释）：叠加层效果注册语义不对称（`stack_card` 不逐层注册，`overwrite` 却逐层 `effect_remove_cb`）。CardEffectEngine 接口落地后统一"每绑定持 context（stack_count 动态读取）"或"逐层注册"二选一。已在 `overwrite_binding` 叠层分支加注释。
+- C4（延后 Story 004，已注释）：`restore_bindings` 仅验证主实例，叠层实例逐张校验延后至 `card_exists_cb` 接 CardSystem 收藏池后。
+- C5（已修复）：`_find_free_slot_index` 返回 `limit` 静默哨兵 → 改 `push_error` + 返回 -1。
+- C6（延后 Story 004，已注释）：`card_name`/`card_rarity` 未填充（无模板查询）+ `invalid_character` reason 未返回（无 Character 系统）——战斗 Epic 接入后由调用方前置校验。
+**QA-Lead GAPS（已补齐）**：
+- G1：AC-006 主 Then（同名叠加沿用首次 is_native/native_multiplier）补 `test_native_stack_preserves_native_flag`。
+- G2：AC-011 覆盖叠加回调序列补 `assert_eq(_effect_log, ["remove:102", "discard:102"])`。
+- G3：AC-011 剩余层重算 + AC-009 高倍率边界补 `test_effective_value_high_multiplier_240`（240）。
+- G4：AC-013 `remove_binding` 多层叠层映射清理补 `test_remove_binding_clears_all_stack_mappings`。
+- G5：ADR-0013 §本命判定第 4 点（覆盖本命卡后新卡重占本命位）补 `test_overwrite_native_reclaims_native_slot`。
+- G6（采纳）：`test_native_detection_truncated_name_no_match` 补分段锚定回归（C2 同源）。
+**Test Evidence**：`tests/unit/binding_system/test_bind_unbind_query_api.gd`（37 测试全通过）+ `test_binding_record_model.gd`（19 测试，全量 56）；全量套件 73 scripts / 1368 tests / 1367 passing / 1 pending / 0 failing 零回归
+**Code Review**：lead-programmer CONCERNS→已处理（C1/C2/C5 修复 + C3/C4/C6 延后记录）；qa-lead GAPS→已补齐（G1-G5 + 命名）
 
 ## Context
 
