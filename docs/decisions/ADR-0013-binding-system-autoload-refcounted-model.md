@@ -173,7 +173,7 @@ Accepted（2026-07-26——Feature 层审查通过。修复：Foundation 编号�
 |------|------|------|
 | `bind_card` | `bind_card(card_instance_id: int, template_id: StringName, character_id: int, slot_type: BindingSlot) → BindResult` | 新绑定到空位。BindResult = {success: bool, binding_id: int, reason: String}。reason: 'bound' / 'slot_full' / 'invalid_character' / 'card_already_bound' |
 | `stack_card` | `stack_card(card_instance_id: int, template_id: StringName, character_id: int) → StackResult` | 同名叠加。StackResult = {stacked: bool, stack_count: int, reason: String}。reason: 'stacked' / 'stack_limit_reached' / 'no_existing_binding' |
-| `overwrite_binding` | `overwrite_binding(card_instance_id: int, template_id: StringName, character_id: int, slot_index: int) → BindResult` | 覆盖已有绑定位 |
+| `overwrite_binding` | `overwrite_binding(card_instance_id: int, template_id: StringName, character_id: int, slot_index: int) → BindResult` | 覆盖已有绑定位。reason: 'overwritten'（完全覆盖）/ 'overwritten_stack'（叠加层覆盖）/ 'no_existing_binding' / 'card_already_bound' |
 | `remove_binding` | `remove_binding(binding_id: int) → void` | 移除单个绑定（覆盖流程内部调用） |
 | `remove_all_bindings` | `remove_all_bindings(character_id: int) → Array[Dictionary]` | 角色阵亡时调用——返回序列化后的绑定数据供 CardSystem 洗回牌库 |
 | `suspend_bindings` | `suspend_bindings(character_id: int) → void` | 角色离场——所有 BindingRecord.is_suspended = true |
@@ -205,7 +205,7 @@ BindingManager 在以下时机调用 CardEffectEngine：
 | 信号 | 参数 | 触发时机 | 订阅者 |
 |------|------|----------|--------|
 | `binding_applied` | `(binding_id, card_instance_id, template_id, character_id, slot_type, is_native)` | 新绑定成功 | CombatUI（创建绑定图标+动画）、Audio（绑定音效） |
-| `binding_removed` | `(binding_id, card_instance_id, character_id, reason: String)` | 绑定解除（阵亡/覆盖旧卡） | CombatUI（销毁图标+动画） |
+| `binding_removed` | `(binding_id, card_instance_id, character_id, reason: String)` | 绑定解除（reason: 'death'阵亡 / 'overwritten'覆盖 / 'removed'手动移除） | CombatUI（销毁图标+动画） |
 | `binding_overwritten` | `(old_binding_id, new_binding_id, character_id, slot_index)` | 覆盖完成 | CombatUI（替换图标+过渡动画） |
 | `binding_stacked` | `(binding_id, template_id, character_id, new_stack_count)` | 同名叠加 | CombatUI（"+1层"文字特效+层数徽章更新） |
 | `binding_suspended` | `(character_id, binding_ids: Array[int])` | 角色离场 | CombatUI（图标灰显+半透明） |

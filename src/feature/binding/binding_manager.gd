@@ -26,6 +26,24 @@ extends Node
 # 控制清单 2026-08-05 规则）。
 
 
+# === Cat 2b 生命周期信号（ADR-0013 §Cat 2b 信号，经 GSM._emit_signal_safe 路由）====
+#
+## 绑定成功——新卡落位（含 is_native 标志，CombatUI 据此创建图标/动画 + 本命星标）。
+signal binding_applied(binding_id: int, card_instance_id: int, template_id: StringName, character_id: int, slot_type: int, is_native: bool)
+## 绑定解除（reason 区分阵亡 'death' / 覆盖 'overwritten' / 移除 'removed'）。
+signal binding_removed(binding_id: int, card_instance_id: int, character_id: int, reason: String)
+## 覆盖完成（携带 old/new binding_id，UI 据此替换图标 + 过渡动画）。
+signal binding_overwritten(old_binding_id: int, new_binding_id: int, character_id: int, slot_index: int)
+## 同名叠加（携带 new_stack_count，UI 据此更新 "+1层" 文字特效 + 层数徽章）。
+signal binding_stacked(binding_id: int, template_id: StringName, character_id: int, new_stack_count: int)
+## 角色离场暂挂（携带 binding_ids: Array[int]，UI 据此图标灰显+半透明）。
+signal binding_suspended(character_id: int, binding_ids: Array[int])
+## 角色重新上场恢复（携带 binding_ids: Array[int]，UI 据此图标恢复色彩）。
+signal binding_restored(character_id: int, binding_ids: Array[int])
+## 本命绑定激活（CombatUI 据此点亮 ★金色星标 + Audio 金色共鸣音）。
+signal native_activated(binding_id: int, template_id: StringName, character_id: int)
+
+
 # === 内部数据（三个同步索引）======================================================
 
 ## 绑定主索引——[code]key=binding_id[/code] → [BindingRecord]。
@@ -142,6 +160,9 @@ func get_binding(binding_id: int) -> BindingRecord:
 ## 本命加成乘数——[code]native_owner[/code] 匹配且本命位空闲时锁定 1.5（ADR-0013 §本命绑定判定算法）。
 const NATIVE_MULTIPLIER: float = 1.5
 
+## 默认叠加乘数——GDD 默认值 1.5（延后接 CardSystem 后由模板提供）。
+const DEFAULT_STACK_MULTIPLIER: float = 1.5
+
 ## 默认绑定位上限——RealmSystem 槽位数据缺失时的保守回退（炼气基准 1，防止越界分配）。
 const DEFAULT_SLOT_LIMIT: int = 1
 
@@ -238,7 +259,10 @@ func bind_card(card_instance_id: int, template_id: StringName, character_id: int
 	record.is_native = native["is_native"]
 	record.native_multiplier = native["native_multiplier"]
 	_register_binding(record)
-	_invoke_cb(effect_register_cb, [card_instance_id, character_id])
+	_invoke_cb(effect_register_cb, [card_instance_id, template_id, character_id, get_binding_context(card_instance_id)])
+	_emit_safe(&"binding_applied", [record.binding_id, card_instance_id, template_id, character_id, slot_type, record.is_native])
+	if record.is_native:
+		_emit_safe(&"native_activated", [record.binding_id, template_id, character_id])
 	return {"success": true, "binding_id": record.binding_id, "reason": "bound"}
 
 
@@ -262,6 +286,7 @@ func stack_card(card_instance_id: int, template_id: StringName, character_id: in
 	existing.stack_count += 1
 	existing.stack_slots.append(card_instance_id)
 	_card_to_character[card_instance_id] = character_id
+	_emit_safe(&"binding_stacked", [existing.binding_id, template_id, character_id, existing.stack_count])
 	return {"stacked": true, "stack_count": existing.stack_count, "reason": "stacked"}
 
 
@@ -295,17 +320,25 @@ func overwrite_binding(card_instance_id: int, template_id: StringName, character
 		existing.stack_slots.erase(covered_cid)
 		existing.stack_count -= 1
 		_invoke_cb(card_discard_cb, [covered_cid])
+		_emit_safe(&"binding_removed", [existing.binding_id, covered_cid, character_id, "overwritten"])
 		return {"success": true, "binding_id": existing.binding_id, "reason": "overwritten_stack"}
 	# stack_count == 1——完全覆盖（AC-010/AC-012）
 	_invoke_cb(effect_remove_cb, [existing.card_instance_id])
 	_invoke_cb(card_discard_cb, [existing.card_instance_id])
+	var old_binding_id: int = existing.binding_id
+	var old_card_instance_id: int = existing.card_instance_id
 	_unregister_binding(existing)
+	_emit_safe(&"binding_removed", [old_binding_id, old_card_instance_id, character_id, "overwritten"])
 	var record: BindingRecord = _make_record(card_instance_id, template_id, character_id, existing.slot_type, slot_index)
 	var native: Dictionary = _determine_native(character_id, native_owner, character_card_id, record.slot_type)
 	record.is_native = native["is_native"]
 	record.native_multiplier = native["native_multiplier"]
 	_register_binding(record)
-	_invoke_cb(effect_register_cb, [card_instance_id, character_id])
+	_invoke_cb(effect_register_cb, [card_instance_id, template_id, character_id, get_binding_context(card_instance_id)])
+	_emit_safe(&"binding_applied", [record.binding_id, card_instance_id, template_id, character_id, record.slot_type, record.is_native])
+	if record.is_native:
+		_emit_safe(&"native_activated", [record.binding_id, template_id, character_id])
+	_emit_safe(&"binding_overwritten", [old_binding_id, record.binding_id, character_id, slot_index])
 	return {"success": true, "binding_id": record.binding_id, "reason": "overwritten"}
 
 
@@ -335,11 +368,14 @@ func remove_binding(binding_id: int) -> void:
 	if not _bindings.has(binding_id):
 		return
 	var record: BindingRecord = _bindings[binding_id]
+	var card_instance_id: int = record.card_instance_id
+	var character_id: int = record.bound_character_id
 	for cid: int in record.stack_slots:
 		if _card_to_character.has(cid):
 			_card_to_character.erase(cid)
 	_invoke_cb(effect_remove_cb, [record.card_instance_id])
 	_unregister_binding(record)
+	_emit_safe(&"binding_removed", [binding_id, card_instance_id, character_id, "removed"])
 
 
 ## 移除角色全部绑定（AC-013/AC-014）——角色阵亡时清除全部条目并返回序列化数据供洗回。[br]
@@ -355,11 +391,12 @@ func remove_all_bindings(character_id: int) -> Array[Dictionary]:
 		var record: BindingRecord = _bindings[binding_id]
 		result.append(_serialize_record(record))
 		for cid: int in record.stack_slots:
+			_invoke_cb(effect_remove_cb, [cid])
 			_invoke_cb(card_shuffle_cb, [cid])
 			if _card_to_character.has(cid):
 				_card_to_character.erase(cid)
-		_invoke_cb(effect_remove_cb, [record.card_instance_id])
 		_unregister_binding(record)
+		_emit_safe(&"binding_removed", [binding_id, record.card_instance_id, character_id, "death"])
 	return result
 
 
@@ -367,10 +404,13 @@ func remove_all_bindings(character_id: int) -> Array[Dictionary]:
 ## [br][param character_id] 离场角色 ID。
 func suspend_bindings(character_id: int) -> void:
 	var ids: Array[int] = get_binding_ids_by_character(character_id).duplicate()
+	var card_ids: Array[int] = []
 	for binding_id: int in ids:
 		if _bindings.has(binding_id):
 			(_bindings[binding_id] as BindingRecord).is_suspended = true
-	_invoke_cb(effect_suspend_cb, [character_id, ids])
+			card_ids.append((_bindings[binding_id] as BindingRecord).card_instance_id)
+	_invoke_cb(effect_suspend_cb, [character_id, card_ids])
+	_emit_safe(&"binding_suspended", [character_id, ids])
 
 
 ## 角色重新上场恢复（AC-015）——验证 card_instance_id 仍存在则恢复，已不存在则删除变空位（不报错）。[br]
@@ -381,6 +421,7 @@ func suspend_bindings(character_id: int) -> void:
 func restore_bindings(character_id: int) -> void:
 	var ids: Array[int] = get_binding_ids_by_character(character_id).duplicate()
 	var restored_ids: Array[int] = []
+	var restored_card_ids: Array[int] = []
 	for binding_id: int in ids:
 		if not _bindings.has(binding_id):
 			continue
@@ -388,12 +429,14 @@ func restore_bindings(character_id: int) -> void:
 		if _query_card_exists(record.card_instance_id):
 			record.is_suspended = false
 			restored_ids.append(binding_id)
+			restored_card_ids.append(record.card_instance_id)
 		else:
 			for cid: int in record.stack_slots:
 				if _card_to_character.has(cid):
 					_card_to_character.erase(cid)
 			_unregister_binding(record)
-	_invoke_cb(effect_restore_cb, [character_id, restored_ids])
+	_invoke_cb(effect_restore_cb, [character_id, restored_card_ids])
+	_emit_safe(&"binding_restored", [character_id, restored_ids])
 
 
 ## 遍历角色所有绑定卡的数值加成累加（AC-016）——O(k)，k ≤ 6/角色。[br]
@@ -561,6 +604,19 @@ func _invoke_cb(cb: Callable, args: Array) -> void:
 		cb.callv(args)
 
 
+## Cat 2b 信号安全发射——经 GSM._emit_signal_safe 路由（ADR-0007 信号链深度追踪）。[br]
+## 非 Autoload 测试实例（BM_SCRIPT.new()）下 GSM 仍为全局 Autoload，可正常路由。[br]
+## [br][param signal_name] 信号名。[br]
+## [br][param args] 参数数组。
+func _emit_safe(signal_name: StringName, args: Array) -> void:
+	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
+		GameStateManager.get_script()._emit_signal_safe(self, signal_name, args)
+	else:
+		var call_args: Array = [signal_name]
+		call_args.append_array(args)
+		callv("emit_signal", call_args)
+
+
 ## 查询卡牌实例是否存在（存根默认 true）。[br]
 ## [br][b]返回[/b]: true 表示仍存在。
 func _query_card_exists(card_instance_id: int) -> bool:
@@ -575,3 +631,146 @@ func _query_stat_bonus(card_instance_id: int, stat_name: String) -> float:
 	if stat_bonus_cb.is_valid():
 		return float(stat_bonus_cb.call(card_instance_id, stat_name))
 	return 0.0
+
+
+# === 序列化 / 反序列化 / 快照导出（Story 004）=================================
+
+## 序列化全部活跃绑定记录——战斗结束时导出快照（AC-001）。[br]
+## 遍历 [member _bindings] 全部 BindingRecord → 序列化为 Dictionary 列表。[br]
+## 含全部字段：binding_id / card_instance_id / card_template_id / card_name / card_rarity /
+## slot_type / slot_index / bound_character_id / is_native / native_multiplier /
+## activated_turn / is_suspended / stack_slots / stack_count。[br]
+## [br][b]返回[/b]: [code]{"bindings": Array[Dictionary]}[/code]——快照根节点含 bindings 列表。
+## [b]性能[/b]：化神期峰值 ~180 BindingRecord → ~36KB，battle_end 非热路径一次性执行。
+## [b]card_name / card_rarity[/b]：本 Story 无 CardSystem 模板查询，两字段保持默认空值
+## （延后同 Story 002 C6——战斗 Epic 接 CardSystem 后填充）。
+func serialize_all() -> Dictionary:
+	var records: Array = []
+	for binding_id: int in _bindings.keys():
+		var record: BindingRecord = _bindings[binding_id]
+		records.append(_serialize_record(record))
+	return {"bindings": records}
+
+
+## 从快照恢复 BindingRecord——读档 / 战斗快照恢复（AC-003/AC-004）。[br]
+## [b]尽力而为策略[/b]：逐条验证 card_instance_id（通过 [member card_exists_cb]），
+## 失败跳过 + push_warning，其余正常恢复——不阻塞整体恢复。[br]
+## [b]键归一[/b]：快照经 JSON round-trip 后 int-key 可能变 String——binding_id
+## 统一 [code]int()[/code] 转换（同 DeploymentSystem deserialize 先例）。[br]
+## [br][param data] 快照 Dictionary（[code]{"bindings": [...]}[/code]）。
+func deserialize_all(data: Dictionary) -> void:
+	_clear_all()
+	var raw_bindings: Variant = data.get("bindings", [])
+	if not raw_bindings is Array:
+		push_warning("BindingManager.deserialize_all: 快照无 bindings 数组——跳过")
+		return
+	for entry: Variant in raw_bindings:
+		if not entry is Dictionary:
+			continue
+		var d: Dictionary = entry
+		var card_instance_id: int = int(d.get("card_instance_id", -1))
+		if card_instance_id < 0:
+			push_warning("BindingManager.deserialize_all: 条目缺 card_instance_id——跳过")
+			continue
+		if not _query_card_exists(card_instance_id):
+			push_warning("BindingManager.deserialize_all: card_instance_id=%d 不存在——跳过"
+				% card_instance_id)
+			continue
+		var record: BindingRecord = _deserialize_record(d)
+		if record == null:
+			continue
+		_register_binding(record)
+		# 叠层实例的 _card_to_character 映射——_register_binding 仅注册主实例，
+		# 叠层实例需逐条补充（同 stack_card 路径的手动注册）
+		for cid: int in record.stack_slots:
+			if cid != record.card_instance_id:
+				_card_to_character[cid] = record.bound_character_id
+
+
+## 写绑定快照至 GSM battle.bindings（战斗结束导出委托，AC-002）。[br]
+## GSM 不可用时静默跳过（is_instance_valid + has_method 双守卫）。[br]
+## [br]来源: ADR-0013 §GSM 边界 §serialize_all。
+func write_snapshot_to_gsm() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null or not gsm.has_method("_set_battle_bindings"):
+		return  # GSM 不可用——静默跳过
+	gsm.call("_set_battle_bindings", serialize_all()["bindings"])
+
+
+## 查询单条绑定的预计算乘积上下文（AC-009）。[br]
+## [code]multiplier = native_multiplier × stack_multiplier^(stack_count-1)[/code]——
+## CardEffectEngine 结算时查询此值，不在引擎中重复计算。[br]
+## [b]stack_multiplier 延后[/b]：本 Story 无 CardSystem 模板查询（[code]cardTemplate.stack_multiplier[/code]），
+## 暂用默认 1.5（GDD 默认值），Story 004 接 CardSystem 后由调用方传入或注入。[br]
+## [br][param card_instance_id] 卡牌实例 ID。[br]
+## [br][b]返回[/b]: [code]{native_multiplier, stack_count, multiplier}[/code]；
+## 未找到返回空 Dictionary。
+func get_binding_context(card_instance_id: int) -> Dictionary:
+	var character_id: int = get_character_by_card(card_instance_id)
+	if character_id < 0:
+		return {}
+	for binding_id: int in get_binding_ids_by_character(character_id):
+		if not _bindings.has(binding_id):
+			continue
+		var record: BindingRecord = _bindings[binding_id]
+		if record.stack_slots.has(card_instance_id) or record.card_instance_id == card_instance_id:
+			var stack_mult: float = DEFAULT_STACK_MULTIPLIER  # 延后接 CardSystem
+			var mult: float = record.native_multiplier * pow(stack_mult, record.stack_count - 1)
+			return {"native_multiplier": record.native_multiplier, "stack_count": record.stack_count, "multiplier": mult}
+	return {}
+
+
+# === 内部辅助：序列化 / 反序列化 / GSM ==========================
+
+## 从快照 Dictionary 重建单条 BindingRecord。[br]
+## [b]键归一[/b]：int-key 统一 [code]int()[/code] 转换。[br]
+## [br][b]返回[/b]: 重建的 BindingRecord；非法数据返回 null。
+func _deserialize_record(d: Dictionary) -> BindingRecord:
+	var record: BindingRecord = BindingRecord.new()
+	record.binding_id = int(d.get("binding_id", _next_binding_id))
+	if record.binding_id >= _next_binding_id:
+		_next_binding_id = record.binding_id + 1
+	record.card_instance_id = int(d.get("card_instance_id", -1))
+	if record.card_instance_id < 0:
+		return null
+	record.card_template_id = StringName(d.get("card_template_id", &""))
+	record.card_name = str(d.get("card_name", ""))
+	record.card_rarity = int(d.get("card_rarity", 0))
+	record.slot_type = int(d.get("slot_type", BindingRecord.BindingSlot.GONGFA))
+	record.slot_index = int(d.get("slot_index", 0))
+	record.bound_character_id = int(d.get("bound_character_id", -1))
+	if record.bound_character_id < 0:
+		return null
+	record.is_native = bool(d.get("is_native", false))
+	record.native_multiplier = float(d.get("native_multiplier", 1.0))
+	record.activated_turn = int(d.get("activated_turn", 0))
+	record.is_suspended = bool(d.get("is_suspended", false))
+	var raw_slots: Variant = d.get("stack_slots", [record.card_instance_id])
+	if raw_slots is Array:
+		var slots: Array[int] = []
+		for cid: Variant in raw_slots:
+			slots.append(int(cid))
+		record.stack_slots = slots
+	else:
+		var single: Array[int] = [record.card_instance_id]
+		record.stack_slots = single
+	record.stack_count = int(d.get("stack_count", 1))
+	return record
+
+
+## 清空全部三索引（deserialize 前置清理）。
+func _clear_all() -> void:
+	_bindings.clear()
+	_by_character.clear()
+	_card_to_character.clear()
+	_next_binding_id = 1
+
+
+## 动态获取 GSM Autoload 节点。[br]
+## 用 SceneTree.root 查找而非硬引用全局名——避免测试环境无 Autoload 时崩溃
+## （同 DeploymentSystem._get_gsm 先例）。
+func _get_gsm() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/GameStateManager")

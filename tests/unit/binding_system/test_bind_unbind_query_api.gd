@@ -46,7 +46,7 @@ func _wire_callbacks() -> void:
 	bm.set("card_discard_cb", Callable(self, "_on_card_discard"))
 
 
-func _on_effect_register(card_instance_id: int, character_id: int) -> void:
+func _on_effect_register(card_instance_id: int, _template_id: StringName, _character_id: int, _context: Dictionary) -> void:
 	_effect_log.append("register:%d" % card_instance_id)
 
 

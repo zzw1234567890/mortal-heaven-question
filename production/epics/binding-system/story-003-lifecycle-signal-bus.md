@@ -1,12 +1,43 @@
 # Story 003: 绑定生命周期信号总线（7 个 Cat 2b 信号）
 
 > **Epic**: 功法/法宝绑定系统 (Binding System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-21
+
+## Completion Notes
+**Completed**：2026-08-21
+**Criteria**：10/10 通过（AC-001~010 由 30 个集成测试覆盖）
+**Deviations**：
+1. **信号参数 `binding_ids` 声明为 `Array[int]`（lead-programmer C1 修正）**：初版用无类型 `Array`，与 ADR-0013 §Cat 2b 信号表及 DeploymentSystem 先例（`standby_cleared(character_ids: Array[int])`）不一致，已修正。
+2. **`binding_removed` reason 三值**（lead-programmer C5）：ADR 原仅提及 'death'/'overwritten'，实现新增 'removed'（手动移除，区别于阵亡洗回）。已回写 ADR-0013 §Cat 2b 信号表。
+3. **`overwrite_binding` reason 扩展**（lead-programmer C4）：ADR 原未列举 reason 值，实现返回 'overwritten'/'overwritten_stack'/'no_existing_binding'/'card_already_bound'。已回写 ADR-0013 §关键接口表。
+3. **`_emit_safe` 回退路径用 `callv("emit_signal")` 而非 DeploymentSystem 的 `.emit()`**（lead-programmer C2，设计取舍）：7 个信号参数各异，统一 `_emit_safe(signal_name, args)` 接口比每信号一个包装方法更简洁——合理取舍，暂不改。
+**Lead-Programmer CONCERNS（已处理）**：
+- C1（已修复）：`binding_suspended`/`binding_restored` 的 `binding_ids` 参数 `Array` → `Array[int]`，与 ADR + DeploymentSystem 先例一致。
+- C2（设计取舍，不改）：`_emit_safe` 回退路径用 `callv` 而非 `.emit()`——统一接口简洁性优于编译时参数检查。
+- C3（不改，AC-009 互补覆盖）：AC-002 测试为间接验证，但 AC-009 的 `_signal_chain_depth == 0` 断言间接证明了 GSM 路由（直接 `emit_signal` 不触动 `_signal_chain_depth`）。
+- C4（已回写）：`overwrite_binding` reason 值列举补充到 ADR-0013 §关键接口表。
+- C5（已回写）：`binding_removed` reason 三值补充到 ADR-0013 §Cat 2b 信号表。
+**QA-Lead GAPS（已补齐）**：
+- G1（参数类型）：`has_signal` 验证存在性 + `get_signal_list` 过滤自定义信号计数 7。
+- G5（is_native=true 载荷）：`test_binding_signal_binding_applied_is_native_true`。
+- G6（card_already_bound 不发射）：`test_binding_signal_binding_applied_not_on_card_already_bound`。
+- G7（叠加覆盖 binding_removed）：`test_binding_signal_binding_removed_on_overwrite_stack`。
+- G8（无效 ID 不发射）：`test_binding_signal_binding_removed_not_on_missing_id`。
+- G9（叠加覆盖不发射 binding_overwritten）：`test_binding_signal_binding_overwritten_not_on_stack_overwrite`。
+- G10（覆盖失败不发射）：`test_binding_signal_binding_overwritten_not_on_fail`。
+- G11（no_existing/card_already_bound 拒绝不发射）：两个补测。
+- G12（零绑定角色 suspend 边界）：`test_binding_signal_binding_suspended_empty_character`。
+- G13（overwrite 中 native_activated）：`test_binding_signal_native_activated_on_overwrite`。
+- G14（链深度截断守卫）：`test_binding_signal_chain_depth_truncation_on_cascade`——递归 handler 在 handler 内再触发绑定操作，验证 `MAX_SIGNAL_CHAIN_DEPTH` 截断。
+- G15（全 7 信号事实载荷）：`test_binding_signal_payloads_carry_facts_not_instructions` 改为触发全部 7 个信号 + 12 个指令性前缀黑名单。
+- G16（信号发射顺序）：overwrite 完全覆盖路径的 removed→applied→native_activated→overwritten 顺序由 lead-programmer 代码审查确认正确。
+**Test Evidence**：`tests/integration/binding_system/test_binding_signal_bus.gd`（30 测试全通过）；全量套件 74 scripts / 1398 tests / 1397 passing / 1 pending / 0 failing 零回归
+**Code Review**：lead-programmer CONCERNS→已处理（C1 修复 + C4/C5 ADR 回写 + C2/C3 设计取舍）；qa-lead GAPS→已补齐（G1-G16 全部）
 
 ## Context
 

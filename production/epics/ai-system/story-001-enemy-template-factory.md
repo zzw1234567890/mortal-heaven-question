@@ -1,7 +1,7 @@
 # Story 001: EnemyTemplate Resource + EnemyFactory + EnemyBattleState
 
 > **Epic**: AI 系统（敌方 AI） (ai-system)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
@@ -33,16 +33,16 @@
 
 *From ADR-0017 §关键接口 + GDD ai-system.md §2（敌方卡组构成）+ §3（敌方上阵与阵位分配）+ §验收标准:*
 
-- [ ] **AC-001**: `EnemyTemplate` 类定义 `class_name EnemyTemplate extends Resource`，`@export` 字段完整——template_id/display_name/realm/is_elite/is_boss/base_hp/base_attack/base_defense/faction_tags/formation_limit/front_slot/behavior_profile/skill_pool/preconfigured_bindings/preconfigured_formations/phase_transitions/reward_config
-- [ ] **AC-002**: 内嵌 Resource 类型存在且 `@export` 字段完整——`BehaviorProfile`（aggression/focus_fire/front_priority/retreat_threshold）、`SkillEntry`（skill_id/display_name/skill_type/base_weight/cost/cooldown/target_type/effect_template_ids）、`BossPhaseTransition`（trigger{hp_below, turn_after}/effects{behavior_override, skill_unlock, skill_remove, reset_cooldowns, heal_percent, animation}）
-- [ ] **AC-003**: `EnemyBattleState` 类定义 `class_name EnemyBattleState extends RefCounted`，运行时字段完整——template_id/current_hp/max_hp/attack/defense/skill_cooldowns/is_alive/field_position/is_front_row/current_phase_index/triggered_transitions
-- [ ] **AC-004**: EnemyFactory 从模板创建实例——max_hp=base_hp、attack=base_attack、defense=base_defense、is_alive=true、skill_cooldowns 初始化为空（或全 0）、current_phase_index=0、triggered_transitions 为空
-- [ ] **AC-005**: 模板只读——实例持有所有可变状态，绝不运行时写 EnemyTemplate 字段
-- [ ] **AC-006**: `load_templates()` 扫描 `res://assets/enemies/` 加载所有 `.tres` EnemyTemplate 到 `_template_registry: Dictionary[StringName, EnemyTemplate]`（key=template_id）
-- [ ] **AC-007**: `create_enemy_roster(template_ids, player_realm)` 返回 `Array[EnemyBattleState]`，数量与 template_ids 一致，且通过 EnemyFactory 创建实例
-- [ ] **AC-008**: 阵位自动分配——防御较高的敌人分配前排、攻击较高的敌人分配后排；`front_slot=true` 时固定前排
-- [ ] **AC-009**: 敌方仅 1~2 人时全部分配前排（无后排保护）
-- [ ] **AC-010**: `formation_limit` 默认值——普通敌人 0、精英敌人 1、Boss 敌人 2（由模板字段承载，创建实例时原样携带）
+- [x] **AC-001**: `EnemyTemplate` 类定义 `class_name EnemyTemplate extends Resource`，`@export` 字段完整——template_id/display_name/realm/is_elite/is_boss/base_hp/base_attack/base_defense/faction_tags/formation_limit/front_slot/behavior_profile/skill_pool/preconfigured_bindings/preconfigured_formations/phase_transitions/reward_config
+- [x] **AC-002**: 内嵌 Resource 类型存在且 `@export` 字段完整——`BehaviorProfile`（aggression/focus_fire/front_priority/retreat_threshold）、`SkillEntry`（skill_id/display_name/skill_type/base_weight/cost/cooldown/target_type/effect_template_ids）、`BossPhaseTransition`（trigger{hp_below, turn_after}/effects{behavior_override, skill_unlock, skill_remove, reset_cooldowns, heal_percent, animation}）
+- [x] **AC-003**: `EnemyBattleState` 类定义 `class_name EnemyBattleState extends RefCounted`，运行时字段完整——template_id/current_hp/max_hp/attack/defense/skill_cooldowns/is_alive/field_position/is_front_row/current_phase_index/triggered_transitions
+- [x] **AC-004**: EnemyFactory 从模板创建实例——max_hp=base_hp、attack=base_attack、defense=base_defense、is_alive=true、skill_cooldowns 初始化为空（或全 0）、current_phase_index=0、triggered_transitions 为空
+- [x] **AC-005**: 模板只读——实例持有所有可变状态，绝不运行时写 EnemyTemplate 字段
+- [x] **AC-006**: `load_templates()` 扫描 `res://assets/enemies/` 加载所有 `.tres` EnemyTemplate 到 `_template_registry: Dictionary[StringName, EnemyTemplate]`（key=template_id）
+- [x] **AC-007**: `create_enemy_roster(template_ids, player_realm)` 返回 `Array[EnemyBattleState]`，数量与 template_ids 一致，且通过 EnemyFactory 创建实例
+- [x] **AC-008**: 阵位自动分配——防御较高的敌人分配前排、攻击较高的敌人分配后排；`front_slot=true` 时固定前排
+- [x] **AC-009**: 敌方仅 1~2 人时全部分配前排（无后排保护）
+- [x] **AC-010**: `formation_limit` 默认值——普通敌人 0、精英敌人 1、Boss 敌人 2（由模板字段承载，创建实例时原样携带）
 
 ---
 
@@ -144,7 +144,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/ai_system/test_enemy_template_factory.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 21 tests passing (test_enemy_template_factory.gd)
 
 ---
 

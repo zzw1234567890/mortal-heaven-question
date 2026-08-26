@@ -1,12 +1,12 @@
 # Story 003: get_aura_bonus O(1) 查询 + 梯度光环计算
 
 > **Epic**: 阵法系统 (Formation System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-24
 
 ## Context
 
@@ -32,13 +32,13 @@
 
 *From GDD `design/gdd/formation-system.md` §7 阵法效果类型 §9 同阵营梯度阵法 + §公式 4 + §边界情况，scoped to this story:*
 
-- [ ] **AC-001**: 归属角色通过 `get_aura_bonus(character_id, stat_name)` 获得阵法光环加成（属性增益，如苍玄正道盟阵 HP+2/DEF+1）
-- [ ] **AC-002**: 未归属任何阵法的角色 `get_aura_bonus()` 返回 0 加成
-- [ ] **AC-003**: 同阵营梯度阵法——场上 2 人 → 效果等级 1；4 人 → 效果等级 3（`effect_level = count_on_field - 1`）
-- [ ] **AC-004**: 梯度阵法封顶——场上同阵营人数超过 max_level+1 时，效果取 max_level 封顶值，不溢出
-- [ ] **AC-005**: 梯度阵法人数从 4 降到 2 → 效果等级从 3 降到 1，不立即失效（≥2 门槛仍满足）
-- [ ] **AC-006**: 梯度阵法人数从 1 恢复到 2 → 效果重新从 1 级开始激活
-- [ ] **AC-007**: 多阵营平局时梯度判定——取先入场的阵营计算（不可同时为两个阵营生效）
+- [x] **AC-001**: 归属角色通过 `get_aura_bonus(character_id, stat_name)` 获得阵法光环加成（属性增益，如苍玄正道盟阵 HP+2/DEF+1）
+- [x] **AC-002**: 未归属任何阵法的角色 `get_aura_bonus()` 返回 0 加成
+- [x] **AC-003**: 同阵营梯度阵法——场上 2 人 → 效果等级 1；4 人 → 效果等级 3（`effect_level = count_on_field - 1`）
+- [x] **AC-004**: 梯度阵法封顶——场上同阵营人数超过 max_level+1 时，效果取 max_level 封顶值，不溢出
+- [x] **AC-005**: 梯度阵法人数从 4 降到 2 → 效果等级从 3 降到 1，不立即失效（≥2 门槛仍满足）
+- [x] **AC-006**: 梯度阵法人数从 1 恢复到 2 → 效果重新从 1 级开始激活
+- [x] **AC-007**: 多阵营平局时梯度判定——取先入场的阵营计算（不可同时为两个阵营生效）
 
 ---
 
@@ -149,7 +149,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/formation_system/test_aura_bonus_query.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 20 tests, all passing (AC-001~007 全覆盖 + 梯度性能 + base_value 非 1.0 + fixed_bonus_cb 注入)
 
 ---
 

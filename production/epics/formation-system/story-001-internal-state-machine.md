@@ -1,12 +1,12 @@
 # Story 001: 内部条件状态机 + 阵法位管理
 
 > **Epic**: 阵法系统 (Formation System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-22
 
 ## Context
 
@@ -31,14 +31,14 @@
 
 *From GDD `design/gdd/formation-system.md` §1 阵法区 + §2 部署流程 + §3 激活与失效 + §4 覆盖规则 + §5 角色归属，scoped to this story:*
 
-- [ ] **AC-001**: 场上无阵法，打出阵法卡 → 阵法部署到阵法区空位（slot_index 自动分配）
-- [ ] **AC-002**: 场上已有 3 个阵法，打出阵法卡 → `deploy_formation()` 返回 `slots_full`（进入覆盖流程，由 `overwrite_formation()` 承接）
-- [ ] **AC-003**: 条件满足（如场上 ≥3 正道），部署对应阵法 → 阵法立即进入 ACTIVE 状态
-- [ ] **AC-004**: 条件不满足，部署阵法 → 阵法处于 DEPLOYED_UNACTIVE 状态（未激活，灰色）
-- [ ] **AC-005**: 覆盖旧阵法，确认覆盖 → 旧阵法进入 DISCARDED 状态（弃牌堆），新阵法部署到该阵位并立即判定条件
-- [ ] **AC-006**: 场上未激活的阵法，检查阵法位占用 → 仍计为 1/3（未激活阵法占用阵位）
-- [ ] **AC-007**: 角色满足多阵法条件，归属选择 → `set_character_affilation()` 手动指定该角色归属（每角色最多 1 个阵法）
-- [ ] **AC-008**: 角色已归属某阵法，该阵法失效 → 角色回到无归属（`clear_character_affilation()` 自动清除）
+- [x] **AC-001**: 场上无阵法，打出阵法卡 → 阵法部署到阵法区空位（slot_index 自动分配）
+- [x] **AC-002**: 场上已有 3 个阵法，打出阵法卡 → `deploy_formation()` 返回 `slots_full`（进入覆盖流程，由 `overwrite_formation()` 承接）
+- [x] **AC-003**: 条件满足（如场上 ≥3 正道），部署对应阵法 → 阵法立即进入 ACTIVE 状态
+- [x] **AC-004**: 条件不满足，部署阵法 → 阵法处于 DEPLOYED_UNACTIVE 状态（未激活，灰色）
+- [x] **AC-005**: 覆盖旧阵法，确认覆盖 → 旧阵法进入 DISCARDED 状态（弃牌堆），新阵法部署到该阵位并立即判定条件
+- [x] **AC-006**: 场上未激活的阵法，检查阵法位占用 → 仍计为 1/3（未激活阵法占用阵位）
+- [x] **AC-007**: 角色满足多阵法条件，归属选择 → `set_character_affilation()` 手动指定该角色归属（每角色最多 1 个阵法）
+- [x] **AC-008**: 角色已归属某阵法，该阵法失效 → 角色回到无归属（`clear_character_affilation()` 自动清除）
 
 ---
 
@@ -173,7 +173,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/formation_system/test_internal_state_machine.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 36 tests, all passing (AC-001~008 全覆盖 + lead-programmer/qa-lead 审查 GAPS 已补齐)
 
 ---
 

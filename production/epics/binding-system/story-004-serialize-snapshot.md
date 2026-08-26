@@ -1,12 +1,12 @@
 # Story 004: serialize_all 快照导出 + persistent effect 接口
 
 > **Epic**: 功法/法宝绑定系统 (Binding System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-22
 
 ## Context
 
@@ -31,18 +31,18 @@
 
 *From GDD `design/gdd/binding-system.md` §与其他系统的交互 + ADR-0013 §关键接口 CardEffectEngine 集成点 / §GSM 边界 / §验证标准 / §风险:*
 
-- [ ] **AC-001**: `serialize_all() → Dictionary` 序列化全部活跃绑定记录（含 binding_id/card_instance_id/slot_type/is_native/native_multiplier/stack_slots/stack_count/is_suspended 等全部字段）
-- [ ] **AC-002**: `serialize_all()` 导出快照至 `GSM.battle.bindings`——用于存档/战斗快照持久化（战斗期间不写入 GSM，仅战斗结束时导出）
-- [ ] **AC-003**: `deserialize_all(data: Dictionary)` 从快照恢复 BindingRecord——逐条验证 card_instance_id 是否仍存在于 CardSystem
-- [ ] **AC-004**: `deserialize_all` 部分恢复策略——验证失败的 card_instance_id 跳过 + WARN 日志，其余正常恢复（"尽力而为"，不阻塞整体恢复）
-- [ ] **AC-005**: 绑定成功时调用 `CardEffectEngine.register_persistent_effect(card_instance_id, template_id, character_id, context: BindingContext)`——BindingContext 含 native_multiplier 和 stack_count
-- [ ] **AC-006**: 覆盖旧卡时 `remove_effects_by_source(old_card_instance_id)` 先于 `register_persistent_effect(new_card_instance_id, ...)`——严格顺序、无重叠帧
-- [ ] **AC-007**: 角色离场时 `suspend_effects_by_source(all_binding_card_ids)`；角色上场时 `restore_effects_by_source(valid_binding_card_ids)`（仅恢复验证通过的绑定卡）
-- [ ] **AC-008**: 角色阵亡时 `remove_effects_by_source(all_binding_card_ids)`（含所有叠层实例）
-- [ ] **AC-009**: `get_binding_context(card_instance_id)` 提供预计算的 multiplier 乘积（`native_multiplier × stack_multiplier^(stack_count-1)`）——CardEffectEngine 结算时查询，不在引擎中重复计算
-- [ ] **AC-010**: 同名叠加非数值效果按类型分支处理（二元/概率触发/持续回合/条件触发/抽牌资源生成）——由效果引擎在运行时按效果类型分支（本 Story 提供 stack_count 上下文）
-- [ ] **AC-011**: 覆盖时旧卡已积累的数值加成（`Character.accumulated_bonuses`）保留在角色上——仅持续触发效果停止（不通过 remove_effects_by_source 清除累积值）
-- [ ] **AC-012**: `serialize_all()` × N 次调用性能可接受（化神期峰值 ~180 BindingRecord）；`get_accumulated_bonus()` × 1000 次 <10ms
+- [x] **AC-001**: `serialize_all() → Dictionary` 序列化全部活跃绑定记录（含 binding_id/card_instance_id/slot_type/is_native/native_multiplier/stack_slots/stack_count/is_suspended 等全部字段）
+- [x] **AC-002**: `serialize_all()` 导出快照至 `GSM.battle.bindings`——用于存档/战斗快照持久化（战斗期间不写入 GSM，仅战斗结束时导出）
+- [x] **AC-003**: `deserialize_all(data: Dictionary)` 从快照恢复 BindingRecord——逐条验证 card_instance_id 是否仍存在于 CardSystem
+- [x] **AC-004**: `deserialize_all` 部分恢复策略——验证失败的 card_instance_id 跳过 + WARN 日志，其余正常恢复（"尽力而为"，不阻塞整体恢复）
+- [x] **AC-005**: 绑定成功时调用 `CardEffectEngine.register_persistent_effect(card_instance_id, template_id, character_id, context: BindingContext)`——BindingContext 含 native_multiplier 和 stack_count
+- [x] **AC-006**: 覆盖旧卡时 `remove_effects_by_source(old_card_instance_id)` 先于 `register_persistent_effect(new_card_instance_id, ...)`——严格顺序、无重叠帧
+- [x] **AC-007**: 角色离场时 `suspend_effects_by_source(all_binding_card_ids)`；角色上场时 `restore_effects_by_source(valid_binding_card_ids)`（仅恢复验证通过的绑定卡）
+- [x] **AC-008**: 角色阵亡时 `remove_effects_by_source(all_binding_card_ids)`（含所有叠层实例）
+- [x] **AC-009**: `get_binding_context(card_instance_id)` 提供预计算的 multiplier 乘积（`native_multiplier × stack_multiplier^(stack_count-1)`）——CardEffectEngine 结算时查询，不在引擎中重复计算
+- [x] **AC-010**: 同名叠加非数值效果按类型分支处理（二元/概率触发/持续回合/条件触发/抽牌资源生成）——由效果引擎在运行时按效果类型分支（本 Story 提供 stack_count 上下文）
+- [x] **AC-011**: 覆盖时旧卡已积累的数值加成（`Character.accumulated_bonuses`）保留在角色上——仅持续触发效果停止（不通过 remove_effects_by_source 清除累积值）
+- [x] **AC-012**: `serialize_all()` × N 次调用性能可接受（化神期峰值 ~180 BindingRecord）；`get_accumulated_bonus()` × 1000 次 <10ms
 
 ---
 
@@ -164,7 +164,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/binding_system/test_serialize_snapshot_effect_integration.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 20 tests, all passing (AC-001~AC-012 全覆盖)
 
 ---
 

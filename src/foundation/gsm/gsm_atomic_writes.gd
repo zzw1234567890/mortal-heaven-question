@@ -152,6 +152,56 @@ func _set_player_unavailable_characters(data: Dictionary) -> void:
 	_gsm._buffer_change("player.unavailable_characters", old, data)
 
 
+## 原子写入战斗绑定快照——仅 BindingManager 调用（战斗结束导出）。[br]
+## [br][b]窄范围[/b]：仅写入 battle.bindings——不操作 battle 域其他字段。[br]
+## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值（深层相等）不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播（展平路径 [code]"battle.bindings"[/code]）。[br]
+## [br]来源: ADR-0013 §GSM 边界 §serialize_all。
+func _set_battle_bindings(snapshot: Array) -> void:
+	if _gsm.battle == null:
+		push_warning("GSM._set_battle_bindings: 无活跃战斗，拒绝写入")
+		return
+
+	# 首次写入——battle 中尚无 bindings 键，跳过去重确保键被创建
+	if not _gsm.battle.has("bindings"):
+		_gsm.battle.bindings = snapshot
+		_gsm._buffer_change("battle.bindings", [], snapshot)
+		return
+
+	var old: Array = _gsm.battle.get("bindings", [])
+	if _gsm._deep_equal(old, snapshot):
+		return  # 值无变化——去重
+
+	_gsm.battle.bindings = snapshot
+	_gsm._buffer_change("battle.bindings", old, snapshot)
+
+
+## 原子写入战斗阵法快照——仅 FormationSystem 调用（战斗结束导出）。[br]
+## [br][b]窄范围[/b]：仅写入 battle.formation_snapshot——不操作 battle 域其他字段。[br]
+## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值（深层相等）不写入。[br]
+## [br][b]首次写入[/b]：battle 无 formation_snapshot 键时跳过去重直接创建。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0024 §GSM 边界 §serialize_all。
+func _set_battle_formation_snapshot(snapshot: Dictionary) -> void:
+	if _gsm.battle == null:
+		push_warning("GSM._set_battle_formation_snapshot: 无活跃战斗，拒绝写入")
+		return
+
+	if not _gsm.battle.has("formation_snapshot"):
+		_gsm.battle.formation_snapshot = snapshot
+		_gsm._buffer_change("battle.formation_snapshot", {}, snapshot)
+		return
+
+	var old: Dictionary = _gsm.battle.get("formation_snapshot", {})
+	if _gsm._deep_equal(old, snapshot):
+		return  # 值无变化——去重
+
+	_gsm.battle.formation_snapshot = snapshot
+	_gsm._buffer_change("battle.formation_snapshot", old, snapshot)
+
+
 ## 战斗开始——仅 CombatSystem 调用。Cat 2a 生命周期信号，立即发射不缓冲。
 func battle_start(config: Dictionary) -> void:
 	if _gsm.battle != null:

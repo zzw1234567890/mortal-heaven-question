@@ -1,12 +1,12 @@
 # Story 002: 激活条件实时重判（订阅 deployment 信号）
 
 > **Epic**: 阵法系统 (Formation System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-22
 
 ## Context
 
@@ -31,11 +31,11 @@
 
 *From GDD `design/gdd/formation-system.md` §3 激活与失效 §6 阵眼角色阵亡 + §边界情况，scoped to this story:*
 
-- [ ] **AC-001**: 阵法未激活时场上状态变更（角色上场补足条件），自动判定 → 阵法激活
-- [ ] **AC-002**: 阵眼角色阵亡（特定角色在场条件），自动判定 → 依赖该角色的阵法立即失效
-- [ ] **AC-003**: 场上正道角色从 3 人降到 2 人（阵营人数条件），自动判定 → 阵法失效
-- [ ] **AC-004**: 阵眼角色被复活后重新上场，自动判定 → 阵法条件重新满足 → 可重新激活
-- [ ] **AC-005**: `recheck_all_conditions()` 不直接发射信号——返回变更列表 `Array[Dictionary]`，由调用方批量发射 `formation_condition_reevaluated`
+- [x] **AC-001**: 阵法未激活时场上状态变更（角色上场补足条件），自动判定 → 阵法激活
+- [x] **AC-002**: 阵眼角色阵亡（特定角色在场条件），自动判定 → 依赖该角色的阵法立即失效
+- [x] **AC-003**: 场上正道角色从 3 人降到 2 人（阵营人数条件），自动判定 → 阵法失效
+- [x] **AC-004**: 阵眼角色被复活后重新上场，自动判定 → 阵法条件重新满足 → 可重新激活
+- [x] **AC-005**: `recheck_all_conditions()` 不直接发射信号——返回变更列表 `Array[Dictionary]`，由调用方批量发射 `formation_condition_reevaluated`
 
 ---
 
@@ -123,7 +123,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/formation_system/test_activation_rejudge.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 15 tests, all passing (AC-001~005 全覆盖 + 性能断言 + reason/changes 载荷验证)
 
 ---
 

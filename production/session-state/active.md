@@ -351,17 +351,93 @@ Task: 4-10 完成（binding-system 001），待 4-11（bind/unbind/get_bindings 
 
 ---
 
-## Session Extract — Story 4-11 binding-system bind/stack/overwrite/can_bind 查询 API 2026-08-18
+## Session Extract — Story 4-12 binding-system 绑定生命周期信号总线 2026-08-21
 
-- Verdict：COMPLETE（4-11 done，零回归）
-- 变更：`src/feature/binding/binding_manager.gd` 增量扩展——cache_slot_limits/_query_realm_slots/_get_slot_limit（RealmSystem 查询 gongfa/fabao slots）+ bind_card（card_already_bound/slot_full 拒绝 + 本命判定）/ stack_card（同名叠加共享槽位）/ overwrite_binding（覆盖严格顺序 + 覆盖叠加层 LIFO 移除末位）/ can_bind（四种着色状态）/ remove_binding/remove_all_bindings（叠层全洗回）/ suspend_bindings/restore_bindings（card 缺失删除变空位）/ get_accumulated_bonus/compute_effective_value（乘法公式）+ _determine_native（本命判定）+ 可注入 Callable 存根（effect_register/remove/suspend/restore + card_shuffle/discard/exists + stat_bonus）
-- RealmSystem 扩展：realm_table 10→12 键（+gongfa_slots/fabao_slots，炼气1/1、筑基2/2、金丹2/2、元婴3/3、化神3/3），回写 realm-system GDD 属性表 + ADR-0010 上下文 + smoke test 10→12 keys
-- 关键裁决（用户确认）：槽位数据扩展 RealmSystem（非 BindingManager 内部维护——AC-004 要求查询 RealmSystem）；本命判定/效果引擎/牌库集成用注入 + 存根策略（native_owner/character_card_id 注入参数，同 is_game_over roster 先例；CardEffectEngine 接口/牌库洗回/弃牌堆用 Callable 存根）
-- 关卡：lead-programmer CONCERNS→已处理（C1 stack/overwrite 补 card_already_bound 守卫 + C2 本命子串误匹配→下划线分段锚定 + C5 哨兵→push_error/-1 + C3/C4/C6 延后 Story 004 注释）；qa-lead GAPS→已补齐（G1 AC-006 主语义沿用 is_native + G2 覆盖叠加回调序列 remove→discard + G3 高倍率边界 240 + G4 remove_binding 多层叠层清理 + G5 覆盖本命后重占本命位 + G6 截断名不误配）
-- 测试：`tests/unit/binding_system/test_bind_unbind_query_api.gd` 37 测试 + `test_binding_record_model.gd` 19 测试（共 56）；全量 73 scripts / 1368 tests / 1367 passing / 1 pending / 0 failing 零回归
-- Next：/dev-story 4-12（绑定生命周期信号总线 7 个 Cat 2b 信号，blocker 4-11 已解除）
+- Verdict：COMPLETE（4-12 done，零回归）
+- 变更：`src/feature/binding/binding_manager.gd` 增量扩展——7 个 Cat 2b 信号声明（binding_applied/removed/overwritten/stacked/suspended/restored/native_activated）+ _emit_safe 包装器（GSM._emit_signal_safe 路由 + 链深度追踪 + 回退 callv）+ 6 业务方法挂钩信号发射（bind_card→binding_applied+native_activated / stack_card→binding_stacked / overwrite_binding→binding_removed+binding_applied+native_activated+binding_overwritten / remove_binding→binding_removed(reason=removed) / remove_all_bindings→binding_removed(reason=death) / suspend_bindings→binding_suspended / restore_bindings→binding_restored）
+- 关键裁决：lead-programmer C1 → binding_ids 参数 Array→Array[int]（与 ADR+DeploymentSystem 先例一致）；C2 → _emit_safe 回退用 callv 而非 .emit()（统一接口简洁性取舍）；C4/C5 → ADR reason 值补充回写
+- 测试：`tests/integration/binding_system/test_binding_signal_bus.gd` 30 测试（AC-001~010 全覆盖 + is_native=true 载荷 + card_already_bound 不发射 + 叠加覆盖 binding_removed + 无效 ID 不发射 + 叠加覆盖不发射 binding_overwritten + 覆盖失败不发射 + no_existing/card_already_bound 拒绝不发射 + 零绑定角色 suspend + overwrite 中 native_activated + 链深度截断守卫 + 全 7 信号事实载荷）；全量 74 scripts / 1398 tests / 1397 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer CONCERNS→已处理（C1 修复 + C4/C5 ADR 回写 + C2/C3 设计取舍）；qa-lead GAPS→已补齐（G1-G16 全部含 G14 链深度截断守卫）
+- Next：/dev-story 4-13（serialize_all 快照导出 + persistent effect 接口，blocker 4-11 已解除）
 <!-- STATUS -->
 Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-11 完成（binding-system 002 绑定生命周期 API），待 4-12（信号总线）
+Task: 4-12 完成（binding-system 003 信号总线），待 4-13（serialize_all 快照）
+<!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-13 binding-system serialize_all 快照导出 + persistent effect 接口 2026-08-22
+
+- Verdict：COMPLETE（4-13 done，零回归）
+- 变更：`src/feature/binding/binding_manager.gd` 增量扩展——serialize_all（14 字段完整序列化）/ deserialize_all（best-effort 恢复 + card_exists_cb 逐条验证 + 缺失跳过 push_warning + stack_slots 卡映射重建）/ write_snapshot_to_gsm（调 GSM _set_battle_bindings）/ get_binding_context（预计算 multiplier = native × DEFAULT_STACK_MULTIPLIER^(count-1)）/ _clear_all / _deserialize_record（int() 键归一 JSON round-trip 安全）；`src/foundation/gsm/gsm_atomic_writes.gd` 新增 _set_battle_bindings（null 守卫 + 首次写入跳过去重 + deep_equal 去重 + _buffer_change）；`src/foundation/game_state_manager.gd` 薄转发
+- 关键裁决：lead-programmer C1 → _set_battle_bindings old 值必须在覆盖前捕获（原代码赋值后读 _gsm.battle.bindings 与 snapshot 同引用）；GSM 首次写入 battle 无 bindings 键时跳过 deep_equal 直接创建键；effect_register_cb 从 2 参数扩展为 4 参数 (card_instance_id, template_id, character_id, context: BindingContext)（AC-005 合规）；remove_all_bindings 遍历所有 stack_slots 实例调 effect_remove_cb（AC-008）；suspend/restore 传 card_ids 而非 binding_ids（AC-007）
+- 测试：`tests/integration/binding_system/test_serialize_snapshot_effect_integration.gd` 20 测试（AC-001~012 全覆盖）；`tests/unit/binding_system/test_bind_unbind_query_api.gd` mock 签名同步修正（_on_effect_register 4 参数）；全量 75 scripts / 1418 tests / 1417 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer CONCERNS→已处理（C1 GSM old 值捕获 + effect_register_cb 4 参数 + remove_all_bindings 全叠层 + suspend/restore card_ids）；qa-lead GAPS→已补齐（G1-G7 含 AC-011 积累值保留 + AC-012 性能阈值）
+- 关键经验：GSM _set_battle_bindings 首次写入时 battle 字典无 bindings 键——get("bindings", []) 返回空数组与空快照 deep_equal 为 true 导致跳过写入，键永不被创建；修复：has("bindings") 检查首次写入直接赋值 + _buffer_change
+- Next：/dev-story 4-14（formation-system 内部条件状态机 + 阵法位管理，blocker 无）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-13 完成（binding-system 004 serialize_all），待 4-14（formation-system 内部状态机）
+<!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-14 formation-system 内部条件状态机 + 阵法位管理 2026-08-22
+
+- Verdict：COMPLETE（4-14 done，零回归）
+- 变更：新建 `src/feature/formation_system.gd`（extends Node 不声明 class_name，Autoload #23）——SlotState 枚举（EMPTY/DEPLOYED_UNACTIVE/ACTIVE/DISCARDED）+ AuraScope 枚举 + _slots 3 阵位数据模型（11 字段）+ _affiliations 归属索引 + deploy_formation（空位自动分配+占用守卫+即时条件判定 ACTIVE/DEPLOYED_UNACTIVE）+ overwrite_formation（严格顺序 DISCARDED→清除归属→remove→discard→部署→判定→register）+ set/clear_character_affilation（每角色最多 1 + 阵法须 ACTIVE）+ 6 查询 API（get_formation_state/get_active_formations/get_slot_states/get_character_affilation/is_formation_active/can_deploy）+ 5 Cat 2b 信号经 _emit_safe 路由 + condition_check_cb 注入存根（回退 FactionSystem.check_condition）
+- 关键裁决：lead-programmer C1 → deploy_formation 显式 slot_index 不校验占用会静默覆盖 slot 数据绕过 overwrite 流程 → 补占用守卫返回 slot_occupied；C4 → set_character_affilation 缺第三检查"角色满足条件"延后至 Story 002 集成（代码注释标注）；C7 → _clear_all 重置 _next_formation_id 与 ADR"保留"矛盾→注释标注 Story 004 公共 API 须按 ADR
+- 测试：`tests/unit/formation_system/test_internal_state_machine.gd` 36 测试（AC-001~008 全覆盖 + 信号正负断言 + 效果回调严格顺序 + 占用拒绝 + 覆盖 inactive 路径 + 阵亡保留归属 + 失效阵法覆盖 + 空 requirement 自动激活 + 信号顺序 + deactivated 不发射 + 拒绝后原归属不变 + affiliated_count 递增）；全量 76 scripts / 1454 tests / 1453 passing / 1 pending / 0 failing 零回归
+- 关卡：lead-programmer CONCERNS→已处理（C1 占用守卫 + C2/C3/C5 补测试 + C4 延后注释 + C7 _clear_all 注释）；qa-lead GAPS→已补齐（G1-G9 全部含 AC-005 失效覆盖+AC-008 阵亡保留+GAP-004 占用守卫）
+- 关键经验：GDScript 信号 Callable.bind() 绑定参数后信号参数必须匹配声明签名（int/StringName 类型转换失败）——改为每信号独立 typed callback 函数避免类型不匹配；deploy_formation 显式 slot_index 须校验占用状态，否则静默覆盖绕过 overwrite 严格顺序流程
+- Next：/dev-story 4-15（formation-system 激活条件实时重判，blocker 4-14+4-7 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-14 完成（formation-system 001 内部状态机），待 4-15（激活条件实时重判）
+<!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-15 formation-system 激活条件实时重判 2026-08-22
+
+- Verdict：COMPLETE（4-15 done，零回归）
+- 变更：`src/feature/formation_system.gd` 增量扩展——recheck_all_conditions（遍历 3 阵位+跳过 EMPTY/DISCARDED+条件变化时更新状态 DEPLOYED_UNACTIVE↔ACTIVE+返回变更列表不发射信号）+ _on_field_changed（DeploymentSystem 信号处理器：批量处理副作用 ACTIVE→register+formation_activated / UNACTIVE→remove+clear_affiliations+formation_deactivated + 变更非空时批量发射 formation_condition_reevaluated）+ formation_condition_reevaluated 信号声明 + _pending_affiliations 队列骨架（ADR §风险敌方回合时序）+ _clear_affiliations_by_formation 同步清理 slot.affiliated_chars（C1 修复数据不一致）
+- 关键裁决：lead-programmer C1 → _clear_affiliations_by_formation 仅清 _affiliations 不清 slot.affiliated_chars → 失活→重新激活后 affiliated_count 虚高 → 修复同步 clear()；C2 → _pending_affiliations 队列骨架实现（数据结构+压入存根，弹出由 CombatSystem 编排）；C3 → 测试重命名 skips_empty_and_discarded→skips_empty_and_keeps_unactive（DISCARDED 瞬态不可达）；qa-lead G2 → reason/trigger_reason 参数断言；G3 → 性能断言 recheck×1000<20ms；G4 → changes 载荷验证
+- 测试：`tests/integration/formation_system/test_activation_rejudge.gd` 15 测试（AC-001~005 全覆盖 + 上场无关 changes 空 + 门槛 2 不失效 + 复活重新激活 + recheck 不发射信号 + 空变更不发射 + 多阵法同时变更 + 跳过 EMPTY + 性能<20ms + reason 断言 + changes 载荷 + affiliated_count 同步清理）；全量 77 scripts / 1469 tests / 1468 passing / 1 pending / 0 failing 零回归
+- 关键经验：recheck_all_conditions 与 _on_field_changed 职责分离——前者纯函数返回变更+更新状态不处理副作用，后者处理副作用+发射信号，避免信号重入级联；_clear_affiliations_by_formation 须同步清理 slot.affiliated_chars 数组否则 affiliated_count 数据不一致
+- Next：/dev-story 4-16（formation-system get_aura_bonus O(1) 查询 + 梯度光环计算，blocker 4-14 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-15 完成（formation-system 002 条件重判），待 4-16（get_aura_bonus 光环查询）
+<!-- /STATUS -->
+
+---
+
+## Session Extract — Story 4-16 formation-system get_aura_bonus O(1) 查询 + 梯度光环计算 2026-08-24
+
+- Verdict：COMPLETE（4-16 done，零回归）
+- 变更：`src/feature/formation_system.gd` 增量扩展——get_aura_bonus（O(1) _affiliations 查找+固定/梯度统一接口分支 max_level>0 and requirement.has(tag_id)→梯度否则→固定+breakdown 含 formation_id/template_id/aura_scope/bonus/stat+bonus=0 不创建 breakdown）+ _calculate_gradient_aura（base_value × mini(count_on_field-1, max_level) 门槛≥2 人返回 0+tag_id 空/max_level≤0 防御）+ _get_fixed_bonus（fixed_bonus_cb 优先→effect_config.get 回退）+ _query_count_on_field（count_on_field_cb 注入+FactionSystem 回退+默认 0）+ count_on_field_cb/fixed_bonus_cb 注入存根
+- 关键裁决：lead-programmer APPROVED WITH SUGGESTIONS（C1 冗余 slot 查找 O(3) 可忽略+C2 AC-007 由设计满足+C3 fixed_bonus_cb 测试+C4 性能阈值 20x 容差+C5 测试数 16 非 25——全部 LOW 可选）；qa-lead GAP-001 → AC-007 tag_id 传递验证（_last_queried_tag_id 断言只查 requirement 指定阵营）；GAP-002 → breakdown.bonus 断言；GAP-003 → 梯度性能测试；GAP-004 → base_value=2.0 非 1.0 测试；GAP-005 → 3 人中间点；GAP-008 → fixed_bonus_cb 注入覆盖
+- 测试：`tests/unit/formation_system/test_aura_bonus_query.gd` 20 测试（AC-001~007 全覆盖+固定 hp/def/unknown+未归属/非 ACTIVE+梯度 2/3/4 人+封顶/exact+降级+恢复+base_value=2.0+性能+breakdown 结构+tag_id 传递+fixed_bonus_cb）；全量 78 scripts / 1489 tests / 1488 passing / 1 pending / 0 failing 零回归
+- 关键经验：梯度公式 base_value × mini(count-1, max_level) 中 base_value=1.0 时 effect_value 恒等于 effect_level——需用 base_value≠1.0 测试才能验证乘法；count_on_field_cb 签名参数名带下划线前缀（_tag_id）会被 GDScript 视为未使用——改用 tag_id 记录到实例变量以验证 tag_id 正确传递
+- Next：/dev-story 4-17（formation-system serialize_all 快照导出 GSM.battle.formation_snapshot，blocker 4-16 已解除）
+
+---
+
+## Session Extract — Story 4-17 formation-system serialize_all 快照导出 + deserialize_all 恢复 + GSM battle.formation_snapshot 2026-08-24
+
+- Verdict：COMPLETE（4-17 done，零回归，formation-system Epic 全部完成）
+- 变更：`src/feature/formation_system.gd` 增量扩展——serialize_all（slots 3 阵位 + affiliations + next_formation_id，StringName→String 确保 JSON 可序列化）+ deserialize_all（_reset_slots + 逐条 character_exists_cb 验证 + 跳过+push_warning + **以 _affiliations 为唯一真理来源重建 slot.affiliated_chars 派生索引**）+ _deserialize_slot（11 字段键归一 int()/StringName() + 嵌套集合类型守卫 requirement/effect_config/affiliated_chars 非 Dictionary/Array 时回退默认值）+ _validate_character_exists（character_exists_cb 注入+默认 true）+ write_snapshot_to_gsm（_get_gsm null 守卫+has_method 双守卫）+ _get_gsm（SceneTree→/root/GameStateManager）+ clear_all_formations（保留 _next_formation_id+清理 _pending_affiliations 跨战斗遗留防护）；`src/foundation/gsm/gsm_atomic_writes.gd` 新增 _set_battle_formation_snapshot（null 守卫+首次写入跳过去重+deep_equal 去重+_buffer_change）+ `game_state_manager.gd` 薄转发
+- 关键裁决：lead-programmer CONCERN 1 (HIGH) → deserialize_all 跳过悬空角色时只清 _affiliations 不清 slot.affiliated_chars → affiliated_count 虚高 → **以 _affiliations 重建 affiliated_chars 派生索引**（同 BindingManager 先例——派生索引从主索引重建，不从快照恢复）；CONCERN 2 (LOW) → clear_all_formations 未清 _pending_affiliations → 添加清理；CONCERN 3 (LOW) → _deserialize_slot 无类型守卫 → 添加 is Dictionary/Array 检查；qa-lead GAP-001 → affiliated_count 断言；GAP-002 → JSON round-trip 深度验证（state/formation_id/affiliated_count/next_formation_id）；GAP-006 → slot 11 字段全验证；GAP-007 → next_formation_id 默认值验证
+- 测试：`tests/integration/formation_system/test_serialize_snapshot.gd` 13 测试（AC-001~005 全覆盖 + 完整快照 + 空阵法 + GSM 写入成功/空/去重 + 往返完整性 + 悬空角色跳过+affiliated_count + 空快照 + 缺键 + clear 重置/清归属/保留 ID + JSON round-trip 深度验证）；全量 79 scripts / 1502 tests / 1501 passing / 1 pending / 0 failing 零回归
+- 关键经验：派生索引（slot.affiliated_chars 是 _affiliations 的派生）反序列化时不能从快照原样恢复——必须从主索引重建，否则验证跳过会导致主/派生数据不一致；GSM 第二层方法首次写入跳过去重模式（has_key 守卫）已成为 deployment/binding/formation 三个系统的统一先例
+- Next：/dev-story 4-18（ai-system EnemyTemplate/EnemyFactory/EnemyBattleState，blocker 4-0 已解除）
+<!-- STATUS -->
+Epic: sprint-4
+Feature: Feature 层战斗子系统（25 story + 1 task）
+Task: 4-17 完成（formation-system 004 快照导出），待 4-18（ai-system 敌方模板）
 <!-- /STATUS -->

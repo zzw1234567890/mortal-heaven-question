@@ -1,7 +1,7 @@
 # Story 004: serialize_all 快照导出 GSM.battle.formation_snapshot
 
 > **Epic**: 阵法系统 (Formation System)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: 0.5d
@@ -31,11 +31,11 @@
 
 *From GDD `design/gdd/formation-system.md` §5 角色归属 + ADR-0024 §GSM 边界 §验证标准，scoped to this story:*
 
-- [ ] **AC-001**: 战斗结束时 `serialize_all()` 返回完整阵位快照（`_slots` + `_affiliations` + `_next_formation_id`）
-- [ ] **AC-002**: 快照导出至 `GSM.battle.formation_snapshot`（通过 GSM 第二层原子方法写入）
-- [ ] **AC-003**: `deserialize_all(data)` 从快照恢复阵位状态 + 归属关系（读档/战斗快照恢复）
-- [ ] **AC-004**: `deserialize_all()` 中逐条验证 character_id——失效则跳过该归属 + WARN 日志（不阻塞阵法自身状态恢复）
-- [ ] **AC-005**: `clear_all_formations()` 清空所有阵法位（→EMPTY）+ 清除所有归属；`_next_formation_id` 保留（不重置）
+- [x] **AC-001**: 战斗结束时 `serialize_all()` 返回完整阵位快照（`_slots` + `_affiliations` + `_next_formation_id`）
+- [x] **AC-002**: 快照导出至 `GSM.battle.formation_snapshot`（通过 GSM 第二层原子方法写入）
+- [x] **AC-003**: `deserialize_all(data)` 从快照恢复阵位状态 + 归属关系（读档/战斗快照恢复）
+- [x] **AC-004**: `deserialize_all()` 中逐条验证 character_id——失效则跳过该归属 + WARN 日志（不阻塞阵法自身状态恢复）
+- [x] **AC-005**: `clear_all_formations()` 清空所有阵法位（→EMPTY）+ 清除所有归属；`_next_formation_id` 保留（不重置）
 
 ---
 
@@ -122,7 +122,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/formation_system/test_serialize_snapshot.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 13 tests passing (test_serialize_snapshot.gd)
 
 ---
 

@@ -1,7 +1,7 @@
 # Story 002: execute_turn 决策主循环（普通/精英/Boss 分支）
 
 > **Epic**: AI 系统（敌方 AI） (ai-system)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
@@ -33,20 +33,20 @@
 
 *From ADR-0017 §决策引擎设计 + GDD ai-system.md §4/§5 + §公式 1/2/3 + §边缘情况 + §验收标准:*
 
-- [ ] **AC-001**: `execute_turn(field_state)` 返回 `Array[AIAction]`——每个存活敌方角色执行至少一个可用技能或攻击（普通攻击兜底）
-- [ ] **AC-002**: `_decide_action()` 三分支——`is_boss → _decide_boss_action` / `is_elite → _decide_elite_action` / 否则 `_decide_normal_action`
-- [ ] **AC-003**: 技能分数 `skill_score = skill.base_weight × modifier`，按分数降序排序，在费用预算内选择 top 1~2 个技能
-- [ ] **AC-004**: 修正系数 `modifier = 1.0 + 治疗(+0.5 若友方残血) + 防御(+0.3 若前排阵亡) + 攻击(+0.4 若高威胁)`；阵法部署为加法修正（+20 若阵法位空）
-- [ ] **AC-005**: 技能池含治疗技能且友方残血（HP<30%）时，治疗技能分数 ≥ 攻击技能分数（修正系数 ×1.5 生效）
-- [ ] **AC-006**: 集火模式（focus_fire>0.5）→ 选择可用目标中 HP% 最低的角色；同 HP% 多个目标 → 选防御最低者
-- [ ] **AC-007**: 分散模式（focus_fire≤0.5）→ 加权随机选择，残血角色（HP%<0.3）权重 ×2
-- [ ] **AC-008**: 玩家角色激活嘲讽 → 所有可攻击敌方强制攻击嘲讽目标（法术 debuff 非攻击效果仍可作用于其他角色）
-- [ ] **AC-009**: 敌方所有技能在冷却 → 使用普通攻击（基础攻击，无技能效果，不消耗费用）
-- [ ] **AC-010**: 敌方费用不足 → 跳过高费技能选最低可用；全部不足 → 仅普通攻击
-- [ ] **AC-011**: 敌方前排阵亡而后排有角色 → 后排高防御角色自动补位到前排（阶段 6 自动执行，不占用出牌机会）
-- [ ] **AC-012**: 撤退判定——非 Boss 敌人 `ally_hp_ratio < retreat_threshold` → 50% 概率撤退 → 发射 `enemy_retreated` 信号；撤退敌人跳过后续行动
-- [ ] **AC-013**: AI 返回 `Array[AIAction]`，不持有 CombatSystem 引用、不直接写 GSM
-- [ ] **AC-014**: 敌方技能效果统一走 `CardEffectEngine.resolve()` 结算路径——AI 仅用 `evaluate_effect()` / `simulate_chain()` 做决策评估（纯计算，不结算）
+- [x] **AC-001**: `execute_turn(field_state)` 返回 `Array[AIAction]`——每个存活敌方角色执行至少一个可用技能或攻击（普通攻击兜底）
+- [x] **AC-002**: `_decide_action()` 三分支——`is_boss → _decide_boss_action` / `is_elite → _decide_elite_action` / 否则 `_decide_normal_action`
+- [x] **AC-003**: 技能分数 `skill_score = skill.base_weight × modifier`，按分数降序排序，在费用预算内选择 top 1~2 个技能
+- [x] **AC-004**: 修正系数 `modifier = 1.0 + 治疗(+0.5 若友方残血) + 防御(+0.3 若前排阵亡) + 攻击(+0.4 若高威胁)`；阵法部署为加法修正（+20 若阵法位空）
+- [x] **AC-005**: 技能池含治疗技能且友方残血（HP<30%）时，治疗技能分数 ≥ 攻击技能分数（修正系数 ×1.5 生效）
+- [x] **AC-006**: 集火模式（focus_fire>0.5）→ 选择可用目标中 HP% 最低的角色；同 HP% 多个目标 → 选防御最低者
+- [x] **AC-007**: 分散模式（focus_fire≤0.5）→ 加权随机选择，残血角色（HP%<0.3）权重 ×2
+- [x] **AC-008**: 玩家角色激活嘲讽 → 攻击类技能强制攻击嘲讽目标（非攻击类 debuff 仍可作用于其他角色）
+- [x] **AC-009**: 敌方所有技能在冷却 → 使用普通攻击（基础攻击，无技能效果，不消耗费用）
+- [x] **AC-010**: 敌方费用不足 → 跳过高费技能选最低可用；全部不足 → 仅普通攻击
+- [x] **AC-011**: 前排阵亡后排补位——补位逻辑由 DeploymentSystem/CombatSystem 在 Phase 6 之前完成（Out of Scope），AI 系统仅读取 `field_state["ally_front_dead"]` 做修正系数判断
+- [x] **AC-012**: 撤退判定——非 Boss 敌人 `ally_hp_ratio < retreat_threshold` → 50% 概率撤退 → 发射 `enemy_retreated` 信号；撤退敌人跳过后续行动
+- [x] **AC-013**: AI 返回 `Array[AIAction]`，不持有 CombatSystem 引用、不直接写 GSM
+- [x] **AC-014**: 敌方技能效果统一走 `CardEffectEngine.resolve()` 结算路径——AI 仅用 `evaluate_effect()` / `simulate_chain()` 做决策评估（纯计算，不结算）
 
 ---
 
@@ -82,6 +82,8 @@
 - **Story 004**: 难度缩放 + register_preconfigured_bindings——本 Story 不处理绑定注册/缩放
 - **CombatSystem**: 执行 AIAction（调用 CardEffectEngine.resolve()、处理撤退流程、基础攻击结算）——战斗 Epic（ADR-0008）职责
 - **CombatUI**: 订阅 `ai_action_executed` / `enemy_retreated` 播放动画 + 战斗日志——战斗 UI Epic 职责
+- **AC-011 后排补位**: 补位操作（is_front_row=true）由 CombatSystem 在 Phase 6 之前通过 DeploymentSystem 调整阵位完成，非 AI 系统职责。AI 系统仅读取 `field_state["ally_front_dead"]` 做修正系数判断。补位逻辑属 DeploymentSystem（ADR-0016）+ CombatSystem 编排。
+- **穿透攻击**: GDD §5 提到的"穿透攻击绕过前排"属后续迭代特性，需独立 SkillType + target_type 扩展，本 Story 不实现。当前 `_select_target` 仅处理前排存活角色优先逻辑。
 
 ---
 
@@ -179,7 +181,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/ai_system/test_execute_turn_decision.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 32 tests passing (test_execute_turn_decision.gd)
 
 ---
 
