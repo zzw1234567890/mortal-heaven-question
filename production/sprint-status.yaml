@@ -237,11 +237,11 @@ stories:
     name: "难度缩放 + register_preconfigured_bindings"
     file: "production/epics/ai-system/story-004-difficulty-scaling.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-19, 4-20"
-    completed: ""
+    completed: "2026-08-26 _apply_difficulty_scaling（scale=1.0+gap×0.3，round 取整）+ _apply_difficulty_scaling_to_roster + register_preconfigured_bindings（SceneTree 查找 BM + bind_card + 返回值检查）+ remove_enemy_bindings（remove_all_bindings）+ create_enemy_roster 集成缩放→阵位→绑定；character_id=100000+idx×10000（敌方 ID 范围）+card_instance_id=character_id+binding_idx（唯一）；player_realm 移除默认值（不硬编码）；_compare_by_defense_desc/attack_desc 改为基于 template.base_*（缩放不影响分配）；MockBindingManager fixtures 验证调用次数/参数/唯一性/移除；20 单测全通过，全量 83 scripts / 1603 tests / 1602 passing 零回归；lead-programmer CONCERNS（HIGH-1 ID 碰撞→组合键+HIGH-3 默认值→移除+HIGH-4 返回值→检查+比较器注释）+ qa-lead GAPS（GAP-1~5 Mock BM 调用验证）已补齐"
 
   # === combat-system（编排器，依赖全部，最后做）===
   - id: "4-22"

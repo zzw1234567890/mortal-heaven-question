@@ -1,7 +1,7 @@
 # Story 004: 难度缩放 + register_preconfigured_bindings
 
 > **Epic**: AI 系统（敌方 AI） (ai-system)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
@@ -33,17 +33,17 @@
 
 *From ADR-0017 §关键接口 + GDD ai-system.md §6（敌方绑定与阵法）+ §9（难度缩放）+ §公式 5 + §边缘情况 + §验收标准:*
 
-- [ ] **AC-001**: 难度缩放公式 `scale = 1.0 + (player_realm - enemy_realm) × 0.3`——玩家境界高于敌人基准时应用
-- [ ] **AC-002**: `player_realm > enemy_realm` → `max_hp = round(base_hp × scale)`、`attack = round(base_attack × scale)`、`defense = round(base_defense × scale)`
-- [ ] **AC-003**: `player_realm <= enemy_realm` → 不缩放（返回基础值，境界压制规则由战斗系统处理）
-- [ ] **AC-004**: 通过 `RealmSystem.get_realm_property()` 获取玩家境界——不硬编码境界数值
-- [ ] **AC-005**: 缩放应用时机在 `create_enemy_roster()` 时（创建实例后、分配阵位前或后按 ADR 顺序）
-- [ ] **AC-006**: `register_preconfigured_bindings(enemy)` 遍历 `preconfigured_bindings` 调用 `BindingManager.register_binding(character_id, card_id, is_enemy=true)`
-- [ ] **AC-007**: 普通敌人无预配置绑定（`preconfigured_bindings` 为空，不调用注册）
-- [ ] **AC-008**: 精英敌人战前配置 → 预配置绑定已注册到 BindingManager
-- [ ] **AC-009**: Boss 敌人战前配置 → 预配置绑定已注册到 BindingManager
-- [ ] **AC-010**: 敌方绑定不消耗费用、不占用出牌机会（绑定为预配置，非战斗中打出）
-- [ ] **AC-011**: 敌方角色阵亡 → 绑定随角色阵亡直接移除（不走玩家绑定链销毁流程）
+- [x] **AC-001**: 难度缩放公式 `scale = 1.0 + (player_realm - enemy_realm) × 0.3`——玩家境界高于敌人基准时应用
+- [x] **AC-002**: `player_realm > enemy_realm` → `max_hp = round(base_hp × scale)`、`attack = round(base_attack × scale)`、`defense = round(base_defense × scale)`
+- [x] **AC-003**: `player_realm <= enemy_realm` → 不缩放（返回基础值，境界压制规则由战斗系统处理）
+- [x] **AC-004**: 通过 `RealmSystem.get_realm_property()` 获取玩家境界——不硬编码境界数值
+- [x] **AC-005**: 缩放应用时机在 `create_enemy_roster()` 时（创建实例后、分配阵位前或后按 ADR 顺序）
+- [x] **AC-006**: `register_preconfigured_bindings(enemy)` 遍历 `preconfigured_bindings` 调用 `BindingManager.register_binding(character_id, card_id, is_enemy=true)`
+- [x] **AC-007**: 普通敌人无预配置绑定（`preconfigured_bindings` 为空，不调用注册）
+- [x] **AC-008**: 精英敌人战前配置 → 预配置绑定已注册到 BindingManager
+- [x] **AC-009**: Boss 敌人战前配置 → 预配置绑定已注册到 BindingManager
+- [x] **AC-010**: 敌方绑定不消耗费用、不占用出牌机会（绑定为预配置，非战斗中打出）
+- [x] **AC-011**: 敌方角色阵亡 → 绑定随角色阵亡直接移除（不走玩家绑定链销毁流程）
 
 ---
 
@@ -167,7 +167,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/ai_system/test_difficulty_scaling_bindings.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 20 tests passing (test_difficulty_scaling_bindings.gd)
 
 ---
 

@@ -444,9 +444,18 @@ Task: 4-15 完成（formation-system 002 条件重判），待 4-16（get_aura_b
 - 关键裁决：lead-programmer HIGH-1 信号双发→删除 emit_signal 直发仅保留 _emit_safe 单路径；HIGH-2 模板只读违规→实例字段下沉 runtime_behavior_profile/runtime_skill_pool + _get_behavior_profile 辅助方法；MEDIUM-1 AC-009 阶段上限→load_templates push_warning；qa-lead GAP-1 skill_unlock 添加→实现 + 测试；GAP-3 turn==turn_after 边界→新增测试；GAP-4/5 信号参数+call_count→补充断言
 - 测试：27 单测全通过（AC-001~013 全覆盖+边界+信号+模板只读+多阶段连续转换），全量 82 scripts / 1583 tests / 1582 passing / 1 pending / 0 failing 零回归
 - 关键经验：Godot 4.6 信号参数类型检查中 Object 不接受 RefCounted 子类——去除类型标注避免 emit_signal 静默失败；GDScript lambda 按值捕获基元类型——用 Dictionary 可变容器绕过；模板只读约定（ADR-0017）要求 Boss 阶段转换的可变状态写入实例字段而非模板——runtime_behavior_profile/runtime_skill_pool 模式
-- Next：/dev-story 4-21（ai-system 难度缩放 + register_preconfigured_bindings，blocker 4-19/4-20 已解除）
+- Next：/dev-story 4-22（combat-system 7 阶段回合状态机，blocker #5/#7/#13/#17/#21 全部已解除）
+
+## Session Extract — Story 4-21 难度缩放 + register_preconfigured_bindings 2026-08-26
+
+- Verdict：COMPLETE（4-21 done，零回归，ai-system Epic 全部完成）
+- 变更：`src/feature/ai_system.gd` 新增 _apply_difficulty_scaling（scale=1.0+gap×0.3，round 取整，player_realm<=enemy_realm 不缩放）+ _apply_difficulty_scaling_to_roster + register_preconfigured_bindings（SceneTree 查找 BM + bind_card + 返回值 success 检查 + push_warning）+ remove_enemy_bindings（remove_all_bindings）+ create_enemy_roster 集成缩放→阵位→绑定；character_id=100000+roster_idx×10000（敌方 ID 范围避免与玩家冲突）+card_instance_id=character_id+binding_idx（唯一，避免共享预配置绑定卡时 card_already_bound）；player_realm 移除默认值（不硬编码境界数值）；_compare_by_defense_desc/attack_desc 改为基于 template.base_*（缩放不影响分配逻辑 AC-005）；`tests/fixtures/mock_binding_manager.gd` 新建 MockBindingManager（记录 bind_card/remove_all_bindings 调用次数与参数）；`tests/unit/ai_system/test_difficulty_scaling_bindings.gd` 20 测试
+- 关键裁决：lead-programmer HIGH-1 ID 碰撞（StringName.hash 共享预配置绑定卡时 card_instance_id 相同→card_already_bound 拒绝）→改为递增组合键 100000+idx×10000；HIGH-3 player_realm 默认值 1 硬编码→移除默认值强制调用方传入；HIGH-4 bind_card 返回值未检查→检查 success + push_warning；比较器基于 state.defense（缩放后）改为 template.base_defense（原值）符合 AC-005；qa-lead GAP-1~5 MockBindingManager 验证调用次数/参数/唯一性/移除→补充 4 个 mock 测试
+- 测试：20 单测全通过（AC-001~011 全覆盖+缩放公式 gap 1/2/3+round .5 边界+realm 相等/低于+缩放时机+mock BM 调用次数/参数/唯一性/移除+全流程 pipeline），全量 83 scripts / 1603 tests / 1602 passing / 1 pending / 0 failing 零回归
+- 关键经验：StringName.hash() 作为 card_instance_id 违背"实例"语义——同一模板的多个副本共享同一 ID 导致 BindingManager _card_to_character 反向索引拒绝；用递增组合键（character_id + binding_idx）保证唯一性；MockBindingManager 挂载到 SceneTree root 作为 /root/BindingManager 是 AI SceneTree 查找模式的测试接缝
+- Next：/dev-story 4-22（combat-system 7 阶段回合状态机，blocker #5/#7/#13/#17/#21 全部已解除）
 <!-- STATUS -->
 Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-20 完成（ai-system 003 BossPhaseMgr），待 4-21（ai-system 难度缩放+绑定注册）
+Task: 4-21 完成（ai-system 004 难度缩放+绑定注册），ai-system Epic 全部完成，待 4-22（combat-system 7 阶段状态机）
 <!-- /STATUS -->

@@ -64,7 +64,7 @@
 | 18 | ai-system | EnemyTemplate Resource + EnemyFactory + EnemyBattleState | `ai-system/story-001-*.md` | Logic | 0.5d | #0 | Complete |
 | 19 | ai-system | execute_turn 决策主循环（普通/精英/Boss 分支） | `ai-system/story-002-*.md` | Logic | 0.5d | #18, #5 | Complete |
 | 20 | ai-system | BossPhaseMgr 阶段转换内部状态机 | `ai-system/story-003-*.md` | Logic | 0.5d | #18 | Complete |
-| 21 | ai-system | 难度缩放 + register_preconfigured_bindings | `ai-system/story-004-*.md` | Logic | 0.5d | #19, #20 | Ready |
+| 21 | ai-system | 难度缩放 + register_preconfigured_bindings | `ai-system/story-004-*.md` | Logic | 0.5d | #19, #20 | Complete |
 | 22 | combat-system | 7 阶段回合状态机（advance_phase 确定性推进 + 阶段转换校验） | `combat-system/story-001-*.md` | Logic | 1.5d | #5, #7, #13, #17, #21 | Ready |
 | 23 | combat-system | 战斗生命周期编排（battle_start / battle_end + GSM battle.* 域） | `combat-system/story-002-*.md` | Integration | 0.5d | #22 | Ready |
 | 24 | combat-system | play_card 出牌 + 目标解析 + 自动推进调度 | `combat-system/story-003-*.md` | Logic | 0.5d | #22 | Ready |
