@@ -17,11 +17,13 @@ extends Resource
 ## 运行时由赋值路径保证类型安全（BehaviorProfile extends Resource）。
 @export var behavior_override: Resource
 
-## 解锁新技能 ID 列表（加入技能池）。
-@export var skill_unlock: Array[StringName] = []
+## 解锁新技能 ID 列表（加入技能池）。[br]
+## [b]声明为无类型 Array[/b]——Array[StringName] 跨文件 class_name 引用时可能解析失败（同 EnemyTemplate 模式）。
+@export var skill_unlock: Array = []
 
-## 锁定旧技能 ID 列表（从技能池移除）。
-@export var skill_remove: Array[StringName] = []
+## 锁定旧技能 ID 列表（从技能池移除）。[br]
+## [b]声明为无类型 Array[/b]——同上。
+@export var skill_remove: Array = []
 
 ## 是否重置所有技能冷却。
 @export var reset_cooldowns: bool = false

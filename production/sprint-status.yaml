@@ -227,11 +227,11 @@ stories:
     name: "BossPhaseMgr 阶段转换内部状态机"
     file: "production/epics/ai-system/story-003-boss-phase-manager.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-18"
-    completed: ""
+    completed: "2026-08-26 BossPhaseMgr 内部状态机 check/transition/get_phase + _should_transition OR 语义+哨兵 + _do_boss_phase_transition（行为替换+技能解锁/移除+冷却重置+回血+信号）+ 实例级 runtime_behavior_profile/runtime_skill_pool（不写回模板 ADR-0017 只读约定）+ load_templates AC-009 阶段上限 2 校验；signal boss_phase_transitioned 首参无类型（RefCounted 不被 Object 接受）；27 单测全通过，全量 82 scripts / 1583 tests / 1582 passing 零回归；lead-programmer CONCERNS（HIGH-1 信号双发→单路径+HIGH-2 模板只读→实例字段下沉+MEDIUM-1 AC-009 校验）+ qa-lead GAPS（GAP-1 skill_unlock+GAP-3 turn==turn_after 边界+GAP-4/5 信号 call_count+GAP-6 注释）已补齐"
 
   - id: "4-21"
     name: "难度缩放 + register_preconfigured_bindings"

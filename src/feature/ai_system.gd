@@ -2,12 +2,14 @@
 ##
 ## Feature 层 Autoload。负责敌方所有战斗决策。[br]
 ## 本文件持有 EnemyFactory 创建方法 + 模板注册表 + 阵位自动分配逻辑 +[br]
-## execute_turn 决策主循环（三级智能分支 + 技能评分 + 目标选择 + 撤退判定）。[br]
-## [br][b]本 Story 范围[/b]（4-19）：execute_turn + _decide_action 三分支 +[br]
-## _evaluate_skills 技能评分 + _select_target 目标选择 + _check_retreat 撤退判定。[br]
+## execute_turn 决策主循环（三级智能分支 + 技能评分 + 目标选择 + 撤退判定）+[br]
+## BossPhaseMgr 阶段转换内部状态机（HP/回合触发 → 行为替换 → 技能解锁/锁定 →[br]
+## 冷却重置 → 回血 → boss_phase_transitioned 信号）。[br]
+## [br][b]本 Story 范围[/b]（4-20）：BossPhaseMgr——check/transition/get_phase +[br]
+## should_transition OR 语义 + 防重复 triggered_transitions + 击杀优先。[br]
 ## [b]不注册进 project.godot[/b]——待各系统实现完毕后统一注册（4-0b 终验）。[br]
-## [b]后续 story[/b]：BossPhaseMgr 阶段转换（4-20）、难度缩放 + 绑定注册（4-21）。[br]
-## [br]来源: ADR-0017 §决策 §关键接口 §决策引擎设计 §三智能层级分支 / GDD ai-system.md §4/§5。
+## [b]后续 story[/b]：难度缩放 + 绑定注册（4-21）。[br]
+## [br]来源: ADR-0017 §决策 §决策引擎设计 ② §Boss 阶段转换 / GDD ai-system.md §7/§公式 4。
 extends Node
 # class_name AISystem —— 不声明：Autoload 全局单例，
 # 声明 class_name 会与全局名冲突，导致 AI_SCRIPT.new() 测试实例无法解析。
@@ -60,8 +62,10 @@ var _current_turn: int = 0
 signal ai_action_executed(enemy_id: int, action: Dictionary)
 
 ## Boss 阶段转换——HP/回合触发阶段转换时发射。[br]
-## 载荷: (enemy_id: int, from_phase: int, to_phase: int)。
-signal boss_phase_transitioned(enemy_id: int, from_phase: int, to_phase: int)
+## 载荷: (enemy: Object, from_phase: int, to_phase: int)。[br]
+## [b]首参无类型[/b]——EnemyBattleState 为 RefCounted，Godot 4.6 信号类型检查中
+## Object 不接受 RefCounted，去除类型标注以避免 emit_signal 静默失败。
+signal boss_phase_transitioned(enemy, from_phase: int, to_phase: int)
 
 ## 敌方撤退——非 Boss 敌人 HP 低于阈值且概率判定通过时发射。[br]
 ## 载荷: (retreated_enemy_ids: Array[int])。
@@ -98,6 +102,9 @@ func load_templates() -> void:
 				var tid: StringName = loaded.template_id
 				if _template_registry.has(tid):
 					push_warning("AISystem.load_templates: 重复 template_id '%s'（文件: %s）" % [tid, res_path])
+				# AC-009：Boss phase_transitions 上限 2（起始阶段 + 2 转换 = 3 阶段）
+				if loaded.is_boss and (loaded.phase_transitions as Array).size() > 2:
+					push_warning("AISystem.load_templates: Boss '%s' phase_transitions 超过 2 项上限（%d 项）" % [tid, (loaded.phase_transitions as Array).size()])
 				_template_registry[tid] = loaded
 		file_name = dir.get_next()
 	dir.list_dir_end()
@@ -321,19 +328,133 @@ func _decide_elite_action(enemy, field_state: Dictionary) -> Dictionary:
 
 
 ## Boss 决策——阶段转换检查 + 阵法部署 + 技能评估 + 目标选择（AC-002）。[br]
-## _check_phase_transition 钩子——Story 003 实现，本 Story 为空桩。[br]
-## 空桩确保分支结构完整，后续 Story 仅需填充钩子实现。
+## _check_phase_transition 实现——Story 003，检测 + 执行阶段转换。[br]
+## 转换触发时该 Boss 本回合不产出技能行动（AC-012）。
 func _decide_boss_action(enemy, field_state: Dictionary) -> Dictionary:
-	_check_phase_transition(enemy, field_state)
+	var transitioned: bool = _check_phase_transition(enemy, field_state)
+	if transitioned:
+		# AC-012：阶段转换回合不进行其他行动
+		return {"enemy_id": enemy, "skill_id": &"", "target_ids": [], "is_retreat": false}
 	_check_formation_deploy(enemy, field_state)
 	var skill_result = _evaluate_skills(enemy, field_state)
 	var target_ids = _select_target(enemy, skill_result, field_state)
 	return {"enemy_id": enemy, "skill_id": skill_result.skill_id, "target_ids": target_ids, "is_retreat": false}
 
 
-## Boss 阶段转换检查——空桩（Story 003 实现）。
-func _check_phase_transition(enemy, _field_state: Dictionary) -> void:
-	pass  # Story 003 实现
+## Boss 阶段转换检查——检测 + 执行（Story 003 实现）。[br]
+## [br][b]流程[/b]（ADR-0017 §决策引擎设计 ②）：[br]
+##   1. 仅 is_alive 时检查（击杀优先）[br]
+##   2. should_transition 遍历 phase_transitions（OR 语义 + 哨兵）[br]
+##   3. 触发则 transition 执行替换/解锁/冷却/回血 + 发射信号[br]
+## [br][b]返回[/b]: true 表示触发了阶段转换（调用方应跳过后续行动）。
+func _check_phase_transition(enemy, field_state: Dictionary) -> bool:
+	# AC-007：击杀优先——仅 is_alive 时检查
+	if not _is_alive(enemy):
+		return false
+	var template = enemy.template
+	if not template.is_boss:
+		return false
+	var phase_transitions: Array = template.phase_transitions
+	if phase_transitions.is_empty():
+		return false  # 无阶段转换定义
+	var hp_pct: float = _get_hp_pct(enemy)
+	var turn: int = int(field_state.get("turn", 0))
+	var phase_idx: int = _should_transition(enemy, phase_transitions, turn, hp_pct)
+	if phase_idx < 0:
+		return false
+	# AC-013：所有阶段已触发 → 不再转换
+	if (enemy.triggered_transitions as Array).has(phase_idx):
+		return false
+	_do_boss_phase_transition(enemy, phase_idx)
+	return true
+
+
+## should_transition 公式——遍历 phase_transitions，OR 语义 + 哨兵（AC-010/011）。[br]
+## [br][param phase_transitions] Boss 阶段转换列表。[br]
+## [br][param turn] 当前回合数。[br]
+## [br][param hp_pct] Boss HP 百分比。[br]
+## [br][b]返回[/b]: 待触发阶段索引（-1 = 不触发）。[br]
+## [br]公式: `(hp_below > 0 AND hp_pct <= hp_below) OR (turn_after > 0 AND turn >= turn_after)` 且 `not triggered`。[br]
+## [br]来源: GDD ai-system.md §公式 4 / Story 003 AC-010。
+func _should_transition(enemy, phase_transitions: Array, turn: int, hp_pct: float) -> int:
+	var triggered: Array = enemy.triggered_transitions
+	for i in range(phase_transitions.size()):
+		if triggered.has(i):
+			continue  # 已触发
+		var phase = phase_transitions[i]
+		var hp_triggered: bool = phase.hp_below > 0.0 and hp_pct <= phase.hp_below
+		var turn_triggered: bool = phase.turn_after > 0 and turn >= phase.turn_after
+		if hp_triggered or turn_triggered:
+			return i
+	return -1
+
+
+## 执行 Boss 阶段转换——替换行为 + 解锁/锁定技能 + 冷却重置 + 回血 + 信号（AC-002~006）。[br]
+## [br][b]模板只读约定[/b]（ADR-0017）：behavior_profile/skill_pool 修改写入实例字段
+## runtime_behavior_profile/runtime_skill_pool，绝不写回 template。[br]
+## [br][param enemy] EnemyBattleState。[br]
+## [br][param phase_idx] 待执行阶段索引。
+func _do_boss_phase_transition(enemy, phase_idx: int) -> void:
+	var template = enemy.template
+	var phase = template.phase_transitions[phase_idx]
+	# AC-008：标记防重复触发
+	(enemy.triggered_transitions as Array).append(phase_idx)
+	# 首次转换时初始化实例级运行时副本（深拷贝模板 skill_pool）
+	if (enemy.runtime_skill_pool as Array).is_empty() and not (template.skill_pool as Array).is_empty():
+		enemy.runtime_skill_pool = (template.skill_pool as Array).duplicate(true)
+	# AC-002：行为配置替换（实例级，不写回模板）
+	if phase.behavior_override != null:
+		enemy.runtime_behavior_profile = phase.behavior_override
+	# AC-003：技能解锁/锁定（实例级 runtime_skill_pool）
+	var skill_pool: Array = enemy.runtime_skill_pool if not (enemy.runtime_skill_pool as Array).is_empty() else (template.skill_pool as Array)
+	# skill_remove: 从技能池移除指定 ID
+	for remove_id in phase.skill_remove:
+		for i in range(skill_pool.size() - 1, -1, -1):
+			if skill_pool[i].skill_id == remove_id:
+				skill_pool.remove_at(i)
+				break
+	# skill_unlock: 添加新 SkillEntry 到技能池
+	for new_skill in phase.skill_unlock:
+		skill_pool.append(new_skill)
+	# AC-004：冷却重置
+	if phase.reset_cooldowns:
+		enemy.skill_cooldowns.clear()
+	# AC-005：转换回血
+	if phase.heal_percent > 0.0:
+		var heal_amount: int = int(round(float(enemy.max_hp) * phase.heal_percent))
+		enemy.current_hp = mini(enemy.current_hp + heal_amount, enemy.max_hp)
+	# 更新阶段索引
+	enemy.current_phase_index = phase_idx + 1
+	# AC-006：发射 boss_phase_transitioned 信号（经 GSM _emit_signal_safe 路由，ADR-0007）
+	_emit_safe(&"boss_phase_transitioned", [enemy, phase_idx, enemy.current_phase_index])
+
+
+## BossPhaseMgr 查询接口——get_phase（AC-001）。[br]
+## [br][b]返回[/b]: Boss 当前阶段索引。
+func get_phase(enemy) -> int:
+	return int(enemy.current_phase_index)
+
+
+## BossPhaseMgr 查询接口——check（AC-001）。[br]
+## [br][b]返回[/b]: 待触发阶段索引（-1 = 无转换）。
+func check(enemy, turn: int, hp_pct: float) -> int:
+	if not _is_alive(enemy):
+		return -1
+	var template = enemy.template
+	if not template.is_boss:
+		return -1
+	var phase_transitions: Array = template.phase_transitions
+	if phase_transitions.is_empty():
+		return -1
+	return _should_transition(enemy, phase_transitions, turn, hp_pct)
+
+
+## BossPhaseMgr 执行接口——transition（AC-001）。[br]
+## [br][param enemy] EnemyBattleState。[br]
+## [br][param phase_idx] 阶段索引。
+func transition(enemy, phase_idx: int) -> void:
+	if not (enemy.triggered_transitions as Array).has(phase_idx):
+		_do_boss_phase_transition(enemy, phase_idx)
 
 
 ## 阵法部署检查——空桩（Story 003/004 集成点）。
@@ -346,7 +467,8 @@ func _check_formation_deploy(enemy, _field_state: Dictionary) -> void:
 ## 全技能冷却/费用不足 → basic_attack 兜底。
 func _evaluate_skills(enemy, field_state: Dictionary) -> Dictionary:
 	var template = enemy.template
-	var skill_pool: Array = template.skill_pool
+	# 优先使用实例级 runtime_skill_pool（Boss 阶段转换后修改），回退到模板
+	var skill_pool: Array = enemy.runtime_skill_pool if not (enemy.runtime_skill_pool as Array).is_empty() else (template.skill_pool as Array)
 	var available_budget: int = int(field_state.get("enemy_cost_budget", 3))
 	var scored: Array = []
 	for skill in skill_pool:
@@ -435,8 +557,7 @@ func _select_target(enemy, skill_result: Dictionary, field_state: Dictionary) ->
 		if taunting != null:
 			return [taunting]
 	# AC-006：集火模式（focus_fire>0.5）→ HP% 最低
-	var template = enemy.template
-	var behavior = template.behavior_profile
+	var behavior = _get_behavior_profile(enemy)
 	if behavior != null and behavior.focus_fire > 0.5:
 		var target = _select_focus_fire_target(available_targets)
 		return [target]
@@ -481,7 +602,7 @@ func _check_retreat(enemy, field_state: Dictionary) -> bool:
 	var template = enemy.template
 	if template.is_boss:
 		return false
-	var behavior = template.behavior_profile
+	var behavior = _get_behavior_profile(enemy)
 	if behavior == null or behavior.retreat_threshold <= 0.0:
 		return false
 	var ally_hp_ratio: float = float(field_state.get("ally_hp_ratio", 1.0))
@@ -491,6 +612,14 @@ func _check_retreat(enemy, field_state: Dictionary) -> bool:
 
 
 # === 决策引擎辅助 ===============================================================
+
+## 获取行为配置——优先实例级 runtime_behavior_profile（Boss 阶段转换后替换），[br]
+## 回退到 template.behavior_profile。避免写回模板（ADR-0017 只读约定）。
+func _get_behavior_profile(enemy) -> Resource:
+	if enemy.runtime_behavior_profile != null:
+		return enemy.runtime_behavior_profile
+	return enemy.template.behavior_profile
+
 
 ## 检查角色是否存活。
 func _is_alive(char_state) -> bool:

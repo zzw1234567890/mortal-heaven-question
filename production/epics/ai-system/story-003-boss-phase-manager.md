@@ -1,7 +1,7 @@
 # Story 003: BossPhaseMgr 阶段转换内部状态机
 
 > **Epic**: AI 系统（敌方 AI） (ai-system)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
@@ -32,19 +32,19 @@
 
 *From ADR-0017 §决策引擎设计 ② + GDD ai-system.md §7（Boss 阶段转换）+ §公式 4 + §边缘情况 + §验收标准:*
 
-- [ ] **AC-001**: `BossPhaseMgr` 内部状态机组件——`check()`（检测触发）、`transition()`（执行转换）、`get_phase()`（查询当前阶段索引）
-- [ ] **AC-002**: Boss HP 降到阈值（hp_below）以下 → 触发转换 + `behavior_profile` 替换为新阶段 `behavior_override`
-- [ ] **AC-003**: 转换时执行 `skill_unlock`（解锁新技能加入技能池）+ `skill_remove`（锁定旧技能从技能池移除）
-- [ ] **AC-004**: `reset_cooldowns=true` 时 → `skill_cooldowns.clear()`（所有技能冷却重置）
-- [ ] **AC-005**: `heal_percent>0` 时 → `current_hp += round(max_hp × heal_percent)`
-- [ ] **AC-006**: 转换完成发射 `boss_phase_transitioned(enemy_id, from_phase, to_phase)` 信号（通过 `_emit_signal_safe` 路由）
-- [ ] **AC-007**: 击杀优先——仅在 `is_alive` 为 true 时检查阶段转换；转换触发瞬间被击杀 → 不触发转换，Boss 正常阵亡
-- [ ] **AC-008**: 每个转换条件只触发一次——`triggered_transitions` 记录已触发索引，触发后锁定（防血量波动重复触发）
-- [ ] **AC-009**: 每个 Boss 最多 3 个阶段（起始阶段 + 2 个转换）——`phase_transitions` 数组长度上限 2
-- [ ] **AC-010**: `should_transition(boss, turn, hp_pct)` 公式——`(hp_below > 0 AND hp_pct <= hp_below) OR (turn_after > 0 AND turn >= turn_after)` 且 `not triggered` 时返回阶段索引，否则 -1
-- [ ] **AC-011**: 回合兜底触发（turn_after）——配置 `turn_after > 0` 的 Boss 回合数到达时即使血量未到阈值也触发阶段转换（OR 语义，防拖回合）；通用 Boss 配置 `turn_after=0` 时不启用回合兜底，仅按 HP 阈值转换
-- [ ] **AC-012**: 阶段转换回合不进行其他行动——触发转换后 return，跳过技能评估与目标选择
-- [ ] **AC-013**: Boss 所有阶段已触发完毕 → 保持最终阶段行为模式（不再检查转换）
+- [x] **AC-001**: `BossPhaseMgr` 内部状态机组件——`check()`（检测触发）、`transition()`（执行转换）、`get_phase()`（查询当前阶段索引）
+- [x] **AC-002**: Boss HP 降到阈值（hp_below）以下 → 触发转换 + `behavior_profile` 替换为新阶段 `behavior_override`
+- [x] **AC-003**: 转换时执行 `skill_unlock`（解锁新技能加入技能池）+ `skill_remove`（锁定旧技能从技能池移除）
+- [x] **AC-004**: `reset_cooldowns=true` 时 → `skill_cooldowns.clear()`（所有技能冷却重置）
+- [x] **AC-005**: `heal_percent>0` 时 → `current_hp += round(max_hp × heal_percent)`
+- [x] **AC-006**: 转换完成发射 `boss_phase_transitioned(enemy_id, from_phase, to_phase)` 信号（通过 `_emit_signal_safe` 路由）
+- [x] **AC-007**: 击杀优先——仅在 `is_alive` 为 true 时检查阶段转换；转换触发瞬间被击杀 → 不触发转换，Boss 正常阵亡
+- [x] **AC-008**: 每个转换条件只触发一次——`triggered_transitions` 记录已触发索引，触发后锁定（防血量波动重复触发）
+- [x] **AC-009**: 每个 Boss 最多 3 个阶段（起始阶段 + 2 个转换）——`phase_transitions` 数组长度上限 2
+- [x] **AC-010**: `should_transition(boss, turn, hp_pct)` 公式——`(hp_below > 0 AND hp_pct <= hp_below) OR (turn_after > 0 AND turn >= turn_after)` 且 `not triggered` 时返回阶段索引，否则 -1
+- [x] **AC-011**: 回合兜底触发（turn_after）——配置 `turn_after > 0` 的 Boss 回合数到达时即使血量未到阈值也触发阶段转换（OR 语义，防拖回合）；通用 Boss 配置 `turn_after=0` 时不启用回合兜底，仅按 HP 阈值转换
+- [x] **AC-012**: 阶段转换回合不进行其他行动——触发转换后 return，跳过技能评估与目标选择
+- [x] **AC-013**: Boss 所有阶段已触发完毕 → 保持最终阶段行为模式（不再检查转换）
 
 ---
 
@@ -170,7 +170,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/ai_system/test_boss_phase_manager.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 27 tests passing (test_boss_phase_manager.gd)
 
 ---
 

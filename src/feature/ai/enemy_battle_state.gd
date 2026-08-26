@@ -52,3 +52,13 @@ var current_phase_index: int = 0
 ## 已触发的阶段索引（防重复触发）。[br]
 ## [b]声明为无类型 Array[/b]——Array[int] 在跨文件 class_name 引用时可能解析失败。
 var triggered_transitions: Array = []
+
+## 运行时行为配置——Boss 阶段转换时替换（实例级，不写回模板）。[br]
+## null 时回退到 template.behavior_profile。[br]
+## [b]类型为 Resource[/b]——跨文件 class_name 引用可能解析失败（BehaviorProfile extends Resource）。
+var runtime_behavior_profile: Resource = null
+
+## 运行时技能池——Boss 阶段转换时移除/添加技能（实例级，不写回模板）。[br]
+## 空时回退到 template.skill_pool。[br]
+## [b]声明为无类型 Array[/b]——Array[SkillEntry] 跨文件 class_name 可能解析失败。
+var runtime_skill_pool: Array = []

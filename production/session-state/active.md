@@ -435,9 +435,18 @@ Task: 4-15 完成（formation-system 002 条件重判），待 4-16（get_aura_b
 - 关键裁决：lead-programmer CONCERN 1 (HIGH) → deserialize_all 跳过悬空角色时只清 _affiliations 不清 slot.affiliated_chars → affiliated_count 虚高 → **以 _affiliations 重建 affiliated_chars 派生索引**（同 BindingManager 先例——派生索引从主索引重建，不从快照恢复）；CONCERN 2 (LOW) → clear_all_formations 未清 _pending_affiliations → 添加清理；CONCERN 3 (LOW) → _deserialize_slot 无类型守卫 → 添加 is Dictionary/Array 检查；qa-lead GAP-001 → affiliated_count 断言；GAP-002 → JSON round-trip 深度验证（state/formation_id/affiliated_count/next_formation_id）；GAP-006 → slot 11 字段全验证；GAP-007 → next_formation_id 默认值验证
 - 测试：`tests/integration/formation_system/test_serialize_snapshot.gd` 13 测试（AC-001~005 全覆盖 + 完整快照 + 空阵法 + GSM 写入成功/空/去重 + 往返完整性 + 悬空角色跳过+affiliated_count + 空快照 + 缺键 + clear 重置/清归属/保留 ID + JSON round-trip 深度验证）；全量 79 scripts / 1502 tests / 1501 passing / 1 pending / 0 failing 零回归
 - 关键经验：派生索引（slot.affiliated_chars 是 _affiliations 的派生）反序列化时不能从快照原样恢复——必须从主索引重建，否则验证跳过会导致主/派生数据不一致；GSM 第二层方法首次写入跳过去重模式（has_key 守卫）已成为 deployment/binding/formation 三个系统的统一先例
-- Next：/dev-story 4-18（ai-system EnemyTemplate/EnemyFactory/EnemyBattleState，blocker 4-0 已解除）
+- Next：/dev-story 4-21（ai-system 难度缩放 + register_preconfigured_bindings，blocker 4-19/4-20 已解除）
+
+## Session Extract — Story 4-20 BossPhaseMgr 阶段转换内部状态机 2026-08-26
+
+- Verdict：COMPLETE（4-20 done，零回归）
+- 变更：`assets/enemies/boss_phase_transition.gd` skill_unlock/skill_remove 从 Array[StringName]→无类型 Array（跨文件 class_name 解析）；`src/feature/ai/enemy_battle_state.gd` 新增 runtime_behavior_profile + runtime_skill_pool 实例字段（ADR-0017 模板只读约定）；`src/feature/ai_system.gd` 新增 check/transition/get_phase 公共 API + _check_phase_transition/_should_transition（OR 语义+哨兵+防重复）+ _do_boss_phase_transition（行为替换+技能解锁/移除+冷却重置+回血+信号）+ _get_behavior_profile 辅助 + _evaluate_skills/runtime_skill_pool 优先 + _check_retreat 用 _get_behavior_profile + load_templates AC-009 阶段上限 2 校验 + signal boss_phase_transitioned 首参无类型（RefCounted 不被 Object 接受）；`tests/unit/ai_system/test_boss_phase_manager.gd` 27 测试
+- 关键裁决：lead-programmer HIGH-1 信号双发→删除 emit_signal 直发仅保留 _emit_safe 单路径；HIGH-2 模板只读违规→实例字段下沉 runtime_behavior_profile/runtime_skill_pool + _get_behavior_profile 辅助方法；MEDIUM-1 AC-009 阶段上限→load_templates push_warning；qa-lead GAP-1 skill_unlock 添加→实现 + 测试；GAP-3 turn==turn_after 边界→新增测试；GAP-4/5 信号参数+call_count→补充断言
+- 测试：27 单测全通过（AC-001~013 全覆盖+边界+信号+模板只读+多阶段连续转换），全量 82 scripts / 1583 tests / 1582 passing / 1 pending / 0 failing 零回归
+- 关键经验：Godot 4.6 信号参数类型检查中 Object 不接受 RefCounted 子类——去除类型标注避免 emit_signal 静默失败；GDScript lambda 按值捕获基元类型——用 Dictionary 可变容器绕过；模板只读约定（ADR-0017）要求 Boss 阶段转换的可变状态写入实例字段而非模板——runtime_behavior_profile/runtime_skill_pool 模式
+- Next：/dev-story 4-21（ai-system 难度缩放 + register_preconfigured_bindings，blocker 4-19/4-20 已解除）
 <!-- STATUS -->
 Epic: sprint-4
 Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-17 完成（formation-system 004 快照导出），待 4-18（ai-system 敌方模板）
+Task: 4-20 完成（ai-system 003 BossPhaseMgr），待 4-21（ai-system 难度缩放+绑定注册）
 <!-- /STATUS -->
