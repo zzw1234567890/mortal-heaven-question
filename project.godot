@@ -32,6 +32,11 @@ StatusEffectSystem="*res://src/core/status_effect/status_effect_system.gd"
 RealmSystem="*res://src/core/realm_system.gd"
 SchoolSystem="*res://src/core/school_system/school_system.gd"
 CombatSystem="*res://src/feature/combat_system.gd"
+CardEffectEngine="*res://src/feature/card_effect_engine/card_effect_engine.gd"
+DeploymentSystem="*res://src/feature/deployment_system.gd"
+BindingManager="*res://src/feature/binding/binding_manager.gd"
+FormationSystem="*res://src/feature/formation_system.gd"
+AISystem="*res://src/feature/ai_system.gd"
 
 [display]
 

@@ -43,7 +43,7 @@
 
 | # | Epic | Story | 文件 | 类型 | 预估 | 依赖 | 状态 |
 |:--|------|:--|------|:--:|:--:|:--:|:--:|
-| 0 | 多 Epic | Autoload 注册：RealmSystem #11 + SchoolSystem #19 + 6 个 Feature Autoload 顺序验证 | — | Task | 0.5d | — | In Progress |
+| 0 | 多 Epic | Autoload 注册：RealmSystem #11 + SchoolSystem #19 + 6 个 Feature Autoload 顺序验证 | — | Task | 0.5d | — | Complete |
 | 1 | card-effect-engine | EffectTemplate/EffectInstance 双层对象模型（4 种子类） | `card-effect-engine/story-001-*.md` | Logic | 0.5d | — | Complete |
 | 2 | card-effect-engine | ResolutionStack 栈式结算引擎（优先级队列 + LIFO + 中断插入） | `card-effect-engine/story-002-*.md` | Logic | 0.5d | #1 | Complete |
 | 3 | card-effect-engine | 触发链硬限制 10 层 + visited_card_ids 循环检测 | `card-effect-engine/story-003-*.md` | Logic | 0.5d | #2 | Complete |

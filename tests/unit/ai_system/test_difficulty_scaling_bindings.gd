@@ -19,6 +19,7 @@ const MockBindingManager := preload("res://tests/fixtures/mock_binding_manager.g
 
 var ai: Node = null
 var _mock_bm: Node = null
+var _mock_original_script: Script = null
 
 
 func before_each() -> void:
@@ -28,18 +29,35 @@ func before_each() -> void:
 
 func after_each() -> void:
 	if _mock_bm != null:
-		_mock_bm.get_parent().remove_child(_mock_bm)
-		_mock_bm.queue_free()
+		if _mock_original_script != null:
+			# 恢复原 BindingManager 脚本
+			_mock_bm.set_script(_mock_original_script)
+			_mock_original_script = null
+		else:
+			# 手动挂载的 mock 节点——从树移除并释放
+			_mock_bm.get_parent().remove_child(_mock_bm)
+			_mock_bm.queue_free()
 		_mock_bm = null
 	if ai != null:
 		ai.free()
 		ai = null
 
 
-## 创建 MockBindingManager 并挂载到 SceneTree root 作为 /root/BindingManager。
+## 创建 MockBindingManager 并挂载到 SceneTree root 作为 /root/BindingManager。[br]
+## [br][b]注意[/b]：BindingManager 已注册为 Autoload 时，测试通过临时替换 Autoload 节点的
+## 脚本为 MockBindingManager 实现 mock 行为，测试后恢复原脚本。[br]
+## BindingManager 未注册时，直接 add_child 挂载 mock 节点。
 func _create_mock_bm() -> Node:
-	var bm := MockBindingManager.new()
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var existing_bm: Node = tree.root.get_node_or_null("/root/BindingManager")
+	if existing_bm != null:
+		# BindingManager 已注册为 Autoload——保存原脚本并替换为 Mock
+		_mock_original_script = existing_bm.get_script()
+		existing_bm.set_script(MockBindingManager)
+		existing_bm.call("reset")
+		return existing_bm
+	# BindingManager 未注册——创建新节点挂载
+	var bm := MockBindingManager.new()
 	tree.root.add_child(bm, false)
 	bm.name = "BindingManager"
 	return bm

@@ -22,11 +22,11 @@ stories:
     name: "Autoload 注册：RealmSystem #11 + SchoolSystem #19 + 6 个 Feature Autoload 顺序验证"
     file: ""
     priority: must-have
-    status: in-progress
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: "2026-08-16 RealmSystem+SchoolSystem 已注册并验证；2026-08-27 Sprint 4 完成后追加注册 CombatSystem #14（全量零回归）；CardEffectEngine/DeploymentSystem/BindingManager/FormationSystem/AISystem 待各系统测试桩改造后注册（BindingManager 与 AI MockBindingManager 冲突需先解决）"
+    completed: "2026-08-28 全部 6 个 Feature Autoload 已注册并验证（CombatSystem #14 + CardEffectEngine #15 + DeploymentSystem #16 + BindingManager #17 + FormationSystem #18 + AISystem #19）；MockBindingManager 改为脚本替换模式解决与 Autoload 冲突；全量 1727 tests/1726 passing/1 pending 零回归"
 
   # === card-effect-engine（结算引擎，无下游依赖，最先做）===
   - id: "4-1"
