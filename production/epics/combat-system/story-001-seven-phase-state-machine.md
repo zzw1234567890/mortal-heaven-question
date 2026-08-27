@@ -1,12 +1,12 @@
 # Story 001: 7 阶段回合状态机（advance_phase 确定性推进 + 阶段转换校验）
 
 > **Epic**: combat-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 1.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-27
 
 ## Context
 
@@ -33,19 +33,19 @@
 
 *From ADR-0008 §验证标准 + §关键接口（CombatPhase 枚举 + advance_phase 核心算法）+ GDD §1 完整回合流程 + GDD §2 抽牌规则:*
 
-- [ ] **AC-001**: `CombatPhase` 枚举包含 7 个阶段，取值 PREPARATION(0)→DRAW(1)→PLAY(2)→ATTACK_DECLARATION(3)→ATTACK_RESOLUTION(4)→ENEMY_TURN(5)→END(6)，END 之后回到 PREPARATION
-- [ ] **AC-002**: `advance_phase()` 执行确定性序列：`_validate_transition(from, to)`（前置条件检查）→ `_exit_phase(current)`（当前阶段清理）→ `_enter_phase(next)`（下一阶段初始化）→ `GSM._set_battle_phase(next)`（GSM 第二层）→ 发射 `phase_changed`
-- [ ] **AC-003**: `advance_phase()` 在验证失败时返回 false + `push_warning`，不推进阶段
-- [ ] **AC-004**: `advance_phase()` 在非活跃战斗（`battle.is_active == false`）时返回 false + `push_error`
-- [ ] **AC-005**: 阶段 0→1、1→2、4→5、5→6、6→0 无条件自动推进（`_validate_transition` 返回 true）
-- [ ] **AC-006**: 阶段 2 PLAY→3 ATTACK_DECLARATION 推进条件为 `player_confirmed_end || timer_exceeded || (hand_empty && !can_afford_any)`
-- [ ] **AC-007**: 阶段 3 ATTACK_DECLARATION→4 ATTACK_RESOLUTION 推进条件为 `all_characters_targeted || player_confirmed_skip || attack_queue 为空`
-- [ ] **AC-008**: 自动阶段（0,1,4,5,6）通过 `call_deferred()` 下一帧推进（确保每阶段至少 1 帧渲染）
-- [ ] **AC-009**: 手动阶段（2,3）不自动推进——等待玩家输入（`confirm_end_turn()` / `confirm_attack_targets()`）或超时计时器
-- [ ] **AC-010**: 完整 1 回合流程通过：Phase 0→1→2（手动确认）→3（手动确认）→4→5→6→0
-- [ ] **AC-011**: Phase 2 超时（`timer_exceeded`）→ `advance_phase()` 成功推进
-- [ ] **AC-012**: Phase 3 空攻击队列（所有己方角色均「待命」或「已行动」）时，`all_characters_targeted()` 空真（vacuously true），系统自动推进——首回合所有角色待命时 Phase 3 自动跳过
-- [ ] **AC-013**: 牌库抽空时（`需抽牌但牌库为空`），从弃牌堆随机返还 1 张到牌库底部（GDD §2 抽牌规则）
+- [x] **AC-001**: `CombatPhase` 枚举包含 7 个阶段，取值 PREPARATION(0)→DRAW(1)→PLAY(2)→ATTACK_DECLARATION(3)→ATTACK_RESOLUTION(4)→ENEMY_TURN(5)→END(6)，END 之后回到 PREPARATION
+- [x] **AC-002**: `advance_phase()` 执行确定性序列：`_validate_transition(from, to)`（前置条件检查）→ `_exit_phase(current)`（当前阶段清理）→ `_enter_phase(next)`（下一阶段初始化）→ `GSM._set_battle_phase(next)`（GSM 第二层）→ 发射 `phase_changed`
+- [x] **AC-003**: `advance_phase()` 在验证失败时返回 false + `push_warning`，不推进阶段
+- [x] **AC-004**: `advance_phase()` 在非活跃战斗（`battle.is_active == false`）时返回 false + `push_error`
+- [x] **AC-005**: 阶段 0→1、1→2、4→5、5→6、6→0 无条件自动推进（`_validate_transition` 返回 true）
+- [x] **AC-006**: 阶段 2 PLAY→3 ATTACK_DECLARATION 推进条件为 `player_confirmed_end || timer_exceeded || (hand_empty && !can_afford_any)`
+- [x] **AC-007**: 阶段 3 ATTACK_DECLARATION→4 ATTACK_RESOLUTION 推进条件为 `all_characters_targeted || player_confirmed_skip || attack_queue 为空`
+- [x] **AC-008**: 自动阶段（0,1,4,5,6）通过 `call_deferred()` 下一帧推进（确保每阶段至少 1 帧渲染）
+- [x] **AC-009**: 手动阶段（2,3）不自动推进——等待玩家输入（`confirm_end_turn()` / `confirm_attack_targets()`）或超时计时器
+- [x] **AC-010**: 完整 1 回合流程通过：Phase 0→1→2（手动确认）→3（手动确认）→4→5→6→0
+- [x] **AC-011**: Phase 2 超时（`timer_exceeded`）→ `advance_phase()` 成功推进
+- [x] **AC-012**: Phase 3 空攻击队列（所有己方角色均「待命」或「已行动」）时，`all_characters_targeted()` 空真（vacuously true），系统自动推进——首回合所有角色待命时 Phase 3 自动跳过
+- [x] **AC-013**: 牌库抽空时（`需抽牌但牌库为空`），从弃牌堆随机返还 1 张到牌库底部（GDD §2 抽牌规则）
 
 ---
 
@@ -183,7 +183,7 @@
 
 **Story Type**: Logic
 **Required evidence**: `tests/unit/combat_system/test_seven_phase_state_machine.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 41 tests passing (test_seven_phase_state_machine.gd)
 
 ---
 

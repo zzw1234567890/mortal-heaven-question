@@ -176,6 +176,12 @@ func _set_battle_bindings(snapshot: Array) -> void:
 	_atomic_writes._set_battle_bindings(snapshot)
 func _set_battle_formation_snapshot(snapshot: Dictionary) -> void:
 	_atomic_writes._set_battle_formation_snapshot(snapshot)
+func _set_battle_phase(phase: int) -> void:
+	_atomic_writes._set_battle_phase(phase)
+func _increment_battle_turn() -> void:
+	_atomic_writes._increment_battle_turn()
+func _set_battle_active(active: bool) -> void:
+	_atomic_writes._set_battle_active(active)
 func _set_player_unavailable_characters(data: Dictionary) -> void:
 	_atomic_writes._set_player_unavailable_characters(data)
 func battle_start(config: Dictionary) -> void:

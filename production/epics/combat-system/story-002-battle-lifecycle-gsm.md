@@ -1,12 +1,12 @@
 # Story 002: 战斗生命周期编排（battle_start / battle_end + GSM battle.* 域）
 
 > **Epic**: combat-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-27
 
 ## Context
 
@@ -33,23 +33,23 @@
 
 *From ADR-0008 §验证标准 + §决策（战斗生命周期 + GSM battle.* 域写入所有权例外）+ GDD §9 战斗结束规则 + GDD §状态与转换:*
 
-- [ ] **AC-001**: `battle_start(config)` 初始化 battle.* 域——phase=PREPARATION, turn=1, is_active=true
-- [ ] **AC-002**: `battle_start(config)` 调用 `GSM._set_battle_active(true)` 创建 battle 域（而非直接写属性）
-- [ ] **AC-003**: `battle_start(config)` 发射 `battle_started` 信号（Cat 2b，通过 `_emit_signal_safe`）——载荷为 config Dictionary
-- [ ] **AC-004**: `battle_start(config)` 创建战斗快照——`SaveLoad.create_battle_snapshot(GSM.serialize())`
-- [ ] **AC-005**: `battle_start(config)` 推入输入锁——`InputManager.push_lock(ANIMATION, &"combat_system")`
-- [ ] **AC-006**: `battle_start(config)` 完成后调用 `advance_phase(PREPARATION)` 开始第一个回合
-- [ ] **AC-007**: 需要新增 3 个 GSM 第二层方法：`_set_battle_phase(phase: int)`、`_increment_battle_turn()`、`_set_battle_active(active: bool)`
-- [ ] **AC-008**: `battle_end(VICTORY)` 调用 `GSM.apply_battle_rewards(lingshi, cultivation, cards)`——参数正确
-- [ ] **AC-009**: `battle_end(DEFEAT)` 保留 50% 资源——`GSM.add_resource("ling_shi", retain_50%)` 和 `GSM.add_cultivation(retain_50%)` 被调用且参数正确
-- [ ] **AC-010**: `battle_end(RETREAT)` 语义与 DEFEAT 相同——50% 保留
-- [ ] **AC-011**: `battle_end(result)` 入口处防御清理——`_attack_queue.clear()` + `InputManager.clear_locks(&"combat_system")` + `_is_active = false`
-- [ ] **AC-012**: `battle_end(result)` 调用 `GSM._set_battle_active(false)` 清理 battle.* 域（设为 null）
-- [ ] **AC-013**: `battle_end(result)` 发射 `battle_ended` 信号（Cat 2b）——载荷为 `(result, rewards)`，在清理 battle 域之前发射
-- [ ] **AC-014**: `battle_end(VICTORY)` 调用 `SaveLoad.clear_battle_snapshot()` 清理快照
-- [ ] **AC-015**: `battle_end(result)` 调用 `SceneManager.request_scene_change(COMBAT, target_scene)` 切换场景
-- [ ] **AC-016**: `retreat()` 在 `battle.is_active == false` 时返回而不修改状态
-- [ ] **AC-017**: `retreat()` 在 `battle.is_active == true` 时发射确认提示信号（Cat 2b）——UI 展示确认弹窗，玩家确认后调用 `battle_end(RETREAT)`
+- [x] **AC-001**: `battle_start(config)` 初始化 battle.* 域——phase=PREPARATION, turn=1, is_active=true
+- [x] **AC-002**: `battle_start(config)` 调用 `GSM._set_battle_active(true)` 创建 battle 域（而非直接写属性）
+- [x] **AC-003**: `battle_start(config)` 发射 `battle_started` 信号（Cat 2b，通过 `_emit_signal_safe`）——载荷为 config Dictionary
+- [x] **AC-004**: `battle_start(config)` 创建战斗快照——`SaveLoad.create_battle_snapshot(GSM.serialize())`
+- [x] **AC-005**: `battle_start(config)` 推入输入锁——`InputManager.push_lock(ANIMATION, &"combat_system")`
+- [x] **AC-006**: `battle_start(config)` 完成后调用 `advance_phase(PREPARATION)` 开始第一个回合
+- [x] **AC-007**: 需要新增 3 个 GSM 第二层方法：`_set_battle_phase(phase: int)`、`_increment_battle_turn()`、`_set_battle_active(active: bool)`
+- [x] **AC-008**: `battle_end(VICTORY)` 调用 `GSM.apply_battle_rewards(lingshi, cultivation, cards)`——参数正确
+- [x] **AC-009**: `battle_end(DEFEAT)` 保留 50% 资源——`GSM.add_resource("ling_shi", retain_50%)` 和 `GSM.add_cultivation(retain_50%)` 被调用且参数正确
+- [x] **AC-010**: `battle_end(RETREAT)` 语义与 DEFEAT 相同——50% 保留
+- [x] **AC-011**: `battle_end(result)` 入口处防御清理——`_attack_queue.clear()` + `InputManager.clear_locks(&"combat_system")` + `_is_active = false`
+- [x] **AC-012**: `battle_end(result)` 调用 `GSM._set_battle_active(false)` 清理 battle.* 域（设为 null）
+- [x] **AC-013**: `battle_end(result)` 发射 `battle_ended` 信号（Cat 2b）——载荷为 `(result, rewards)`，在清理 battle 域之前发射
+- [x] **AC-014**: `battle_end(VICTORY)` 调用 `SaveLoad.clear_battle_snapshot()` 清理快照
+- [x] **AC-015**: `battle_end(result)` 调用 `SceneManager.request_scene_change(COMBAT, target_scene)` 切换场景
+- [x] **AC-016**: `retreat()` 在 `battle.is_active == false` 时返回而不修改状态
+- [x] **AC-017**: `retreat()` 在 `battle.is_active == true` 时发射确认提示信号（Cat 2b）——UI 展示确认弹窗，玩家确认后调用 `battle_end(RETREAT)`
 
 ---
 
@@ -227,7 +227,7 @@
 
 **Story Type**: Integration
 **Required evidence**: `tests/integration/combat_system/test_battle_lifecycle_gsm.gd` — must exist and pass
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 24 tests passing (test_battle_lifecycle_gsm.gd)
 
 ---
 

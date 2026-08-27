@@ -248,21 +248,21 @@ stories:
     name: "7 阶段回合状态机（advance_phase 确定性推进 + 阶段转换校验）"
     file: "production/epics/combat-system/story-001-seven-phase-state-machine.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 1.5
     blocker: "4-5, 4-7, 4-13, 4-17, 4-21"
-    completed: ""
+    completed: "2026-08-27 CombatSystem Autoload #9 + CombatPhase 枚举(7 值) + advance_phase 确定性序列(验证→清理→初始化→GSM 镜像→信号) + _validate_transition 验证矩阵(2→3/3→4 条件式,其余无条件) + _enter_phase/_exit_phase 桩编排 + call_deferred 自动推进 + confirm_end_turn/confirm_attack_targets 手动确认 + AC-013 牌库抽空返还 + _emit_safe GSM 路由 + set_battle_active 初始化链; GSM 第二层 _set_battle_phase/_increment_battle_turn/_set_battle_active(active=false 清理 battle 域); 41 单测全通过,全量 84 scripts / 1644 tests / 1643 passing 零回归; lead-programmer APPROVE WITH SUGGESTIONS(HIGH ADR 漂移→_set_battle_active(false) 清理 battle 域已修复 + MEDIUM GSM 镜像测试待 Story 002 + LOW _emit_safe fallback 告警+nil 守卫已修复) + qa-lead ADEQUATE(MAJOR-1~5 全补齐:exit_phase 副作用+帧间隔精确+多次抽牌返还+enter_phase DRAW 集成+MINOR turn 参数+confirm 阶段守卫)"
 
   - id: "4-23"
     name: "战斗生命周期编排（battle_start / battle_end + GSM battle.* 域）"
     file: "production/epics/combat-system/story-002-battle-lifecycle-gsm.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-22"
-    completed: ""
+    completed: "2026-08-27 battle_start(config) 初始化 battle.* 域(重复守卫+GSM _set_battle_active(true) 创建+内部状态重置+SaveLoad 快照+InputManager ANIMATION 锁+_emit_safe battle_started+_enter_phase(PREPARATION)) + battle_end(result) 防御清理(_attack_queue.clear+_is_active=false+InputManager clear_locks)+_settle_result(VICTORY/DEFEAT/RETREAT 桩)+VICTORY 清快照+_gsm_set_battle_active(false) 清理 battle 域+_emit_safe battle_ended+SceneManager 场景切换 + retreat()/confirm_retreat() + _scene_change_enabled 测试开关; GSM _set_battle_active 双向语义(active=true 创建 battle 域+active=false 清理为 null); 24 集成测试全通过,全量 85 scripts / 1668 tests / 1666 passing / 1 pending / 1 failing(既有跨测试污染,基准 6 失败→改动后 1 失败,零新增回归)"
 
   - id: "4-24"
     name: "play_card 出牌 + 目标解析 + 自动推进调度"

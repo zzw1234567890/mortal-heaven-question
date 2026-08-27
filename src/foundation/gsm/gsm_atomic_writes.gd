@@ -202,6 +202,80 @@ func _set_battle_formation_snapshot(snapshot: Dictionary) -> void:
 	_gsm._buffer_change("battle.formation_snapshot", old, snapshot)
 
 
+## 原子写入战斗阶段——仅 CombatSystem 调用。[br]
+## [br][b]窄范围[/b]：仅写入 battle.phase——不操作 battle 域其他字段。[br]
+## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0008 §GSM battle.* 域写入所有权例外。
+func _set_battle_phase(phase: int) -> void:
+	if _gsm.battle == null:
+		push_warning("GSM._set_battle_phase: 无活跃战斗，拒绝写入")
+		return
+
+	var old_phase: int = int(_gsm.battle.get("phase", 0))
+	if old_phase == phase:
+		return  # 值无变化——去重
+
+	_gsm.battle.phase = phase
+	_gsm._buffer_change("battle.phase", old_phase, phase)
+
+
+## 原子递增战斗回合数——仅 CombatSystem 调用。[br]
+## [br][b]窄范围[/b]：仅写入 battle.turn——不操作 battle 域其他字段。[br]
+## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0008 §GSM battle.* 域写入所有权例外。
+func _increment_battle_turn() -> void:
+	if _gsm.battle == null:
+		push_warning("GSM._increment_battle_turn: 无活跃战斗，拒绝写入")
+		return
+
+	var old_turn: int = int(_gsm.battle.get("turn", 1))
+	_gsm.battle.turn = old_turn + 1
+	_gsm._buffer_change("battle.turn", old_turn, old_turn + 1)
+
+
+## 原子写入战斗活跃标志——仅 CombatSystem 调用。[br]
+## [br][b]active=true 时创建 battle 域[/b]：若 battle == null，初始化默认 battle 字典[br]
+## （phase=PREPARATION, turn=1, is_active=true, player_field=[], enemy_field=[]）。[br]
+## [br][b]active=false 时清理 battle 域[/b]：ADR-0008 §GSM 边界要求 _set_battle_active(false)[br]
+## 同时清理 battle.* 域（设为 null）——battle_end() 调用本方法即完成全部清理。[br]
+## [br][b]去重[/b]：同值不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0008 §GSM battle.* 域写入所有权例外。
+func _set_battle_active(active: bool) -> void:
+	if active:
+		# active=true：如果 battle 域不存在，初始化默认值
+		if _gsm.battle == null:
+			_gsm.battle = {
+				"is_active": true,
+				"phase": 0,  # CombatPhase.PREPARATION
+				"turn": 1,
+				"current_cost": 0,
+				"max_cost": 0,
+				"player_field": [],
+				"enemy_field": [],
+				"result": null,
+			}
+			_gsm._buffer_change("battle", null, _gsm.battle)
+			return
+		# battle 域已存在——仅更新 is_active
+		var old_active: bool = bool(_gsm.battle.get("is_active", false))
+		if old_active == active:
+			return  # 值无变化——去重
+		_gsm.battle.is_active = active
+		_gsm._buffer_change("battle.is_active", old_active, active)
+	else:
+		# active=false：清理 battle 域（设为 null）——ADR-0008 §GSM 边界
+		if _gsm.battle == null:
+			push_warning("GSM._set_battle_active: 无活跃战斗，拒绝写入")
+			return
+		var old_battle: Dictionary = _gsm.battle
+		_gsm.battle = null
+		_gsm._buffer_change("battle", old_battle, null)
+
+
 ## 战斗开始——仅 CombatSystem 调用。Cat 2a 生命周期信号，立即发射不缓冲。
 func battle_start(config: Dictionary) -> void:
 	if _gsm.battle != null:
