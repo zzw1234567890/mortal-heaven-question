@@ -54,8 +54,9 @@ signal battle_started(config: Dictionary)
 ## 战斗结束后发射（Cat 2b）。载荷: (result: int, rewards: Dictionary)。
 signal battle_ended(result: int, rewards: Dictionary)
 
-## 单次攻击结算完毕后发射（Cat 2b）。载荷: (attacker_id: int, target_id: int, damage: int, is_kill: bool)。
-signal attack_resolved(attacker_id: int, target_id: int, damage: int, is_kill: bool)
+## 单次攻击结算完毕后发射（Cat 2b）。[br]
+## 载荷: [code]{attacker_id, target_id, damage, is_kill}[/code] 具名字典（ADR-0007 >3 参数规则）。
+signal attack_resolved(attack_data: Dictionary)
 
 ## 角色 HP ≤ 0 时发射（Cat 2b）。载荷: (character_id: int, side: int, binding_card_ids: Array)。
 signal character_died(character_id: int, side: int, binding_card_ids: Array)
@@ -217,7 +218,8 @@ func battle_start(config: Dictionary) -> void:
 ##   2. 按结果结算奖励/损失[br]
 ##   3. GSM._set_battle_active(false) 清理 battle 域[br]
 ##   4. _emit_safe("battle_ended", [result, rewards]) 发射 Cat 2b 信号[br]
-##   5. SceneManager.request_scene_change 切换场景
+##   5. GSM._set_battle_active(false) 清理 battle 域[br]
+##   6. SceneManager.request_scene_change 切换场景
 func battle_end(result: int) -> void:
 	# AC-011：入口防御清理
 	_attack_queue.clear()
@@ -231,13 +233,12 @@ func battle_end(result: int) -> void:
 	if result == CombatResult.VICTORY:
 		_clear_battle_snapshot()
 
-	# AC-012：清理 battle 域
-	_gsm_set_battle_active(false)
-
-	# AC-013：发射 battle_ended 信号（在清理 battle 域之前发射——此时 battle 已被 _set_battle_active(false) 清理）
-	# 注意：ADR 要求信号在清理之前发射，但 _set_battle_active(false) 已清理 battle 域
-	# rewards Dictionary 已在 _settle_result 中构建，不依赖 battle 域
+	# AC-013：发射 battle_ended 信号（在清理 battle 域之前发射——ADR-0008 §信号分类表）
+	# rewards Dictionary 已在 _settle_result 中构建，但消费者可能需要读取 battle 域最终状态
 	_emit_safe(&"battle_ended", [result, rewards])
+
+	# AC-012：清理 battle 域（在 battle_ended 信号发射之后）
+	_gsm_set_battle_active(false)
 
 	# AC-015：切换场景
 	_request_scene_change(result)
@@ -463,6 +464,7 @@ func _enter_phase(phase: int) -> void:
 			pass
 		CombatPhase.ATTACK_RESOLUTION:
 			# 按速度排序依次结算（Story 003 接线）
+			_resolve_attack_queue()
 			_schedule_auto_advance()
 		CombatPhase.ENEMY_TURN:
 			# AISystem.execute_turn（Story 003 接线）
@@ -770,6 +772,39 @@ func set_hand(hand: Array) -> void:
 	_hand = hand.duplicate()
 
 
+# === 攻击结算（AC-005 attack_resolved 信号发射）==================================
+
+## 攻击队列结算——Phase 4 ATTACK_RESOLUTION 入口。[br]
+## [br]遍历 _attack_queue，对每条攻击记录调用 calculate_damage 计算伤害，[br]
+## 发射 attack_resolved 信号（Cat 2b 具名字典格式——ADR-0007）。[br]
+## [br][b]桩实现[/b]——Story 003 接线后由 CardEffectEngine 驱动实际伤害结算。[br]
+## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def, attacker_realm, defender_realm, is_kill}[/code][br]
+## [br][b]技术债[/b]：is_kill 当前从队列条目读取（桩），Story 003 接线后应从目标 HP 派生。
+func _resolve_attack_queue() -> void:
+	for entry in _attack_queue:
+		if not (entry is Dictionary):
+			continue
+		var attacker_id: int = int(entry.get("attacker_id", -1))
+		var target_id: int = int(entry.get("target_id", -1))
+		if attacker_id < 0 or target_id < 0:
+			push_warning("CombatSystem: _resolve_attack_queue skipping entry with invalid id")
+			continue
+		var atk: int = int(entry.get("attacker_atk", 0))
+		var def: int = int(entry.get("target_def", 0))
+		var atk_realm: int = int(entry.get("attacker_realm", 1))
+		var def_realm: int = int(entry.get("defender_realm", 1))
+		var dmg_result: Dictionary = calculate_damage(atk, def, atk_realm, def_realm)
+		var is_kill: bool = bool(entry.get("is_kill", false))
+		# AC-005：attack_resolved 使用具名字典格式（ADR-0007 >3 参数规则）
+		var payload: Dictionary = {
+			"attacker_id": attacker_id,
+			"target_id": target_id,
+			"damage": dmg_result["final_damage"],
+			"is_kill": is_kill,
+		}
+		_emit_safe(&"attack_resolved", [payload])
+
+
 # === 伤害计算（AC-008~012）=======================================================
 
 ## 计算最终伤害——`max(1, ATK - DEF) × realm_penalty`（AC-008/009）。[br]
@@ -881,11 +916,9 @@ func _get_gsm() -> Node:
 ## [br]来源: ADR-0008 §信号分类 / ADR-0007 §_emit_signal_safe。
 func _emit_safe(signal_name: StringName, args: Array) -> void:
 	var gsm = _get_gsm()
-	if gsm != null:
-		var s = gsm.get_script()
-		if s != null and s.has_method("_emit_signal_safe"):
-			s._emit_signal_safe(self, signal_name, args)
-			return
+	if gsm != null and gsm.has_method("_emit_signal_safe"):
+		gsm._emit_signal_safe(self, signal_name, args)
+		return
 	push_warning("CombatSystem: GSM 不可用，%s 信号绕过 _emit_signal_safe 路由" % signal_name)
 	var call_args: Array = [signal_name]
 	call_args.append_array(args)

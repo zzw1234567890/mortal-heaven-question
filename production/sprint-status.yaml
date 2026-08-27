@@ -278,8 +278,8 @@ stories:
     name: "阶段转换 Cat 2b 信号通知 CombatUI"
     file: "production/epics/combat-system/story-004-phase-transition-signals.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: "4-23"
-    completed: ""
+    completed: "2026-08-27 6 个 Cat 2b 信号声明+_emit_safe 路由+attack_resolved 具名字典+_resolve_attack_queue; battle_ended 发射时机修正(清理 battle 域之前发射); _emit_safe 简化为实例直接调用; lead-programmer APPROVE WITH SUGGESTIONS(HIGH battle_ended 时机已修复+MEDIUM 技术债已标注) + qa-lead GAPS(GAP-1 retreat_requested+GAP-2 链深度 GSM 验证+GAP-3 帧级重置+GAP-4 发射顺序+GAP-5 空队列+GAP-6 多周期 已补齐); 28 单测全通过, 全量 1727 tests/1726 passing 零回归"

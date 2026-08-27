@@ -1,12 +1,12 @@
 # Story 004: 阶段转换 Cat 2b 信号通知 CombatUI
 
 > **Epic**: combat-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-27
 
 ## Context
 
@@ -34,16 +34,16 @@
 
 *From ADR-0008 §验证标准 + §决策（信号分类 Cat 2b）+ GDD §与其他系统的交互（战斗UI系统交互）:*
 
-- [ ] **AC-001**: 声明 5 个 Cat 2b 信号在 CombatSystem（语义归属系统）：`phase_changed`、`battle_started`、`battle_ended`、`attack_resolved`、`character_died`
-- [ ] **AC-002**: `phase_changed(old_phase: int, new_phase: int, turn: int)` 在 `advance_phase()` 成功后发射，通过 `_emit_signal_safe`
-- [ ] **AC-003**: `battle_started(config: Dictionary)` 在 `battle_start()` 完成后发射，通过 `_emit_signal_safe`
-- [ ] **AC-004**: `battle_ended(result: CombatResult, rewards: Dictionary)` 在 `battle_end()` 完成后、清理 battle 域之前发射，通过 `_emit_signal_safe`
-- [ ] **AC-005**: `attack_resolved(attacker_id, target_id, damage, is_kill)` 在每次攻击结算完毕发射——4 参数使用具名字典格式（ADR-0007），通过 `_emit_signal_safe`
-- [ ] **AC-006**: `character_died(character_id: int, side: Side, binding_card_ids: Array[int])` 在角色 HP ≤ 0 时发射——携带正确的 `binding_card_ids`，通过 `_emit_signal_safe`
-- [ ] **AC-007**: CombatUI 监听 `phase_changed` → 阶段指示器随 `advance_phase()` 更新
-- [ ] **AC-008**: 信号链深度不超过 4 层硬限制——`character_died` → BindingSystem 解绑 → GSM `batch_updated` → HUD 刷新 = 3 层
-- [ ] **AC-009**: 信号处理器捕获异常（ADR-0007 禁止模式 #8）——异常逃逸导致的深度计数器泄漏通过 GSM 帧级重置恢复
-- [ ] **AC-010**: HP/费用变更不通过战斗系统自有信号——通过 GSM Cat 1 `batch_updated` 传播（无自有数据信号重复）
+- [x] **AC-001**: 声明 5 个 Cat 2b 信号在 CombatSystem（语义归属系统）：`phase_changed`、`battle_started`、`battle_ended`、`attack_resolved`、`character_died`
+- [x] **AC-002**: `phase_changed(old_phase: int, new_phase: int, turn: int)` 在 `advance_phase()` 成功后发射，通过 `_emit_signal_safe`
+- [x] **AC-003**: `battle_started(config: Dictionary)` 在 `battle_start()` 完成后发射，通过 `_emit_signal_safe`
+- [x] **AC-004**: `battle_ended(result: CombatResult, rewards: Dictionary)` 在 `battle_end()` 完成后、清理 battle 域之前发射，通过 `_emit_signal_safe`
+- [x] **AC-005**: `attack_resolved(attacker_id, target_id, damage, is_kill)` 在每次攻击结算完毕发射——4 参数使用具名字典格式（ADR-0007），通过 `_emit_signal_safe`
+- [x] **AC-006**: `character_died(character_id: int, side: Side, binding_card_ids: Array[int])` 在角色 HP ≤ 0 时发射——携带正确的 `binding_card_ids`，通过 `_emit_signal_safe`
+- [x] **AC-007**: CombatUI 监听 `phase_changed` → 阶段指示器随 `advance_phase()` 更新
+- [x] **AC-008**: 信号链深度不超过 4 层硬限制——`character_died` → BindingSystem 解绑 → GSM `batch_updated` → HUD 刷新 = 3 层
+- [x] **AC-009**: 信号处理器捕获异常（ADR-0007 禁止模式 #8）——异常逃逸导致的深度计数器泄漏通过 GSM 帧级重置恢复
+- [x] **AC-010**: HP/费用变更不通过战斗系统自有信号——通过 GSM Cat 1 `batch_updated` 传播（无自有数据信号重复）
 
 ---
 
