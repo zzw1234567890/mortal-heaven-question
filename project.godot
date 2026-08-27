@@ -31,6 +31,7 @@ FactionSystem="*res://src/core/faction_system.gd"
 StatusEffectSystem="*res://src/core/status_effect/status_effect_system.gd"
 RealmSystem="*res://src/core/realm_system.gd"
 SchoolSystem="*res://src/core/school_system/school_system.gd"
+CombatSystem="*res://src/feature/combat_system.gd"
 
 [display]
 

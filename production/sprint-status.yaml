@@ -26,7 +26,7 @@ stories:
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: "2026-08-16 RealmSystem+SchoolSystem 已注册并验证（headless 启动 + 全量 1145 测试零回归）；6 Feature Autoload 待各系统实现时注册（4-0b 终验）"
+    completed: "2026-08-16 RealmSystem+SchoolSystem 已注册并验证；2026-08-27 Sprint 4 完成后追加注册 CombatSystem #14（全量零回归）；CardEffectEngine/DeploymentSystem/BindingManager/FormationSystem/AISystem 待各系统测试桩改造后注册（BindingManager 与 AI MockBindingManager 冲突需先解决）"
 
   # === card-effect-engine（结算引擎，无下游依赖，最先做）===
   - id: "4-1"
