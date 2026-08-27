@@ -1,12 +1,12 @@
 # Story 003: play_card 出牌 + 目标解析 + 自动推进调度
 
 > **Epic**: combat-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: 0.5d
 > **Manifest Version**: 2026-08-05
-> **Last Updated**:
+> **Last Updated**: 2026-08-27
 
 ## Context
 
@@ -33,18 +33,18 @@
 
 *From ADR-0008 §验证标准 + §决策（出牌结算流程 Phase 2 核心交互）+ GDD §4 出牌规则 + GDD §8 境界压制规则 + GDD §公式（伤害公式 + 境界压制公式）:*
 
-- [ ] **AC-001**: `play_card(card_instance_id, target_indices)` 在非 PLAY 阶段被调用时返回 false + `push_warning`
-- [ ] **AC-002**: `play_card` 先执行费用验证——`CostSystem.can_afford(card.template.cost)` 不通过则返回 false（不扣费、不结算）
-- [ ] **AC-003**: `play_card` 执行目标验证——`CardEffectEngine.validate_targets(card.template, targets)` 不通过则返回 false
-- [ ] **AC-004**: `play_card` 通过验证后执行扣费——`CostSystem.spend(card.template.cost)`
-- [ ] **AC-005**: `play_card` 执行效果结算——`CardEffectEngine.resolve(card, targets)`，返回结果列表
-- [ ] **AC-006**: `play_card` 在效果结算后检查阵亡——`_check_and_process_deaths()` 处理角色 HP ≤ 0
-- [ ] **AC-007**: `play_card` 在满足 `hand_empty && !can_afford_any` 时自动调用 `advance_phase()`（空手牌 + 无费可出 → 自动结束出牌）
-- [ ] **AC-008**: 伤害计算 `max(1, attacker_ATK - target_DEF)`——最低 1 点伤害（0 防御时伤害 = ATK）
-- [ ] **AC-009**: 伤害经境界压制修正 `final_damage = floor(actual_damage × realm_penalty)`——realm_penalty 来自 `RealmSystem.get_suppression(attacker, defender)`
-- [ ] **AC-010**: 玩家攻击高 1 级敌人时 realm_penalty = 0.8（伤害显示 80%）
-- [ ] **AC-011**: 敌人高玩家 2 级及以上时 realm_penalty = 0.5（伤害显示 50%）
-- [ ] **AC-012**: 同境界或低于时 realm_penalty = 1.0（无压制）
+- [x] **AC-001**: `play_card(card_instance_id, target_indices)` 在非 PLAY 阶段被调用时返回 false + `push_warning`
+- [x] **AC-002**: `play_card` 先执行费用验证——`CostSystem.can_afford(card.template.cost)` 不通过则返回 false（不扣费、不结算）
+- [x] **AC-003**: `play_card` 执行目标验证——`CardEffectEngine.validate_targets(card.template, targets)` 不通过则返回 false
+- [x] **AC-004**: `play_card` 通过验证后执行扣费——`CostSystem.spend(card.template.cost)`
+- [x] **AC-005**: `play_card` 执行效果结算——`CardEffectEngine.resolve(card, targets)`，返回结果列表
+- [x] **AC-006**: `play_card` 在效果结算后检查阵亡——`_check_and_process_deaths()` 处理角色 HP ≤ 0
+- [x] **AC-007**: `play_card` 在满足 `hand_empty && !can_afford_any` 时自动调用 `advance_phase()`（空手牌 + 无费可出 → 自动结束出牌）
+- [x] **AC-008**: 伤害计算 `max(1, attacker_ATK - target_DEF)`——最低 1 点伤害（0 防御时伤害 = ATK）
+- [x] **AC-009**: 伤害经境界压制修正 `final_damage = floor(actual_damage × realm_penalty)`——realm_penalty 来自 `RealmSystem.get_suppression(attacker, defender)`
+- [x] **AC-010**: 玩家攻击高 1 级敌人时 realm_penalty = 0.8（伤害显示 80%）
+- [x] **AC-011**: 敌人高玩家 2 级及以上时 realm_penalty = 0.5（伤害显示 50%）
+- [x] **AC-012**: 同境界或低于时 realm_penalty = 1.0（无压制）
 
 ---
 

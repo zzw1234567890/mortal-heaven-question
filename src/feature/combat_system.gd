@@ -111,6 +111,21 @@ var _hand: Array = []
 ## 独立 RNG 实例（AC-013 牌库抽空随机返还）。
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
+## 可注入回调——CardEffectEngine.validate_targets（Story 003 接线后替换）。[br]
+## [br][b]桩实现[/b]：默认返回 true（认为目标始终合法）。
+var validate_targets_cb: Callable = Callable()
+
+## 可注入回调——CardEffectEngine.resolve（Story 003 接线后替换）。[br]
+## [br][b]桩实现[/b]：默认返回空 Array（无效果结果）。
+var resolve_cb: Callable = Callable()
+
+## 可注入回调——CardSystem.get_instance（Story 003 接线后替换）。[br]
+## [br][b]桩实现[/b]：默认返回 null——测试时通过 set_card_instances 注入。
+var get_card_instance_cb: Callable = Callable()
+
+## 卡牌实例缓存（测试桩——Story 003 接线 CardSystem 后移除）。
+var _card_instances: Dictionary = {}
+
 
 # === 生命周期 ====================================================================
 
@@ -517,7 +532,8 @@ func set_timer_exceeded() -> void:
 
 ## 检查手牌中是否有任何可支付费用的卡牌（AC-006 条件）。
 ## [br][b]桩实现[/b]——Story 002/003 接线 CostSystem.can_afford 后替换。[br]
-## [br]当前策略：手牌非空时返回 true（假设 0 费卡牌始终可出）。
+## [br]当前桩语义：手牌非空即返回 true——不检查费用。[br]
+## 接线 CostSystem 后改为遍历手牌调用 can_afford。
 func _can_afford_any_card() -> bool:
 	return not _hand.is_empty()
 
@@ -590,6 +606,222 @@ func get_hand() -> Array:
 	return _hand
 
 
+# === 出牌结算（Story 003）=======================================================
+
+## 玩家打出卡牌——由 CombatUI 触发（AC-001~007）。[br]
+## [br][b]确定性流程[/b]（顺序不可更改，ADR-0008 §出牌结算流程）：[br]
+##   1. 阶段守卫——非 PLAY 阶段 push_warning + return false[br]
+##   2. 卡牌获取——_get_card_instance(card_instance_id) → null 则 return false[br]
+##   3. 费用验证——CostSystem.can_afford(cost) → false 则 return false（不扣费）[br]
+##   4. 目标验证——_validate_targets(card, targets) → false 则 return false（不扣费）[br]
+##   5. 扣费——CostSystem.spend(cost)（直接调用——需要保证）[br]
+##   6. 效果结算——_resolve_effects(card, targets) 返回结果列表[br]
+##   7. 阵亡检查——_check_and_process_deaths()[br]
+##   8. 自动推进判定——hand_empty && !can_afford_any → advance_phase()[br]
+## [br][param card_instance_id] 卡牌实例 ID。[br]
+## [br][param target_indices] 目标索引列表。[br]
+## [br][b]返回[/b]: true 出牌成功，false 被拒绝。
+func play_card(card_instance_id: int, target_indices: Array) -> bool:
+	# AC-001：阶段守卫
+	if _phase != CombatPhase.PLAY:
+		push_warning("CombatSystem: play_card() called outside PLAY phase (current=%d)" % _phase)
+		return false
+
+	# 卡牌获取
+	var card = _get_card_instance(card_instance_id)
+	if card == null:
+		push_warning("CombatSystem: play_card() card_instance_id=%d not found" % card_instance_id)
+		return false
+
+	var cost: int = int(_get_card_cost(card))
+
+	# AC-002：费用验证——不通过不扣费不结算
+	if not _can_afford(cost):
+		push_warning("CombatSystem: play_card() cost=%d unaffordable" % cost)
+		return false
+
+	# AC-003：目标验证——不通过不扣费
+	var targets = _resolve_targets(card, target_indices)
+	if not _validate_targets(card, targets):
+		push_warning("CombatSystem: play_card() target validation failed")
+		return false
+
+	# AC-004：扣费（直接调用——需要保证）
+	_spend(cost)
+
+	# AC-005：效果结算（直接调用——需要结果列表）
+	var results = _resolve_effects(card, targets)
+
+	# AC-006：阵亡检查
+	_check_and_process_deaths(results)
+
+	# 从手牌移除已打出的卡牌
+	_remove_card_from_hand(card_instance_id)
+
+	# AC-007：空手牌 + 无费可出 → 自动结束出牌
+	if _hand.is_empty() and not _can_afford_any_card():
+		advance_phase()
+
+	return true
+
+
+## 获取卡牌实例——优先注入回调，回退到内部缓存（测试桩）。
+func _get_card_instance(card_instance_id: int) -> Variant:
+	if get_card_instance_cb.is_valid():
+		return get_card_instance_cb.call(card_instance_id)
+	return _card_instances.get(card_instance_id, null)
+
+
+## 获取卡牌费用——从卡牌数据中读取 cost 字段。[br]
+## [br][b]桩实现[/b]——Story 003 接线 CardSystem 后卡牌结构标准化。[br]
+## [br]当前策略：读取 card["cost"] 或 card.template["cost"]，默认 0。
+func _get_card_cost(card: Variant) -> int:
+	if card is Dictionary:
+		if card.has("cost"):
+			return int(card["cost"])
+		if card.has("template") and card["template"] is Dictionary and card["template"].has("cost"):
+			return int(card["template"]["cost"])
+	# 对象类型——尝试动态分派
+	if card.has_method("get_cost"):
+		return int(card.get_cost())
+	push_warning("CombatSystem: _get_card_cost unrecognized card format, defaulting to 0")
+	return 0
+
+
+## 费用验证——通过 CostSystem Autoload 检查。[br]
+## [br][b]桩实现[/b]——CostSystem 不可用时返回 true（0 费卡牌始终可出）。
+func _can_afford(cost: int) -> bool:
+	var cs = _get_cost_system()
+	if cs != null and cs.has_method("can_afford"):
+		return cs.can_afford(cost)
+	return true  # 桩——无 CostSystem 时不限制
+
+
+## 扣费——通过 CostSystem Autoload 执行。[br]
+## [br][b]桩实现[/b]——CostSystem 不可用时静默跳过。
+func _spend(cost: int) -> void:
+	var cs = _get_cost_system()
+	if cs != null and cs.has_method("spend"):
+		cs.spend(cost)
+
+
+## 目标解析——将 target_indices 转换为目标对象列表。[br]
+## [br][b]桩实现[/b]——Story 003 接线后由 CardEffectEngine 验证目标合法性。[br]
+## [br]当前策略：直接返回 target_indices（测试桩不解析角色/阵位）。
+func _resolve_targets(card: Variant, target_indices: Array) -> Array:
+	return target_indices.duplicate()
+
+
+## 目标验证——通过注入回调或 CardEffectEngine 验证。[br]
+## [br][b]桩实现[/b]——validate_targets_cb 未注入时返回 true。
+func _validate_targets(card: Variant, targets: Array) -> bool:
+	if validate_targets_cb.is_valid():
+		return bool(validate_targets_cb.call(card, targets))
+	return true
+
+
+## 效果结算——通过注入回调或 CardEffectEngine 执行。[br]
+## [br][b]桩实现[/b]——resolve_cb 未注入时返回空 Array。[br]
+## [br][b]返回[/b]: 结果列表 Array[Dictionary]。
+func _resolve_effects(card: Variant, targets: Array) -> Array:
+	if resolve_cb.is_valid():
+		return resolve_cb.call(card, targets)
+	return []
+
+
+## 阵亡检查——遍历结算结果，处理 HP ≤ 0 的角色。[br]
+## [br][b]桩实现[/b]——Story 004 接线 character_died 信号发射。[br]
+## [br]当前策略：遍历 results 检查 is_kill 字段，发射 character_died 信号。
+func _check_and_process_deaths(results: Array) -> void:
+	for result in results:
+		if result is Dictionary and result.get("is_kill", false):
+			var char_id: int = int(result.get("target_id", -1))
+			if char_id < 0:
+				push_warning("CombatSystem: _check_and_process_deaths skipping result with invalid target_id")
+				continue
+			var side: int = int(result.get("side", 0))
+			var binding_ids: Array = result.get("binding_card_ids", [])
+			_emit_safe(&"character_died", [char_id, side, binding_ids])
+
+
+## 从手牌移除已打出的卡牌。
+func _remove_card_from_hand(card_instance_id: int) -> void:
+	for i in range(_hand.size() - 1, -1, -1):
+		var card = _hand[i]
+		# 兼容 Dictionary 和对象类型
+		var cid: Variant = null
+		if card is Dictionary:
+			cid = card.get("card_instance_id", card.get("instance_id", -1))
+		elif card.has_method("get"):
+			cid = card.get("card_instance_id", -1)
+		if cid == card_instance_id:
+			_hand.remove_at(i)
+			return
+	push_warning("CombatSystem: _remove_card_from_hand card_instance_id=%d not found in hand" % card_instance_id)
+
+
+## 设置卡牌实例缓存（测试桩注入——Story 003 接线 CardSystem 后移除）。
+func set_card_instances(instances: Dictionary) -> void:
+	_card_instances = instances.duplicate()
+
+
+## 设置手牌（测试桩注入——Story 002 接线 DeckSystem 后移除）。
+func set_hand(hand: Array) -> void:
+	_hand = hand.duplicate()
+
+
+# === 伤害计算（AC-008~012）=======================================================
+
+## 计算最终伤害——`max(1, ATK - DEF) × realm_penalty`（AC-008/009）。[br]
+## [br][param attacker_atk] 攻击者攻击力。[br]
+## [br][param target_def] 目标防御力。[br]
+## [br][param attacker_realm] 攻击者境界等级。[br]
+## [br][param defender_realm] 防御者境界等级。[br]
+## [br][b]返回[/b]: [code]{actual_damage, realm_penalty, final_damage}[/code] Dictionary。[br]
+## [br][b]方向性约定[/b]：GDD §3 规定压制仅影响玩家→敌方的伤害。本函数作为纯函数
+## 不校验调用方向——方向性由调用方保证（玩家攻击时玩家为 attacker）。
+func calculate_damage(attacker_atk: int, target_def: int, attacker_realm: int, defender_realm: int) -> Dictionary:
+	# AC-008：actual_damage = max(1, ATK - DEF)
+	var actual_damage: int = maxi(1, attacker_atk - target_def)
+	# AC-009~012：realm_penalty 来自 RealmSystem.realm_penalty
+	var penalty: float = _get_realm_penalty(attacker_realm, defender_realm)
+	# AC-009：final_damage = floor(actual_damage × realm_penalty)
+	var final_damage: int = floori(float(actual_damage) * penalty)
+	# 最低保底 1 点伤害
+	final_damage = maxi(1, final_damage)
+	return {
+		"actual_damage": actual_damage,
+		"realm_penalty": penalty,
+		"final_damage": final_damage,
+	}
+
+
+## 获取境界压制系数——通过 RealmSystem Autoload。[br]
+## [br][b]桩实现[/b]——RealmSystem 不可用时返回 1.0（无压制）。[br]
+## [br][b]方向性约定[/b]：压制仅影响玩家→敌方（GDD §3），调用方保证方向。
+func _get_realm_penalty(attacker_realm: int, defender_realm: int) -> float:
+	var rs = _get_realm_system()
+	if rs != null and rs.has_method("realm_penalty"):
+		return float(rs.realm_penalty(attacker_realm, defender_realm))
+	return 1.0
+
+
+## 查找 CostSystem Autoload。
+func _get_cost_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/CostSystem")
+
+
+## 查找 RealmSystem Autoload。
+func _get_realm_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/RealmSystem")
+
+
 # === 查询 API ===================================================================
 
 ## 返回当前阶段。
@@ -641,6 +873,9 @@ func _get_gsm() -> Node:
 
 
 ## Cat 2b 信号安全发射——经 GSM._emit_signal_safe 路由（ADR-0007 信号链深度追踪）。[br]
+## [br][b]动态查找 GSM[/b]——而非直接引用 GameStateManager 全局名，[br]
+## 避免测试环境无 Autoload 时 NameError（CombatSystem 测试用 CS_SCRIPT.new() 构造，[br]
+## 无 Autoload 注册）。BindingManager 先例用直接引用是因为它本身是 Autoload。[br]
 ## [br][b]GSM 不可用时回退[/b]到直接 emit_signal + push_warning 告警——[br]
 ## 生产环境若 GSM 意外缺失会降级但不静默。[br]
 ## [br]来源: ADR-0008 §信号分类 / ADR-0007 §_emit_signal_safe。

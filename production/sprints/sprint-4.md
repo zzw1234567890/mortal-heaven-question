@@ -67,7 +67,7 @@
 | 21 | ai-system | 难度缩放 + register_preconfigured_bindings | `ai-system/story-004-*.md` | Logic | 0.5d | #19, #20 | Complete |
 | 22 | combat-system | 7 阶段回合状态机（advance_phase 确定性推进 + 阶段转换校验） | `combat-system/story-001-*.md` | Logic | 1.5d | #5, #7, #13, #17, #21 | Complete |
 | 23 | combat-system | 战斗生命周期编排（battle_start / battle_end + GSM battle.* 域） | `combat-system/story-002-*.md` | Integration | 0.5d | #22 | Complete |
-| 24 | combat-system | play_card 出牌 + 目标解析 + 自动推进调度 | `combat-system/story-003-*.md` | Logic | 0.5d | #22 | Ready |
+| 24 | combat-system | play_card 出牌 + 目标解析 + 自动推进调度 | `combat-system/story-003-*.md` | Logic | 0.5d | #22 | Complete |
 | 25 | combat-system | 阶段转换 Cat 2b 信号通知 CombatUI | `combat-system/story-004-*.md` | Integration | 0.5d | #23 | Ready |
 
 **总计**：25 story + 1 task = 26 项，预估 14.5d（4-22 取 1.5d 下限；上限 2d → 15d）
