@@ -3,12 +3,12 @@
 > **Sprint**: 4
 > **Start Date**: 2026-08-16
 > **End Date**: 2026-08-23
-> **Status**: Active
+> **Status**: Complete
 > **Focus**: Feature 层战斗子系统 6 Epic（CardEffectEngine / DeploymentSystem / BindingSystem / FormationSystem / AISystem / CombatSystem）——形成可运行的战斗闭环
 > **Milestone**: core-layer-complete 之后（Feature 层启动，无独立里程碑）
 > **Review Mode**: full
 > **Manifest Version**: 2026-08-05
-> **Last Updated**: 2026-08-24
+> **Last Updated**: 2026-08-28
 
 ## Sprint Goal
 
@@ -98,17 +98,17 @@
 
 ## 此冲刺的完成定义
 
-- [ ] 所有必须完成的任务已完成（26 项）
-- [ ] 所有任务通过验收标准
-- [ ] QA 计划已存在 (`production/qa/qa-plan-sprint-4.md`)
-- [ ] 所有逻辑/集成类故事有通过的单元/集成测试
-- [ ] 冒烟检查已通过 (`/smoke-check sprint`)
-- [ ] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
-- [ ] 已交付特性中无 S1 或 S2 的 bug
-- [ ] 任何偏差已更新设计文档
-- [ ] 代码已审查并合并
-- [ ] /story-done 门禁已强化（全量零回归 + orphan + parse error 检查——Sprint 3 回顾行动项 #1/#2）
-- [ ] RealmSystem(#11)/SchoolSystem(#19)/6 个 Feature Autoload 已注册且顺序验证通过（4-0）
+- [x] 所有必须完成的任务已完成（26 项）
+- [x] 所有任务通过验收标准
+- [x] QA 计划已存在 (`production/qa/qa-plan-sprint-4.md`)
+- [x] 所有逻辑/集成类故事有通过的单元/集成测试
+- [x] 冒烟检查已通过 (`/smoke-check sprint`)
+- [x] QA 签收报告：APPROVED WITH CONDITIONS (`/team-qa sprint`)
+- [x] 已交付特性中无 S1 或 S2 的 bug
+- [x] 任何偏差已更新设计文档
+- [x] 代码已审查并合并
+- [x] /story-done 门禁已强化（全量零回归 + orphan + parse error 检查——Sprint 3 回顾行动项 #1/#2）
+- [x] RealmSystem(#11)/SchoolSystem(#19)/6 个 Feature Autoload 已注册且顺序验证通过（4-0）
 
 ## 关键依赖链
 
