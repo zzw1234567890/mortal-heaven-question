@@ -1,6 +1,6 @@
 # Epics Index
 
-Last Updated: 2026-08-14
+Last Updated: 2026-08-28
 Engine: Godot 4.6.3
 
 | Epic | Layer | System | GDD | Stories | Status |
@@ -11,18 +11,18 @@ Engine: Godot 4.6.3
 | input-manager | Foundation | 输入管理器 | systems-mapping-2026-07-24.md | 4 stories | Complete |
 | scene-manager | Foundation | 场景管理器 | systems-mapping-2026-07-24.md | 4 stories | Complete |
 | card-system | Core | 卡牌系统 | card-system.md | 5 stories | Complete |
-| cost-system | Core | 费用系统 | cost-system.md | 2 stories | Ready |
-| status-effect | Core | 状态效果系统 | status-system.md | 3 stories | Ready |
+| cost-system | Core | 费用系统 | cost-system.md | 2 stories | Complete |
+| status-effect | Core | 状态效果系统 | status-system.md | 3 stories | Complete |
 | realm-system | Core | 境界系统 | realm-system.md | 3 stories | Complete |
 | faction-system | Core | 阵营系统 | faction-system.md | 2 stories | Complete |
 | resource-system | Core | 资源系统 | resource-system.md | 2 stories | Complete |
-| school-system | Core | 流派系统 | school-system.md | 2 stories | Ready |
-| combat-system | Feature | 战斗系统 | combat-system.md | 4 stories | Ready |
-| card-effect-engine | Feature | 卡牌效果解析引擎 | card-effect-engine.md | 5 stories | Ready |
-| deployment-system | Feature | 角色上场与阵位系统 | deployment-system.md | 4 stories | Ready |
-| binding-system | Feature | 功法/法宝绑定系统 | binding-system.md | 4 stories | Ready |
-| formation-system | Feature | 阵法系统 | formation-system.md | 4 stories | Ready |
-| ai-system | Feature | AI系统（敌方AI） | ai-system.md | 4 stories | Backlog |
+| school-system | Core | 流派系统 | school-system.md | 2 stories | Complete |
+| combat-system | Feature | 战斗系统 | combat-system.md | 4 stories | Complete |
+| card-effect-engine | Feature | 卡牌效果解析引擎 | card-effect-engine.md | 5 stories | Complete |
+| deployment-system | Feature | 角色上场与阵位系统 | deployment-system.md | 4 stories | Complete |
+| binding-system | Feature | 功法/法宝绑定系统 | binding-system.md | 4 stories | Complete |
+| formation-system | Feature | 阵法系统 | formation-system.md | 4 stories | Complete |
+| ai-system | Feature | AI系统（敌方AI） | ai-system.md | 4 stories | Complete |
 | exploration-system | Feature | 探索系统 | exploration-system.md | 5 stories | Backlog |
 | cultivation-system | Feature | 修为养成系统 | cultivation-system.md | 4 stories | Backlog |
 | tribulation-system | Feature | 渡劫突破系统 | tribulation-system.md | 4 stories | Backlog |

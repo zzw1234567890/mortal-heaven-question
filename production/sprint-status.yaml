@@ -9,277 +9,184 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 
-sprint: 4
-goal: "Feature 层战斗子系统 6 Epic（25 story + 1 task）——形成可运行的战斗闭环"
-start: "2026-08-16"
-end: "2026-08-23"
-generated: "2026-08-16"
-updated: "2026-08-24"
+sprint: 5
+goal: "Feature 层探索经济线 4 Epic（17 story）——形成可运行的探索循环"
+start: "2026-08-29"
+end: "2026-09-05"
+generated: "2026-08-29"
+updated: "2026-08-29"
 
 stories:
-  # === 4-0 Autoload 注册（硬前置）===
-  - id: "4-0"
-    name: "Autoload 注册：RealmSystem #11 + SchoolSystem #19 + 6 个 Feature Autoload 顺序验证"
-    file: ""
+  # === exploration-system（探索系统，DAG 程序化生成）===
+  - id: "5-1"
+    name: "程序化 DAG 地图生成（generate_map）"
+    file: "production/epics/exploration-system/story-001-procedural-dag.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 1.0
+    blocker: ""
+    completed: ""
+
+  - id: "5-2"
+    name: "导航状态 GSM exploration.* 主存储"
+    file: "production/epics/exploration-system/story-002-navigation-gsm.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-1"
+    completed: ""
+
+  - id: "5-3"
+    name: "move_to_node / resolve_node 节点推进"
+    file: "production/epics/exploration-system/story-003-move-resolve-node.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-1"
+    completed: ""
+
+  - id: "5-4"
+    name: "DAG 缓存重建 + _dag_ready 就绪标志"
+    file: "production/epics/exploration-system/story-004-dag-cache-rebuild.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-2"
+    completed: ""
+
+  - id: "5-5"
+    name: "事件节点分配 + 经济计算"
+    file: "production/epics/exploration-system/story-005-event-allocation-economy.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-3"
+    completed: ""
+
+  # === cultivation-system（修为养成）===
+  - id: "5-6"
+    name: "gain_cultivation 统一获取入口 + 溢出判定"
+    file: "production/epics/cultivation-system/story-001-gain-cultivation.md"
+    priority: must-have
+    status: ready-for-dev
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: "2026-08-28 全部 6 个 Feature Autoload 已注册并验证（CombatSystem #14 + CardEffectEngine #15 + DeploymentSystem #16 + BindingManager #17 + FormationSystem #18 + AISystem #19）；MockBindingManager 改为脚本替换模式解决与 Autoload 冲突；全量 1727 tests/1726 passing/1 pending 零回归"
+    completed: ""
 
-  # === card-effect-engine（结算引擎，无下游依赖，最先做）===
-  - id: "4-1"
-    name: "EffectTemplate/EffectInstance 双层对象模型（4 种子类）"
-    file: "production/epics/card-effect-engine/story-001-template-instance-model.md"
+  - id: "5-7"
+    name: "GSM player.* 数据存储 + batch_updated 传播"
+    file: "production/epics/cultivation-system/story-002-gsm-storage.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-6"
+    completed: ""
+
+  - id: "5-8"
+    name: "settle_overflow + 突破后溢出结算"
+    file: "production/epics/cultivation-system/story-003-settle-overflow.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-6"
+    completed: ""
+
+  - id: "5-9"
+    name: "realm_upgraded 信号订阅 + check_breakthrough"
+    file: "production/epics/cultivation-system/story-004-realm-upgraded-check-breakthrough.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-6"
+    completed: ""
+
+  # === tribulation-system（渡劫突破）===
+  - id: "5-10"
+    name: "渡劫流程编排 + TribulationState 状态机"
+    file: "production/epics/tribulation-system/story-001-tribulation-state-machine.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 1.0
+    blocker: "5-9"
+    completed: ""
+
+  - id: "5-11"
+    name: "渡劫战斗委托 CombatSystem + 天雷 debuff"
+    file: "production/epics/tribulation-system/story-002-combat-delegate-thunder.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-10"
+    completed: ""
+
+  - id: "5-12"
+    name: "渡劫丹辅助 + 成功/失败分支处理"
+    file: "production/epics/tribulation-system/story-003-pill-branch.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-10"
+    completed: ""
+
+  - id: "5-13"
+    name: "渡劫结果 GSM 同步 + 场景恢复"
+    file: "production/epics/tribulation-system/story-004-gsm-sync-scene-restore.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "5-11"
+    completed: ""
+
+  # === deck-editing-system（卡组编辑）===
+  - id: "5-14"
+    name: "卡组验证器（卡组上限/添加/移除校验）"
+    file: "production/epics/deck-editing-system/story-001-deck-validator.md"
+    priority: must-have
+    status: ready-for-dev
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: "2026-08-16 双层对象模型 + 4 子类 + EffectFactory + 5 Cat 2b 信号声明；OutcomeType 扩展 12→17；29 单测全通过，全量 1174 passing 零回归；C1 factory 签名经 TD 裁决两层分离并回写 ADR-0009"
+    completed: ""
 
-  - id: "4-2"
-    name: "ResolutionStack 栈式结算引擎（优先级队列 + LIFO + 中断插入）"
-    file: "production/epics/card-effect-engine/story-002-resolution-stack.md"
+  - id: "5-15"
+    name: "卡组编辑 API + GSM deck.* 存储"
+    file: "production/epics/deck-editing-system/story-002-edit-api-gsm.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
     owner: ""
     estimate_days: 0.5
-    blocker: "4-1"
-    completed: "2026-08-16 5 级优先级 + 次级 priority 决胜 + 二分中分辨率插入 + LIFO 出栈；12 单测全通过，全量 1186 passing 零回归；lead-programmer APPROVE / qa-lead ADEQUATE"
+    blocker: "5-14"
+    completed: ""
 
-  - id: "4-3"
-    name: "触发链硬限制 10 层 + visited_card_ids 循环检测"
-    file: "production/epics/card-effect-engine/story-003-trigger-chain-10-layer-cycle.md"
+  - id: "5-16"
+    name: "卡组保存/加载 + 默认卡组"
+    file: "production/epics/deck-editing-system/story-003-save-load-default.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
     owner: ""
     estimate_days: 0.5
-    blocker: "4-2"
-    completed: "2026-08-16 TriggerChainState 纯逻辑类 + resolve_all 接入深度/循环检查；13 单测全通过，全量 1197 passing 零回归；lead-programmer APPROVE / qa-lead GAPS 已补 continue 语义用例"
+    blocker: "5-15"
+    completed: ""
 
-  - id: "4-4"
-    name: "PRD 伪随机分布引擎（5% 步进 + 怜悯保护）"
-    file: "production/epics/card-effect-engine/story-004-prd-distribution.md"
+  - id: "5-17"
+    name: "卡组验证 UI 数据源接口"
+    file: "production/epics/deck-editing-system/story-004-ui-data-source.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
     owner: ""
     estimate_days: 0.5
-    blocker: "4-1"
-    completed: "2026-08-16 标准 PRD（起始=C 累加 C）+ calibrate_C 二分求解 + 怜悯 ceil(1/p)；11 单测全通过，全量 1207 passing 零回归；公式经 game-designer 裁决修订（原公式无法收敛），已回写 GDD/ADR-0009/QA 缺口 #2"
-
-  - id: "4-5"
-    name: "AI 干跑评估接口（GameStateSnapshot 不可变纯计算）"
-    file: "production/epics/card-effect-engine/story-005-ai-dry-run-snapshot.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-3, 4-4"
-    completed: "2026-08-17 不可变 GameStateSnapshot + EffectEvaluation + CardEffectEvaluator（evaluate_effect/evaluate_effect_probabilistic/simulate_chain/get_effect_categories）；17 单测全通过，全量 1225 passing 零回归；签名漂移+简化模型边界经 lead-programmer CONCERNS 采纳记录，qa-lead GAPS 已补齐"
-
-  # === deployment-system（纯逻辑）===
-  - id: "4-6"
-    name: "内部状态机 + 阵位数据管理（STANDBY→READY→ACTED）"
-    file: "production/epics/deployment-system/story-001-internal-state-machine.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-08-17 FieldState 枚举 + _field 阵位模型 + setup_field 自动/手动分配（前排配额表）+ 待命状态机 + 查询 API；22 单测全通过，全量 1246 passing 零回归；ADR-0016 阵位算法 retrofit 修正，lead-programmer CONCERNS + qa-lead GAPS 已补齐"
-
-  - id: "4-7"
-    name: "deploy / remove / is_targetable 前后排保护 O(1)"
-    file: "production/epics/deployment-system/story-002-deploy-remove-targetable.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-6"
-    completed: "2026-08-17 deploy/remove_character/is_targetable 6 步判断 + 3 个 Cat 2b 信号经 _emit_signal_safe 路由；22 单测全通过，全量 1268 passing 零回归；lead-programmer CONCERNS（deploy 补 max_deploy 上限）+ qa-lead GAPS 已补齐"
-
-  - id: "4-8"
-    name: "战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot"
-    file: "production/epics/deployment-system/story-003-serialize-snapshot-export.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-7"
-    completed: "2026-08-18 serialize_field/deserialize_field/sync_unavailable_to_gsm/load_unavailable_from_gsm/write_snapshot_to_gsm + _state_to_string/_state_from_string 枚举双向映射；GSM 第二层 _set_battle_deployment_snapshot + _set_player_unavailable_characters + player 默认域补 unavailable_characters；20 集成测试全通过，全量 1289 tests / 1288 passing 零回归；lead-programmer CONCERNS（C-1 JSON int-key 丢数据→键归一修复）+ qa-lead GAPS 已补齐"
-
-  - id: "4-9"
-    name: "clear_standby_state + mark_unavailable + revive_character"
-    file: "production/epics/deployment-system/story-004-clear-standby-revive.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-7"
-    completed: "2026-08-18 clear_standby_state（STANDBY/ACTED→READY + standby_cleared 信号仅含待命角色）+ mark_unavailable/get_unavailable_characters/revive_character/is_game_over + 3 Cat 2b 信号；22 单元测试全通过，全量 1311 tests / 1310 passing 零回归；is_game_over 签名偏离 ADR-0016（注入 roster 必传）已回写；lead-programmer CONCERNS + qa-lead GAPS 已补齐"
-
-  # === binding-system ===
-  - id: "4-10"
-    name: "BindingRecord RefCounted 实例模型 + 内部注册表"
-    file: "production/epics/binding-system/story-001-refcounted-model.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-08-18 BindingRecord（class_name + 14 字段 + BindingSlot 枚举）+ BindingManager 三同步索引（_bindings/_by_character/_card_to_character）+ _register_binding/_unregister_binding 原子同步 + 4 查询 API；文件位置 story 过时路径 src/core/binding/→src/feature/binding/ 修正；_by_character 无类型 Dictionary（嵌套类型化集合不支持）回写 ADR-0013；19 单测全通过，全量 1330 passing 零回归；lead-programmer CONCERNS（C1 assert 死代码→Variant 读入 + C4 反查 character_id）+ qa-lead GAPS 已补齐"
-
-  - id: "4-11"
-    name: "bind / unbind / get_bindings 查询 API"
-    file: "production/epics/binding-system/story-002-bind-unbind-query-api.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-10"
-    completed: "2026-08-18 bind/stack/overwrite/can_bind/remove/suspend/restore/get_accumulated_bonus + 本命判定 + 叠加公式 + RealmSystem 10→12 键（gongfa/fabao_slots）；37 单测全通过，全量 1368 tests / 1367 passing 零回归；lead-programmer CONCERNS（C1 stack/overwrite 补 card_already_bound 守卫 + C2 本命子串误匹配→分段锚定 + C5 哨兵→push_error/-1 + C3/C4/C6 延后 Story 004 记录）+ qa-lead GAPS（G1 AC-006 主语义 + G2 回调序列 + G3 高倍率 240 + G4 叠层清理 + G5 本命位重占 + G6 命名）已补齐"
-
-  - id: "4-12"
-    name: "绑定生命周期信号总线（7 个 Cat 2b 信号）"
-    file: "production/epics/binding-system/story-003-lifecycle-signal-bus.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-11"
-    completed: "2026-08-21 7 个 Cat 2b 信号声明（binding_applied/removed/overwritten/stacked/suspended/restored/native_activated）+ _emit_safe 路由（GSM._emit_signal_safe 链深度追踪）+ 6 业务方法挂钩信号发射；30 集成测试全通过，全量 1398 tests / 1397 passing 零回归；lead-programmer CONCERNS（C1 Array→Array[int] 类型修正 + C4/C5 ADR reason 值补充）+ qa-lead GAPS（G1-G16 全补齐含 G14 链深度截断守卫）已处理"
-
-  - id: "4-13"
-    name: "serialize_all 快照导出 + persistent effect 接口"
-    file: "production/epics/binding-system/story-004-serialize-snapshot.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-11"
-    completed: "2026-08-22 serialize_all/deserialize_all/write_snapshot_to_gsm/get_binding_context + GSM _set_battle_bindings（首次写入跳过去重）；effect_register_cb 4 参数含 BindingContext（AC-005）；remove_all_bindings 遍历所有叠层实例调 effect_remove_cb（AC-008）；suspend/restore 传 card_ids（AC-007）；20 集成测试全通过，全量 1418 tests / 1417 passing 零回归；lead-programmer CONCERNS（C1 GSM old 值捕获）+ qa-lead GAPS 已补齐"
-
-  # === formation-system ===
-  - id: "4-14"
-    name: "内部条件状态机 + 阵法位管理"
-    file: "production/epics/formation-system/story-001-internal-state-machine.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-08-22 SlotState/AuraScope 枚举 + _slots 3 阵位数据模型 + deploy_formation（空位自动分配+占用守卫+即时条件判定）+ overwrite_formation（严格顺序 remove→discard→register）+ set/clear_character_affilation（每角色最多 1）+ 6 查询 API + 5 Cat 2b 信号经 _emit_safe 路由；condition_check_cb 注入存根（回退 FactionSystem.check_condition）；36 单测全通过，全量 1454 tests / 1453 passing 零回归；lead-programmer CONCERNS（C1 占用守卫+C2/C3/C5 补测试+C7 _clear_all 注释）+ qa-lead GAPS（G1-G9 全补齐含 AC-005 失效覆盖+AC-008 阵亡保留）已处理"
-
-  - id: "4-15"
-    name: "激活条件实时重判（订阅 deployment 信号）"
-    file: "production/epics/formation-system/story-002-activation-rejudge.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-14, 4-7"
-    completed: "2026-08-22 recheck_all_conditions（遍历 3 阵位+跳过 EMPTY/DISCARDED+条件变化更新状态+返回变更列表不发射信号）+ _on_field_changed（批量处理副作用：ACTIVE→register+activated / UNACTIVE→remove+清归属+deactivated + 批量发射 formation_condition_reevaluated）+ _pending_affiliations 队列骨架；_clear_affiliations_by_formation 同步清理 slot.affiliated_chars（C1 修复）；15 集成测试全通过，全量 1469 tests / 1468 passing 零回归；lead-programmer CONCERNS（C1 affiliated_chars 同步+C2 队列骨架+C3 测试重命名）+ qa-lead GAPS（G1 多归属清除+G2 reason 断言+G3 性能+G4 changes 载荷）已处理"
-
-  - id: "4-16"
-    name: "get_aura_bonus O(1) 查询 + 梯度光环计算"
-    file: "production/epics/formation-system/story-003-aura-bonus-query.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-14"
-    completed: "2026-08-24 get_aura_bonus（O(1) _affiliations 查找+固定/梯度统一接口+breakdown 结构）+ _calculate_gradient_aura（base_value × mini(count-1, max_level) 门槛≥2）+ _get_fixed_bonus（effect_config/fixed_bonus_cb 双路径）+ _query_count_on_field（count_on_field_cb 注入+FactionSystem 回退）；20 单测全通过，全量 1489 tests / 1488 passing 零回归；lead-programmer APPROVED WITH SUGGESTIONS（5 LOW 全可选）+ qa-lead GAPS（G1 tag_id 传递验证+G2 breakdown.bonus+G3 梯度性能+G4 base_value 非 1.0+G5 3 人中间点+G8 fixed_bonus_cb）已补齐"
-
-  - id: "4-17"
-    name: "serialize_all 快照导出 GSM.battle.formation_snapshot"
-    file: "production/epics/formation-system/story-004-serialize-snapshot.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-16"
-    completed: "2026-08-24 serialize_all（slots+affiliations+next_formation_id，StringName→String）+ deserialize_all（character_exists_cb 验证+跳过+WARN+_affiliations 重建 affiliated_chars 派生索引）+ _deserialize_slot（类型守卫+键归一）+ clear_all_formations（保留 _next_formation_id+清理 _pending_affiliations）+ write_snapshot_to_gsm + GSM _set_battle_formation_snapshot（首次写入跳过去重）；13 集成测试全通过，全量 1502 tests / 1501 passing 零回归；lead-programmer CONCERNS（C1 affiliated_chars 不同步→重建派生索引修复+C2 _pending_affiliations 清理+C3 类型守卫）+ qa-lead GAPS（G1 affiliated_count 断言+G2 JSON round-trip 深度验证+G6 slot 字段全验证+G7 next_formation_id 默认值）已补齐"
-
-  # === ai-system（依赖 card-effect-engine）===
-  - id: "4-18"
-    name: "EnemyTemplate Resource + EnemyFactory + EnemyBattleState"
-    file: "production/epics/ai-system/story-001-enemy-template-factory.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-0"
-    completed: "2026-08-25 EnemyTemplate（Resource + 17 @export 字段）+ 4 个内嵌 Resource 类型（BehaviorProfile/SkillEntry 含 SkillType/TargetType 枚举/BossPhaseTransition/RewardConfig）在 assets/enemies/ 独立文件；EnemyBattleState（RefCounted + 12 运行时字段）在 src/feature/ai/；AISystem Autoload #18（extends Node 无 class_name，preload _EnemyBattleState/_EnemyTemplate 避免 class_name 解析失败）+ load_templates 目录扫描 + create_state 模板→实例映射 + create_enemy_roster 阵位自动分配（≤2 人全前排/front_slot 强制前排/防御降序→前排/攻击降序→后排/前排容量 3）；21 单测全通过，全量 80 scripts / 1523 tests / 1522 passing 零回归"
-
-  - id: "4-19"
-    name: "execute_turn 决策主循环（普通/精英/Boss 分支）"
-    file: "production/epics/ai-system/story-002-execute-turn-decision.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-18, 4-5"
-    completed: "2026-08-25 execute_turn（Phase 6 入口+遍历存活敌人+撤退先行+批量发射 enemy_retreated）+ _decide_action 三分支（normal/elite/boss，elite/boss 含 _check_formation_deploy/_check_phase_transition 空桩钩子）+ _evaluate_skills（base_weight×modifier 降序排序+全冷却/全超费 basic_attack 兜底+返回 skill_id/cost/target_type/skill_type）+ _calculate_modifier（治疗+0.5/防御+0.3/攻击+0.4 乘法修正+阵法+20 加法修正）+ _select_target（SELF→空/ALL_ENEMY→全部/ALL_ALLIES→友方/SINGLE→集火 HP%最低+同 HP% 防御最低/分散加权随机残血×2/嘲讽仅攻击类受限）+ _check_retreat（非 Boss+ally_hp_ratio<threshold+50%概率+retreat_threshold=0 永不撤退）+ _emit_safe GSM 信号路由；AC-011 补位逻辑标注 Out of Scope（DeploymentSystem/CombatSystem 职责）；32 单测全通过，全量 81 scripts / 1555 tests / 1554 passing 零回归；lead-programmer CONCERNS（D1 钩子空桩+D2 多目标 target_type+D3 field_state 键名常量化+T4 ally_low_hp_count=0 测试）+ qa-lead GAPS（G1 双重标记+G2 同分稳定+G3 阵法+20+G4 嘲讽不影响非攻击+G5 AC-011 Out of Scope+G6 retreat_threshold=0+G7 穿透攻击延后+G8 边界）已补齐"
-
-  - id: "4-20"
-    name: "BossPhaseMgr 阶段转换内部状态机"
-    file: "production/epics/ai-system/story-003-boss-phase-manager.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-18"
-    completed: "2026-08-26 BossPhaseMgr 内部状态机 check/transition/get_phase + _should_transition OR 语义+哨兵 + _do_boss_phase_transition（行为替换+技能解锁/移除+冷却重置+回血+信号）+ 实例级 runtime_behavior_profile/runtime_skill_pool（不写回模板 ADR-0017 只读约定）+ load_templates AC-009 阶段上限 2 校验；signal boss_phase_transitioned 首参无类型（RefCounted 不被 Object 接受）；27 单测全通过，全量 82 scripts / 1583 tests / 1582 passing 零回归；lead-programmer CONCERNS（HIGH-1 信号双发→单路径+HIGH-2 模板只读→实例字段下沉+MEDIUM-1 AC-009 校验）+ qa-lead GAPS（GAP-1 skill_unlock+GAP-3 turn==turn_after 边界+GAP-4/5 信号 call_count+GAP-6 注释）已补齐"
-
-  - id: "4-21"
-    name: "难度缩放 + register_preconfigured_bindings"
-    file: "production/epics/ai-system/story-004-difficulty-scaling.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-19, 4-20"
-    completed: "2026-08-26 _apply_difficulty_scaling（scale=1.0+gap×0.3，round 取整）+ _apply_difficulty_scaling_to_roster + register_preconfigured_bindings（SceneTree 查找 BM + bind_card + 返回值检查）+ remove_enemy_bindings（remove_all_bindings）+ create_enemy_roster 集成缩放→阵位→绑定；character_id=100000+idx×10000（敌方 ID 范围）+card_instance_id=character_id+binding_idx（唯一）；player_realm 移除默认值（不硬编码）；_compare_by_defense_desc/attack_desc 改为基于 template.base_*（缩放不影响分配）；MockBindingManager fixtures 验证调用次数/参数/唯一性/移除；20 单测全通过，全量 83 scripts / 1603 tests / 1602 passing 零回归；lead-programmer CONCERNS（HIGH-1 ID 碰撞→组合键+HIGH-3 默认值→移除+HIGH-4 返回值→检查+比较器注释）+ qa-lead GAPS（GAP-1~5 Mock BM 调用验证）已补齐"
-
-  # === combat-system（编排器，依赖全部，最后做）===
-  - id: "4-22"
-    name: "7 阶段回合状态机（advance_phase 确定性推进 + 阶段转换校验）"
-    file: "production/epics/combat-system/story-001-seven-phase-state-machine.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 1.5
-    blocker: "4-5, 4-7, 4-13, 4-17, 4-21"
-    completed: "2026-08-27 CombatSystem Autoload #9 + CombatPhase 枚举(7 值) + advance_phase 确定性序列(验证→清理→初始化→GSM 镜像→信号) + _validate_transition 验证矩阵(2→3/3→4 条件式,其余无条件) + _enter_phase/_exit_phase 桩编排 + call_deferred 自动推进 + confirm_end_turn/confirm_attack_targets 手动确认 + AC-013 牌库抽空返还 + _emit_safe GSM 路由 + set_battle_active 初始化链; GSM 第二层 _set_battle_phase/_increment_battle_turn/_set_battle_active(active=false 清理 battle 域); 41 单测全通过,全量 84 scripts / 1644 tests / 1643 passing 零回归; lead-programmer APPROVE WITH SUGGESTIONS(HIGH ADR 漂移→_set_battle_active(false) 清理 battle 域已修复 + MEDIUM GSM 镜像测试待 Story 002 + LOW _emit_safe fallback 告警+nil 守卫已修复) + qa-lead ADEQUATE(MAJOR-1~5 全补齐:exit_phase 副作用+帧间隔精确+多次抽牌返还+enter_phase DRAW 集成+MINOR turn 参数+confirm 阶段守卫)"
-
-  - id: "4-23"
-    name: "战斗生命周期编排（battle_start / battle_end + GSM battle.* 域）"
-    file: "production/epics/combat-system/story-002-battle-lifecycle-gsm.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-22"
-    completed: "2026-08-27 battle_start(config) 初始化 battle.* 域(重复守卫+GSM _set_battle_active(true) 创建+内部状态重置+SaveLoad 快照+InputManager ANIMATION 锁+_emit_safe battle_started+_enter_phase(PREPARATION)) + battle_end(result) 防御清理(_attack_queue.clear+_is_active=false+InputManager clear_locks)+_settle_result(VICTORY/DEFEAT/RETREAT 桩)+VICTORY 清快照+_gsm_set_battle_active(false) 清理 battle 域+_emit_safe battle_ended+SceneManager 场景切换 + retreat()/confirm_retreat() + _scene_change_enabled 测试开关; GSM _set_battle_active 双向语义(active=true 创建 battle 域+active=false 清理为 null); 24 集成测试全通过,全量 85 scripts / 1668 tests / 1666 passing / 1 pending / 1 failing(既有跨测试污染,基准 6 失败→改动后 1 失败,零新增回归)"
-
-  - id: "4-24"
-    name: "play_card 出牌 + 目标解析 + 自动推进调度"
-    file: "production/epics/combat-system/story-003-play-card-target-resolution.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-22"
-    completed: "2026-08-27 play_card 确定性流程 + calculate_damage + Callable 注入桩; lead-programmer APPROVE WITH SUGGESTIONS (HIGH 守卫+告警 已处理) + qa-lead GAPS (GAP-1~6 已补齐); 28 单测全通过, 全量 1699 tests / 1698 passing 零回归"
-
-  - id: "4-25"
-    name: "阶段转换 Cat 2b 信号通知 CombatUI"
-    file: "production/epics/combat-system/story-004-phase-transition-signals.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "4-23"
-    completed: "2026-08-27 6 个 Cat 2b 信号声明+_emit_safe 路由+attack_resolved 具名字典+_resolve_attack_queue; battle_ended 发射时机修正(清理 battle 域之前发射); _emit_safe 简化为实例直接调用; lead-programmer APPROVE WITH SUGGESTIONS(HIGH battle_ended 时机已修复+MEDIUM 技术债已标注) + qa-lead GAPS(GAP-1 retreat_requested+GAP-2 链深度 GSM 验证+GAP-3 帧级重置+GAP-4 发射顺序+GAP-5 空队列+GAP-6 多周期 已补齐); 28 单测全通过, 全量 1727 tests/1726 passing 零回归"
+    blocker: "5-16"
+    completed: ""
