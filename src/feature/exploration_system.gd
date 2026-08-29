@@ -190,6 +190,177 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 	}
 
 
+# === 节点导航（Story 003）=====================================================
+
+## Cat 2b 信号——节点移动完成（ADR-0007 / ADR-0014 §决策 3）。
+signal node_moved(from_node: int, to_node: int, ap_remaining: int)
+
+## Cat 2b 信号——到达事件节点，委托 EventSystem（ADR-0014 §决策 3）。
+signal event_node_reached(map_pool: Array, player_realm: int)
+
+## Cat 2b 信号——到达战斗/精英节点，委托 CombatSystem（ADR-0014 §决策 3）。
+signal combat_node_reached(enemy_roster: Array, combat_type: StringName)
+
+## Cat 2b 信号——到达 Boss 节点，委托 CombatSystem（ADR-0014 §决策 3）。
+signal boss_node_reached(boss_data: Dictionary)
+
+## Cat 2b 信号——到达商店/回复/灵泉/渡劫台/传送节点，UI 按 interaction_type 分发（ADR-0014 §决策 3）。
+signal node_interaction_triggered(node_id: int, interaction_type: StringName, payload: Dictionary)
+
+## AP=0 豁免节点类型集合——不消耗行动力且行动力不足时仍可移动。
+const AP_EXEMPT_TYPES: Array = [NodeType.TELEPORT, NodeType.ACTION_SPRING, NodeType.BOSS]
+
+## 节点导航——从 from_node 移动到 to_node。[br]
+## [br][b]验证链路[/b]（短路求值）：可达性 → 已访问 → 行动力。[br]
+## [br][b]AP=0 豁免[/b]：传送/行动力泉/Boss 节点不消耗 AP，行动力不足时仍可移动。[br]
+## [br][b]成功后[/b]：更新 GSM 导航状态 → 消耗 AP → 发射 node_moved → 调用 resolve_node。[br]
+## [br][param from_node] 起始节点 ID。[br]
+## [br][param to_node] 目标节点 ID。[br]
+## [br][b]返回[/b]: [code]{success: bool, reason: String, ap_remaining: int}[/code] Dictionary。[br]
+## [br]来源: ADR-0014 §关键接口 + GDD §4 节点导航。
+func move_to_node(from_node: int, to_node: int) -> Dictionary:
+	var result: Dictionary = {"success": false, "reason": "", "ap_remaining": 0}
+
+	# 验证 1：可达性——graph[from] 包含 to
+	if not _is_reachable(from_node, to_node):
+		result["reason"] = "不可达"
+		return result
+
+	# 验证 2：已访问——不可回退到已访问节点
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		result["reason"] = "GSM 不可用"
+		return result
+	var visited: Array = gsm.exploration.get("visited_nodes", [])
+	if visited.has(to_node):
+		result["reason"] = "已访问"
+		return result
+
+	# 验证 3：行动力——非豁免节点 AP 不足时拒绝
+	var ap: int = int(gsm.exploration.get("action_points", 0))
+	var to_type: int = _get_node_type(to_node)
+	var is_exempt: bool = AP_EXEMPT_TYPES.has(to_type)
+	if ap < 1 and not is_exempt:
+		result["reason"] = "行动力不足"
+		return result
+
+	# 验证通过——执行移动
+	var ap_cost: int = 1
+	if is_exempt:
+		ap_cost = 0
+	var new_ap: int = ap - ap_cost
+
+	# 更新 GSM 导航状态（通过第二层方法——ADR-0014 §GSM 写入契约）
+	var to_layer: int = to_node / 100
+	var to_idx: int = to_node % 100
+	gsm.set_exploration_position(to_layer, to_idx)
+	gsm.add_visited_node(to_node)
+	gsm.set_exploration_ap(new_ap, int(gsm.exploration.get("max_action_points", 0)))
+
+	result["success"] = true
+	result["ap_remaining"] = new_ap
+
+	# 发射 node_moved Cat 2b 信号
+	_emit_safe(&"node_moved", [from_node, to_node, new_ap])
+
+	# 自动调用 resolve_node 触发节点交互
+	resolve_node(to_node)
+
+	return result
+
+
+## 只读查询——验证从 from_node 是否可移动到 to_node。[br]
+## [br][b]不修改任何状态[/b]——与 move_to_node() 分离（查询 vs 命令，ADR-0014 §关键接口）。[br]
+## [br][param from_node] 起始节点 ID。[br]
+## [br][param to_node] 目标节点 ID。[br]
+## [br][b]返回[/b]: [code]true[/code] 可移动，[code]false[/code] 不可移动。[br]
+## [br]来源: ADR-0014 §关键接口 can_move_to。
+func can_move_to(from_node: int, to_node: int) -> bool:
+	if not _is_reachable(from_node, to_node):
+		return false
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return false
+	var visited: Array = gsm.exploration.get("visited_nodes", [])
+	if visited.has(to_node):
+		return false
+	var ap: int = int(gsm.exploration.get("action_points", 0))
+	var to_type: int = _get_node_type(to_node)
+	var is_exempt: bool = AP_EXEMPT_TYPES.has(to_type)
+	if ap < 1 and not is_exempt:
+		return false
+	return true
+
+
+## 节点交互分发——按节点类型发射 Cat 2b 委托信号。[br]
+## [br][param node_id] 节点 ID。[br]
+## [br][b]分发规则[/b]（ADR-0014 §决策 3）:[br]
+## [br]EVENT → event_node_reached(map_pool, player_realm)[br]
+## [br]COMBAT/ELITE → combat_node_reached(enemy_roster, combat_type)[br]
+## [br]BOSS → boss_node_reached(boss_data)[br]
+## [br]SHOP/REST/ACTION_SPRING/TELEPORT/TRIBULATION → node_interaction_triggered(node_id, type, payload)[br]
+## [br]来源: ADR-0014 §决策 3 信号驱动子系统委托。
+func resolve_node(node_id: int) -> void:
+	var ntype: int = _get_node_type(node_id)
+	var detail: Dictionary = _node_details.get(node_id, {})
+	var gsm: Node = _get_gsm()
+	var player_realm: int = 1
+	if gsm != null:
+		player_realm = int(gsm.player.get("realm", 1))
+
+	match ntype:
+		NodeType.EVENT:
+			var map_pool: Array = detail.get("event_pool", [])
+			_emit_safe(&"event_node_reached", [map_pool, player_realm])
+		NodeType.COMBAT:
+			var roster: Array = detail.get("enemy_roster", [])
+			_emit_safe(&"combat_node_reached", [roster, &"combat"])
+		NodeType.ELITE:
+			var roster_elite: Array = detail.get("enemy_roster", [])
+			_emit_safe(&"combat_node_reached", [roster_elite, &"elite"])
+		NodeType.BOSS:
+			var boss_data: Dictionary = {"node_id": node_id, "enemy_roster": detail.get("enemy_roster", [])}
+			_emit_safe(&"boss_node_reached", [boss_data])
+		NodeType.SHOP:
+			var payload: Dictionary = {"inventory": detail.get("inventory", {})}
+			_emit_safe(&"node_interaction_triggered", [node_id, &"shop", payload])
+		NodeType.REST:
+			_emit_safe(&"node_interaction_triggered", [node_id, &"rest", {}])
+		NodeType.ACTION_SPRING:
+			_emit_safe(&"node_interaction_triggered", [node_id, &"action_spring", {}])
+		NodeType.TELEPORT:
+			_emit_safe(&"node_interaction_triggered", [node_id, &"teleport", {}])
+		NodeType.TRIBULATION:
+			_emit_safe(&"node_interaction_triggered", [node_id, &"tribulation", {}])
+		NodeType.ENTRY:
+			pass  # 入口无交互
+
+
+## 检查 from→to 是否邻接（graph[from] 包含 to）。
+func _is_reachable(from_node: int, to_node: int) -> bool:
+	if not _node_graph.has(from_node):
+		return false
+	return _node_graph[from_node].has(to_node)
+
+
+## 获取节点类型——从 _node_details 读取。
+func _get_node_type(node_id: int) -> int:
+	var detail: Dictionary = _node_details.get(node_id, {})
+	return int(detail.get("type", NodeType.COMBAT))
+
+
+## 通过 GSM._emit_signal_safe 路由 Cat 2b 信号（ADR-0007）。
+func _emit_safe(signal_name: StringName, args: Array) -> void:
+	var gsm: Node = _get_gsm()
+	if gsm != null and gsm.has_method("_emit_signal_safe"):
+		gsm._emit_signal_safe(self, signal_name, args)
+		return
+	push_warning("ExplorationSystem: GSM 不可用，%s 信号绕过 _emit_signal_safe 路由" % signal_name)
+	var call_args: Array = [signal_name]
+	call_args.append_array(args)
+	callv("emit_signal", call_args)
+
+
 # === 导航状态 GSM 主存储（Story 002）===========================================
 
 ## 进入地图——生成 DAG + 初始化 GSM exploration.* 导航状态。[br]
