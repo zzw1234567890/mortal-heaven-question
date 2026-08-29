@@ -39,15 +39,15 @@
 
 | # | Epic | Story | 文件 | 类型 | 预估 | 依赖 | 状态 |
 |:--|------|:--|------|:--:|:--:|:--:|:--:|
-| 1 | exploration-system | 程序化 DAG 地图生成（generate_map） | `exploration-system/story-001-*.md` | Logic | 1.0d | — | Ready |
-| 2 | exploration-system | 导航状态 GSM exploration.* 主存储 | `exploration-system/story-002-*.md` | Integration | 0.5d | #1 | Ready |
-| 3 | exploration-system | move_to_node / resolve_node 节点推进 | `exploration-system/story-003-*.md` | Logic | 0.5d | #1 | Ready |
-| 4 | exploration-system | DAG 缓存重建 + _dag_ready 就绪标志 | `exploration-system/story-004-*.md` | Integration | 0.5d | #2 | Ready |
-| 5 | exploration-system | 事件节点分配 + 经济计算 | `exploration-system/story-005-*.md` | Integration | 0.5d | #3 | Ready |
-| 6 | cultivation-system | gain_cultivation 统一获取入口 + 溢出判定 | `cultivation-system/story-001-*.md` | Logic | 0.5d | — | Ready |
-| 7 | cultivation-system | GSM player.* 数据存储 + batch_updated 传播 | `cultivation-system/story-002-*.md` | Integration | 0.5d | #6 | Ready |
-| 8 | cultivation-system | settle_overflow + 突破后溢出结算 | `cultivation-system/story-003-*.md` | Logic | 0.5d | #6 | Ready |
-| 9 | cultivation-system | realm_upgraded 信号订阅 + check_breakthrough | `cultivation-system/story-004-*.md` | Integration | 0.5d | #6 | Ready |
+| 1 | exploration-system | 程序化 DAG 地图生成（generate_map） | `exploration-system/story-001-*.md` | Logic | 1.0d | — | Done |
+| 2 | exploration-system | 导航状态 GSM exploration.* 主存储 | `exploration-system/story-002-*.md` | Integration | 0.5d | #1 | Done |
+| 3 | exploration-system | move_to_node / resolve_node 节点推进 | `exploration-system/story-003-*.md` | Logic | 0.5d | #1 | Done |
+| 4 | exploration-system | DAG 缓存重建 + _dag_ready 就绪标志 | `exploration-system/story-004-*.md` | Integration | 0.5d | #2 | Done |
+| 5 | exploration-system | 事件节点分配 + 经济计算 | `exploration-system/story-005-*.md` | Integration | 0.5d | #3 | Done |
+| 6 | cultivation-system | gain_cultivation 统一获取入口 + 溢出判定 | `cultivation-system/story-001-*.md` | Logic | 0.5d | — | Done |
+| 7 | cultivation-system | GSM player.* 数据存储 + batch_updated 传播 | `cultivation-system/story-002-*.md` | Integration | 0.5d | #6 | Done |
+| 8 | cultivation-system | settle_overflow + 突破后溢出结算 | `cultivation-system/story-003-*.md` | Logic | 0.5d | #6 | Done |
+| 9 | cultivation-system | realm_upgraded 信号订阅 + check_breakthrough | `cultivation-system/story-004-*.md` | Integration | 0.5d | #6 | Done |
 | 10 | tribulation-system | 渡劫流程编排 + TribulationState 状态机 | `tribulation-system/story-001-*.md` | Logic | 1.0d | #9 | Ready |
 | 11 | tribulation-system | 渡劫战斗委托 CombatSystem + 天雷 debuff | `tribulation-system/story-002-*.md` | Integration | 0.5d | #10 | Ready |
 | 12 | tribulation-system | 渡劫丹辅助 + 成功/失败分支处理 | `tribulation-system/story-003-*.md` | Logic | 0.5d | #10 | Ready |

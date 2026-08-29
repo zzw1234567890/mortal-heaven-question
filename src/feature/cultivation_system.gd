@@ -113,6 +113,67 @@ func get_cultivation_status() -> Dictionary:
 	}
 
 
+# === 突破检查（Story 004）====================================================
+
+## Autoload 就绪——订阅 GSM realm_changed 信号（ADR-0014 同 ExplorationSystem _ready 模式）。[br]
+## [br][b]流程[/b]: 连接 GSM.realm_changed → on_realm_changed。[br]
+## [br]来源: GDD §6 突破后修为处理 + GSM realm_changed 信号。
+func _ready() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("CultivationSystem._ready: GSM 不可用，信号未订阅")
+		return
+	if not gsm.realm_changed.is_connected(on_realm_changed):
+		gsm.realm_changed.connect(on_realm_changed)
+
+
+## 境界变化回调——境界变化时更新 max_cultivation 并触发溢出结算（GDD §6）。[br]
+## [br][param old_realm] 旧境界等级。[br]
+## [br][param new_realm] 新境界等级。[br]
+## [br][b]流程[/b]: 调用 update_max_cultivation(new_realm) [Story 5-8 已实现]。[br]
+## [br]来源: GDD §6 突破后修为处理。
+func on_realm_changed(old_realm: int, new_realm: int) -> void:
+	update_max_cultivation(new_realm)
+
+
+## 检查是否可以突破——修为已满时返回 true（GDD §4）。[br]
+## [br][b]返回[/b]: [code]true[/code] 可突破（cultivation >= max_cultivation），[code]false[/code] 不可。[br]
+## [br]来源: GDD §4 修为满值提示。
+func check_breakthrough() -> bool:
+	return check_cultivation_full()
+
+
+## 请求突破——返回突破请求信息（供 tribulation-system 使用）。[br]
+## [br][b]返回[/b]: [code]{can_breakthrough, current_realm, cultivation, max_cultivation, overflow_pool}[/code] Dictionary。[br]
+## [br]来源: GDD §4 + tribulation-system 交互。
+func request_breakthrough() -> Dictionary:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return {"can_breakthrough": false, "current_realm": 0, "cultivation": 0, "max_cultivation": 0, "overflow_pool": 0}
+	return {
+		"can_breakthrough": check_breakthrough(),
+		"current_realm": int(gsm.player.realm),
+		"cultivation": int(gsm.player.cultivation),
+		"max_cultivation": int(gsm.player.max_cultivation),
+		"overflow_pool": int(gsm.player.overflow_pool),
+	}
+
+
+## 获取突破状态摘要——供 UI 查询（GDD §4）。[br]
+## [br][b]返回[/b]: [code]{can_breakthrough, realm, cultivation_full, overflow_pool}[/code] Dictionary。[br]
+## [br]来源: GDD §4 + UI 查询需求。
+func get_breakthrough_status() -> Dictionary:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return {"can_breakthrough": false, "realm": 0, "cultivation_full": false, "overflow_pool": 0}
+	return {
+		"can_breakthrough": check_breakthrough(),
+		"realm": int(gsm.player.realm),
+		"cultivation_full": bool(gsm.player.cultivation_full),
+		"overflow_pool": int(gsm.player.overflow_pool),
+	}
+
+
 # === 内部辅助 ==================================================================
 
 ## 获取 GSM 引用——通过 SceneTree Autoload。
