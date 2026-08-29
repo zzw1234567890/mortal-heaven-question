@@ -195,6 +195,9 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 
 # === 节点导航（Story 003）=====================================================
 
+## Cat 2b 信号——探索结束（ADR-0014 §决策 5）。
+signal exploration_ended(reason: int, summary: Dictionary)
+
 ## Cat 2b 信号——节点移动完成（ADR-0007 / ADR-0014 §决策 3）。
 signal node_moved(from_node: int, to_node: int, ap_remaining: int)
 
@@ -736,3 +739,266 @@ func get_node_graph() -> Dictionary:
 ## 返回当前节点详情（测试桩）。
 func get_node_details() -> Dictionary:
 	return _node_details
+
+
+# === 经济计算 + 事件分配（Story 005）===========================================
+
+## 探索结束原因枚举。
+enum EndReason {
+	BOSS_DEFEATED,  ## Boss 击败——通关奖励结算
+	BATTLE_LOST,    ## 战斗失败——修为保留 50%
+	AP_DEPLETED,    ## 行动力耗尽——全额保留
+	PLAYER_QUIT,    ## 玩家主动退出——全额保留
+}
+
+## 永久免费地图列表——每个境界 1 张，重入始终免费（GDD §1 经济安全阀）。
+const PERMANENT_FREE_MAPS: Dictionary = {
+	&"qing_yun_jian_zong": 1,   # 青云剑宗（炼气）
+	&"sui_xing_wai_huan": 2,    # 碎星外环（筑基）
+	&"xi_yu_gu_lin": 3,         # 西域古林（金丹）
+	&"mu_lan_cao_yuan": 4,      # 慕兰草原（元婴）
+	&"gui_xu_fu_yun_lu": 5,     # 归墟·浮云陆（化神）
+}
+
+## 重入费用基价表——按 MapDifficulty 枚举索引（GDD §公式 10）。
+const REENTRY_BASE_COSTS: Array = [30, 60, 100, 150]  # LOW/MEDIUM/HIGH/VERY_HIGH
+
+## 通关奖励基价表——按 MapDifficulty 枚举索引（GDD §公式 5）。
+const CLEAR_REWARDS: Array = [
+	{"ling_shi": 50,  "cultivation": 50},   # LOW
+	{"ling_shi": 100, "cultivation": 80},   # MEDIUM
+	{"ling_shi": 200, "cultivation": 120},  # HIGH
+	{"ling_shi": 300, "cultivation": 150},  # VERY_HIGH
+]
+
+## 计算地图重入传送费（GDD §公式 10）。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][b]返回[/b]: 灵石费用（0=免费）。[br]
+## [br][b]规则[/b]: 首次进入免费；永久免费地图始终 0；后续按 base×multiplier。[br]
+## [br]来源: ADR-0014 §决策 4 + GDD §公式 10。
+func calculate_reentry_cost(map_id: StringName) -> int:
+	# 永久免费地图——始终 0
+	if PERMANENT_FREE_MAPS.has(map_id):
+		return 0
+	var stored_count: int = _get_entry_count(map_id)
+	var entry_count: int = stored_count + 1  # 本次进入的序号（1=首次, 2=第二次, ...）
+	# 首次进入免费
+	if entry_count <= 1:
+		return 0
+	# 获取地图难度
+	var config: Dictionary = _get_map_config(map_id, _get_player_realm())
+	var difficulty: int = _get_difficulty_from_config(config)
+	var base: int = REENTRY_BASE_COSTS[difficulty]
+	# multiplier = min(1.0 + (entry_count - 2) * 0.5, 3.0)
+	var multiplier: float = 1.0 + (entry_count - 2) * 0.5
+	multiplier = minf(multiplier, 3.0)
+	return int(floor(base * multiplier))
+
+
+## 计算地图通关奖励（GDD §公式 5+6）。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][param is_first_clear] 是否首次通关。[br]
+## [br][param player_realm] 玩家境界。[br]
+## [br][param map_max_realm] 地图最高允许境界。[br]
+## [br][b]返回[/b]: [code]{ling_shi, cultivation, extra}[/code] Dictionary。[br]
+## [br][b]规则[/b]: 灵石受境界差额惩罚；修为不受。[br]
+## [br]来源: ADR-0014 §决策 4 + GDD §公式 5+6。
+func calculate_map_clear_rewards(map_id: StringName, is_first_clear: bool, player_realm: int, map_max_realm: int) -> Dictionary:
+	var config: Dictionary = _get_map_config(map_id, player_realm)
+	var difficulty: int = _get_difficulty_from_config(config)
+	var base: Dictionary = CLEAR_REWARDS[difficulty]
+	var penalty: float = realm_gap_penalty(player_realm, map_max_realm)
+	var rewards: Dictionary = {
+		"ling_shi": int(floor(base["ling_shi"] * penalty)),
+		"cultivation": int(base["cultivation"]),  # 修为不受惩罚
+	}
+	if is_first_clear:
+		rewards["extra"] = config.get("first_clear_reward", {})
+	return rewards
+
+
+## 境界差额惩罚系数（GDD §公式 6）。[br]
+## [br][param player_L] 玩家实际境界。[br]
+## [br][param map_max_L] 地图最高允许境界。[br]
+## [br][b]返回[/b]: float [0.1, 1.0]——灵石惩罚系数。[br]
+## [br][b]规则[/b]: gap<=0→1.0；gap>=1→max(0.1, 1.0-gap*0.3)。[br]
+## [br]来源: ADR-0014 §决策 4 + GDD §公式 6。
+func realm_gap_penalty(player_L: int, map_max_L: int) -> float:
+	var gap: int = player_L - map_max_L
+	if gap <= 0:
+		return 1.0
+	return maxf(0.1, 1.0 - gap * 0.3)
+
+
+## 收集资源——累积到 map_states[current_map].collected_*。[br]
+## [br][param resource_type] 资源类型（"ling_shi" / "cultivation" / "cards"）。[br]
+## [br][param amount] 数量。[br]
+## [br][b]不直接写入 GSM player.* 域[/b]——仅累积到 map_states，结算时 _flush_map_state 转移。[br]
+## [br]来源: ADR-0014 §决策 5 探索结束结算。
+func collect_resource(resource_type: StringName, amount: int) -> void:
+	if amount <= 0:
+		return
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("ExplorationSystem.collect_resource: GSM 不可用")
+		return
+	var current_map: StringName = gsm.exploration.get("current_map", &"")
+	if current_map == &"" or str(current_map).is_empty():
+		push_warning("ExplorationSystem.collect_resource: 无活跃地图")
+		return
+	var map_states: Dictionary = gsm.exploration.get("map_states", {})
+	var state: Dictionary = map_states.get(current_map, {})
+	var key_str: String = "collected_" + str(resource_type)
+	var current_val: int = int(state.get(key_str, 0))
+	state[key_str] = current_val + amount
+	gsm.update_exploration_map_state(current_map, state)
+
+
+## 将 map_states[map_id] 中的 collected_* 转移到 GSM player.* 域。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][b]流程[/b]: 读取 collected_ling_shi / collected_cultivation → GSM 原子写入 → 清零 collected_*。[br]
+## [br]来源: ADR-0014 §决策 5 探索结束结算。
+func _flush_map_state(map_id: StringName) -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var map_states: Dictionary = gsm.exploration.get("map_states", {})
+	var state: Dictionary = map_states.get(map_id, {})
+	# 转移灵石
+	var collected_ls: int = int(state.get("collected_ling_shi", 0))
+	if collected_ls > 0:
+		var current_ls: int = int(gsm.player.resources.get("ling_shi", 0))
+		gsm._set_resource_ling_shi(current_ls + collected_ls)
+		state["collected_ling_shi"] = 0
+	# 转移修为
+	var collected_cult: int = int(state.get("collected_cultivation", 0))
+	if collected_cult > 0:
+		gsm.add_cultivation(collected_cult, "exploration_flush")
+		state["collected_cultivation"] = 0
+	# 回写清零后的 state
+	gsm.update_exploration_map_state(map_id, state)
+
+
+## 探索结束结算——三种路径（GDD §公式 11 + ADR-0014 §决策 5）。[br]
+## [br][param reason] 结束原因（EndReason 枚举）。[br]
+## [br][b]结算路径[/b]:[br]
+## [br]BOSS_DEFEATED → 通关奖励 + collected_* 全额转移[br]
+## [br]BATTLE_LOST → collected_ling_shi 全额转移，collected_cultivation 保留 50%[br]
+## [br]AP_DEPLETED / PLAYER_QUIT → collected_* 全额转移[br]
+## [br][b]流程[/b]: _flush_map_state → clear_exploration_navigation → clear_dag_cache。[br]
+## [br]来源: ADR-0014 §决策 5 + GDD §公式 11。
+func end_exploration(reason: int) -> Dictionary:
+	var gsm: Node = _get_gsm()
+	var summary: Dictionary = {"reason": reason, "rewards": {}}
+	if gsm == null:
+		push_warning("ExplorationSystem.end_exploration: GSM 不可用")
+		return summary
+	var current_map: StringName = gsm.exploration.get("current_map", &"")
+	if current_map == &"" or str(current_map).is_empty():
+		push_warning("ExplorationSystem.end_exploration: 无活跃地图")
+		return summary
+
+	match reason:
+		EndReason.BOSS_DEFEATED:
+			# 通关奖励
+			var is_first: bool = not _is_map_cleared(current_map)
+			var player_realm: int = _get_player_realm()
+			var map_max_realm: int = _get_map_max_realm(current_map)
+			var rewards: Dictionary = calculate_map_clear_rewards(current_map, is_first, player_realm, map_max_realm)
+			summary["rewards"] = rewards
+			# 发放通关奖励
+			if rewards.has("ling_shi") and rewards["ling_shi"] > 0:
+				var current_ls: int = int(gsm.player.resources.get("ling_shi", 0))
+				gsm._set_resource_ling_shi(current_ls + rewards["ling_shi"])
+			if rewards.has("cultivation") and rewards["cultivation"] > 0:
+				gsm.add_cultivation(rewards["cultivation"], "map_clear")
+			# 标记地图通关
+			_mark_map_cleared(current_map)
+			# 转移已收集资源
+			_flush_map_state(current_map)
+		EndReason.BATTLE_LOST:
+			# 灵石全额保留，修为保留 50%
+			_flush_map_state_half_cultivation(current_map)
+		EndReason.AP_DEPLETED, EndReason.PLAYER_QUIT:
+			# 全额保留已收集资源
+			_flush_map_state(current_map)
+
+	# 清理导航状态 + DAG 缓存
+	gsm.clear_exploration_navigation()
+	clear_dag_cache()
+
+	# 发射探索结束信号
+	_emit_safe(&"exploration_ended", [reason, summary])
+
+	return summary
+
+
+## 战败结算——灵石全额，修为保留 50%（GDD §公式 11）。
+func _flush_map_state_half_cultivation(map_id: StringName) -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var map_states: Dictionary = gsm.exploration.get("map_states", {})
+	var state: Dictionary = map_states.get(map_id, {})
+	# 灵石全额
+	var collected_ls: int = int(state.get("collected_ling_shi", 0))
+	if collected_ls > 0:
+		var current_ls: int = int(gsm.player.resources.get("ling_shi", 0))
+		gsm._set_resource_ling_shi(current_ls + collected_ls)
+		state["collected_ling_shi"] = 0
+	# 修为保留 50%
+	var collected_cult: int = int(state.get("collected_cultivation", 0))
+	if collected_cult > 0:
+		var retained: int = int(floor(collected_cult * 0.5))
+		if retained > 0:
+			gsm.add_cultivation(retained, "battle_lost_half")
+		state["collected_cultivation"] = 0
+	gsm.update_exploration_map_state(map_id, state)
+
+
+## 检查地图是否已通关——从 map_states 读取 is_first_clear。
+func _is_map_cleared(map_id: StringName) -> bool:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return false
+	var map_states: Dictionary = gsm.exploration.get("map_states", {})
+	var state: Dictionary = map_states.get(map_id, {})
+	return bool(state.get("is_first_clear", false))
+
+
+## 标记地图通关——写入 is_first_clear=true。
+func _mark_map_cleared(map_id: StringName) -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	gsm.update_exploration_map_state(map_id, {"is_first_clear": true})
+
+
+## 获取玩家境界——从 GSM player.realm 读取。
+func _get_player_realm() -> int:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return 1
+	return int(gsm.player.get("realm", 1))
+
+
+## 获取地图最高允许境界——从 PERMANENT_FREE_MAPS 或配置读取。
+func _get_map_max_realm(map_id: StringName) -> int:
+	if PERMANENT_FREE_MAPS.has(map_id):
+		return int(PERMANENT_FREE_MAPS[map_id])
+	var config: Dictionary = _get_map_config(map_id, _get_player_realm())
+	return int(config.get("max_realm", 1))
+
+
+## 从配置获取难度索引。
+func _get_difficulty_from_config(config: Dictionary) -> int:
+	var layers: int = int(config.get("layers", 5))
+	match layers:
+		4: return 0  # LOW
+		6: return 3  # VERY_HIGH
+		5:
+			var min_n: int = int(config.get("min_nodes", 2))
+			if min_n >= 3:
+				return 2  # HIGH
+			return 1  # MEDIUM
+		_: return 1  # MEDIUM fallback
