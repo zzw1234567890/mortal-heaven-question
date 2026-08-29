@@ -107,7 +107,14 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 		"deck":
 			return {"character_slots": [null, null, null, null, null, null], "current_deck": [], "presets": []}
 		"exploration":
-			return {"current_map_id": "", "node_position": 0, "action_points": 0, "revealed_nodes": [], "map_state": {}}
+			return {
+				"current_map": &"",
+				"node_position": {"layer": 0, "idx": 0},
+				"visited_nodes": [],
+				"action_points": 0,
+				"max_action_points": 0,
+				"map_states": {},
+			}
 		"narrative":
 			return {"current_chapter": "", "completed_chapters": [], "story_flags": {}}
 		"session":

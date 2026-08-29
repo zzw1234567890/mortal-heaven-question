@@ -210,7 +210,7 @@ func test_deserialize_migrates_legacy_flat_ling_cai() -> void:
 		},
 		"collection": {"owned_cards": [], "total_count": 0},
 		"deck": {"character_slots": [null, null, null, null, null, null], "current_deck": [], "presets": []},
-		"exploration": {"current_map_id": "", "node_position": 0, "action_points": 0, "revealed_nodes": [], "map_state": {}},
+		"exploration": {"current_map": &"", "node_position": {"layer": 0, "idx": 0}, "visited_nodes": [], "action_points": 0, "max_action_points": 0, "map_states": {}},
 		"narrative": {"current_chapter": "", "completed_chapters": [], "story_flags": {}},
 	}
 	var ok: bool = gsm.deserialize(legacy_data)
@@ -244,17 +244,23 @@ func test_round_trip_collection_and_deck() -> void:
 
 
 func test_round_trip_exploration_and_narrative() -> void:
-	gsm.exploration.current_map_id = "map_01"
-	gsm.exploration.node_position = 7
+	gsm.exploration.current_map = &"map_01"
+	gsm.exploration.node_position = {"layer": 3, "idx": 1}
 	gsm.exploration.action_points = 3
+	gsm.exploration.visited_nodes = [100, 200]
+	gsm.exploration.max_action_points = 10
+	gsm.exploration.map_states = {&"map_01": {"entry_count": 2}}
 	gsm.narrative.current_chapter = "chapter_2"
 	gsm.narrative.completed_chapters = ["chapter_1"]
 	var data: Dictionary = gsm.serialize()
 	var ok: bool = gsm.deserialize(data)
 	assert_true(ok)
-	assert_eq(gsm.exploration.current_map_id, "map_01")
-	assert_eq(gsm.exploration.node_position, 7)
+	assert_eq(gsm.exploration.current_map, &"map_01")
+	assert_eq(gsm.exploration.node_position, {"layer": 3, "idx": 1})
 	assert_eq(gsm.exploration.action_points, 3)
+	assert_eq(gsm.exploration.visited_nodes, [100, 200])
+	assert_eq(gsm.exploration.max_action_points, 10)
+	assert_eq(gsm.exploration.map_states, {&"map_01": {"entry_count": 2}})
 	assert_eq(gsm.narrative.current_chapter, "chapter_2")
 	assert_eq(gsm.narrative.completed_chapters, ["chapter_1"])
 

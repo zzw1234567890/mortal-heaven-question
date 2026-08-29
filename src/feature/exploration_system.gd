@@ -190,6 +190,57 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 	}
 
 
+# === 导航状态 GSM 主存储（Story 002）===========================================
+
+## 进入地图——生成 DAG + 初始化 GSM exploration.* 导航状态。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][param player_realm] 玩家境界等级。[br]
+## [br][param max_ap] 行动力上限（由 RealmSystem 查询，此处由调用方传入）。[br]
+## [br][b]流程[/b]：generate_map → set_exploration_map → set_exploration_ap → update_exploration_map_state(entry_count++)。[br]
+## [br][b]返回[/b]: generate_map 返回的图结构 Dictionary。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型 + §GSM 写入契约。
+func enter_map(map_id: StringName, player_realm: int = 1, max_ap: int = 10) -> Dictionary:
+	var map_data: Dictionary = generate_map(map_id, player_realm, _get_entry_count(map_id))
+
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("ExplorationSystem.enter_map: GSM 不可用，导航状态未写入")
+		return map_data
+
+	# 写入导航状态——通过 GSM 第二层原子方法（ADR-0014 §GSM 写入契约）
+	gsm.set_exploration_map(map_id)
+	gsm.set_exploration_ap(max_ap, max_ap)
+
+	# 递增 entry_count
+	var entry_count: int = _get_entry_count(map_id) + 1
+	gsm.update_exploration_map_state(map_id, {"entry_count": entry_count})
+
+	return map_data
+
+
+## 获取当前地图的进入次数——从 GSM exploration.map_states 读取。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][b]返回[/b]: 进入次数（0 表示从未进入）。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func _get_entry_count(map_id: StringName) -> int:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return 0
+	var map_states: Dictionary = gsm.exploration.get("map_states", {})
+	var state: Dictionary = map_states.get(map_id, {})
+	return int(state.get("entry_count", 0))
+
+
+## 获取 GSM 引用——通过 SceneTree Autoload。[br]
+## [br][b]返回[/b]: GSM 节点或 null（未注册时）。[br]
+## [br]来源: ADR-0014 §决策 1 ExplorationSystem 作为 Autoload。
+func _get_gsm() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("/root/GameStateManager")
+
+
 ## 获取地图配置——优先注入回调，回退到难度配置表。
 func _get_map_config(map_id: StringName, player_realm: int) -> Dictionary:
 	if get_map_config_cb.is_valid():

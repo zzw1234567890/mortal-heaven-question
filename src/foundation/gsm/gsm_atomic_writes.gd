@@ -550,6 +550,112 @@ func restore_action_points(amount: int) -> void:
 	_gsm._buffer_change("exploration.action_points", old_val, _gsm.exploration.action_points)
 
 
+# === 探索导航状态（ADR-0014 §GSM 写入契约）===================================
+
+## 设置当前地图——写入 exploration.current_map 并重置 node_position 为入口。[br]
+## [br][b]仅 ExplorationSystem.enter_map() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][b]batch_updated[/b]：current_map + node_position 两条路径变更帧末传播。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func set_exploration_map(map_id: StringName) -> void:
+	var old_map: StringName = _gsm.exploration.get("current_map", &"")
+	var old_pos: Dictionary = _gsm.exploration.get("node_position", {}).duplicate(true)
+	var new_pos: Dictionary = {"layer": 0, "idx": 0}
+
+	_gsm.exploration.current_map = map_id
+	_gsm.exploration.node_position = new_pos.duplicate(true)
+
+	_gsm._buffer_change("exploration.current_map", old_map, map_id)
+	_gsm._buffer_change("exploration.node_position", old_pos, new_pos)
+
+
+## 更新节点位置——写入 exploration.node_position。[br]
+## [br][b]仅 ExplorationSystem.move_to_node() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
+## [br][param layer] 层级。[br]
+## [br][param idx] 层内索引。[br]
+## [br][b]batch_updated[/b]：node_position 路径变更帧末传播。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func set_exploration_position(layer: int, idx: int) -> void:
+	var old_pos: Dictionary = _gsm.exploration.get("node_position", {}).duplicate(true)
+	var new_pos: Dictionary = {"layer": layer, "idx": idx}
+
+	_gsm.exploration.node_position = new_pos.duplicate(true)
+	_gsm._buffer_change("exploration.node_position", old_pos, new_pos)
+
+
+## 追加已访问节点——写入 exploration.visited_nodes（去重）。[br]
+## [br][b]仅 ExplorationSystem.move_to_node() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
+## [br][param node_id] 节点 ID。[br]
+## [br][b]去重[/b]：已存在不追加，不触发 buffer_change。[br]
+## [br][b]batch_updated[/b]：visited_nodes 路径变更帧末传播。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func add_visited_node(node_id: int) -> void:
+	var visited: Array = _gsm.exploration.get("visited_nodes", [])
+	if visited.has(node_id):
+		return  # 去重
+	var old_visited: Array = visited.duplicate()
+	visited.append(node_id)
+	_gsm._buffer_change("exploration.visited_nodes", old_visited, visited)
+
+
+## 设置行动力——同时写入 exploration.action_points + max_action_points。[br]
+## [br][b]仅 ExplorationSystem.enter_map() / 恢复节点调用[/b]——ADR-0014 §GSM 写入契约。[br]
+## [br][param current] 当前行动力。[br]
+## [br][param max_ap] 行动力上限。[br]
+## [br][b]batch_updated[/b]：action_points + max_action_points 两条路径变更帧末传播。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func set_exploration_ap(current: int, max_ap: int) -> void:
+	var old_current: int = int(_gsm.exploration.get("action_points", 0))
+	var old_max: int = int(_gsm.exploration.get("max_action_points", 0))
+
+	_gsm.exploration.action_points = current
+	_gsm.exploration.max_action_points = max_ap
+
+	_gsm._buffer_change("exploration.action_points", old_current, current)
+	_gsm._buffer_change("exploration.max_action_points", old_max, max_ap)
+
+
+## 合并写入地图状态——更新 exploration.map_states[map_id] 子字段。[br]
+## [br][b]仅 ExplorationSystem 调用[/b]——用于 entry_count、collected_* 等跨地图累计数据。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][param changes] 要合并的子字段 Dictionary。[br]
+## [br][b]batch_updated[/b]：map_states.<map_id> 路径变更帧末传播。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func update_exploration_map_state(map_id: StringName, changes: Dictionary) -> void:
+	var map_states: Dictionary = _gsm.exploration.get("map_states", {})
+	var key_str: String = str(map_id)
+	var old_state: Dictionary = (map_states.get(map_id, {}) as Dictionary).duplicate(true)
+
+	if not map_states.has(map_id):
+		map_states[map_id] = {}
+	var target: Dictionary = map_states[map_id]
+	for k in changes:
+		target[k] = changes[k]
+
+	var new_state: Dictionary = target.duplicate(true)
+	_gsm._buffer_change("exploration.map_states.%s" % key_str, old_state, new_state)
+
+
+## 清除导航状态——重置 current_map/node_position/visited_nodes，保留 map_states。[br]
+## [br][b]仅 ExplorationSystem.end_exploration() 调用[/b]——ADR-0014 §决策 5 探索结束结算。[br]
+## [br]导航字段重置为默认值（current_map=&"", node_position={layer:0,idx:0}, visited_nodes=[]），[br]
+## map_states（跨地图累计数据——entry_count、collected_*、is_first_clear）保留。[br]
+## [br][b]batch_updated[/b]：3 条路径变更帧末传播。[br]
+## [br]来源: ADR-0014 §决策 5 探索结束结算。
+func clear_exploration_navigation() -> void:
+	var old_map: StringName = _gsm.exploration.get("current_map", &"")
+	var old_pos: Dictionary = _gsm.exploration.get("node_position", {}).duplicate(true)
+	var old_visited: Array = (_gsm.exploration.get("visited_nodes", []) as Array).duplicate()
+
+	_gsm.exploration.current_map = &""
+	_gsm.exploration.node_position = {"layer": 0, "idx": 0}
+	_gsm.exploration.visited_nodes = []
+
+	_gsm._buffer_change("exploration.current_map", old_map, &"")
+	_gsm._buffer_change("exploration.node_position", old_pos, {"layer": 0, "idx": 0})
+	_gsm._buffer_change("exploration.visited_nodes", old_visited, [])
+
+
 ## 解锁天赋——写入 player.talents（去重 append）。[br]
 ## [br][param talent_id] 天赋 ID。[br]
 ## [br][b]示例[/b]: [code]GameStateManager.unlock_talent(&"talent_003")[/code]

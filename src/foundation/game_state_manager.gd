@@ -214,6 +214,18 @@ func remove_card_from_collection(card_instance_id: int) -> bool:
 	return _atomic_writes.remove_card_from_collection(card_instance_id)
 func restore_action_points(amount: int) -> void:
 	_atomic_writes.restore_action_points(amount)
+func set_exploration_map(map_id: StringName) -> void:
+	_atomic_writes.set_exploration_map(map_id)
+func set_exploration_position(layer: int, idx: int) -> void:
+	_atomic_writes.set_exploration_position(layer, idx)
+func add_visited_node(node_id: int) -> void:
+	_atomic_writes.add_visited_node(node_id)
+func set_exploration_ap(current: int, max_ap: int) -> void:
+	_atomic_writes.set_exploration_ap(current, max_ap)
+func update_exploration_map_state(map_id: StringName, changes: Dictionary) -> void:
+	_atomic_writes.update_exploration_map_state(map_id, changes)
+func clear_exploration_navigation() -> void:
+	_atomic_writes.clear_exploration_navigation()
 func unlock_talent(talent_id: StringName) -> void:
 	_atomic_writes.unlock_talent(talent_id)
 func advance_chapter(chapter_id: StringName) -> void:
