@@ -127,6 +127,7 @@ func _setup_linear_dag() -> void:
 		gsm.exploration.max_action_points = 10
 		gsm.exploration.visited_nodes = [0]
 		gsm.exploration.node_position = {"layer": 0, "idx": 0}
+	es.set("_dag_ready", true)
 
 
 ## 设置带豁免节点的 DAG
@@ -146,6 +147,7 @@ func _setup_exempt_dag() -> void:
 	if gsm != null:
 		gsm.exploration.visited_nodes = [0]
 		gsm.exploration.node_position = {"layer": 0, "idx": 0}
+	es.set("_dag_ready", true)
 
 
 ## 设置带商店和渡劫台的 DAG
@@ -167,6 +169,7 @@ func _setup_shop_tribulation_dag() -> void:
 		gsm.exploration.node_position = {"layer": 0, "idx": 0}
 		gsm.exploration.action_points = 10
 		gsm.exploration.max_action_points = 10
+	es.set("_dag_ready", true)
 
 
 # ============================================================================

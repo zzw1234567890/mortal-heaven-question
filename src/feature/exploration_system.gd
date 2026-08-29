@@ -48,6 +48,9 @@ var _reachable_cache: Dictionary = {}
 ## 当前地图配置快照。
 var _map_config: Dictionary = {}
 
+## DAG 缓存就绪标志——_ready() 末尾设为 true，公共方法入口守卫（ADR-0014 R7）。
+var _dag_ready: bool = false
+
 ## 独立 RNG 实例——确定性 DAG 生成。
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -221,6 +224,11 @@ const AP_EXEMPT_TYPES: Array = [NodeType.TELEPORT, NodeType.ACTION_SPRING, NodeT
 func move_to_node(from_node: int, to_node: int) -> Dictionary:
 	var result: Dictionary = {"success": false, "reason": "", "ap_remaining": 0}
 
+	# _dag_ready 守卫（ADR-0014 R7）
+	if not _dag_ready:
+		result["reason"] = "DAG 缓存未就绪"
+		return result
+
 	# 验证 1：可达性——graph[from] 包含 to
 	if not _is_reachable(from_node, to_node):
 		result["reason"] = "不可达"
@@ -276,6 +284,9 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 ## [br][b]返回[/b]: [code]true[/code] 可移动，[code]false[/code] 不可移动。[br]
 ## [br]来源: ADR-0014 §关键接口 can_move_to。
 func can_move_to(from_node: int, to_node: int) -> bool:
+	# _dag_ready 守卫（ADR-0014 R7）
+	if not _dag_ready:
+		return false
 	if not _is_reachable(from_node, to_node):
 		return false
 	var gsm: Node = _get_gsm()
@@ -301,6 +312,10 @@ func can_move_to(from_node: int, to_node: int) -> bool:
 ## [br]SHOP/REST/ACTION_SPRING/TELEPORT/TRIBULATION → node_interaction_triggered(node_id, type, payload)[br]
 ## [br]来源: ADR-0014 §决策 3 信号驱动子系统委托。
 func resolve_node(node_id: int) -> void:
+	# _dag_ready 守卫（ADR-0014 R7）
+	if not _dag_ready:
+		push_warning("ExplorationSystem.resolve_node: DAG 缓存未就绪，跳过节点交互")
+		return
 	var ntype: int = _get_node_type(node_id)
 	var detail: Dictionary = _node_details.get(node_id, {})
 	var gsm: Node = _get_gsm()
@@ -373,6 +388,9 @@ func _emit_safe(signal_name: StringName, args: Array) -> void:
 func enter_map(map_id: StringName, player_realm: int = 1, max_ap: int = 10) -> Dictionary:
 	var map_data: Dictionary = generate_map(map_id, player_realm, _get_entry_count(map_id))
 
+	# generate_map 已填充 _node_graph / _node_details / _map_config——缓存就绪
+	_dag_ready = true
+
 	var gsm: Node = _get_gsm()
 	if gsm == null:
 		push_warning("ExplorationSystem.enter_map: GSM 不可用，导航状态未写入")
@@ -382,11 +400,73 @@ func enter_map(map_id: StringName, player_realm: int = 1, max_ap: int = 10) -> D
 	gsm.set_exploration_map(map_id)
 	gsm.set_exploration_ap(max_ap, max_ap)
 
-	# 递增 entry_count
+	# 递增 entry_count + 缓存 DAG 快照到 map_states（供读档后重建）
 	var entry_count: int = _get_entry_count(map_id) + 1
-	gsm.update_exploration_map_state(map_id, {"entry_count": entry_count})
+	gsm.update_exploration_map_state(map_id, {
+		"entry_count": entry_count,
+		"graph": map_data["graph"],
+		"nodes": map_data["nodes"],
+	})
 
 	return map_data
+
+
+# === DAG 缓存重建（Story 004）=================================================
+
+## Autoload 就绪——检测读档后是否有活跃地图，重建 DAG 缓存。[br]
+## [br][b]流程[/b]（ADR-0014 §决策 1 状态分层模型 + R7）:[br]
+## [br]1. 检测 GSM.exploration.current_map 非空[br]
+## [br]2. 非空 → 从 map_states 读取 graph/nodes 快照 → rebuild_dag_cache[br]
+## [br]3. 为空 → 跳过重建[br]
+## [br]4. 末尾设 _dag_ready = true（保护 UI 早期调用）[br]
+## [br]来源: ADR-0014 §决策 1 + R7。
+func _ready() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		_dag_ready = true
+		return
+
+	var current_map: StringName = gsm.exploration.get("current_map", &"")
+	if current_map != &"" and not str(current_map).is_empty():
+		# 读档后重建——从 map_states 读取 graph/nodes 快照
+		var map_states: Dictionary = gsm.exploration.get("map_states", {})
+		var state: Dictionary = map_states.get(current_map, {})
+		if state.has("graph") and state.has("nodes"):
+			var map_data: Dictionary = {
+				"graph": state["graph"],
+				"nodes": state["nodes"],
+				"layers": state.get("layers", []),
+				"boss_node_id": state.get("boss_node_id", 0),
+				"path_count": state.get("path_count", 0),
+			}
+			rebuild_dag_cache(current_map, map_data)
+		else:
+			push_warning("ExplorationSystem._ready: current_map=%s 但 map_states 无 graph/nodes 快照" % current_map)
+
+	_dag_ready = true
+
+
+## 从已有数据重建 DAG 缓存——不重新生成，直接填充内部成员。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][param map_data] 含 graph/nodes/layers/boss_node_id/path_count 的 Dictionary。[br]
+## [br][b]用途[/b]：读档后从 map_states 快照重建 + 探索→战斗→探索往返恢复。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func rebuild_dag_cache(map_id: StringName, map_data: Dictionary) -> void:
+	_node_graph = (map_data.get("graph", {}) as Dictionary).duplicate(true)
+	_node_details = (map_data.get("nodes", {}) as Dictionary).duplicate(true)
+	_map_config = {}
+	_dag_ready = true
+
+
+## 清理 DAG 缓存——重置所有内部状态。[br]
+## [br][b]用途[/b]：end_exploration 后清理 + 测试清理。[br]
+## [br]来源: ADR-0014 §决策 5 探索结束结算。
+func clear_dag_cache() -> void:
+	_node_graph.clear()
+	_node_details.clear()
+	_reachable_cache.clear()
+	_map_config.clear()
+	_dag_ready = false
 
 
 ## 获取当前地图的进入次数——从 GSM exploration.map_states 读取。[br]
