@@ -54,7 +54,7 @@
 | 13 | tribulation-system | 渡劫结果 GSM 同步 + 场景恢复 | `tribulation-system/story-004-*.md` | Integration | 0.5d | #11 | Done |
 | 14 | deck-editing-system | 卡组验证器（卡组上限/添加/移除校验） | `deck-editing-system/story-001-*.md` | Logic | 0.5d | — | Done |
 | 15 | deck-editing-system | 卡组编辑 API + GSM deck.* 存储 | `deck-editing-system/story-002-*.md` | Integration | 0.5d | #14 | Done |
-| 16 | deck-editing-system | 卡组保存/加载 + 默认卡组 | `deck-editing-system/story-003-*.md` | Logic | 0.5d | #15 | Ready |
+| 16 | deck-editing-system | 卡组保存/加载 + 默认卡组 | `deck-editing-system/story-003-*.md` | Logic | 0.5d | #15 | Done |
 | 17 | deck-editing-system | 卡组验证 UI 数据源接口 | `deck-editing-system/story-004-*.md` | Integration | 0.5d | #16 | Ready |
 
 **总计**：17 story，预估 8.5d（exploration #1 + tribulation #10 各取 1.0d 上限）
