@@ -690,3 +690,46 @@ func advance_chapter(chapter_id: StringName) -> void:
 	_gsm.narrative.current_chapter = chapter_str
 	_gsm._buffer_change("narrative.current_chapter", old_current, chapter_str)
 	_gsm._buffer_change("narrative.completed_chapters", old_completed, _gsm.narrative.completed_chapters)
+
+
+## 原子写入渡劫状态——仅 TribulationSystem 调用。[br]
+## [br][b]窄范围[/b]：仅写入 player.tribulation_state——不操作 player 域其他字段。[br]
+## [br][b]null 守卫[/b]：player 为 null 时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0021 §GSM 新增域与方法。
+func _set_tribulation_state(state: int) -> void:
+	if _gsm.player == null:
+		push_warning("GSM._set_tribulation_state: player 域为 null，拒绝写入")
+		return
+
+	var old_state: int = int(_gsm.player.get("tribulation_state", 0))
+	if old_state == state:
+		return  # 值无变化——去重
+
+	_gsm.player.tribulation_state = state
+	_gsm._buffer_change("player.tribulation_state", old_state, state)
+
+
+## 原子写入连续渡劫失败计数——仅 TribulationSystem 调用。[br]
+## [br][b]窄范围[/b]：仅写入 player.consecutive_tribulation_failures——不操作 player 域其他字段。[br]
+## [br][b]持久化[/b]：此字段持久化到存档——连续失败保护跨会话保留（ADR-0021）。[br]
+## [br][b]null 守卫[/b]：player 为 null 时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0021 §GSM 新增域与方法。
+func _set_consecutive_tribulation_failures(count: int) -> void:
+	if _gsm.player == null:
+		push_warning("GSM._set_consecutive_tribulation_failures: player 域为 null，拒绝写入")
+		return
+
+	if count < 0:
+		push_warning("GSM._set_consecutive_tribulation_failures: count 不能为负（收到 %d）" % count)
+		return
+
+	var old_count: int = int(_gsm.player.get("consecutive_tribulation_failures", 0))
+	if old_count == count:
+		return  # 值无变化——去重
+
+	_gsm.player.consecutive_tribulation_failures = count
+	_gsm._buffer_change("player.consecutive_tribulation_failures", old_count, count)

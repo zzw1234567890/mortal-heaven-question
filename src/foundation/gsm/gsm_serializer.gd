@@ -101,6 +101,8 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"identity_id": "",
 				"talents": [],
 				"unavailable_characters": {},
+				"tribulation_state": 0,
+				"consecutive_tribulation_failures": 0,
 			}
 		"collection":
 			return {"owned_cards": [], "total_count": 0}

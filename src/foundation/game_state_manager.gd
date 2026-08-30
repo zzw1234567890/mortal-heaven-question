@@ -230,6 +230,10 @@ func unlock_talent(talent_id: StringName) -> void:
 	_atomic_writes.unlock_talent(talent_id)
 func advance_chapter(chapter_id: StringName) -> void:
 	_atomic_writes.advance_chapter(chapter_id)
+func _set_tribulation_state(state: int) -> void:
+	_atomic_writes._set_tribulation_state(state)
+func _set_consecutive_tribulation_failures(count: int) -> void:
+	_atomic_writes._set_consecutive_tribulation_failures(count)
 
 # === 第三层：信号订阅（委托 → GSMSignalRouter）==============================
 
