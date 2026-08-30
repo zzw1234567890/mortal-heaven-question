@@ -20,6 +20,12 @@ const MINIMUM_DECK_SIZE: int = 5
 ## 可注入 RealmSystem 引用——测试时设置，绕过 Autoload 查找。
 var _realm_override: Node = null
 
+## 可注入 ResourceSystem 引用——测试时设置，绕过 Autoload 查找。
+var _resource_override: Node = null
+
+## 当前战利品选项缓存——generate_loot_options 生成，apply_loot_choice 消费。
+var _loot_options: Array = []
+
 
 # === 卡组校验 API（纯函数——不修改 GSM 状态）==================================
 
@@ -199,3 +205,139 @@ func _get_realm_system() -> Node:
 	if tree == null:
 		return null
 	return tree.root.get_node_or_null("/root/RealmSystem")
+
+
+## 获取 ResourceSystem 引用——优先使用注入的覆盖引用，否则通过 SceneTree Autoload 查找。[br]
+## [br][b]返回[/b]: ResourceSystem 节点或 [code]null[/code]（未注册时）。
+func _get_resource_system() -> Node:
+	if _resource_override != null and is_instance_valid(_resource_override):
+		return _resource_override
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("/root/ResourceSystem")
+
+
+# === 坊市操作（Story 5-15）=======================================================
+
+## 获取散功费用——委托 ResourceSystem.delete_card_cost。[br]
+## [br][b]返回[/b]: 下一次散功费用灵石数。[br]
+## [br][b]注意[/b]: session_remove_count 是已执行次数，delete_card_cost 期望次数从 1 开始。[br]
+## [br]来源: ADR-0023 §坊市操作 + GDD §核心规则 #3 ②散功。
+func get_delete_cost() -> int:
+	var rs: Node = _get_resource_system()
+	if rs == null or not rs.has_method("delete_card_cost"):
+		return 50  # 默认基价
+	var count: int = get_session_remove_count() + 1  # 下一次散功次数
+	return rs.delete_card_cost(count)
+
+
+## 执行散功——支付灵石永久移除一张卡牌。[br]
+## [br][param card_id] 要移除的卡牌实例 ID。[br]
+## [br][b]返回[/b]: [code]true[/code] 成功，[code]false[/code] 被拒绝。[br]
+## [br][b]流程[/b]: get_delete_cost → can_spend → remove_cards → spend_resource → session_remove_count+1。[br]
+## [br]来源: ADR-0023 §execute_delete + GDD §核心规则 #3 ②散功。
+func execute_delete(card_id: int) -> bool:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("DeckEditingSystem.execute_delete: GSM 不可用")
+		return false
+	var rs: Node = _get_resource_system()
+	if rs == null:
+		push_warning("DeckEditingSystem.execute_delete: ResourceSystem 不可用")
+		return false
+	var cost: int = get_delete_cost()
+	# 灵石不足时拒绝
+	if rs.has_method("can_spend") and not rs.can_spend(&"ling_shi", cost):
+		push_warning("DeckEditingSystem.execute_delete: 灵石不足（需要 %d）" % cost)
+		return false
+	# 移除卡牌（含最低张数保护）
+	if not remove_cards_from_deck([card_id], "shop_delete", "散功"):
+		return false
+	# 扣除灵石
+	if rs.has_method("spend_resource"):
+		rs.spend_resource(&"ling_shi", cost)
+	# 递增散功计数
+	var new_count: int = get_session_remove_count() + 1
+	gsm._set_deck_session_remove_count(new_count)
+	return true
+
+
+## 获取拆解价值——委托 ResourceSystem.dismantle_value。[br]
+## [br][param card_id] 卡牌实例 ID（桩阶段用默认 rarity=1, level=1）。[br]
+## [br][b]返回[/b]: 拆解所得灵石数。[br]
+## [br]来源: ADR-0023 §get_sell_price + GDD §核心规则 #3 ③拆解。
+func get_sell_price(card_id: int) -> int:
+	var rs: Node = _get_resource_system()
+	if rs == null or not rs.has_method("dismantle_value"):
+		return 10  # 默认白色拆解值
+	# 桩阶段——用默认 rarity=1(白), level=1
+	# 后续接线：从 CardSystem.get_instance(card_id) 查询 rarity + level
+	return rs.dismantle_value(1, 1)
+
+
+## 执行拆解——移除卡牌并获取灵石。[br]
+## [br][param card_id] 要拆解的卡牌实例 ID。[br]
+## [br][b]返回[/b]: [code]true[/code] 成功，[code]false[/code] 被拒绝。[br]
+## [br][b]流程[/b]: get_sell_price → remove_cards → add_resource。[br]
+## [br]来源: ADR-0023 §execute_sell + GDD §核心规则 #3 ③拆解。
+func execute_sell(card_id: int) -> bool:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("DeckEditingSystem.execute_sell: GSM 不可用")
+		return false
+	var rs: Node = _get_resource_system()
+	if rs == null:
+		push_warning("DeckEditingSystem.execute_sell: ResourceSystem 不可用")
+		return false
+	var price: int = get_sell_price(card_id)
+	# 移除卡牌（含最低张数保护）
+	if not remove_cards_from_deck([card_id], "shop_sell", "拆解"):
+		return false
+	# 增加灵石
+	if rs.has_method("add_resource"):
+		rs.add_resource(&"ling_shi", price)
+	return true
+
+
+# === 战利品编排（Story 5-15 桩实现）===========================================
+
+## 生成战利品选项——桩实现返回固定 3 选项（2卡+1灵石模式）。[br]
+## [br][param enemy_data] 敌人数据字典。[br]
+## [br][b]返回[/b]: Array[Dictionary]——3 个选项 [{type, data}]。[br]
+## [br][b]桩阶段[/b]: 返回固定模式，后续接线 CardSystem 掉落规则。[br]
+## [br]来源: ADR-0023 §generate_loot_options + GDD §核心规则 #2。
+func generate_loot_options(enemy_data: Dictionary) -> Array:
+	# 桩阶段——固定返回 2卡+1灵石模式
+	var options: Array = [
+		{"type": "card", "data": {"card_id": 1001}},
+		{"type": "card", "data": {"card_id": 1002}},
+		{"type": "lingshi", "data": {"amount": 15}},
+	]
+	_loot_options = options.duplicate(true)
+	return options
+
+
+## 应用战利品选择——桩实现根据选项类型执行操作。[br]
+## [br][param option_index] 选项索引（0-based）。[br]
+## [br][b]流程[/b]: card 选项 → add_cards_to_deck；lingshi 选项 → add_resource。[br]
+## [br]来源: ADR-0023 §apply_loot_choice + GDD §核心规则 #2。
+func apply_loot_choice(option_index: int) -> bool:
+	if option_index < 0 or option_index >= _loot_options.size():
+		push_warning("DeckEditingSystem.apply_loot_choice: 无效选项索引 %d" % option_index)
+		return false
+	var option: Dictionary = _loot_options[option_index]
+	var opt_type: String = str(option.get("type", ""))
+	match opt_type:
+		"card":
+			var card_id: int = int(option["data"]["card_id"])
+			return add_cards_to_deck([card_id], "loot", "战利品")
+		"lingshi":
+			var amount: int = int(option["data"]["amount"])
+			var rs: Node = _get_resource_system()
+			if rs != null and rs.has_method("add_resource"):
+				rs.add_resource(&"ling_shi", amount)
+			return true
+		_:
+			push_warning("DeckEditingSystem.apply_loot_choice: 未知选项类型 '%s'" % opt_type)
+			return false
