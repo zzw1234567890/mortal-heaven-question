@@ -85,7 +85,7 @@
 
 - [x] 所有必须完成的任务已完成（17 项）
 - [x] 所有任务通过验收标准
-- [ ] QA 计划已存在 (`production/qa/qa-plan-sprint-5.md`)
+- [x] QA 计划已存在 (`production/qa/qa-plan-sprint-5-2026-08-30.md`)
 - [x] 所有逻辑/集成类故事有通过的单元/集成测试
 - [ ] 冒烟检查已通过 (`/smoke-check sprint`)
 - [ ] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
