@@ -234,6 +234,10 @@ func _set_tribulation_state(state: int) -> void:
 	_atomic_writes._set_tribulation_state(state)
 func _set_consecutive_tribulation_failures(count: int) -> void:
 	_atomic_writes._set_consecutive_tribulation_failures(count)
+func _set_deck_cards(ids: Array) -> void:
+	_atomic_writes._set_deck_cards(ids)
+func _set_deck_session_remove_count(count: int) -> void:
+	_atomic_writes._set_deck_session_remove_count(count)
 
 # === 第三层：信号订阅（委托 → GSMSignalRouter）==============================
 

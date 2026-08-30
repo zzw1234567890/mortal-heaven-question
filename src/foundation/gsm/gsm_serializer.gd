@@ -107,7 +107,13 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 		"collection":
 			return {"owned_cards": [], "total_count": 0}
 		"deck":
-			return {"character_slots": [null, null, null, null, null, null], "current_deck": [], "presets": []}
+			return {
+				"current_deck": [],
+				"slots": [null, null, null, null, null, null],
+				"change_log": [],
+				"session_remove_count": 0,
+				"deck_limit_modifier": 0,
+			}
 		"exploration":
 			return {
 				"current_map": &"",

@@ -145,7 +145,7 @@ func test_ac019_missing_entire_domain_gets_default() -> void:
 	var ok: bool = gsm.deserialize(data)
 	assert_true(ok, "缺失 deck 域应成功（填充默认）")
 	assert_eq(gsm.deck.current_deck.size(), 0, "deck 应为默认值")
-	assert_eq(gsm.deck.character_slots.size(), 6)
+	assert_eq(gsm.deck.slots.size(), 6)
 
 
 func test_ac019_missing_field_in_domain_gets_default() -> void:
@@ -209,7 +209,7 @@ func test_deserialize_migrates_legacy_flat_ling_cai() -> void:
 			"identity_id": "", "talents": [],
 		},
 		"collection": {"owned_cards": [], "total_count": 0},
-		"deck": {"character_slots": [null, null, null, null, null, null], "current_deck": [], "presets": []},
+		"deck": {"current_deck": [], "slots": [null, null, null, null, null, null], "change_log": [], "session_remove_count": 0, "deck_limit_modifier": 0},
 		"exploration": {"current_map": &"", "node_position": {"layer": 0, "idx": 0}, "visited_nodes": [], "action_points": 0, "max_action_points": 0, "map_states": {}},
 		"narrative": {"current_chapter": "", "completed_chapters": [], "story_flags": {}},
 	}
@@ -230,7 +230,7 @@ func test_round_trip_collection_and_deck() -> void:
 	]
 	gsm.collection.total_count = 3
 	gsm.deck.current_deck = [4, 5]
-	gsm.deck.character_slots = [null, "char_1", null, null, null, null]
+	gsm.deck.slots = [null, "char_1", null, null, null, null]
 	var data: Dictionary = gsm.serialize()
 	var ok: bool = gsm.deserialize(data)
 	assert_true(ok)
@@ -240,7 +240,7 @@ func test_round_trip_collection_and_deck() -> void:
 	assert_eq(gsm.collection.owned_cards[2].card_instance_id, 3)
 	assert_eq(gsm.collection.total_count, 3)
 	assert_eq(gsm.deck.current_deck, [4, 5])
-	assert_eq(gsm.deck.character_slots[1], "char_1")
+	assert_eq(gsm.deck.slots[1], "char_1")
 
 
 func test_round_trip_exploration_and_narrative() -> void:

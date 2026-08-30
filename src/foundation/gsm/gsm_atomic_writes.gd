@@ -733,3 +733,40 @@ func _set_consecutive_tribulation_failures(count: int) -> void:
 
 	_gsm.player.consecutive_tribulation_failures = count
 	_gsm._buffer_change("player.consecutive_tribulation_failures", old_count, count)
+
+
+## 原子写入卡组卡牌列表——仅 DeckEditingSystem 调用。[br]
+## [br][b]窄范围[/b]：仅写入 deck.current_deck——不操作 deck 域其他字段。[br]
+## [br][b]null 守卫[/b]：deck 为 null 时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值（深层相等）不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0023 §GSM 第二层扩展方法。
+func _set_deck_cards(ids: Array) -> void:
+	if _gsm.deck == null:
+		push_warning("GSM._set_deck_cards: deck 域为 null，拒绝写入")
+		return
+	var old: Array = _gsm.deck.get("current_deck", [])
+	if _gsm._deep_equal(old, ids):
+		return  # 值无变化——去重
+	_gsm.deck.current_deck = ids
+	_gsm._buffer_change("deck.current_deck", old, ids)
+
+
+## 原子写入卡组散功计数——仅 DeckEditingSystem 调用。[br]
+## [br][b]窄范围[/b]：仅写入 deck.session_remove_count——不操作 deck 域其他字段。[br]
+## [br][b]null 守卫[/b]：deck 为 null 时 push_warning 并返回。[br]
+## [br][b]去重[/b]：同值不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0023 §GSM 第二层扩展方法。
+func _set_deck_session_remove_count(count: int) -> void:
+	if _gsm.deck == null:
+		push_warning("GSM._set_deck_session_remove_count: deck 域为 null，拒绝写入")
+		return
+	if count < 0:
+		push_warning("GSM._set_deck_session_remove_count: count 不能为负（收到 %d）" % count)
+		return
+	var old_count: int = int(_gsm.deck.get("session_remove_count", 0))
+	if old_count == count:
+		return  # 值无变化——去重
+	_gsm.deck.session_remove_count = count
+	_gsm._buffer_change("deck.session_remove_count", old_count, count)
