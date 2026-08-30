@@ -5,7 +5,8 @@ extends Node
 ## 委托 CombatSystem 启动渡劫战、委托 RealmSystem 境界升级、委托 GSM 修为扣除。[br]
 ## 本文件持有 [enum TribulationState] 枚举 + [enum TribulationType] 枚举 +[br]
 ## 渡劫触发/状态转换/查询接口 + 5 个 Cat 2b 信号声明。[br]
-## [br][b]本 Story 范围[/b]（5-10）：状态机骨架 + GSM 域扩展 + 触发条件检查 + 信号声明。[br]
+## [br][b]Story 5-10 范围[/b]：状态机骨架 + GSM 域扩展 + 触发条件检查 + 信号声明。[br]
+## [br][b]Story 5-11 范围[/b]：渡劫战斗委托 CombatSystem + 雷伤纯函数 + Boss 配置查询。[br]
 ## [b]不注册进 project.godot[/b]——待各系统接线后统一注册。[br]
 ## [br]来源: ADR-0021 §关键接口 / GDD tribulation-system.md §1-7 + §状态与转换。
 
@@ -74,6 +75,12 @@ signal tribulation_protection_unlocked()
 
 ## 当前渡劫类型——trigger_tribulation 时设置，结算后清除。
 var _trib_type: int = TribulationType.NORMAL
+
+## 激活的渡劫丹列表——准备阶段使用_tribulation_pill 添加（Story 5-12 实现）。
+var _active_pills: Array = []
+
+## 可注入 CombatSystem 引用——测试时设置，绕过 Autoload 查找（同 CombatSystem get_card_instance_cb 模式）。
+var _combat_override: Node = null
 
 ## 合法状态转换白名单——_validate_state_transition 使用。
 ## [br]键=当前状态，值=可转换到的状态集合。
@@ -213,3 +220,141 @@ func _get_gsm() -> Node:
 	if tree == null:
 		return null
 	return tree.root.get_node_or_null("/root/GameStateManager")
+
+
+# === 渡劫战斗委托（Story 5-11）==================================================
+
+## Autoload 就绪——订阅 CombatSystem.battle_ended 信号（ADR-0021 §结算监听）。[br]
+## [br][b]流程[/b]: 获取 CombatSystem 引用 → 连接 battle_ended → _on_battle_ended。[br]
+## [br]来源: ADR-0021 §渡劫战启动与结算监听（同 CultivationSystem 订阅 realm_changed 模式）。
+func _ready() -> void:
+	var combat: Node = _get_combat_system()
+	if combat == null:
+		push_warning("TribulationSystem._ready: CombatSystem 不可用，battle_ended 信号未订阅")
+		return
+	if not combat.battle_ended.is_connected(_on_battle_ended):
+		combat.battle_ended.connect(_on_battle_ended)
+
+
+## 启动渡劫战斗——从 PREPARING → IN_COMBAT + 委托 CombatSystem。[br]
+## [br][b]流程[/b]:[br]
+##   1. 验证 PREPARING 状态[br]
+##   2. _set_state(IN_COMBAT)[br]
+##   3. 构建 tribulation_config[br]
+##   4. 调用 CombatSystem.battle_start(config)[br]
+## [br][b]注意[/b]: 不在此处 await——战斗生命周期由 CombatSystem 管理。[br]
+## [br]来源: ADR-0021 §start_tribulation_combat + GDD §3 渡劫战斗规则。
+func start_tribulation_combat() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("TribulationSystem.start_tribulation_combat: GSM 不可用")
+		return
+	var state: int = int(gsm.player.get("tribulation_state", TribulationState.NOT_READY))
+	if state != TribulationState.PREPARING:
+		push_warning("TribulationSystem.start_tribulation_combat: 当前状态非 PREPARING（%d）" % state)
+		return
+	_set_state(TribulationState.IN_COMBAT)
+	var config: Dictionary = _build_tribulation_config()
+	var combat: Node = _get_combat_system()
+	if combat == null:
+		push_warning("TribulationSystem.start_tribulation_combat: CombatSystem 不可用")
+		return
+	combat.battle_start(config)
+
+
+## 构建渡劫战斗配置——传入 is_tribulation: true 标志。[br]
+## [br][b]返回[/b]: [code]{is_tribulation: true, tribulation_data: {realm_level, is_cross_realm, boss_config}}[/code] Dictionary。[br]
+## [br]来源: ADR-0021 §_build_tribulation_config + §CombatSystem 扩展契约。
+func _build_tribulation_config() -> Dictionary:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return {}
+	var realm_level: int = int(gsm.player.realm)
+	var is_cross: bool = _trib_type == TribulationType.CROSS_REALM
+	var boss_realm: int = realm_level + 1 if is_cross else realm_level
+	var boss_config: Dictionary = get_tribulation_boss_config(boss_realm)
+	return {
+		"is_tribulation": true,
+		"tribulation_data": {
+			"realm_level": realm_level,
+			"is_cross_realm": is_cross,
+			"active_pills": _active_pills.duplicate(true),
+			"boss_config": boss_config,
+		},
+	}
+
+
+## 监听 CombatSystem.battle_ended——渡劫专属结算入口。[br]
+## [br][param result] 战斗结果（CombatResult.VICTORY/DEFEAT/RETREAT）。[br]
+## [br][param rewards] 奖励字典。[br]
+## [br][b]流程[/b]: 检查 tribulation_state == IN_COMBAT → VICTORY 转 SUCCESS / DEFEAT 转 FAILED。[br]
+## [br][b]非渡劫战[/b]: tribulation_state != IN_COMBAT 时忽略（普通战斗不响应）。[br]
+## [br]来源: ADR-0021 §_on_battle_ended + GDD §4-5。
+func _on_battle_ended(result: int, rewards: Dictionary) -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var state: int = int(gsm.player.get("tribulation_state", TribulationState.NOT_READY))
+	if state != TribulationState.IN_COMBAT:
+		return  # 非渡劫战——忽略
+	# CombatResult.VICTORY=0, DEFEAT=1, RETREAT=2（渡劫战中撤退不可用——仅 DEFEAT）
+	if result == 0:  # CombatResult.VICTORY
+		_set_state(TribulationState.SUCCESS)
+	else:  # DEFEAT or RETREAT
+		_set_state(TribulationState.FAILED)
+
+
+# === 雷伤计算（纯函数）========================================================
+
+## 计算雷伤层数伤害——GDD §公式 3。[br]
+## [br][param turn] 当前回合数（从 1 开始）。[br]
+## [br][param layers_per_turn] 每回合叠层数（1 或 2）。[br]
+## [br][b]返回[/b]: 本回合雷伤 = turn × layers_per_turn（先叠后伤——第1回合末即1层）。[br]
+## [br]来源: GDD §公式 3 + §边缘情况「雷伤结算时机」。
+func calculate_lightning_damage(turn: int, layers_per_turn: int) -> int:
+	if turn < 1:
+		return 0
+	if layers_per_turn < 1:
+		layers_per_turn = 1
+	return turn * layers_per_turn
+
+
+## 获取雷伤每回合叠层数——元婴劫为 2 层/回合，其余 1 层/回合。[br]
+## [br][param realm_level] 当前境界等级。[br]
+## [br][b]返回[/b]: 元婴劫(realm=4)返回 2，其余返回 1。[br]
+## [br]来源: GDD §3 雷伤叠加速度 + §调优参数。
+func get_lightning_layers_per_turn(realm_level: int) -> int:
+	# 元婴期为第 4 境界——雷伤叠加速度为 2 层/回合
+	if realm_level == 4:
+		return 2
+	return 1
+
+
+# === 天劫 Boss 配置查询 ========================================================
+
+## 查询天劫 Boss 配置——从 RealmSystem 查询或返回桩默认值。[br]
+## [br][param realm] 天劫 Boss 境界等级。[br]
+## [br][b]返回[/b]: [code]{realm, hp, atk}[/code] Dictionary。[br]
+## [br][b]桩阶段[/b]: 返回默认字典，后续接线 RealmSystem.get_realm_property。[br]
+## [br]来源: ADR-0021 §get_tribulation_boss_config + GDD §3 天劫Boss 雷灵。
+func get_tribulation_boss_config(realm: int) -> Dictionary:
+	# 桩阶段——返回默认 Boss 配置
+	# 后续接线：var boss_data = RealmSystem.get_realm_property(realm, &"tribulation_boss")
+	return {
+		"realm": realm,
+		"hp": 1000 + (realm - 1) * 500,
+		"atk": 50 + (realm - 1) * 20,
+	}
+
+
+# === CombatSystem 引用 =========================================================
+
+## 获取 CombatSystem 引用——优先使用注入的覆盖引用，否则通过 SceneTree Autoload 查找。[br]
+## [br][b]返回[/b]: CombatSystem 节点或 [code]null[/code]（未注册时）。
+func _get_combat_system() -> Node:
+	if _combat_override != null and is_instance_valid(_combat_override):
+		return _combat_override
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("/root/CombatSystem")
