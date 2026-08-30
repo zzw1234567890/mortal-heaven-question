@@ -55,7 +55,7 @@
 | 14 | deck-editing-system | 卡组验证器（卡组上限/添加/移除校验） | `deck-editing-system/story-001-*.md` | Logic | 0.5d | — | Done |
 | 15 | deck-editing-system | 卡组编辑 API + GSM deck.* 存储 | `deck-editing-system/story-002-*.md` | Integration | 0.5d | #14 | Done |
 | 16 | deck-editing-system | 卡组保存/加载 + 默认卡组 | `deck-editing-system/story-003-*.md` | Logic | 0.5d | #15 | Done |
-| 17 | deck-editing-system | 卡组验证 UI 数据源接口 | `deck-editing-system/story-004-*.md` | Integration | 0.5d | #16 | Ready |
+| 17 | deck-editing-system | 卡组验证 UI 数据源接口 | `deck-editing-system/story-004-*.md` | Integration | 0.5d | #16 | Done |
 
 **总计**：17 story，预估 8.5d（exploration #1 + tribulation #10 各取 1.0d 上限）
 
@@ -83,13 +83,13 @@
 
 ## 此冲刺的完成定义
 
-- [ ] 所有必须完成的任务已完成（17 项）
-- [ ] 所有任务通过验收标准
+- [x] 所有必须完成的任务已完成（17 项）
+- [x] 所有任务通过验收标准
 - [ ] QA 计划已存在 (`production/qa/qa-plan-sprint-5.md`)
-- [ ] 所有逻辑/集成类故事有通过的单元/集成测试
+- [x] 所有逻辑/集成类故事有通过的单元/集成测试
 - [ ] 冒烟检查已通过 (`/smoke-check sprint`)
 - [ ] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
-- [ ] 已交付特性中无 S1 或 S2 的 bug
+- [x] 已交付特性中无 S1 或 S2 的 bug
 - [ ] 任何偏差已更新设计文档
 - [ ] 代码已审查并合并
 - [ ] 4 个新 Autoload 已注册且顺序验证通过
