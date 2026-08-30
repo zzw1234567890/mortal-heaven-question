@@ -156,9 +156,12 @@ func test_ac003_battle_ended_victory_transitions_success() -> void:
 	ts.call("start_tribulation_combat")
 	await _flush()
 	# 模拟 CombatSystem 发射 battle_ended(VICTORY=0)
+	# Story 5-12 后 _on_battle_ended 调用 _handle_tribulation_success
+	# 最终回到 NOT_READY（完整结算行为在 test_pill_and_settlement.gd 验证）
 	ts.call("_on_battle_ended", 0, {})
 	await _flush()
-	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.SUCCESS, "VICTORY → SUCCESS")
+	assert_ne(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.IN_COMBAT, "VICTORY 后离开 IN_COMBAT")
+	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.NOT_READY, "VICTORY 最终回到 NOT_READY")
 
 
 func test_ac003_battle_ended_defeat_transitions_failed() -> void:
@@ -167,9 +170,12 @@ func test_ac003_battle_ended_defeat_transitions_failed() -> void:
 	ts.call("start_tribulation_combat")
 	await _flush()
 	# 模拟 CombatSystem 发射 battle_ended(DEFEAT=1)
+	# Story 5-12 后 _on_battle_ended 调用 _handle_tribulation_failure
+	# 最终回到 NOT_READY（完整结算行为在 test_pill_and_settlement.gd 验证）
 	ts.call("_on_battle_ended", 1, {})
 	await _flush()
-	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.FAILED, "DEFEAT → FAILED")
+	assert_ne(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.IN_COMBAT, "DEFEAT 后离开 IN_COMBAT")
+	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.NOT_READY, "DEFEAT 最终回到 NOT_READY")
 
 
 func test_ac003_battle_ended_ignored_when_not_in_combat() -> void:
@@ -279,9 +285,11 @@ func test_ac008_victory_to_success() -> void:
 	ts.call("start_tribulation_combat")
 	await _flush()
 	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.IN_COMBAT, "战斗中")
+	# Story 5-12 后 _on_battle_ended 调用 _handle_tribulation_success
+	# 最终回到 NOT_READY（完整结算在 test_pill_and_settlement.gd 验证）
 	ts.call("_on_battle_ended", 0, {})  # VICTORY
 	await _flush()
-	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.SUCCESS, "VICTORY→SUCCESS")
+	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.NOT_READY, "VICTORY 最终回到 NOT_READY")
 
 
 func test_ac008_defeat_to_failed() -> void:
@@ -291,7 +299,7 @@ func test_ac008_defeat_to_failed() -> void:
 	await _flush()
 	ts.call("_on_battle_ended", 1, {})  # DEFEAT
 	await _flush()
-	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.FAILED, "DEFEAT→FAILED")
+	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.NOT_READY, "DEFEAT 最终回到 NOT_READY")
 
 
 func test_ac008_retreat_to_failed() -> void:
@@ -301,4 +309,4 @@ func test_ac008_retreat_to_failed() -> void:
 	await _flush()
 	ts.call("_on_battle_ended", 2, {})  # RETREAT
 	await _flush()
-	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.FAILED, "RETREAT→FAILED")
+	assert_eq(gsm.player.tribulation_state, TS_SCRIPT.TribulationState.NOT_READY, "RETREAT 最终回到 NOT_READY")

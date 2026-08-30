@@ -49,7 +49,7 @@
 | 8 | cultivation-system | settle_overflow + 突破后溢出结算 | `cultivation-system/story-003-*.md` | Logic | 0.5d | #6 | Done |
 | 9 | cultivation-system | realm_upgraded 信号订阅 + check_breakthrough | `cultivation-system/story-004-*.md` | Integration | 0.5d | #6 | Done |
 | 10 | tribulation-system | 渡劫流程编排 + TribulationState 状态机 | `tribulation-system/story-001-*.md` | Logic | 1.0d | #9 | Done |
-| 11 | tribulation-system | 渡劫战斗委托 CombatSystem + 天雷 debuff | `tribulation-system/story-002-*.md` | Integration | 0.5d | #10 | Ready |
+| 11 | tribulation-system | 渡劫战斗委托 CombatSystem + 天雷 debuff | `tribulation-system/story-002-*.md` | Integration | 0.5d | #10 | Done |
 | 12 | tribulation-system | 渡劫丹辅助 + 成功/失败分支处理 | `tribulation-system/story-003-*.md` | Logic | 0.5d | #10 | Ready |
 | 13 | tribulation-system | 渡劫结果 GSM 同步 + 场景恢复 | `tribulation-system/story-004-*.md` | Integration | 0.5d | #11 | Ready |
 | 14 | deck-editing-system | 卡组验证器（卡组上限/添加/移除校验） | `deck-editing-system/story-001-*.md` | Logic | 0.5d | — | Ready |

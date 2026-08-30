@@ -82,6 +82,9 @@ var _active_pills: Array = []
 ## 可注入 CombatSystem 引用——测试时设置，绕过 Autoload 查找（同 CombatSystem get_card_instance_cb 模式）。
 var _combat_override: Node = null
 
+## 可注入 RealmSystem 引用——测试时设置，绕过 Autoload 查找。
+var _realm_override: Node = null
+
 ## 合法状态转换白名单——_validate_state_transition 使用。
 ## [br]键=当前状态，值=可转换到的状态集合。
 const _VALID_TRANSITIONS: Dictionary = {
@@ -287,7 +290,7 @@ func _build_tribulation_config() -> Dictionary:
 ## 监听 CombatSystem.battle_ended——渡劫专属结算入口。[br]
 ## [br][param result] 战斗结果（CombatResult.VICTORY/DEFEAT/RETREAT）。[br]
 ## [br][param rewards] 奖励字典。[br]
-## [br][b]流程[/b]: 检查 tribulation_state == IN_COMBAT → VICTORY 转 SUCCESS / DEFEAT 转 FAILED。[br]
+## [br][b]流程[/b]: 检查 tribulation_state == IN_COMBAT → VICTORY 调用 _handle_success / DEFEAT 调用 _handle_failure。[br]
 ## [br][b]非渡劫战[/b]: tribulation_state != IN_COMBAT 时忽略（普通战斗不响应）。[br]
 ## [br]来源: ADR-0021 §_on_battle_ended + GDD §4-5。
 func _on_battle_ended(result: int, rewards: Dictionary) -> void:
@@ -299,9 +302,130 @@ func _on_battle_ended(result: int, rewards: Dictionary) -> void:
 		return  # 非渡劫战——忽略
 	# CombatResult.VICTORY=0, DEFEAT=1, RETREAT=2（渡劫战中撤退不可用——仅 DEFEAT）
 	if result == 0:  # CombatResult.VICTORY
-		_set_state(TribulationState.SUCCESS)
+		_handle_tribulation_success()
 	else:  # DEFEAT or RETREAT
-		_set_state(TribulationState.FAILED)
+		_handle_tribulation_failure()
+
+
+# === 渡劫丹管理（Story 5-12）=================================================
+
+## 使用渡劫丹——准备阶段使用，最多 2 枚，同种不叠加取最高稀有度。[br]
+## [br][param pill_data] 渡劫丹数据 [code]{type, rarity_tier, ...}[/code] Dictionary。[br]
+## [br][b]返回[/b]: [code]true[/code] 使用成功，[code]false[/code] 被拒绝。[br]
+## [br][b]规则[/b]（GDD §2 + §边缘情况）:[br]
+##   1. 仅 PREPARING 状态可使用[br]
+##   2. 总上限 MAX_TRIBULATION_PILLS(2) 枚[br]
+##   3. 同种不叠加——高稀有度替换低稀有度，低稀有度被拒绝[br]
+## [br]来源: ADR-0021 §use_tribulation_pill + GDD §2 渡劫准备阶段。
+func use_tribulation_pill(pill_data: Dictionary) -> bool:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("TribulationSystem.use_tribulation_pill: GSM 不可用")
+		return false
+	var state: int = int(gsm.player.get("tribulation_state", TribulationState.NOT_READY))
+	if state != TribulationState.PREPARING:
+		push_warning("TribulationSystem.use_tribulation_pill: 非 PREPARING 状态（%d）" % state)
+		return false
+	if not pill_data.has("type") or not pill_data.has("rarity_tier"):
+		push_warning("TribulationSystem.use_tribulation_pill: pill_data 缺少 type 或 rarity_tier")
+		return false
+	if _active_pills.size() >= MAX_TRIBULATION_PILLS:
+		push_warning("TribulationSystem: 最多使用 %d 枚渡劫丹" % MAX_TRIBULATION_PILLS)
+		return false
+	var pill_type: String = str(pill_data["type"])
+	var pill_rarity: int = int(pill_data["rarity_tier"])
+	# 同种不叠加——检查是否已有同类型
+	for i in range(_active_pills.size()):
+		var existing: Dictionary = _active_pills[i]
+		if str(existing["type"]) == pill_type:
+			var existing_rarity: int = int(existing["rarity_tier"])
+			if existing_rarity >= pill_rarity:
+				push_warning("TribulationSystem: 同种渡劫丹已有更高/等同稀有度")
+				return false
+			else:
+				# 替换为更高稀有度版本
+				_active_pills[i] = pill_data.duplicate(true)
+				return true
+	_active_pills.append(pill_data.duplicate(true))
+	return true
+
+
+# === 成功/失败结算（Story 5-12）===============================================
+
+## 渡劫成功结算——调用 realm_up + 重置失败计数 + 发射信号。[br]
+## [br][b]流程[/b]（ADR-0021 §_handle_tribulation_success）:[br]
+##   1. 记录 old_realm[br]
+##   2. 调用 RealmSystem.realm_up(old_realm)[br]
+##   3. GSM._set_consecutive_tribulation_failures(0)[br]
+##   4. _set_state(SUCCESS)[br]
+##   5. 发射 tribulation_succeeded 信号[br]
+##   6. _set_state(NOT_READY)[br]
+## [br][b]金卡奖励[/b]: TODO——CardSystem 未接线，后续 Sprint 补充。[br]
+## [br]来源: ADR-0021 §_handle_tribulation_success + GDD §4。
+func _handle_tribulation_success() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var old_realm: int = int(gsm.player.realm)
+	# 1. 调用 RealmSystem.realm_up——编排境界升级全流程
+	var realm_sys: Node = _get_realm_system()
+	if realm_sys != null and realm_sys.has_method("realm_up"):
+		realm_sys.realm_up(old_realm)
+	else:
+		push_warning("TribulationSystem: RealmSystem 不可用，realm_up 未调用")
+	# 2. 重置连续失败计数器
+	gsm._set_consecutive_tribulation_failures(0)
+	# 3. 金卡奖励——TODO: CardSystem 未接线
+	# 4. 进入 SUCCESS 状态
+	_set_state(TribulationState.SUCCESS)
+	var new_realm: int = int(gsm.player.realm)
+	var is_cross: bool = _trib_type == TribulationType.CROSS_REALM
+	# 5. 发射渡劫成功信号
+	_emit_safe(&"tribulation_succeeded", [old_realm, new_realm, is_cross])
+	# 6. 回到 NOT_READY
+	_set_state(TribulationState.NOT_READY)
+	_trib_type = TribulationType.NORMAL
+	_active_pills.clear()
+
+
+## 渡劫失败结算——修为扣除 + 失败计数 + 发射信号 + 保护检查。[br]
+## [br][b]流程[/b]（ADR-0021 §_handle_tribulation_failure + GDD §5）:[br]
+##   1. 计算 penalty = floor(max_cult × FAILURE_PENALTY_RATIO)[br]
+##   2. 扣除修为（兜底 ≥ 0）[br]
+##   3. 失败计数 +1[br]
+##   4. _set_state(FAILED)[br]
+##   5. 发射 tribulation_failed 信号[br]
+##   6. 连续 ≥3 次发射 tribulation_protection_unlocked[br]
+##   7. _set_state(NOT_READY)[br]
+## [br]来源: ADR-0021 §_handle_tribulation_failure + GDD §5 + §公式 1。
+func _handle_tribulation_failure() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var max_cult: int = int(gsm.player.max_cultivation)
+	var current: int = int(gsm.player.cultivation)
+	# 1. 计算修为损失——max_cult × 0.15（GDD §公式 1）
+	var penalty: int = int(floor(float(max_cult) * FAILURE_PENALTY_RATIO))
+	# 2. 扣除修为——兜底不会低于 0
+	var new_cult: int = maxi(current - penalty, 0)
+	if new_cult != current:
+		gsm.player.cultivation = new_cult
+		gsm._buffer_change("player.cultivation", current, new_cult)
+	# 3. 失败计数 +1
+	var failures: int = int(gsm.player.get("consecutive_tribulation_failures", 0)) + 1
+	gsm._set_consecutive_tribulation_failures(failures)
+	# 4. 进入 FAILED 状态
+	_set_state(TribulationState.FAILED)
+	# 5. 发射渡劫失败信号
+	var realm_level: int = int(gsm.player.realm)
+	_emit_safe(&"tribulation_failed", [penalty, realm_level])
+	# 6. 连续失败保护
+	if failures >= CONSECUTIVE_FAILURE_THRESHOLD:
+		_emit_safe(&"tribulation_protection_unlocked", [])
+	# 7. 回到 NOT_READY
+	_set_state(TribulationState.NOT_READY)
+	_trib_type = TribulationType.NORMAL
+	_active_pills.clear()
 
 
 # === 雷伤计算（纯函数）========================================================
@@ -358,3 +482,14 @@ func _get_combat_system() -> Node:
 	if tree == null:
 		return null
 	return tree.root.get_node_or_null("/root/CombatSystem")
+
+
+## 获取 RealmSystem 引用——优先使用注入的覆盖引用，否则通过 SceneTree Autoload 查找。[br]
+## [br][b]返回[/b]: RealmSystem 节点或 [code]null[/code]（未注册时）。
+func _get_realm_system() -> Node:
+	if _realm_override != null and is_instance_valid(_realm_override):
+		return _realm_override
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("/root/RealmSystem")
