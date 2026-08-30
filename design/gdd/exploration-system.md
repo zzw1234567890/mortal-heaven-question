@@ -1,9 +1,9 @@
 # 探索系统 (Exploration System)
 
-> **状态 (Status)**：设计中 (In Design)
+> **状态 (Status)**：已实现（桩阶段）——DAG 生成 + 导航 + 经济计算 + GSM 存储 + 缓存重建已实现；节点可见性延迟至 UI 层
 > **作者 (Author)**：Claude Code + 用户
-> **最后更新 (Last Updated)**：2026-07-23
-> **最后验证 (Last Verified)**：—
+> **最后更新 (Last Updated)**：2026-08-30（Sprint 5 偏差更新）
+> **最后验证 (Last Verified)**：2026-08-30（Sprint 5 实现验证）
 > **实现的支柱 (Implements Pillar)**：支柱3「机缘巧合，意外之喜」、支柱2「苟道成长，步步为营」
 
 ## 概述

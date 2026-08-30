@@ -1,9 +1,9 @@
 # 渡劫突破系统 (Tribulation Breakthrough System)
 
-> **状态 (Status)**：已修订——2026-07-28 gate-check CONCERNS 响应：修为损失 10%→15%，新增「心魔」debuff，新增角色复活途径
+> **状态 (Status)**：已实现（桩阶段）——状态机 + 战斗委托 + 渡劫丹 + 结算 + GSM 同步已实现；心魔 debuff / 天劫试炼 / 金卡奖励 / 角色复活途径为桩实现（待后续 Sprint 接线）
 > **作者 (Author)**：Claude Code + 用户
-> **最后更新 (Last Updated)**：2026-07-28（gate-check C3 修订——失败惩罚强化 + 心魔 + 复活途径）
-> **最后验证 (Last Verified)**：—
+> **最后更新 (Last Updated)**：2026-08-30（Sprint 5 偏差更新）
+> **最后验证 (Last Verified)**：2026-08-30（Sprint 5 实现验证）
 > **实现的支柱 (Implements Pillar)**：支柱2「苟道成长，步步为营」
 
 ## 概述

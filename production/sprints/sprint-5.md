@@ -87,10 +87,10 @@
 - [x] 所有任务通过验收标准
 - [x] QA 计划已存在 (`production/qa/qa-plan-sprint-5-2026-08-30.md`)
 - [x] 所有逻辑/集成类故事有通过的单元/集成测试
-- [ ] 冒烟检查已通过 (`/smoke-check sprint`)
-- [ ] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
+- [x] 冒烟检查已通过 (`/smoke-check sprint`——全量 104 scripts / 2060 tests / 0 failing)
+- [x] QA 签收报告：APPROVED WITH CONDITIONS (`/team-qa sprint`——`production/qa/qa-signoff-sprint-5-2026-08-30.md`)
 - [x] 已交付特性中无 S1 或 S2 的 bug
-- [ ] 任何偏差已更新设计文档
+- [x] 任何偏差已更新设计文档（`production/qa/deviation-report-sprint-5-2026-08-30.md` + 4 GDD 状态更新）
 - [ ] 代码已审查并合并
 - [x] 4 个新 Autoload 已注册且顺序验证通过
 

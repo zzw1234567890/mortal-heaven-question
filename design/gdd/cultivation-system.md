@@ -1,6 +1,6 @@
 # 修为养成系统 (Cultivation System)
 
-> **状态 (Status)**：设计中 (In Design)
+> **状态 (Status)**：已实现——修为获取 + 溢出结算 + 突破检查 + GSM 存储已实现 (In Design)
 > **作者 (Author)**：Claude Code + 用户
 > **最后更新 (Last Updated)**：2026-07-22
 > **最后验证 (Last Verified)**：—
