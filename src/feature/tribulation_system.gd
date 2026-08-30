@@ -7,7 +7,7 @@ extends Node
 ## 渡劫触发/状态转换/查询接口 + 5 个 Cat 2b 信号声明。[br]
 ## [br][b]Story 5-10 范围[/b]：状态机骨架 + GSM 域扩展 + 触发条件检查 + 信号声明。[br]
 ## [br][b]Story 5-11 范围[/b]：渡劫战斗委托 CombatSystem + 雷伤纯函数 + Boss 配置查询。[br]
-## [b]不注册进 project.godot[/b]——待各系统接线后统一注册。[br]
+## [b]已注册进 project.godot[/b]——Autoload #22（TribulationSystem）。[br]
 ## [br]来源: ADR-0021 §关键接口 / GDD tribulation-system.md §1-7 + §状态与转换。
 
 

@@ -5,7 +5,7 @@ extends Node
 ## 本文件持有 [method generate_map] 程序化 DAG 生成 + 地图难度配置 + 加权随机分配 +
 ## 边连接连通性保证 + 独立路径验证。[br]
 ## [br][b]本 Story 范围[/b]（5-1）：纯 DAG 生成逻辑——不写入 GSM、不处理导航、不触发事件。[br]
-## [b]不注册进 project.godot[/b]——待各系统接线后统一注册（5-0b 终验）。[br]
+## [b]已注册进 project.godot[/b]——Autoload #19（ExplorationSystem）。[br]
 ## [br]来源: ADR-0014 §决策 2 程序化 DAG 生成 / GDD exploration-system.md §2-3。
 
 
@@ -850,8 +850,8 @@ func collect_resource(resource_type: StringName, amount: int) -> void:
 	var state: Dictionary = map_states.get(current_map, {})
 	var key_str: String = "collected_" + str(resource_type)
 	var current_val: int = int(state.get(key_str, 0))
-	state[key_str] = current_val + amount
-	gsm.update_exploration_map_state(current_map, state)
+	# 通过 update_exploration_map_state 传增量字典——不直接修改 GSM 内部引用（H-1 修复）
+	gsm.update_exploration_map_state(current_map, {key_str: current_val + amount})
 
 
 ## 将 map_states[map_id] 中的 collected_* 转移到 GSM player.* 域。[br]
@@ -864,19 +864,21 @@ func _flush_map_state(map_id: StringName) -> void:
 		return
 	var map_states: Dictionary = gsm.exploration.get("map_states", {})
 	var state: Dictionary = map_states.get(map_id, {})
+	var changes: Dictionary = {}
 	# 转移灵石
 	var collected_ls: int = int(state.get("collected_ling_shi", 0))
 	if collected_ls > 0:
 		var current_ls: int = int(gsm.player.resources.get("ling_shi", 0))
 		gsm._set_resource_ling_shi(current_ls + collected_ls)
-		state["collected_ling_shi"] = 0
+		changes["collected_ling_shi"] = 0
 	# 转移修为
 	var collected_cult: int = int(state.get("collected_cultivation", 0))
 	if collected_cult > 0:
 		gsm.add_cultivation(collected_cult, "exploration_flush")
-		state["collected_cultivation"] = 0
-	# 回写清零后的 state
-	gsm.update_exploration_map_state(map_id, state)
+		changes["collected_cultivation"] = 0
+	# 回写清零后的 state——传增量字典（H-1 修复：不直接修改 GSM 内部引用）
+	if not changes.is_empty():
+		gsm.update_exploration_map_state(map_id, changes)
 
 
 ## 探索结束结算——三种路径（GDD §公式 11 + ADR-0014 §决策 5）。[br]
@@ -940,20 +942,23 @@ func _flush_map_state_half_cultivation(map_id: StringName) -> void:
 		return
 	var map_states: Dictionary = gsm.exploration.get("map_states", {})
 	var state: Dictionary = map_states.get(map_id, {})
+	var changes: Dictionary = {}
 	# 灵石全额
 	var collected_ls: int = int(state.get("collected_ling_shi", 0))
 	if collected_ls > 0:
 		var current_ls: int = int(gsm.player.resources.get("ling_shi", 0))
 		gsm._set_resource_ling_shi(current_ls + collected_ls)
-		state["collected_ling_shi"] = 0
+		changes["collected_ling_shi"] = 0
 	# 修为保留 50%
 	var collected_cult: int = int(state.get("collected_cultivation", 0))
 	if collected_cult > 0:
 		var retained: int = int(floor(collected_cult * 0.5))
 		if retained > 0:
 			gsm.add_cultivation(retained, "battle_lost_half")
-		state["collected_cultivation"] = 0
-	gsm.update_exploration_map_state(map_id, state)
+		changes["collected_cultivation"] = 0
+	# 回写清零后的 state——传增量字典（H-1 修复：不直接修改 GSM 内部引用）
+	if not changes.is_empty():
+		gsm.update_exploration_map_state(map_id, changes)
 
 
 ## 检查地图是否已通关——从 map_states 读取 is_first_clear。

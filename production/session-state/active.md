@@ -1,477 +1,76 @@
-## Session Extract — /story-done 2026-08-13
-
-- Verdict：COMPLETE
-- Story：`production/epics/school-system/story-002-5-school-effects-undispellable-switch-clear.md` — 5 流派增益公式 + 不可驱散约束 + 切换清空
-- Implementation：`src/core/school_system/school_system.gd`（5 个 effects 数组字段名/数值重写匹配 AC-001~005）
-- Tests：`tests/unit/school_system/test_school_effects.gd`（20 测试，覆盖 AC-001~018），school_system 套件 53/53 passed
-- Next recommended：Story 3-9（拆分 game_state_manager.gd）
-
----
-
-## Session Extract — Story 3-9 拆分 GSM 2026-08-13
-
-- Verdict：COMPLETE（game_state_manager.gd 1080 → 282 行，达成 ≤300 目标）
-- 拆分结构（4 文件）：
-  - `src/foundation/game_state_manager.gd`（282 行）——信号/枚举/数据域/生命周期 + 薄转发 wrapper
-  - `src/foundation/gsm/gsm_atomic_writes.gd`（429 行）——22 个第二层原子写入方法 + 卡牌校验
-  - `src/foundation/gsm/gsm_signal_router.gd`（141 行）——信号缓冲/帧末刷新/域信号路由/订阅
-  - `src/foundation/gsm/gsm_serializer.gd`（311 行）——序列化/反序列化/域访问/深拷贝/默认值
-- 委托模式：同 event_system 拆分先例（RefCounted delegate + init(gsm) + _init 装配）
-- 回归：全量 53 scripts / 1003 tests，993 passed / 8 failing——与拆分前基线一致（8 个既有失败：cost_system 6 + realm 1 + event 1），零新增失败
-- 注意：`tests/unit/gsm/` 下 4 个 `*_test.gd` 后缀文件名不以 `test_` 开头，GUT 未发现（孤儿测试）——既有问题，本 Story 未处理（属 3-10 范畴）
-- Next recommended：Story 3-10（GSM 第二层方法独立单测补齐）或 3-11（ADR-0003 文档）
-
----
-
-## 状态同步 2026-08-14
-
-- sprint 进度：12/12 done（3-1~3-12）——Sprint 3 全部完成 ✅
-- 剩余：无
-
----
-
-## Session Extract — Sprint 3 QA 验收（smoke + team-qa）2026-08-15
-
-- Verdict：APPROVED（QA 签收通过）
-- 冒烟检查：PASS WITH WARNINGS（`production/qa/smoke-2026-08-15.md`）——1145/1146 通过，0 失败
-- QA 签收：APPROVED（`production/qa/qa-signoff-sprint-3-2026-08-15.md`）——12/12 story PASS，零 S1/S2 缺陷
-- 冒烟检查期间修复 3 个 EventSystem 测试文件 parse error（28 个哑测试解锁）：
-  - `test_event_trigger.gd`（10 处 `var instance := es.trigger_event(...)` → `var instance: EventInstance = ...`）
-  - `test_resolve_option.gd`（8 处 `var results := es.resolve_option(...)` → `var results: Array = ...`）
-  - `test_select_event.gd`（续行 `+` 卡方表达式缩进错误 → 拆 `heavy_term`/`light_term`）
-- 文档审查修复 1 处措辞矛盾：ADR-0003 与 `chain_handler.gd` docstring 中 `get_chain_event()`「不修改 visited_ids」→「不追加、不发射信号，但链结束分支 clear()」
-- 全量测试：62 scripts / 1146 tests / 1145 passing / 1 pending（save_load 多步迁移）/ 0 failing
-- sprint-3.md 完成定义更新：冒烟检查 ✅、QA 签收 ✅、无 S1/S2 bug ✅；剩「代码已审查并合并」一项未勾（待 /code-review + git 提交，需用户明确指示）
-- 3 项 ADVISORY（S3/S4，不阻塞）：orphan 测试内存泄漏 / RealmSystem·SchoolSystem 未注册 Autoload / CardSystem 模板目录缺失
-- Next recommended：/code-review 代码审查 → git 提交（需用户指示）→ 启动 Sprint 4（/dev-story combat-system）
-
----
-
-## Session Extract — 修复 cost_system 既有 8 个测试失败 2026-08-14
-
-- Verdict：FIXED（全量 1118 tests → 1117 passing / 1 pending，0 failing）
-- 根因与修复（两类）：
-  1. **6 个信号计数失败**（`tests/unit/cost_system/test_cost_signals.gd`）：`_track_signal` 连接晚于 `init_for_battle`，丢失 init 发射的 cost_changed → 移 `_track_signal` 到 `init_for_battle` 之前（test_ac002/003/004/006）
-  2. **2 个 lambda 按值捕获 int 失效**（test_ac010/011）：GDScript lambda 对 int 按值捕获，闭包内 `+=`/`=` 不写回外部 → 改用 `Array` 承载可变值（`cat2b_received: Array = [0]`、`ui_cost_current: Array = [-1]`）
-  3. **2 个 push_warning 计数失败**（`tests/integration/cost_system/test_cost_system_basic.gd`）：`_write_cost_to_gsm` → `_set_battle_cost` 在 battle=null 时 push_warning，叠加原警告 → 补 `GameStateManager.battle_start({})` / `battle_end({})` 包裹（test_ac006_spend_insufficient_push_warning、test_ac015_clear_then_add_temp_bonus_rejected）
-  4. **1 个 risky 测试**（test_ac018_write_to_gsm_silent_when_method_missing）：Story 001 桩模式（has_method 返回 false）已过时，Story 002 已实现 `_set_battle_cost` → 改写为验证 battle=null 时 null 守卫静默跳过
-- 变更文件：
-  - `tests/unit/cost_system/test_cost_signals.gd`
-  - `tests/integration/cost_system/test_cost_system_basic.gd`
-- 回归：cost_system 套件 74/74 passed；全量 59 scripts / 1118 tests，1117 passing / 1 pending（save_load test_migration_chain 多步迁移，首版有意延后）
-- 附注：`test_event_trigger.gd` 的 parse error（此前发现）已确认不在当前失败列表——event_system 套件 162/162 passed，无需处理
-- Next recommended：启动 Sprint 4（Feature 层）——`/dev-story` 从 combat-system 起逐条填充 AC 并实现
-
----
-
-## Session Extract — Story 3-12 Feature 层 Epic Story 预创建 2026-08-14
-
-- Verdict：COMPLETE
-- 范围（用户决策）：全部 18 个 Feature 系统 + 标题级骨架
-- 产物：18 个 `production/epics/<name>/EPIC.md`（标题级 story 拆分表，AC 留待 `/dev-story` 填充）+ 更新 `production/epics/index.md`
-- 18 个 Epic（Layer=Feature，Status=Backlog）：
-  - 战斗子系统 6：combat-system(4) / card-effect-engine(5) / deployment-system(4) / binding-system(4) / formation-system(4) / ai-system(4)
-  - 探索经济 6：exploration-system(5) / cultivation-system(4) / tribulation-system(4) / deck-editing-system(4) / alchemy-crafting-system(4) / inscription-system(3)
-  - 成长元进度 3：identity-selection-system(3) / reincarnation-talent-system(3) / achievement-system(3)
-  - 叙事 3：story-system(4) / dialogue-system(3) / ending-branch-system(3)
-  - 合计 67 个 story 标题
-- 关键架构事实（写入各 EPIC.md 的 ADR 引用）：
-  - Autoload 编号与层定位从各 ADR 的「排序说明」提取
-  - 非 Autoload 系统：alchemy/inscription/dialogue 为 RefCounted 服务类；ending 嵌入 StorySystem；reincarnation/achievement 经 ProgressionSystem(ADR-0012) 直写
-- Next：Sprint 3 全部 12 个 story 完成。下一步建议用 `/dev-story` 从 combat-system 起逐条填充 AC 并实现 Feature 层（战斗子系统为 MVP 关键路径）。
-
----
-
-## Session Extract — Story 3-11 ADR-0003 §visited_ids 生命周期文档补充 2026-08-14
-
-- Verdict：COMPLETE
-- 文件：`docs/decisions/ADR-0003-event-system-story-flags-owner-resource-templates.md`
-- 变更：§循环检测算法 顶部加「2026-08-14 更新」标注（初版 `_check_chain_cycle` 伪代码已提取至 ChainHandler）；新增 §visited_ids 生命周期 小节，权威记录：
-  - 所有权：`_chain_visited_ids` 唯一所有者 = EventSystem（`event_system.gd:81`），ChainHandler 经 `init(templates, visited_ids)` 注入引用（Array 引用类型，无副本同步）
-  - 初始化：`_init()` 中空数组构造 + 注入共享引用（测试实例 `ES_SCRIPT.new()` 亦可用）
-  - 清空语义：4 条链结束分支（无 chain_next / 深度截断 / 选项不匹配 / 循环命中）均 `clear()`
-  - 追加语义：仅 `check_chain_cycle()` append；`get_chain_event()` 为纯查询（CQS）不修改
-  - 边界：生命周期对齐「事件链」而非「单个事件」；Array 引用共享 → 外部不得在链中直接改写
-- Next recommended：Story 3-12（Feature 层 Epic Story 预创建，nice-to-have，1 天）
-
----
-
-## Session Extract — Story 3-10 GSM 第二层方法独立单测补齐 2026-08-14
-
-- Verdict：COMPLETE
-- 完成内容：
-  1. **重命名 5 个孤儿测试**（`_test.gd` → `test_*.gd` + `.uid`，git mv）——GUT 前缀规则 `test_` 未匹配导致此前不被发现：
-     - `tests/unit/gsm/atomic_write_methods_test.gd` → `test_atomic_write_methods.gd`
-     - `tests/unit/gsm/autoload_and_tier1_read_test.gd` → `test_autoload_and_tier1_read.gd`
-     - `tests/unit/gsm/serialize_deserialize_test.gd` → `test_serialize_deserialize.gd`
-     - `tests/unit/gsm/signal_layer_and_batch_updated_test.gd` → `test_signal_layer_and_batch_updated.gd`
-     - `tests/integration/gsm/validation_skip_and_enable_test.gd` → `test_validation_skip_and_enable.gd`
-  2. **修复既有失效断言**（零覆盖原因：断言针对拆分前/旧数据模型）：
-     - `test_autoload_and_tier1_read.gd`：`ling_cai == 0` → 四品质嵌套字典 `{low,medium,high,top}` 断言
-     - `test_atomic_write_methods.gd`：7 个 `gsm.add_resource/spend_resource`（GSM 无此方法，属 ResourceSystem）重写为真实 GSM 第二层方法 `_set_resource_ling_shi`/`_set_resource_ling_cai`；reincarnation_reset 的 ling_cai 字典断言
-     - `test_serialize_deserialize.gd`：`owned_cards = [1,2,3]`（int 数组）→ 卡牌实例字典数组（`_recover_card_id_counter` 期望 Dictionary 元素，int 触发类型赋值崩溃）
-     - `test_validation_skip_and_enable.gd`：`id: 42` → `card_instance_id: 42`（`add_card_to_collection` 发射信号时读取 `card_instance_id`，非 `id`）
-  3. **新增 6 个零覆盖方法独立单测**：`tests/unit/gsm/test_second_layer_methods.gd`（15 测试）
-     - `_set_battle_status_snapshot`（写入/null 守卫/同值去重）
-     - `set_session_scene`（写入 + 缓冲两条路径）
-     - `remove_card_from_collection`（成功/校验跳过拒绝/未找到拒绝）
-     - `restore_action_points`（增量/非正拒绝）
-     - `unlock_talent`（append/去重）
-     - `advance_chapter`（首章/旧章入 completed/同章去重/空拒绝）
-- 回归：GSM 套件（unit + integration）119/119 全通过
-- 全量：59 scripts / 1118 tests，1108 passing / 8 failing——8 个失败均为 **cost_system 既有失败**（拆分前基线已存在，非本次引入）
-  - 6 个 `test_cost_signals.gd`（cost_changed 信号计数）+ 2 个 `test_cost_system_basic.gd`（push_warning 计数）：根源是 `_write_cost_to_gsm` 的 `has_method("_set_battle_cost")` 在动态分派 `GSM_SCRIPT.new()` 实例下返回 false，属 CostSystem↔GSM 接口既有缺陷，非 GSM 拆分/单测改动引入
-- Next recommended：Story 3-11（ADR-0003 §visited_ids 生命周期文档补充）或 3-12（Feature 层预创建）
+# Active Session State
 
 <!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-0 已注册 RealmSystem+SchoolSystem，待 /dev-story 4-1（card-effect-engine story-001）
+Epic: Sprint 5
+Feature: Feature 层探索经济线（4 Epic 17 Story）
+Task: Sprint 5 QA 签收完成——APPROVED WITH CONDITIONS，待代码审查并合并
 <!-- /STATUS -->
 
-## Session Extract — Sprint 4 计划（/sprint-plan new）2026-08-16
+## 当前任务
 
-- Verdict：COMPLETE（sprint-4.md + sprint-status.yaml 已写入）
-- 范围（用户决策）：战斗子系统 6 Epic，25 story + 1 task = 26 项，**全部 must-have**（拒绝了制作人推荐的 must 17 / should 4 / nice 4 分层，接受"Feature 层压缩率可能衰减"的风险）
-- 时间盒：7-8 日历日（2026-08-16 至 2026-08-23，8 天，缓冲 1.5d，可用 6.5d）
-- 速度基准：改用**日历日**（Sprint 3 回顾行动项 #3）——Sprint 2/3 连续 4 天完成 14 天计划
-- PR-SPRINT 关卡（review mode full）：producer 裁决 CONCERNS，三项结构性建议均已采纳：
-  1. ai-system 提 must（原误归 should）——Phase 5 敌方行动直接调用 AISystem，无 AI 则回合无法闭环
-  2. 新增 4-0 Autoload 注册任务——RealmSystem(#11)/SchoolSystem(#19) 已实现但未注册，combat Phase 4 依赖 get_suppression()
-  3. 4-22 预估 1d → 1.5-2d（7 阶段状态机是最高复杂度单故事）
-- 依赖排序：card-effect-engine(#10)→deployment(#17)/binding(#13)/formation(#23)→ai(#18)→combat(#9 编排器最后)
-- 关键前置：落实 Sprint 3 回顾行动项 #1/#2（/story-done 门禁强化 + 测试清单完整性检查）
-- Next recommended：`/qa-plan sprint`（实现前必需）→ `/dev-story` 从 4-0（Autoload 注册）起逐条填充 AC 并实现
+Sprint 5 探索经济线全部 17/17 Story 完成，QA 流程完成。
 
----
+## Sprint 5 完成定义（8/9 完成）
 
-## Session Extract — Sprint 4 QA 计划（/qa-plan sprint）2026-08-16
+- [x] 所有必须完成的任务已完成（17 项）
+- [x] 所有任务通过验收标准
+- [x] QA 计划已存在（`production/qa/qa-plan-sprint-5-2026-08-30.md`）
+- [x] 所有逻辑/集成类故事有通过的单元/集成测试（335 新增测试）
+- [x] 冒烟检查已通过（104 scripts / 2060 tests / 0 failing）
+- [x] QA 签收报告：APPROVED WITH CONDITIONS（`production/qa/qa-signoff-sprint-5-2026-08-30.md`）
+- [x] 已交付特性中无 S1 或 S2 的 bug
+- [x] 任何偏差已更新设计文档（`production/qa/deviation-report-sprint-5-2026-08-30.md` + 4 GDD 状态更新）
+- [ ] 代码已审查并合并
+- [x] 4 个新 Autoload 已注册且顺序验证通过
 
-- Verdict：COMPLETE（`production/qa/qa-plan-sprint-4-2026-08-16.md` 已写入）
-- 分类：25 story 全 Logic/Integration——**Logic 18（BLOCKING）+ Integration 7（BLOCKING）**，无 UI/Visual/Config；+ 4-0 task（冒烟范围）
-- 预估测试数：约 **314 个测试函数**（Logic ~194 + Integration ~120），测试数最高 binding 4-11（~22）
-- 7 个缺口（qa-lead 标记）：
-  - **缺口 #1（已修复）**：9 个测试文件名 `_test.gd` 后缀 → 孤儿测试。已在 9 个 story 文件 `## Test Evidence` 修正为 `test_` 前缀（card-effect-engine 5 + binding 4，与 `.gutconfig.json` `prefix: "test_"` 一致）。实现时按修正后路径创建测试文件
-  - **缺口 #5（已解决）**：AI Story 4-20 AC-011 语义冲突——GDD §公式4（AND）vs §边缘情况（OR）。game-designer 裁决 **OR 语义 + 显式哨兵（0=禁用）**：`(hp_below>0 AND hp_pct<=hp_below) OR (turn_after>0 AND turn>=turn_after)`；§公式4 的 `and` 为笔误；「最高难度回合兜底」降为配置层分级（`turn_after>0`）。已同步 GDD（7 处）+ story AC-010/011 + QA 计划。ADR-0017 无公式冲突未改（第 448 行 HP 触发为 OR 子集）
-  - 缺口 #2：PRD 累加常数 C 未校准（4-4 AC-002 区间脆弱）
-  - 缺口 #3：性能断言 CI/无头波动（建议宽松阈值 ×3 容差）
-  - 缺口 #4：assert 守卫仅 debug 生效（4-10）
-  - 缺口 #6：call_deferred 帧调度测试需 GUT await（4-22）
-  - 缺口 #7（非阻塞）：formation GDD §公式编号错乱
-- 冒烟关键点：**4-0 Autoload 顺序矛盾**——控制清单 CombatSystem 列 #9 但其 `_ready()` 依赖 9 子系统（#10~#23 均在 #9 后）；sprint-4.md 已声明「CombatSystem 最后注册」，4-0b 需终验（调顺序 or `_ready()` `_initialized` 延迟初始化）
-- Next recommended：`/dev-story` 从 4-0（Autoload 注册）起逐条实现；先裁决缺口 #5（game-designer）+ 落实 Sprint 3 回顾行动项 #1/#2（/story-done 门禁强化）
+## 已完成的 Epic
 
-<!-- QA RUN: 2026-08-15 | Sprint: sprint-3 | Verdict: APPROVED | Report: production/qa/qa-signoff-sprint-3-2026-08-15.md -->
-<!-- QA-PLAN: 2026-08-16 | Sprint: sprint-4 | 25 story (Logic 18 / Integration 7) + 1 task | 约 314 测试 | Report: production/qa/qa-plan-sprint-4-2026-08-16.md | 缺口 #1 已修复；缺口 #5 已裁决（OR 语义） -->
-<!-- GDD 修订: 2026-08-16 | design/gdd/ai-system.md | Boss 阶段转换触发 OR 语义 + 0=禁用哨兵（game-designer 裁决） -->
+1. **exploration-system**（5 Story）：DAG 生成 → GSM 存储 → 节点推进 → 缓存重建 → 事件分配
+2. **cultivation-system**（4 Story）：修为获取 → GSM 存储 → 溢出结算 → 突破检查
+3. **tribulation-system**（4 Story）：状态机 → 战斗委托 → 渡劫丹+结算 → GSM 同步
+4. **deck-editing-system**（4 Story）：验证器 → 编辑 API → 保存/加载 → UI 数据源
 
----
+## 全量测试基线
 
-## Session Extract — Story 4-0 Autoload 注册 2026-08-16
+- Scripts: 104 / Tests: 2060 / Passing: 2059 / Pending: 1 / Failing: 0 / Asserts: 7677
+- 零回归（对比 Sprint 4 基线 85 scripts / 1668 tests）
 
-- Verdict：PARTIAL（RealmSystem+SchoolSystem 已注册；6 Feature Autoload 待各系统实现时注册）
-- 变更：`project.godot` `[autoload]` 段在 StatusEffectSystem(#10) 后追加 RealmSystem(#11) + SchoolSystem(#19)
-- 验证：headless 启动退出码 0（仅 CardSystem 模板目录缺失/GSM 校验空库两个既有 advisory，非本次引入）；全量 GUT 62 scripts / 1146 tests / 1145 passing / 1 pending / 0 failing——与 Sprint 3 QA 基线完全一致，零回归
-- 说明：RealmSystem/SchoolSystem 均 `extends Node` 无 `_ready()` 依赖（RealmSystem 有 `get_current_property` GSM 守卫，无 `_ready` 强依赖），注册安全
-- 剩余（4-0b 终验）：6 Feature Autoload（CombatSystem#9/CardEffectEngine#10/BindingManager#13/DeploymentSystem#17/AISystem#18/FormationSystem#23）待各系统代码实现时注册，届时终验「CombatSystem 最后注册」顺序矛盾（QA 计划 §四）
-- Next：/dev-story 4-1（card-effect-engine story-001 EffectTemplate/EffectInstance 双层对象模型）
----
+## Autoload 注册（project.godot）
 
-## Session Extract — Story 4-1 EffectTemplate/EffectInstance 双层对象模型 2026-08-16
+ExplorationSystem / CultivationSystem / DeckEditingSystem / TribulationSystem
 
-- Verdict：COMPLETE（4-1 done，零回归）
-- 变更：`src/feature/card_effect_engine/` 新建 8 文件（effect_template.gd / effect_base.gd @abstract / instant_effect.gd / persistent_effect.gd / triggered_effect.gd / replacement_effect.gd / effect_factory.gd / card_effect_engine.gd 5 信号声明，未注册 project.godot）；`event_enums.gd` OutcomeType 扩展 12→17（追加 APPLY_STATUS=12/MODIFY_STAT=13/TRIGGER_CHAIN=14/ACTIVATE_FORMATION=15/MODIFY_COST=16）；`event_outcome.gd` @export_enum 同步 12→17
-- 测试：`tests/unit/card_effect_engine/test_template_instance_model.gd` 29 测试 / 71 断言全通过；全量 63 scripts / 1175 tests / 1174 passing / 1 pending / 0 failing——零回归（修正了 event_system 2 个既有断言 12→17）
-- 关键裁决：qa-lead GAPS（专属字段存在性 + 未知 type 拒绝 + conditions 深拷贝隔离）→ 补齐 5 测试升 ADEQUATE；lead-programmer CONCERNS（C1 factory 签名 drift）→ technical-director 裁决「两层 API 分离」——低层 `EffectFactory.create_instance(template: EffectTemplate, ...)`（纯构造不查注册表）+ 高层 `CardEffectEngine.create_instance(template_id: StringName, ...)`（查注册表→委托低层，Story 002 实现）
-- ADR 回写：ADR-0009 §双层对象模型（L99）、§需求（L57）、§对象生命周期（L309-313）已同步签名，消除 57/99 内部矛盾 + EffectInstance→EffectBase 命名漂移
-- Godot 4.6 quirk 记录：`@abstract` 类 `.new()` 是编译期 parse error；`GDScript.can_instantiate()` 对 abstract 返回 true（误），`GDScript.is_abstract()` 正确——测试用 `is_abstract()`
-- 清理：删除 12 个 `_scratch_*` 探针文件（首轮 4-1 agent 遗留）
-- Next：/dev-story 4-2（ResolutionStack 栈式结算引擎，blocker 4-1 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-1 完成（card-effect-engine 对象模型），待 /dev-story 4-2（ResolutionStack）
-<!-- /STATUS -->
+## 关键决策
+
+- GDD §公式 3（deck-editing）从 80% 更新为 100%——遵循 §3 ③ 已移除出售操作
+- 4 个 GDD 状态更新为「已实现」或「已实现（桩阶段）」
+- 10 项偏差记录在案（3 项文件超 300 行 + 4 项桩实现 + 1 项有意偏差 + 2 项延迟）
+
+## 待办
+
+- Sprint 5 完成定义仅剩「代码已审查并合并」未勾选
+- 后续 Sprint 需处理 3 项桩实现接线（CardSystem 掉落表 / RealmSystem 天劫 Boss 配置 / StatusEffectSystem 心魔 debuff）
+- 后续 Sprint 需重构 3 个超 300 行文件（exploration_system / tribulation_system / deck_editing_system）
 
 ---
 
-## Session Extract — Story 4-2 ResolutionStack 栈式结算引擎 2026-08-16
+## 历史会话摘要
 
-- Verdict：COMPLETE（4-2 done，零回归）
-- 变更：`src/feature/card_effect_engine/resolution_stack.gd`（class_name ResolutionStack extends RefCounted）——5 级主排序（TIER_ACTIVE_PLAY/FIRST_STRIKE/NORMAL/ENEMY 命名常量）+ 次级 priority 决胜 + 二分中分辨率插入 + LIFO pop_back 出栈 + resolve_all(resolver: Callable)
-- 设计决策：排序上下文（先发/阵营/主动出牌）经 `set_sort_context(active_card_id, first_strike_card_ids, player_side_card_ids)` 按 source_card_instance_id 注入——因 EffectBase 是 Story 001 最小字段集，不污染对象模型（lead-programmer APPROVE 确认）
-- 测试：`tests/unit/card_effect_engine/test_resolution_stack.gd` 12 测试（AC-001/002 + QA edges + 5 级全序 + 中分辨率插入 + LIFO + 空栈/null 防御）；全量 64 scripts / 1187 tests / 1186 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer APPROVE（C1 二分 O(n) 移位注释补充 + C3 tier 魔数→命名常量已采纳；C2 resolve_all 无终止保护由 Story 003 深度截断兜住）；qa-lead ADEQUATE
-- 关键经验：新增 class_name 需 `--headless --import` 重建全局类缓存，否则 GUT 报 "Could not find type ResolutionStack"
-- 测试修正：中分辨率插入测试初版把残留效果 C 设为「普通己方」导致 C(t 更大)先于 A 出栈——修正为 C=敌方（tier 3）才正确验证「A 触发 B 插入在残留前」
-- Next：/dev-story 4-3（触发链硬限制 10 层 + visited_card_ids 循环检测，blocker 4-2 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-2 完成（ResolutionStack），待 /dev-story 4-3（触发链硬限制）
-<!-- /STATUS -->
+### Sprint 4（Feature 层战斗子系统）— 25 story + 1 task，已签收 APPROVED WITH CONDITIONS
+- combat-system Epic：7 阶段状态机 + 生命周期编排 + play_card 出牌
+- card-effect-engine Epic：双层对象模型 + ResolutionStack + 触发链 + PRD 引擎 + AI 干跑
+- deployment-system Epic：阵位状态机 + deploy/remove + serialize 快照 + standby/revive
+- binding-system Epic：BindingRecord + bind/unbind + 信号总线 + serialize_all
+- formation-system Epic：条件状态机 + 激活重判 + 光环查询 + serialize 快照
+- ai-system Epic：难度缩放 + 预配置绑定 + Boss 阶段转换
+- 全量：85 scripts / 1668 tests / 0 failing
 
----
+### Sprint 3（Foundation 层 GSM 拆分 + EventSystem）— 12/12 story，已签收 APPROVED
+- GSM 拆分为 4 文件（282 + 429 + 141 + 311 行）
+- EventSystem 链式事件 + story flags + owner 资源模板
+- 全量：62 scripts / 1146 tests / 0 failing
 
-## Session Extract — Story 4-3 触发链硬限制 10 层 + 循环检测 2026-08-16
+### Sprint 2（Foundation 层 Core 系统）— 14/14 story，已签收 APPROVED
+- CardSystem / CostSystem / ResourceSystem / FactionSystem / StatusEffectSystem / RealmSystem / SchoolSystem
 
-- Verdict：COMPLETE（4-3 done，零回归）
-- 变更：`src/feature/card_effect_engine/trigger_chain_state.gd`（新类，纯逻辑：MAX_DEPTH=10 + CheckResult 枚举 + check_and_record + build_overflow_message）；`resolution_stack.gd` resolve_all 签名扩展（chain_state/overflow_handler/cycle_skip_handler 可选参数，截断/跳过均 continue 非 break）
-- 设计决策：TriggerChainState 纯逻辑无副作用（不日志不发射信号），日志/信号由调用方 CardEffectEngine Autoload 负责；overflow 消息追加截断者 K 到 chain 尾（AC-003 字面 A→B→...→K 为 11 节点）
-- 测试：`tests/unit/card_effect_engine/test_trigger_chain_10_layer_cycle.gd` 13 测试（纯状态单测 6 + resolve_all 集成 7）；全量 65 scripts / 1198 tests / 1197 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer APPROVE（C1 visited_card_ids→Dictionary[int,bool] 已采纳；C2 chain 追加 K 已采纳；C3 cycle_skip_handler 已加）；qa-lead GAPS→GAP-1 continue vs break 语义已补 12 效果用例锁定
-- 关键经验：GDScript lambda 按值捕获标量——overflow_count 需用 Array 包装才能被 lambda 闭包修改
-- 全量测试含 1 个 flaky（realm_system test_ac010 GSM.realm_changed 帧末信号，单独跑 14/14 全过，全量偶发 1 失败）——既有问题非本次引入，Sprint 3 回顾行动项 #1（/story-done 门禁强化）已记录
-- Next：/dev-story 4-4（PRD 伪随机分布引擎 5% 步进 + 怜悯保护，blocker 4-1 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-3 完成（触发链硬限制），待 /dev-story 4-4（PRD 伪随机分布引擎）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-4 PRD 伪随机分布引擎 2026-08-16
-
-- Verdict：COMPLETE（4-4 done，零回归）
-- 变更：`src/feature/card_effect_engine/prd_engine.gd`（class_name PRDEngine extends RefCounted）——标准 PRD：起始=C、失败累加 C、触发重置 C、怜悯 ceil(1/p) 连败强制触发、calibrate_C 二分求解（30%→C≈0.108）
-- 关键裁决：原 ADR-0009/GDD 公式「起始=P_base + 累加 P_base×C」结构错误（探针实测 C=0.3 长期触发率 40% > 标示 30%，任何 C∈[0.3,1.0] 均过度触发）→ game-designer 裁决改标准 PRD（起始=C<p，累加 C），runtime calibrate_C 使含怜悯截断的 E[N]=1/p
-- 同步：GDD §9 机制 + 调优表（C 恒<p 非 0.3-1.0）+ 待解决问题 #4（已解决）+ ADR-0009 §PRD 伪随机分布引擎 + QA 缺口 #2（已解决）
-- 测试：`tests/unit/card_effect_engine/test_prd_distribution.gd` 11 测试（AC-001 怜悯不变式/阈值/5次内触发 + AC-002 [24,36] + C 校准 + 确定性 + 每卡独立 + 非法拒绝 + 重置）；全量 66 scripts / 1208 tests / 1207 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer CONCERNS（C1 get_p_current 语义歧义已修正注释 + C2 ADR 伪代码顺序回写 + 二分常量注释）；qa-lead ADEQUATE
-- 关键经验：PRD 起始概率必须 < 标示值（业界标准），P_start=p 结构上必过度触发；GDScript lambda 捕获标量需 Array 包装
-- Next：/dev-story 4-5（AI 干跑评估接口 GameStateSnapshot 不可变纯计算，blocker 4-3+4-4 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-4 完成（PRD 引擎），待 /dev-story 4-5（AI 干跑评估接口）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-5 AI 干跑评估接口 2026-08-17
-
-- Verdict：COMPLETE（4-5 done，零回归）
-- 变更：`src/feature/card_effect_engine/game_state_snapshot.gd`（class_name GameStateSnapshot extends RefCounted，构造+getter 均 deep copy 不可变）+ `effect_evaluation.gd`（EffectEvaluation 结果 DTO，damage/healing/stat_changes/statuses_applied/is_overkill/is_overheal + damage_only/heal_only 静态工厂）+ `card_effect_evaluator.gd`（class_name CardEffectEvaluator extends RefCounted，evaluate_effect/evaluate_effect_probabilistic/simulate_chain/get_effect_categories + EffectCategory 枚举）
-- 简化模型：伤害/治疗 = floori(effect_value × binding_multiplier)，分类按 effect_type 字符串前缀（未读 CardType）；simulate_chain 恒单根、would_overflow 恒 false、probability 恒 1.0——完整结算待 CardEffectEngine 接线
-- 测试：`tests/unit/card_effect_engine/test_ai_dry_run_snapshot.gd` 17 测试（AC-001~003 + stat_changes/statuses_applied 分支 + 快照深拷贝/未知角色 + 性能单点子断言）；全量 67 scripts / 1225 tests / 1224 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer CONCERNS→采纳（C1 签名漂移 card_id→card_data:Variant 记录 + C2 create_evaluation_snapshot defer + C3 简化模型边界标注 + C4 _int_field/_stringname_field 去存疑 `in` 改 get() + C5 文档措辞）；qa-lead GAPS→补齐（G1 stat_changes/statuses_applied + G2 AC-003 单点性能子断言 + G3 would_overflow 简化契约锁定）
-- 关键经验：GDScript `in` 运算符不适用于 Object 属性成员测试（用 get() 判空）；性能断言按 QA 缺口 #3 放宽阈值（288 次 <100ms / 单次 <1ms / simulate_chain <5ms）
-- Next：/dev-story 4-6（deployment-system 内部状态机 STANDBY→READY→ACTED，blocker 无）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-5 完成（AI 干跑评估接口），待 /dev-story 4-6（deployment-system 内部状态机）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-6 deployment-system 内部状态机 2026-08-17
-
-- Verdict：COMPLETE（4-6 done，零回归）
-- 变更：`src/feature/deployment_system.gd`（extends Node 不声明 class_name，Autoload #17）——FieldState 枚举（EMPTY/STANDBY/READY/ACTED/DEAD）+ _field 阵位模型 + setup_field（自动/手动分配 + 全部 STANDBY）+ 查询 API（get_field/get_character_slot/get_front_count/get_empty_slots/can_deploy/is_standby/set_acted）
-- 关键裁决：ADR-0016 原文阵位算法「顺序填充 [0,1,2,3,4,5]」与 GDD §2 矛盾（金丹 4 人会成前 3 后 1）→ 实现改用 FRONT_CAPACITY_BY_MAX_DEPLOY 表按境界前排配额（2/3/4→前2，5/6→前3），已回写 ADR-0016 retrofit
-- 测试：`tests/unit/deployment_system/test_internal_state_machine.gd` 22 测试（AC-001~018 + DEAD/EMPTY set_acted + get_front_count 全灭 0）；全量 68 scripts / 1247 tests / 1246 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer CONCERNS→采纳（C1 ADR 算法修正回写 + C2 FRONT_CAPACITY 硬编码上报裁决 + C3 FileAccess 正则测试移除 + C4 手动超配待 game-designer 澄清）；qa-lead GAPS→补齐（G1 DEAD/EMPTY set_acted + G2 全灭 0 + G3 get_character_slot(-1) 哨兵守卫）
-- 关键经验：Autoload 测试用 `DS_SCRIPT.new()` + 动态分派；`get_instance_base_type()` 是实例方法不能直接调 preload 类；境界阵位分布是「前排配额」非「顺序填充」
-- Next：/dev-story 4-7（deploy/remove/is_targetable 前后排保护 O(1)，blocker 4-6 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-6 完成（deployment-system 内部状态机），待 /dev-story 4-7（deploy/remove/is_targetable）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-7 deployment-system deploy/remove/is_targetable 2026-08-17
-
-- Verdict：COMPLETE（4-7 done，零回归）
-- 变更：`src/feature/deployment_system.gd` 增量扩展——deploy（战中补位，前置检查：不可用→已在场→max_deploy 上限→空位→槽位合法性）/ remove_character（阵亡清位，不负责绑定卡洗回）/ is_targetable（6 步前后排保护判断）+ 3 个 Cat 2b 信号（character_deployed/character_removed/front_line_breached 经 GSM._emit_signal_safe 路由）
-- 关键裁决：lead-programmer CONCERNS→deploy 内部补 `deployed >= max_deploy → field_full` 防御检查（原 ADR 编排靠 can_deploy 前置，独立调用不安全）；deploy_turn=0 临时桩注释标注
-- 测试：`tests/unit/deployment_system/test_deploy_targetable.gd` 22 测试（AC-001~015 + 哨兵守卫/已在场/穿透短路/上限 4 分支回归）；全量 69 scripts / 1269 tests / 1268 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer CONCERNS→采纳（C1 deploy 上限 + C2 删 FileAccess 源码 contains 改运行时 + C3 deploy_turn 桩注释）；qa-lead GAPS→补齐（G1 AC-001 前排优先修正 + G2 源码 contains 移除 + G3 front_line_breached 运行时 + G4 deploy_turn + G5 4 分支回归）
-- 关键经验：源码 contains 断言违反「单元测试不得依赖文件系统」+ 脆弱——改运行时行为验证；Cat 2b 信号经 `GameStateManager.get_script()._emit_signal_safe`（Script.has_method 识别 static 方法）
-- Next：/dev-story 4-8（战斗结束 serialize_field 快照导出 GSM.battle.deployment_snapshot，blocker 4-7 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-7 完成（deploy/remove/is_targetable），待 /dev-story 4-8（serialize 快照导出）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-8 deployment-system serialize snapshot export 2026-08-18
-
-- Verdict：COMPLETE（4-8 done，零回归）
-- 变更：`src/feature/deployment_system.gd` 增量扩展——serialize_field（6 阵位，state 用 String 序列化）/ deserialize_field（键归一：int/String key 均接受 + 缺字段默认值填充 + 非法 state 回退 EMPTY）/ sync_unavailable_to_gsm / load_unavailable_from_gsm / write_snapshot_to_gsm + _get_gsm（SceneTree.root 查找，同 StatusEffectSystem 先例）+ _state_to_string/_state_from_string 枚举双向映射；GSM 第二层 `_set_battle_deployment_snapshot` + `_set_player_unavailable_characters`（null 守卫 + deep_equal 去重 + _buffer_change）+ player 默认域补 `unavailable_characters: {}`
-- 关键裁决：lead-programmer CONCERNS→C-1 是首要架构隐患（serialize_field int-key 快照 JSON round-trip 后 key 变 String，deserialize 若仅匹配 int key 会静默丢阵位）→ deserialize 键归一修复 + 补 JSON round-trip 回归测试；C-3 死守卫移除；C-4 测试清理直写属性加注释标注
-- 测试：`tests/integration/deployment_system/test_serialize_snapshot.gd` 20 测试（AC-001~011 + 双守卫 null/missing-method 子类覆盖 + 缺字段默认值 + 非法 state 回退 + JSON round-trip String key）；全量 70 scripts / 1289 tests / 1288 passing / 1 pending / 0 failing 零回归
-- 关卡：qa-lead GAPS→补齐（G1 _get_gsm 返回 null 双守卫路径 + G2 deserialize 缺字段默认值填充 + G3 _state_from_string 非法字符串回退）；lead-programmer CONCERNS→采纳（C-1 键归一 + C-3 死守卫 + C-4 注释）
-- 关键经验：Godot 4 JSON.stringify 会把 int-key Dictionary 转 String key——序列化/反序列化成对 API 必须做键归一防御，否则读档静默丢数据；测试子类 `class X extends "res://...gd"` 可覆盖 Autoload 脚本的 `_get_gsm()` 返回值以模拟 GSM 缺失分支
-- Next：/dev-story 4-9（clear_standby_state + mark_unavailable + revive_character，blocker 4-7 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-8 完成（serialize 快照导出），待 /dev-story 4-9（clear_standby_state + mark_unavailable + revive_character）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-9 deployment-system clear_standby_state + mark_unavailable + revive 2026-08-18
-
-- Verdict：COMPLETE（4-9 done，零回归）
-- 变更：`src/feature/deployment_system.gd` 增量扩展——clear_standby_state（STANDBY/ACTED→READY + standby_cleared 信号仅含待命角色）/ mark_unavailable（death_context 存储 + revival_methods 深拷贝）/ get_unavailable_characters / revive_character / is_game_over + 3 Cat 2b 信号（standby_cleared/character_unavailable/character_revived 经 _emit_signal_safe 路由）
-- 关键裁决：lead-programmer CONCERNS→is_game_over 签名偏离 ADR-0016（原无参→注入 roster 必传，DeploymentSystem 不持有角色位总列表，去默认参数消除「漏传→永不判负」静默失败）；revival_methods 深拷贝防外部 mutate；已回写 ADR-0016 retrofit
-- 测试：`tests/unit/deployment_system/test_standby_unavailable_revive.gd` 22 测试（AC-001~014 + 空 death_context + 空 roster + 复活闭环 + revival_methods 透传 + 重复标记覆盖 + 全空场）；全量 71 scripts / 1311 tests / 1310 passing / 1 pending / 0 failing 零回归
-- 关卡：qa-lead GAPS→补齐（G1 复活后重新上场闭环 + G2 revival_methods 非空透传 + G3 重复标记语义锁定 + G4 全空场 clear_standby_state）；lead-programmer CONCERNS→采纳（C1 is_game_over 必传 roster + ADR 回写 + C2 revival_methods 深拷贝）
-- 关键经验：is_game_over 用默认参数承载「数据为空」会混淆「没传数据」与「数据为空」——必传参数强制调用方显式提供角色位列表，缺失数据在编译期暴露
-- Next：/dev-story 4-10（binding-system BindingRecord RefCounted 实例模型 + 内部注册表，blocker 无）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-10 完成（binding-system 001 RefCounted 模型 + 三索引注册表），待 4-11
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-10 binding-system BindingRecord RefCounted 实例模型 + 内部注册表 2026-08-18
-
-- Verdict：COMPLETE（4-10 done，零回归）
-- 变更：新建 `src/feature/binding/binding_record.gd`（class_name BindingRecord extends RefCounted + 14 字段 + BindingSlot 枚举 GONGFA/FABAO）+ `src/feature/binding/binding_manager.gd`（三同步索引 _bindings/_by_character/_card_to_character + _register_binding/_unregister_binding 原子同步 + get_binding_ids_by_character 零分配热路径 / get_bindings_by_character 非热路径 / get_character_by_card O(1) 反向 / get_binding 单条查询）
-- 关键裁决：文件位置 story 过时路径 src/core/binding/ → 修正为 src/feature/binding/（ADR-0013 明确 Feature 层 Autoload #13）；_by_character 声明为无类型 Dictionary（Godot 4.6 嵌套类型化集合 Dictionary[int, Array[int]] 解析错误 "Nested typed collections are not supported"），已回写 ADR-0013 retrofit；lead-programmer C1 → get_binding 改 Variant 读入 + null 检查 + assert + cast（原类型化赋值使 assert 成死代码）；C4 → _unregister_binding 反查 _card_to_character 权威映射而非信任 record 快照
-- 测试：`tests/unit/binding_system/test_binding_record_model.gd` 19 测试（AC-001~008 + null 注入优雅返回 + unregister 幂等 + 删最后一条清键 + 未绑定路径新分配语义）；全量 72 scripts / 1330 tests / 1329 passing / 1 pending / 0 failing 零回归
-- 关卡：qa-lead GAPS→补齐（G1 AC-005 assert 语义 + G2 删最后一条清键 + G3 unregister 幂等 + G4 未绑定新分配 + G5 命名 system 前缀）；lead-programmer CONCERNS→采纳（C1 assert 死代码 + C2 只读文档 + C3 ADR 回写 + C4 反查 character_id + C5 孤儿跳过注释）
-- 关键经验：类型化 Dictionary 的键类型提示非编译器强制，但值类型是运行时的——`var record: BindingRecord = _bindings[id]` 的类型化赋值会在读取时做类型校验，使后续 assert 成为死代码；应先 Variant 读入再 assert 再 cast。嵌套类型化集合（Dictionary[int, Array[int]]）Godot 4.6 不支持，需退化为无类型 Dictionary + 构造路径类型保证
-- Next：/dev-story 4-11（bind/unbind/get_bindings 查询 API，blocker 4-10 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-10 完成（binding-system 001），待 4-11（bind/unbind/get_bindings 查询 API）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-12 binding-system 绑定生命周期信号总线 2026-08-21
-
-- Verdict：COMPLETE（4-12 done，零回归）
-- 变更：`src/feature/binding/binding_manager.gd` 增量扩展——7 个 Cat 2b 信号声明（binding_applied/removed/overwritten/stacked/suspended/restored/native_activated）+ _emit_safe 包装器（GSM._emit_signal_safe 路由 + 链深度追踪 + 回退 callv）+ 6 业务方法挂钩信号发射（bind_card→binding_applied+native_activated / stack_card→binding_stacked / overwrite_binding→binding_removed+binding_applied+native_activated+binding_overwritten / remove_binding→binding_removed(reason=removed) / remove_all_bindings→binding_removed(reason=death) / suspend_bindings→binding_suspended / restore_bindings→binding_restored）
-- 关键裁决：lead-programmer C1 → binding_ids 参数 Array→Array[int]（与 ADR+DeploymentSystem 先例一致）；C2 → _emit_safe 回退用 callv 而非 .emit()（统一接口简洁性取舍）；C4/C5 → ADR reason 值补充回写
-- 测试：`tests/integration/binding_system/test_binding_signal_bus.gd` 30 测试（AC-001~010 全覆盖 + is_native=true 载荷 + card_already_bound 不发射 + 叠加覆盖 binding_removed + 无效 ID 不发射 + 叠加覆盖不发射 binding_overwritten + 覆盖失败不发射 + no_existing/card_already_bound 拒绝不发射 + 零绑定角色 suspend + overwrite 中 native_activated + 链深度截断守卫 + 全 7 信号事实载荷）；全量 74 scripts / 1398 tests / 1397 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer CONCERNS→已处理（C1 修复 + C4/C5 ADR 回写 + C2/C3 设计取舍）；qa-lead GAPS→已补齐（G1-G16 全部含 G14 链深度截断守卫）
-- Next：/dev-story 4-13（serialize_all 快照导出 + persistent effect 接口，blocker 4-11 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-12 完成（binding-system 003 信号总线），待 4-13（serialize_all 快照）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-13 binding-system serialize_all 快照导出 + persistent effect 接口 2026-08-22
-
-- Verdict：COMPLETE（4-13 done，零回归）
-- 变更：`src/feature/binding/binding_manager.gd` 增量扩展——serialize_all（14 字段完整序列化）/ deserialize_all（best-effort 恢复 + card_exists_cb 逐条验证 + 缺失跳过 push_warning + stack_slots 卡映射重建）/ write_snapshot_to_gsm（调 GSM _set_battle_bindings）/ get_binding_context（预计算 multiplier = native × DEFAULT_STACK_MULTIPLIER^(count-1)）/ _clear_all / _deserialize_record（int() 键归一 JSON round-trip 安全）；`src/foundation/gsm/gsm_atomic_writes.gd` 新增 _set_battle_bindings（null 守卫 + 首次写入跳过去重 + deep_equal 去重 + _buffer_change）；`src/foundation/game_state_manager.gd` 薄转发
-- 关键裁决：lead-programmer C1 → _set_battle_bindings old 值必须在覆盖前捕获（原代码赋值后读 _gsm.battle.bindings 与 snapshot 同引用）；GSM 首次写入 battle 无 bindings 键时跳过 deep_equal 直接创建键；effect_register_cb 从 2 参数扩展为 4 参数 (card_instance_id, template_id, character_id, context: BindingContext)（AC-005 合规）；remove_all_bindings 遍历所有 stack_slots 实例调 effect_remove_cb（AC-008）；suspend/restore 传 card_ids 而非 binding_ids（AC-007）
-- 测试：`tests/integration/binding_system/test_serialize_snapshot_effect_integration.gd` 20 测试（AC-001~012 全覆盖）；`tests/unit/binding_system/test_bind_unbind_query_api.gd` mock 签名同步修正（_on_effect_register 4 参数）；全量 75 scripts / 1418 tests / 1417 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer CONCERNS→已处理（C1 GSM old 值捕获 + effect_register_cb 4 参数 + remove_all_bindings 全叠层 + suspend/restore card_ids）；qa-lead GAPS→已补齐（G1-G7 含 AC-011 积累值保留 + AC-012 性能阈值）
-- 关键经验：GSM _set_battle_bindings 首次写入时 battle 字典无 bindings 键——get("bindings", []) 返回空数组与空快照 deep_equal 为 true 导致跳过写入，键永不被创建；修复：has("bindings") 检查首次写入直接赋值 + _buffer_change
-- Next：/dev-story 4-14（formation-system 内部条件状态机 + 阵法位管理，blocker 无）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-13 完成（binding-system 004 serialize_all），待 4-14（formation-system 内部状态机）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-14 formation-system 内部条件状态机 + 阵法位管理 2026-08-22
-
-- Verdict：COMPLETE（4-14 done，零回归）
-- 变更：新建 `src/feature/formation_system.gd`（extends Node 不声明 class_name，Autoload #23）——SlotState 枚举（EMPTY/DEPLOYED_UNACTIVE/ACTIVE/DISCARDED）+ AuraScope 枚举 + _slots 3 阵位数据模型（11 字段）+ _affiliations 归属索引 + deploy_formation（空位自动分配+占用守卫+即时条件判定 ACTIVE/DEPLOYED_UNACTIVE）+ overwrite_formation（严格顺序 DISCARDED→清除归属→remove→discard→部署→判定→register）+ set/clear_character_affilation（每角色最多 1 + 阵法须 ACTIVE）+ 6 查询 API（get_formation_state/get_active_formations/get_slot_states/get_character_affilation/is_formation_active/can_deploy）+ 5 Cat 2b 信号经 _emit_safe 路由 + condition_check_cb 注入存根（回退 FactionSystem.check_condition）
-- 关键裁决：lead-programmer C1 → deploy_formation 显式 slot_index 不校验占用会静默覆盖 slot 数据绕过 overwrite 流程 → 补占用守卫返回 slot_occupied；C4 → set_character_affilation 缺第三检查"角色满足条件"延后至 Story 002 集成（代码注释标注）；C7 → _clear_all 重置 _next_formation_id 与 ADR"保留"矛盾→注释标注 Story 004 公共 API 须按 ADR
-- 测试：`tests/unit/formation_system/test_internal_state_machine.gd` 36 测试（AC-001~008 全覆盖 + 信号正负断言 + 效果回调严格顺序 + 占用拒绝 + 覆盖 inactive 路径 + 阵亡保留归属 + 失效阵法覆盖 + 空 requirement 自动激活 + 信号顺序 + deactivated 不发射 + 拒绝后原归属不变 + affiliated_count 递增）；全量 76 scripts / 1454 tests / 1453 passing / 1 pending / 0 failing 零回归
-- 关卡：lead-programmer CONCERNS→已处理（C1 占用守卫 + C2/C3/C5 补测试 + C4 延后注释 + C7 _clear_all 注释）；qa-lead GAPS→已补齐（G1-G9 全部含 AC-005 失效覆盖+AC-008 阵亡保留+GAP-004 占用守卫）
-- 关键经验：GDScript 信号 Callable.bind() 绑定参数后信号参数必须匹配声明签名（int/StringName 类型转换失败）——改为每信号独立 typed callback 函数避免类型不匹配；deploy_formation 显式 slot_index 须校验占用状态，否则静默覆盖绕过 overwrite 严格顺序流程
-- Next：/dev-story 4-15（formation-system 激活条件实时重判，blocker 4-14+4-7 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-14 完成（formation-system 001 内部状态机），待 4-15（激活条件实时重判）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-15 formation-system 激活条件实时重判 2026-08-22
-
-- Verdict：COMPLETE（4-15 done，零回归）
-- 变更：`src/feature/formation_system.gd` 增量扩展——recheck_all_conditions（遍历 3 阵位+跳过 EMPTY/DISCARDED+条件变化时更新状态 DEPLOYED_UNACTIVE↔ACTIVE+返回变更列表不发射信号）+ _on_field_changed（DeploymentSystem 信号处理器：批量处理副作用 ACTIVE→register+formation_activated / UNACTIVE→remove+clear_affiliations+formation_deactivated + 变更非空时批量发射 formation_condition_reevaluated）+ formation_condition_reevaluated 信号声明 + _pending_affiliations 队列骨架（ADR §风险敌方回合时序）+ _clear_affiliations_by_formation 同步清理 slot.affiliated_chars（C1 修复数据不一致）
-- 关键裁决：lead-programmer C1 → _clear_affiliations_by_formation 仅清 _affiliations 不清 slot.affiliated_chars → 失活→重新激活后 affiliated_count 虚高 → 修复同步 clear()；C2 → _pending_affiliations 队列骨架实现（数据结构+压入存根，弹出由 CombatSystem 编排）；C3 → 测试重命名 skips_empty_and_discarded→skips_empty_and_keeps_unactive（DISCARDED 瞬态不可达）；qa-lead G2 → reason/trigger_reason 参数断言；G3 → 性能断言 recheck×1000<20ms；G4 → changes 载荷验证
-- 测试：`tests/integration/formation_system/test_activation_rejudge.gd` 15 测试（AC-001~005 全覆盖 + 上场无关 changes 空 + 门槛 2 不失效 + 复活重新激活 + recheck 不发射信号 + 空变更不发射 + 多阵法同时变更 + 跳过 EMPTY + 性能<20ms + reason 断言 + changes 载荷 + affiliated_count 同步清理）；全量 77 scripts / 1469 tests / 1468 passing / 1 pending / 0 failing 零回归
-- 关键经验：recheck_all_conditions 与 _on_field_changed 职责分离——前者纯函数返回变更+更新状态不处理副作用，后者处理副作用+发射信号，避免信号重入级联；_clear_affiliations_by_formation 须同步清理 slot.affiliated_chars 数组否则 affiliated_count 数据不一致
-- Next：/dev-story 4-16（formation-system get_aura_bonus O(1) 查询 + 梯度光环计算，blocker 4-14 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-15 完成（formation-system 002 条件重判），待 4-16（get_aura_bonus 光环查询）
-<!-- /STATUS -->
-
----
-
-## Session Extract — Story 4-16 formation-system get_aura_bonus O(1) 查询 + 梯度光环计算 2026-08-24
-
-- Verdict：COMPLETE（4-16 done，零回归）
-- 变更：`src/feature/formation_system.gd` 增量扩展——get_aura_bonus（O(1) _affiliations 查找+固定/梯度统一接口分支 max_level>0 and requirement.has(tag_id)→梯度否则→固定+breakdown 含 formation_id/template_id/aura_scope/bonus/stat+bonus=0 不创建 breakdown）+ _calculate_gradient_aura（base_value × mini(count_on_field-1, max_level) 门槛≥2 人返回 0+tag_id 空/max_level≤0 防御）+ _get_fixed_bonus（fixed_bonus_cb 优先→effect_config.get 回退）+ _query_count_on_field（count_on_field_cb 注入+FactionSystem 回退+默认 0）+ count_on_field_cb/fixed_bonus_cb 注入存根
-- 关键裁决：lead-programmer APPROVED WITH SUGGESTIONS（C1 冗余 slot 查找 O(3) 可忽略+C2 AC-007 由设计满足+C3 fixed_bonus_cb 测试+C4 性能阈值 20x 容差+C5 测试数 16 非 25——全部 LOW 可选）；qa-lead GAP-001 → AC-007 tag_id 传递验证（_last_queried_tag_id 断言只查 requirement 指定阵营）；GAP-002 → breakdown.bonus 断言；GAP-003 → 梯度性能测试；GAP-004 → base_value=2.0 非 1.0 测试；GAP-005 → 3 人中间点；GAP-008 → fixed_bonus_cb 注入覆盖
-- 测试：`tests/unit/formation_system/test_aura_bonus_query.gd` 20 测试（AC-001~007 全覆盖+固定 hp/def/unknown+未归属/非 ACTIVE+梯度 2/3/4 人+封顶/exact+降级+恢复+base_value=2.0+性能+breakdown 结构+tag_id 传递+fixed_bonus_cb）；全量 78 scripts / 1489 tests / 1488 passing / 1 pending / 0 failing 零回归
-- 关键经验：梯度公式 base_value × mini(count-1, max_level) 中 base_value=1.0 时 effect_value 恒等于 effect_level——需用 base_value≠1.0 测试才能验证乘法；count_on_field_cb 签名参数名带下划线前缀（_tag_id）会被 GDScript 视为未使用——改用 tag_id 记录到实例变量以验证 tag_id 正确传递
-- Next：/dev-story 4-17（formation-system serialize_all 快照导出 GSM.battle.formation_snapshot，blocker 4-16 已解除）
-
----
-
-## Session Extract — Story 4-17 formation-system serialize_all 快照导出 + deserialize_all 恢复 + GSM battle.formation_snapshot 2026-08-24
-
-- Verdict：COMPLETE（4-17 done，零回归，formation-system Epic 全部完成）
-- 变更：`src/feature/formation_system.gd` 增量扩展——serialize_all（slots 3 阵位 + affiliations + next_formation_id，StringName→String 确保 JSON 可序列化）+ deserialize_all（_reset_slots + 逐条 character_exists_cb 验证 + 跳过+push_warning + **以 _affiliations 为唯一真理来源重建 slot.affiliated_chars 派生索引**）+ _deserialize_slot（11 字段键归一 int()/StringName() + 嵌套集合类型守卫 requirement/effect_config/affiliated_chars 非 Dictionary/Array 时回退默认值）+ _validate_character_exists（character_exists_cb 注入+默认 true）+ write_snapshot_to_gsm（_get_gsm null 守卫+has_method 双守卫）+ _get_gsm（SceneTree→/root/GameStateManager）+ clear_all_formations（保留 _next_formation_id+清理 _pending_affiliations 跨战斗遗留防护）；`src/foundation/gsm/gsm_atomic_writes.gd` 新增 _set_battle_formation_snapshot（null 守卫+首次写入跳过去重+deep_equal 去重+_buffer_change）+ `game_state_manager.gd` 薄转发
-- 关键裁决：lead-programmer CONCERN 1 (HIGH) → deserialize_all 跳过悬空角色时只清 _affiliations 不清 slot.affiliated_chars → affiliated_count 虚高 → **以 _affiliations 重建 affiliated_chars 派生索引**（同 BindingManager 先例——派生索引从主索引重建，不从快照恢复）；CONCERN 2 (LOW) → clear_all_formations 未清 _pending_affiliations → 添加清理；CONCERN 3 (LOW) → _deserialize_slot 无类型守卫 → 添加 is Dictionary/Array 检查；qa-lead GAP-001 → affiliated_count 断言；GAP-002 → JSON round-trip 深度验证（state/formation_id/affiliated_count/next_formation_id）；GAP-006 → slot 11 字段全验证；GAP-007 → next_formation_id 默认值验证
-- 测试：`tests/integration/formation_system/test_serialize_snapshot.gd` 13 测试（AC-001~005 全覆盖 + 完整快照 + 空阵法 + GSM 写入成功/空/去重 + 往返完整性 + 悬空角色跳过+affiliated_count + 空快照 + 缺键 + clear 重置/清归属/保留 ID + JSON round-trip 深度验证）；全量 79 scripts / 1502 tests / 1501 passing / 1 pending / 0 failing 零回归
-- 关键经验：派生索引（slot.affiliated_chars 是 _affiliations 的派生）反序列化时不能从快照原样恢复——必须从主索引重建，否则验证跳过会导致主/派生数据不一致；GSM 第二层方法首次写入跳过去重模式（has_key 守卫）已成为 deployment/binding/formation 三个系统的统一先例
-- Next：/dev-story 4-21（ai-system 难度缩放 + register_preconfigured_bindings，blocker 4-19/4-20 已解除）
-
-## Session Extract — Story 4-20 BossPhaseMgr 阶段转换内部状态机 2026-08-26
-
-- Verdict：COMPLETE（4-20 done，零回归）
-- 变更：`assets/enemies/boss_phase_transition.gd` skill_unlock/skill_remove 从 Array[StringName]→无类型 Array（跨文件 class_name 解析）；`src/feature/ai/enemy_battle_state.gd` 新增 runtime_behavior_profile + runtime_skill_pool 实例字段（ADR-0017 模板只读约定）；`src/feature/ai_system.gd` 新增 check/transition/get_phase 公共 API + _check_phase_transition/_should_transition（OR 语义+哨兵+防重复）+ _do_boss_phase_transition（行为替换+技能解锁/移除+冷却重置+回血+信号）+ _get_behavior_profile 辅助 + _evaluate_skills/runtime_skill_pool 优先 + _check_retreat 用 _get_behavior_profile + load_templates AC-009 阶段上限 2 校验 + signal boss_phase_transitioned 首参无类型（RefCounted 不被 Object 接受）；`tests/unit/ai_system/test_boss_phase_manager.gd` 27 测试
-- 关键裁决：lead-programmer HIGH-1 信号双发→删除 emit_signal 直发仅保留 _emit_safe 单路径；HIGH-2 模板只读违规→实例字段下沉 runtime_behavior_profile/runtime_skill_pool + _get_behavior_profile 辅助方法；MEDIUM-1 AC-009 阶段上限→load_templates push_warning；qa-lead GAP-1 skill_unlock 添加→实现 + 测试；GAP-3 turn==turn_after 边界→新增测试；GAP-4/5 信号参数+call_count→补充断言
-- 测试：27 单测全通过（AC-001~013 全覆盖+边界+信号+模板只读+多阶段连续转换），全量 82 scripts / 1583 tests / 1582 passing / 1 pending / 0 failing 零回归
-- 关键经验：Godot 4.6 信号参数类型检查中 Object 不接受 RefCounted 子类——去除类型标注避免 emit_signal 静默失败；GDScript lambda 按值捕获基元类型——用 Dictionary 可变容器绕过；模板只读约定（ADR-0017）要求 Boss 阶段转换的可变状态写入实例字段而非模板——runtime_behavior_profile/runtime_skill_pool 模式
-- Next：/dev-story 4-22（combat-system 7 阶段回合状态机，blocker #5/#7/#13/#17/#21 全部已解除）
-
-## Session Extract — Story 4-21 难度缩放 + register_preconfigured_bindings 2026-08-26
-
-- Verdict：COMPLETE（4-21 done，零回归，ai-system Epic 全部完成）
-- 变更：`src/feature/ai_system.gd` 新增 _apply_difficulty_scaling（scale=1.0+gap×0.3，round 取整，player_realm<=enemy_realm 不缩放）+ _apply_difficulty_scaling_to_roster + register_preconfigured_bindings（SceneTree 查找 BM + bind_card + 返回值 success 检查 + push_warning）+ remove_enemy_bindings（remove_all_bindings）+ create_enemy_roster 集成缩放→阵位→绑定；character_id=100000+roster_idx×10000（敌方 ID 范围避免与玩家冲突）+card_instance_id=character_id+binding_idx（唯一，避免共享预配置绑定卡时 card_already_bound）；player_realm 移除默认值（不硬编码境界数值）；_compare_by_defense_desc/attack_desc 改为基于 template.base_*（缩放不影响分配逻辑 AC-005）；`tests/fixtures/mock_binding_manager.gd` 新建 MockBindingManager（记录 bind_card/remove_all_bindings 调用次数与参数）；`tests/unit/ai_system/test_difficulty_scaling_bindings.gd` 20 测试
-- 关键裁决：lead-programmer HIGH-1 ID 碰撞（StringName.hash 共享预配置绑定卡时 card_instance_id 相同→card_already_bound 拒绝）→改为递增组合键 100000+idx×10000；HIGH-3 player_realm 默认值 1 硬编码→移除默认值强制调用方传入；HIGH-4 bind_card 返回值未检查→检查 success + push_warning；比较器基于 state.defense（缩放后）改为 template.base_defense（原值）符合 AC-005；qa-lead GAP-1~5 MockBindingManager 验证调用次数/参数/唯一性/移除→补充 4 个 mock 测试
-- 测试：20 单测全通过（AC-001~011 全覆盖+缩放公式 gap 1/2/3+round .5 边界+realm 相等/低于+缩放时机+mock BM 调用次数/参数/唯一性/移除+全流程 pipeline），全量 83 scripts / 1603 tests / 1602 passing / 1 pending / 0 failing 零回归
-- 关键经验：StringName.hash() 作为 card_instance_id 违背"实例"语义——同一模板的多个副本共享同一 ID 导致 BindingManager _card_to_character 反向索引拒绝；用递增组合键（character_id + binding_idx）保证唯一性；MockBindingManager 挂载到 SceneTree root 作为 /root/BindingManager 是 AI SceneTree 查找模式的测试接缝
-- Next：/dev-story 4-22（combat-system 7 阶段回合状态机，blocker #5/#7/#13/#17/#21 全部已解除）
-## Session Extract — Story 4-22 CombatSystem 7 阶段回合状态机 2026-08-27
-
-- Verdict：COMPLETE（4-22 done，零回归，combat-system Epic 首个 story 完成）
-- 变更：`src/foundation/gsm/gsm_atomic_writes.gd` 新增 3 个第二层方法 _set_battle_phase(null 守卫+去重+buffer_change)/_increment_battle_turn(null 守卫+buffer_change)/_set_battle_active(active=false 时清理 battle 域设为 null+buffer_change，ADR-0008 §GSM 边界修复)；`src/foundation/game_state_manager.gd` 3 个薄转发 wrapper；`src/feature/combat_system.gd`（新建）CombatPhase 枚举(7 值)+CombatResult 枚举+5 个 Cat 2b 信号声明+advance_phase 确定性序列(验证→清理→初始化→GSM 镜像→递增回合→_emit_safe phase_changed)+_compute_next_phase(END 回绕)+_validate_transition 验证矩阵(2→3: player_confirmed_end||timer_exceeded||hand_empty&&!can_afford_any; 3→4: all_characters_targeted||player_confirmed_skip||attack_queue.is_empty(); 其余无条件)+_enter_phase 桩编排(自动阶段 call_deferred 推进)+_exit_phase 桩(PLAY/ATK_DEC flag 重置+ATK_RES queue 清空)+_schedule_auto_advance(call_deferred 区别于 ADR-0007 禁令)+confirm_end_turn/confirm_attack_targets 手动确认 API+AC-013 牌库抽空返还(弃牌堆随机返还 1 张到牌库底部)+_emit_safe GSM 路由(nil 守卫+fallback 告警)+set_battle_active 初始化链(was_active+首次激活 _enter_phase(PREPARATION) 启动自动推进)；`tests/unit/combat_system/test_seven_phase_state_machine.gd`（新建）41 测试
-- 关键裁决：lead-programmer HIGH ADR 漂移(_set_battle_active(false) 未清理 battle 域)→方案 A 改实现 active=false 时 _gsm.battle=null+buffer_change；MEDIUM 6→0 ADR 内部矛盾→实现遵循伪代码无条件+注释标注 battle_end() 兜底；LOW _emit_safe fallback 缺告警→补 push_warning；LOW gsm.get_script() nil 解引用→补 nil 守卫；LOW confirm_attack_targets 语义→注释说明双语义；LOW 3→4 冗余子句→注释标注防御性目的；qa-lead MAJOR-1 _exit_phase 副作用→3 个测试验证 flag 重置+queue 清空；MAJOR-3 帧间隔精确→改为延迟性+手动阶段停止验证；MAJOR-4 多次抽牌返还→2 个测试覆盖多次返还+双方空跳过；MAJOR-5 enter_phase(DRAW) 集成→1 个测试验证自动抽 2 张；MINOR-1 turn 参数→1 个测试；MINOR-2 confirm 阶段守卫→2 个测试
-- 测试：41 单测全通过（AC-001~013 全覆盖+枚举值+回绕+确定性序列+验证失败+非活跃守卫+无条件推进 5 边+Phase 2 三条件+Phase 3 空队列+自动推进+手动等待+完整 1/2 回合+超时+空队列空真+牌库抽空+exit_phase 副作用+帧间隔+多次抽牌+enter_phase DRAW 集成+turn 参数+confirm 阶段守卫），全量 84 scripts / 1644 tests / 1643 passing / 1 pending / 0 failing 零回归
-- 关键经验：ADR-0008 §GSM 边界要求 _set_battle_active(false) 清理 battle.* 域——实现选择方案 A（改实现）而非方案 B（改 ADR），因为 battle_end() 已有 battle=null 清理但 CombatSystem.set_battle_active(false) 是独立入口，若不清理会残留；call_deferred 自动推进链需在 set_battle_active(true) 时通过 was_active 标志+首次激活 _enter_phase(PREPARATION) 启动——否则自动推进链不会触发；GDScript 4.6 call_deferred 执行时机：set_battle_active 后立即检查仍为初始阶段（未同帧推进），需 await get_tree().process_frame 后才执行——测试断言改为延迟性验证（phase>=PLAY）+手动阶段停止验证
-- Next：/dev-story 4-23（combat-system story-002 战斗生命周期编排 battle_start/battle_end + GSM battle.* 域，blocker #4-22 已解除）
-## Session Extract — Story 4-22+4-23 CombatSystem 状态机+生命周期 2026-08-27
-
-- Verdict：COMPLETE（4-22+4-23 done，零新增回归，combat-system Epic 2/4）
-- 变更：`src/foundation/gsm/gsm_atomic_writes.gd` 新增 _set_battle_phase/_increment_battle_turn/_set_battle_active(active=true 创建 battle 域+active=false 清理为 null ADR-0008 §GSM 边界); `src/foundation/game_state_manager.gd` 3 薄转发; `src/feature/combat_system.gd`（新建）CombatPhase 枚举(7 值)+CombatResult 枚举+6 个 Cat 2b 信号+advance_phase 确定性序列+_validate_transition 验证矩阵+_enter_phase/_exit_phase 桩+call_deferred 自动推进+battle_start/battle_end/retreat/confirm_retreat 生命周期+_settle_result 桩+_create_battle_snapshot/_clear_battle_snapshot/_push_animation_lock/_clear_animation_lock/_request_scene_change+_scene_change_enabled 测试开关+set_deck_state/set_attack_queue 测试桩; `tests/unit/combat_system/test_seven_phase_state_machine.gd`（新建）41 测试; `tests/integration/combat_system/test_battle_lifecycle_gsm.gd`（新建）24 测试
-- 关键裁决：lead-programmer HIGH ADR 漂移(_set_battle_active(false) 未清理 battle 域)→方案 A 改实现 active=false 时 _gsm.battle=null; MEDIUM 6→0 ADR 内部矛盾→实现遵循伪代码无条件+注释标注 battle_end() 兜底; LOW _emit_safe fallback 告警+nil 守卫+confirm_attack_targets 语义注释+3→4 冗余子句注释; qa-lead MAJOR-1~5 全补齐(exit_phase 副作用+帧间隔+多次抽牌+enter_phase DRAW 集成+turn 参数+confirm 阶段守卫)
-- 测试：41 单测+24 集成测试全通过，全量 85 scripts / 1668 tests / 1666 passing / 1 pending / 1 failing(既有跨测试污染 test_ac010_realm_up_triggers_gsm_realm_changed——基准 6 失败→改动后 1 失败，零新增回归)
-- 关键经验：GSM _set_battle_active 需双向语义——active=true 时初始化默认 battle 字典(phase/turn/is_active/player_field/enemy_field)，active=false 时清理 battle=null；CombatSystem 测试用 _scene_change_enabled=false 禁用 SceneManager 调用避免加载不存在的场景文件；GSM _buffer_change + call_deferred(_do_flush) 跨测试泄漏是既有问题——_set_battle_active(true) 的 buffer_change 调度 _do_flush，若在后续测试 await process_frame 时执行会触发 batch_updated 信号发射干扰信号计数
-- Next：/dev-story 4-24（combat-system story-003 play_card 出牌+目标解析+自动推进调度，blocker #4-22 已解除）
-<!-- STATUS -->
-Epic: sprint-4
-Feature: Feature 层战斗子系统（25 story + 1 task）
-Task: 4-22+4-23 完成（combat-system 001 7 阶段状态机 + 002 生命周期），combat-system Epic 2/4，待 4-24（play_card 出牌+目标解析）
-<!-- /STATUS -->
+### Sprint 1（Foundation 层基础架构）— 15/15 story，已签收 APPROVED
+- GameStateManager / InputManager / SceneManager / SaveLoadSystem / EventSystem 基础

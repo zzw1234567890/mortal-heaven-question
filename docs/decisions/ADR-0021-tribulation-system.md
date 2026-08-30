@@ -35,7 +35,7 @@ Accepted（2026-07-26——Feature 层审查通过。修复：InputManager ADR-0
 1. **Autoload 决策**：渡劫是编排流程——协调 GSM 锁 + 战斗系统 + 境界系统 + 修为系统——是否需要独立的 Feature Autoload？
 2. **战斗复用 vs 专用模式**：渡劫战与普通战斗共享 90% 的机制（7 阶段状态机、费用、出牌、攻击结算），但有独立规则覆盖（雷伤 debuff、不可撤退、无战利品、Boss 阵亡即胜利）。是复用 CombatSystem 还是创建专用战斗模式？
 3. **突破流程状态机**：触发 → 准备 → 渡劫战 → 成功/失败结算 —— 状态存放在 GSM 还是 TribulationSystem 内部？
-4. **失败惩罚接口**：GDD 定义扣除 10% 修为——通过什么接口？直接操作 GSM 还是通过修为养成系统？
+4. **失败惩罚接口**：GDD 定义扣除 15% 修为（2026-07-28 修订，原 10%+最低 50 兜底已移除）——通过什么接口？直接操作 GSM 还是通过修为养成系统？
 5. **雷伤 debuff 实现归属**：每回合叠层 + 回合末结算伤害 + 不可驱散——作为 StatusEffect 还是 CombatSystem 内置规则？
 
 ### 约束
@@ -52,7 +52,7 @@ Accepted（2026-07-26——Feature 层审查通过。修复：InputManager ADR-0
 - 渡劫准备阶段：渡劫丹使用（最多 2 枚）+ 上场角色调整
 - 渡劫战特殊规则：雷伤 debuff、不可撤退、Boss 阵亡即胜利、无战利品
 - 渡劫成功：调用 `RealmSystem.realm_up()` + 金卡奖励 + 行动力回满 + 新地图解锁
-- 渡劫失败：扣除 10% 修为 + 连续失败计数 + 回到探索
+- 渡劫失败：扣除 15% 修为 + 连续失败计数 + 回到探索（GDD 2026-07-28 修订：10%→15%）
 - 越阶渡劫：挑战高一级天劫 Boss + 境界压制惩罚 + 额外金卡奖励
 - 连续失败保护：3 次失败后解锁"天劫试炼（简单）"选项
 
@@ -281,7 +281,7 @@ func _handle_tribulation_success() -> void:
 
 func _handle_tribulation_failure() -> void:
     var max_cult: int = RealmSystem.get_current_property(&"max_cultivation")
-    var penalty: int = maxi(floor(max_cult * 0.1), 50)  # 最少损失 50 修为
+    var penalty: int = floor(max_cult * 0.15)  # GDD 2026-07-28 修订：10%→15%
     var current: int = GSM.player.cultivation
     var new_cult: int = maxi(current - penalty, 0)
 
@@ -465,7 +465,7 @@ GSM.apply_cultivation_change(delta: int) → void
 | tribulation-system.md | §2 渡劫准备阶段——渡劫丹使用（最多 2 枚）+ 上场角色调整 | `use_tribulation_pill()` 管理渡劫丹（同种不叠加、总上限 2 枚）；准备阶段通过 `InputManager.push_lock(DIALOGUE)` 锁 gameplay |
 | tribulation-system.md | §3 渡劫战斗规则——雷伤 debuff + 不可撤退 + 无战利品 + Boss 即胜 | CombatSystem `is_tribulation` 配置驱动——雷伤作为 `LightningEffectInstance`（non_dispellable StatusEffect）；撤退禁用；战利品跳过；Boss 阵亡即判胜利 |
 | tribulation-system.md | §4 渡劫成功——realm_up() + 金卡奖励 + 行动力回满 | `_handle_tribulation_success()` 调用 `RealmSystem.realm_up()` → `realm_upgraded` 信号触发连锁结算；`CardSystem.get_random_card_from_pool()` 生成金卡 |
-| tribulation-system.md | §5 渡劫失败——修为扣除 10% + 连续失败计数 | `_handle_tribulation_failure()` 通过 GSM 原子方法扣除修为；`consecutive_tribulation_failures` 持久化计数 |
+| tribulation-system.md | §5 渡劫失败——修为扣除 15% + 连续失败计数 | `_handle_tribulation_failure()` 通过 GSM 原子方法扣除修为（max_cult × 0.15，2026-07-28 修订值）；`consecutive_tribulation_failures` 持久化计数 |
 | tribulation-system.md | §6 越阶渡劫——挑战高一级天劫 Boss + 额外金卡 | `TribulationType.CROSS_REALM` 切换 Boss 配置查询（+1 境界）+ 额外金卡奖励 |
 | tribulation-system.md | §7 连续失败保护——3 次失败后解锁简单模式 | `consecutive_tribulation_failures >= 3` → `tribulation_protection_unlocked` 信号 + 渡劫台简单选项（Boss HP-30%） |
 | tribulation-system.md | §状态与转换——6 状态渡劫生命周期 | `TribulationState` 枚举（NOT_READY → READY → PREPARING → IN_COMBAT → SUCCESS/FAILED）存入 GSM |
@@ -520,7 +520,7 @@ Godot Autoload 在 `project.godot` 的 `[autoload]` 部分按列表顺序初始�
 - **GIVEN** 渡劫准备阶段使用 2 枚同种渡劫丹，**WHEN** 检查激活效果，**THEN** 仅保留高稀有度版本
 - **GIVEN** 渡劫战配置 `is_tribulation = true`，**WHEN** CombatSystem 初始化战斗，**THEN** 雷伤 StatusEffect 注册到所有上场角色 + 撤退按钮不可交互
 - **GIVEN** 渡劫战胜利，**WHEN** `battle_ended(VICTORY)` 触发，**THEN** `RealmSystem.realm_up()` 被调用 + 金卡已发放 + 连续失败计数器重置为 0
-- **GIVEN** 渡劫战失败，**WHEN** `battle_ended(DEFEAT)` 触发，**THEN** 修为扣除 max_cult × 0.1 + 连续失败计数 +1
+- **GIVEN** 渡劫战失败，**WHEN** `battle_ended(DEFEAT)` 触发，**THEN** 修为扣除 max_cult × 0.15 + 连续失败计数 +1（GDD 2026-07-28 修订：10%→15%，无最低兜底）
 - **GIVEN** 连续失败 3 次，**WHEN** 第 4 次触发渡劫，**THEN** 渡劫台出现"天劫试炼（简单）"选项
 - **GIVEN** 越阶渡劫，**WHEN** 检查 Boss 配置，**THEN** Boss 境界 = 玩家境界 +1
 - **GIVEN** 渡劫战后回到探索，**WHEN** 检查雷伤 debuff，**THEN** 不存在（已随战斗结束清除）

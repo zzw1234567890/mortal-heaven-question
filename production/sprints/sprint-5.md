@@ -91,7 +91,7 @@
 - [x] QA 签收报告：APPROVED WITH CONDITIONS (`/team-qa sprint`——`production/qa/qa-signoff-sprint-5-2026-08-30.md`)
 - [x] 已交付特性中无 S1 或 S2 的 bug
 - [x] 任何偏差已更新设计文档（`production/qa/deviation-report-sprint-5-2026-08-30.md` + 4 GDD 状态更新）
-- [ ] 代码已审查并合并
+- [x] 代码已审查并合并（code-reviewer APPROVED WITH CONDITIONS——H-1/H-2/H-3 已修复，M-2 已修复，L-2 已修复）
 - [x] 4 个新 Autoload 已注册且顺序验证通过
 
 ## 关键依赖链

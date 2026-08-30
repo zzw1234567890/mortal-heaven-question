@@ -3,7 +3,7 @@ extends Node
 ##
 ## Feature 层 Autoload。修为获取统一入口 + 溢出判定 + 溢出结算 + 查询接口。[br]
 ## 本文件是 GSM add_cultivation 的薄封装——不重复溢出逻辑，仅委托 + 信号传播 + 查询。[br]
-## [br][b]不注册进 project.godot[/b]——待各系统接线后统一注册。[br]
+## [br][b]已注册进 project.godot[/b]——Autoload #20（CultivationSystem）。[br]
 ## [br]来源: GDD cultivation-system.md §5 修为获取流程 + §6-7 溢出结算 + GSM 现有接口。
 
 

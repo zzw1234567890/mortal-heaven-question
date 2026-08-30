@@ -5,7 +5,7 @@ extends Node
 ## 卡组数据存储在 GSM player.deck 域——本系统不持有数据副本。[br]
 ## 本文件持有卡组校验 API + 统一增删 API + 变更日志 + 查询接口。[br]
 ## [br][b]本 Story 范围[/b]（5-14）：验证器 + 统一增删 + 变更日志 + GSM deck 域扩展。[br]
-## [b]不注册进 project.godot[/b]——待各系统接线后统一注册。[br]
+## [b]已注册进 project.godot[/b]——Autoload #21（DeckEditingSystem）。[br]
 ## [br]来源: ADR-0023 §公共 API / GDD deck-editing-system.md §核心规则 #3/#7。
 
 
@@ -162,8 +162,8 @@ func _append_change_log(card_ids: Array, action: String, source: String, detail:
 			"detail": detail,
 		}
 		log.append(entry)
-	gsm.deck.change_log = log
-	gsm._buffer_change("deck.change_log", log.size() - card_ids.size(), log)
+	# 通过 GSM 第二层原子写入（H-3/M-2 修复：不直接赋值 + 类型匹配）
+	gsm._set_deck_change_log(log)
 
 
 # === 查询接口 ====================================================================
@@ -216,13 +216,11 @@ func initialize_initial_deck(identity_preset: Array) -> void:
 		push_warning("DeckEditingSystem.initialize_initial_deck: GSM 不可用")
 		return
 	gsm._set_deck_cards(identity_preset.duplicate())
-	gsm.deck.slots = [null, null, null, null, null, null]
-	gsm.deck.change_log = []
+	# 通过 GSM 第二层原子写入（H-3 修复：不直接赋值）
+	gsm._set_deck_slots([null, null, null, null, null, null])
+	gsm._set_deck_change_log([])
 	gsm._set_deck_session_remove_count(0)
-	gsm.deck.deck_limit_modifier = 0
-	gsm._buffer_change("deck.slots", [], gsm.deck.slots)
-	gsm._buffer_change("deck.change_log", [], [])
-	gsm._buffer_change("deck.deck_limit_modifier", 0, 0)
+	gsm._set_deck_limit_modifier(0)
 
 
 ## 根据身份 ID 获取默认卡组——返回 card_instance_id 列表副本。[br]

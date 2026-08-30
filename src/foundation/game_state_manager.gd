@@ -238,6 +238,12 @@ func _set_deck_cards(ids: Array) -> void:
 	_atomic_writes._set_deck_cards(ids)
 func _set_deck_session_remove_count(count: int) -> void:
 	_atomic_writes._set_deck_session_remove_count(count)
+func _set_deck_slots(slots: Array) -> void:
+	_atomic_writes._set_deck_slots(slots)
+func _set_deck_change_log(log: Array) -> void:
+	_atomic_writes._set_deck_change_log(log)
+func _set_deck_limit_modifier(modifier: int) -> void:
+	_atomic_writes._set_deck_limit_modifier(modifier)
 
 # === 第三层：信号订阅（委托 → GSMSignalRouter）==============================
 
