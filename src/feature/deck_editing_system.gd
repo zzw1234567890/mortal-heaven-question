@@ -14,6 +14,18 @@ extends Node
 ## 卡组最低张数保护——GDD §核心规则 #3。
 const MINIMUM_DECK_SIZE: int = 5
 
+## 默认卡组——6 个身份的初始卡组 card_instance_id 列表（GDD §核心规则 #1）。[br]
+## [br]身份 ID 1-6 对应 GDD 表中的 6 个开局身份。实际 card_instance_id 由身份选择系统[br]
+## 调用 CardSystem.create_instance 生成——本常量为桩阶段占位，后续接线时替换。
+const DEFAULT_DECKS: Dictionary = {
+	1: [101, 102, 103, 104, 105, 106, 107],  # 青云剑宗外门弟子（7张）
+	2: [201, 202, 203, 204, 205, 206, 207],  # 血海殿遗孤（7张）
+	3: [301, 302, 303, 304, 305, 306, 307],  # 碎星群岛散修（7张）
+	4: [401, 402, 403, 404, 405, 406, 407],  # 玄冰宫弟子（7张）
+	5: [501, 502, 503, 504, 505, 506, 507],  # 丹霞谷弟子（7张）
+	6: [601, 602, 603, 604, 605, 606],          # 阵道双杰（6张）
+}
+
 
 # === 内部状态 ====================================================================
 
@@ -184,6 +196,44 @@ func get_session_remove_count() -> int:
 	if gsm == null:
 		return 0
 	return int(gsm.deck.get("session_remove_count", 0))
+
+
+# === 开局初始化（Story 5-16）===================================================
+
+## 初始化初始卡组——开局身份绑定的固定卡组写入。[br]
+## [br][param identity_preset] 初始卡组 card_instance_id 数组。[br]
+## [br][b]流程[/b]（ADR-0023 §initialize_initial_deck）:[br]
+##   1. 直接写入 GSM deck.current_deck——不受境界上限约束[br]
+##   2. 重置 slots = [null×6][br]
+##   3. 重置 change_log = [][br]
+##   4. 重置 session_remove_count = 0[br]
+##   5. 重置 deck_limit_modifier = 0[br]
+## [br][b]注意[/b]: 初始卡组 6-7 张远低于炼气期 20 上限——无需校验。[br]
+## [br]来源: ADR-0023 §initialize_initial_deck + GDD §核心规则 #1。
+func initialize_initial_deck(identity_preset: Array) -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("DeckEditingSystem.initialize_initial_deck: GSM 不可用")
+		return
+	gsm._set_deck_cards(identity_preset.duplicate())
+	gsm.deck.slots = [null, null, null, null, null, null]
+	gsm.deck.change_log = []
+	gsm._set_deck_session_remove_count(0)
+	gsm.deck.deck_limit_modifier = 0
+	gsm._buffer_change("deck.slots", [], gsm.deck.slots)
+	gsm._buffer_change("deck.change_log", [], [])
+	gsm._buffer_change("deck.deck_limit_modifier", 0, 0)
+
+
+## 根据身份 ID 获取默认卡组——返回 card_instance_id 列表副本。[br]
+## [br][param identity_id] 身份 ID（1-6）。[br]
+## [br][b]返回[/b]: Array[int] 副本——无效 ID 返回空数组。[br]
+## [br]来源: GDD §核心规则 #1 + ADR-0023 §默认卡组。
+func get_default_deck(identity_id: int) -> Array:
+	if not DEFAULT_DECKS.has(identity_id):
+		push_warning("DeckEditingSystem.get_default_deck: 无效身份 ID %d" % identity_id)
+		return []
+	return DEFAULT_DECKS[identity_id].duplicate()
 
 
 # === 内部辅助 ====================================================================
