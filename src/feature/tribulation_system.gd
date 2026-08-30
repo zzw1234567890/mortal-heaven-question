@@ -152,6 +152,29 @@ func trigger_tribulation(trib_type: int = TribulationType.NORMAL) -> void:
 	_emit_safe(&"tribulation_triggered", [realm_level])
 
 
+# === 取消渡劫（Story 5-13）===================================================
+
+## 取消渡劫——准备阶段返回 NOT_READY。[br]
+## [br][b]流程[/b]（GDD §状态与转换 PREPARING→NOT_READY）:[br]
+##   1. 验证 PREPARING 状态[br]
+##   2. _set_state(NOT_READY)[br]
+##   3. 清理 _trib_type + _active_pills[br]
+## [br][b]非 PREPARING[/b] push_warning + return。[br]
+## [br]来源: ADR-0021 §状态与转换 + GDD §2 渡劫准备阶段。
+func cancel_tribulation() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		push_warning("TribulationSystem.cancel_tribulation: GSM 不可用")
+		return
+	var state: int = int(gsm.player.get("tribulation_state", TribulationState.NOT_READY))
+	if state != TribulationState.PREPARING:
+		push_warning("TribulationSystem.cancel_tribulation: 非 PREPARING 状态（%d）" % state)
+		return
+	_set_state(TribulationState.NOT_READY)
+	_trib_type = TribulationType.NORMAL
+	_active_pills.clear()
+
+
 # === 状态管理 ====================================================================
 
 ## 状态转换——验证 + 写入 GSM。[br]
