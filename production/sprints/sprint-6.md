@@ -3,7 +3,7 @@
 > **Sprint**: 6
 > **Start Date**: 2026-08-31
 > **End Date**: 2026-09-07
-> **Status**: Active
+> **Status**: Complete
 > **Focus**: Feature 层叙事经济子系统 5 Epic（IdentitySelectionSystem / AlchemyCraftingSystem / InscriptionSystem / StorySystem / EndingBranchSystem）——MVP 核心循环第三支柱：身份开局 + 经济补充 + 叙事骨干
 > **Milestone**: feature-layer-narrative（叙事经济线完成）
 > **Review Mode**: full
@@ -39,23 +39,23 @@
 
 | # | Epic | Story | 文件 | 类型 | 预估 | 依赖 | 状态 |
 |:--|------|:--|------|:--:|:--:|:--:|:--:|
-| 1 | identity-selection-system | 身份模板 const Dictionary（6 个）+ 查询 API | `identity-selection-system/story-001-*.md` | Logic | 0.5d | — | Not Started |
-| 2 | identity-selection-system | apply_identity 原子操作（编排现有服务 API） | `identity-selection-system/story-002-*.md` | Integration | 0.5d | #1 | Not Started |
-| 3 | identity-selection-system | is_identity_selected / get_current_identity | `identity-selection-system/story-003-*.md` | Logic | 0.5d | #1 | Not Started |
-| 4 | alchemy-crafting-system | 配方表（const Dictionary, 8 配方）+ 查询 API | `alchemy-crafting-system/story-001-*.md` | Logic | 0.5d | — | Not Started |
-| 5 | alchemy-crafting-system | craft_pill / craft_artifact 炼制编排 | `alchemy-crafting-system/story-002-*.md` | Logic | 0.5d | #4 | Not Started |
-| 6 | alchemy-crafting-system | roll_quality / forge_artifact_stat 品质与属性 | `alchemy-crafting-system/story-003-*.md` | Logic | 0.5d | #4 | Not Started |
-| 7 | alchemy-crafting-system | apply_reroll 品质重掷 + 独立 RNG 实例 | `alchemy-crafting-system/story-004-*.md` | Logic | 0.5d | #6 | Not Started |
-| 8 | inscription-system | generate_candidates 候选属性生成 | `inscription-system/story-001-*.md` | Logic | 0.5d | — | Not Started |
-| 9 | inscription-system | inscribe / apply_inscription 铭刻编排 | `inscription-system/story-002-*.md` | Logic | 0.5d | #8 | Not Started |
-| 10 | inscription-system | inscription_cost / dismantle_inscription_refund 成本 | `inscription-system/story-003-*.md` | Logic | 0.5d | #8 | Not Started |
-| 11 | story-system | CHAPTER_TEMPLATES 5 章静态定义（const Dictionary） | `story-system/story-001-*.md` | Logic | 0.5d | — | Not Started |
-| 12 | story-system | can_enter_chapter / get_chapter_context | `story-system/story-002-*.md` | Logic | 0.5d | #11 | Not Started |
-| 13 | story-system | complete_chapter + GSM narrative.* 独占写入 | `story-system/story-003-*.md` | Integration | 0.5d | #12 | Not Started |
-| 14 | story-system | is_boss_unlocked / on_boss_defeated | `story-system/story-004-*.md` | Logic | 0.5d | #13 | Not Started |
-| 15 | ending-branch-system | EndingEvaluator 纯函数工具类 + evaluate_ending | `ending-branch-system/story-001-*.md` | Logic | 0.5d | #13 | Not Started |
-| 16 | ending-branch-system | _calculate_scores / _resolve_tie 评分与平局 | `ending-branch-system/story-002-*.md` | Logic | 0.5d | #15 | Not Started |
-| 17 | ending-branch-system | _determine_variant / _generate_epilogue 变体与尾声 | `ending-branch-system/story-003-*.md` | Logic | 0.5d | #16 | Not Started |
+| 1 | identity-selection-system | 身份模板 const Dictionary（6 个）+ 查询 API | `identity-selection-system/story-001-*.md` | Logic | 0.5d | — | Done |
+| 2 | identity-selection-system | apply_identity 原子操作（编排现有服务 API） | `identity-selection-system/story-002-*.md` | Integration | 0.5d | #1 | Done |
+| 3 | identity-selection-system | is_identity_selected / get_current_identity | `identity-selection-system/story-003-*.md` | Logic | 0.5d | #1 | Done |
+| 4 | alchemy-crafting-system | 配方表（const Dictionary, 8 配方）+ 查询 API | `alchemy-crafting-system/story-001-*.md` | Logic | 0.5d | — | Done |
+| 5 | alchemy-crafting-system | craft_pill / craft_artifact 炼制编排 | `alchemy-crafting-system/story-002-*.md` | Logic | 0.5d | #4 | Done |
+| 6 | alchemy-crafting-system | roll_quality / forge_artifact_stat 品质与属性 | `alchemy-crafting-system/story-003-*.md` | Logic | 0.5d | #4 | Done |
+| 7 | alchemy-crafting-system | apply_reroll 品质重掷 + 独立 RNG 实例 | `alchemy-crafting-system/story-004-*.md` | Logic | 0.5d | #6 | Done |
+| 8 | inscription-system | generate_candidates 候选属性生成 | `inscription-system/story-001-*.md` | Logic | 0.5d | — | Done |
+| 9 | inscription-system | inscribe / apply_inscription 铭刻编排 | `inscription-system/story-002-*.md` | Logic | 0.5d | #8 | Done |
+| 10 | inscription-system | inscription_cost / dismantle_inscription_refund 成本 | `inscription-system/story-003-*.md` | Logic | 0.5d | #8 | Done |
+| 11 | story-system | CHAPTER_TEMPLATES 5 章静态定义（const Dictionary） | `story-system/story-001-*.md` | Logic | 0.5d | — | Done |
+| 12 | story-system | can_enter_chapter / get_chapter_context | `story-system/story-002-*.md` | Logic | 0.5d | #11 | Done |
+| 13 | story-system | complete_chapter + GSM narrative.* 独占写入 | `story-system/story-003-*.md` | Integration | 0.5d | #12 | Done |
+| 14 | story-system | is_boss_unlocked / on_boss_defeated | `story-system/story-004-*.md` | Logic | 0.5d | #13 | Done |
+| 15 | ending-branch-system | EndingEvaluator 纯函数工具类 + evaluate_ending | `ending-branch-system/story-001-*.md` | Logic | 0.5d | #13 | Done |
+| 16 | ending-branch-system | _calculate_scores / _resolve_tie 评分与平局 | `ending-branch-system/story-002-*.md` | Logic | 0.5d | #15 | Done |
+| 17 | ending-branch-system | _determine_variant / _generate_epilogue 变体与尾声 | `ending-branch-system/story-003-*.md` | Logic | 0.5d | #16 | Done |
 
 **总计**：17 story，预估 8.5d
 
@@ -83,16 +83,16 @@
 
 ## 此冲刺的完成定义
 
-- [ ] 所有必须完成的任务已完成（17 项）
-- [ ] 所有任务通过验收标准
-- [ ] QA 计划已存在
-- [ ] 所有逻辑/集成类故事有通过的单元/集成测试
-- [ ] 冒烟检查已通过 (`/smoke-check sprint`)
-- [ ] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
-- [ ] 已交付特性中无 S1 或 S2 的 bug
-- [ ] 任何偏差已更新设计文档
+- [x] 所有必须完成的任务已完成（17 项）
+- [x] 所有任务通过验收标准
+- [x] QA 计划已存在
+- [x] 所有逻辑/集成类故事有通过的单元/集成测试
+- [x] 冒烟检查已通过 (`/smoke-check sprint`)
+- [x] QA 签收报告：APPROVED WITH CONDITIONS (`/team-qa sprint`)
+- [x] 已交付特性中无 S1 或 S2 的 bug
+- [x] 任何偏差已更新设计文档
 - [ ] 代码已审查并合并
-- [ ] 2 个新 Autoload 已注册且顺序验证通过（IdentitySelectionSystem #21 + StorySystem #25）
+- [x] 2 个新 Autoload 已注册且顺序验证通过（IdentitySelectionSystem #21 + StorySystem #25）
 
 ## 关键依赖链
 

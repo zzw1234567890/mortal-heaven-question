@@ -1,67 +1,83 @@
 # Active Session State
 
 <!-- STATUS -->
-Epic: Sprint 5
-Feature: Feature 层探索经济线（4 Epic 17 Story）
-Task: Sprint 5 QA 签收完成——APPROVED WITH CONDITIONS，待代码审查并合并
+Epic: Sprint 6
+Feature: ending-branch-system
+Task: Sprint 6 全部 17/17 Story 完成——全量测试通过，待 QA 签收
 <!-- /STATUS -->
 
 ## 当前任务
 
-Sprint 5 探索经济线全部 17/17 Story 完成，QA 流程完成。
+Sprint 6 叙事经济线全部 17/17 Story 完成。全量测试通过（121 scripts / 2227 tests / 2226 passing / 1 pending / 0 failing）。
 
-## Sprint 5 完成定义（8/9 完成）
+## Sprint 6 完成定义
 
 - [x] 所有必须完成的任务已完成（17 项）
 - [x] 所有任务通过验收标准
-- [x] QA 计划已存在（`production/qa/qa-plan-sprint-5-2026-08-30.md`）
-- [x] 所有逻辑/集成类故事有通过的单元/集成测试（335 新增测试）
-- [x] 冒烟检查已通过（104 scripts / 2060 tests / 0 failing）
-- [x] QA 签收报告：APPROVED WITH CONDITIONS（`production/qa/qa-signoff-sprint-5-2026-08-30.md`）
+- [ ] QA 计划已存在
+- [x] 所有逻辑/集成类故事有通过的单元/集成测试（167 新增测试）
+- [x] 冒烟检查已通过（121 scripts / 2227 tests / 0 failing）
+- [ ] QA 签收报告
 - [x] 已交付特性中无 S1 或 S2 的 bug
-- [x] 任何偏差已更新设计文档（`production/qa/deviation-report-sprint-5-2026-08-30.md` + 4 GDD 状态更新）
+- [ ] 任何偏差已更新设计文档
 - [ ] 代码已审查并合并
-- [x] 4 个新 Autoload 已注册且顺序验证通过
+- [x] 2 个新 Autoload 已注册且顺序验证通过（IdentitySelectionSystem #21 + StorySystem #25）
 
-## 已完成的 Epic
+## 已完成的 Epic（5 Epic 17 Story）
 
-1. **exploration-system**（5 Story）：DAG 生成 → GSM 存储 → 节点推进 → 缓存重建 → 事件分配
-2. **cultivation-system**（4 Story）：修为获取 → GSM 存储 → 溢出结算 → 突破检查
-3. **tribulation-system**（4 Story）：状态机 → 战斗委托 → 渡劫丹+结算 → GSM 同步
-4. **deck-editing-system**（4 Story）：验证器 → 编辑 API → 保存/加载 → UI 数据源
+1. **identity-selection-system**（3 Story）：身份模板 + apply_identity 编排 + 查询 API
+2. **alchemy-crafting-system**（4 Story）：配方表 + 炼制编排 + 品质属性 + 重掷
+3. **inscription-system**（3 Story）：候选生成 + 铭刻编排 + 成本返还
+4. **story-system**（4 Story）：章节模板 + 章节上下文 + GSM narrative 域写入 + Boss 解锁
+5. **ending-branch-system**（3 Story）：EndingEvaluator + 评分平局 + 变体尾声
+
+## 新增测试明细
+
+- identity-selection-system：28 tests
+- alchemy-crafting-system：39 tests
+- inscription-system：34 tests（3 文件）
+- story-system：40 tests（4 文件）
+- ending-branch-system：53 tests（3 文件）
+- GSM narrative 域扩展：
+  - gsm_atomic_writes.gd：+4 方法（add_required_event_completion / set_narrative_boss_unlocked / set_narrative_boss_defeated / set_ending_chosen）
+  - game_state_manager.gd：+4 薄转发 wrapper
+  - gsm_serializer.gd：narrative 域默认值扩展
 
 ## 全量测试基线
 
-- Scripts: 104 / Tests: 2060 / Passing: 2059 / Pending: 1 / Failing: 0 / Asserts: 7677
-- 零回归（对比 Sprint 4 基线 85 scripts / 1668 tests）
+- Scripts: 121 / Tests: 2227 / Passing: 2226 / Pending: 1 / Failing: 0 / Asserts: 8318
+- 零回归（对比 Sprint 5 基线 104 scripts / 2060 tests）
+- 新增 17 scripts / 167 tests
 
 ## Autoload 注册（project.godot）
 
-ExplorationSystem / CultivationSystem / DeckEditingSystem / TribulationSystem
+- IdentitySelectionSystem #21：`res://src/feature/identity_selection_system.gd`
+- StorySystem #25：`res://src/feature/story_system.gd`
+- AlchemyCraftingSystem / InscriptionSystem / EndingEvaluator：RefCounted 服务类，不注册 Autoload
 
-## 关键决策
+## 关键实现决策
 
-- GDD §公式 3（deck-editing）从 80% 更新为 100%——遵循 §3 ③ 已移除出售操作
-- 4 个 GDD 状态更新为「已实现」或「已实现（桩阶段）」
-- 10 项偏差记录在案（3 项文件超 300 行 + 4 项桩实现 + 1 项有意偏差 + 2 项延迟）
+- InscriptionSystem 使用 RefCounted + class_name + static func 模式（ADR-0030）
+- StorySystem 为 narrative.* 域独占写入者（ADR-0026），扩展 GSM 第二层
+- EndingEvaluator 为 RefCounted 工具类，通关时实例化（ADR-0029）
+- GSM 第二层新增 4 个 narrative.* 原子写入方法
+- Godot 4.x RefCounted.get() 只接受 1 个参数——使用 _safe_get_str/_safe_get_int/_safe_get_array 辅助方法
 
 ## 待办
 
-- Sprint 5 完成定义仅剩「代码已审查并合并」未勾选
-- 后续 Sprint 需处理 3 项桩实现接线（CardSystem 掉落表 / RealmSystem 天劫 Boss 配置 / StatusEffectSystem 心魔 debuff）
-- 后续 Sprint 需重构 3 个超 300 行文件（exploration_system / tribulation_system / deck_editing_system）
+- Sprint 6 QA 计划与签收
+- Sprint 5 技术债务遗留（非阻塞）：3 个文件超 300 行重构 / CardSystem 掉落规则接线 / RealmSystem 天劫 Boss 配置接线 / StatusEffectSystem 心魔 debuff 接线 / InputManager 锁管理接线
 
 ---
 
 ## 历史会话摘要
 
+### Sprint 5（Feature 层探索经济线）— 17 story，已签收 APPROVED WITH CONDITIONS
+- exploration-system / cultivation-system / tribulation-system / deck-editing-system
+- 全量：104 scripts / 2060 tests / 0 failing
+
 ### Sprint 4（Feature 层战斗子系统）— 25 story + 1 task，已签收 APPROVED WITH CONDITIONS
-- combat-system Epic：7 阶段状态机 + 生命周期编排 + play_card 出牌
-- card-effect-engine Epic：双层对象模型 + ResolutionStack + 触发链 + PRD 引擎 + AI 干跑
-- deployment-system Epic：阵位状态机 + deploy/remove + serialize 快照 + standby/revive
-- binding-system Epic：BindingRecord + bind/unbind + 信号总线 + serialize_all
-- formation-system Epic：条件状态机 + 激活重判 + 光环查询 + serialize 快照
-- ai-system Epic：难度缩放 + 预配置绑定 + Boss 阶段转换
+- combat-system / card-effect-engine / deployment-system / binding-system / formation-system / ai-system
 - 全量：85 scripts / 1668 tests / 0 failing
 
 ### Sprint 3（Foundation 层 GSM 拆分 + EventSystem）— 12/12 story，已签收 APPROVED

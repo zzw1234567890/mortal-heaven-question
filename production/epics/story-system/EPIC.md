@@ -10,10 +10,10 @@
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | CHAPTER_TEMPLATES 5 章静态定义（const Dictionary） | Logic | Not Started | ADR-0026 |
-| 002 | can_enter_chapter / get_chapter_context | Logic | Not Started | ADR-0026 |
-| 003 | complete_chapter + GSM narrative.* 独占写入 | Integration | Not Started | ADR-0026 |
-| 004 | is_boss_unlocked / on_boss_defeated | Logic | Not Started | ADR-0026 |
+| 001 | CHAPTER_TEMPLATES 5 章静态定义（const Dictionary） | Logic | Done | ADR-0026 |
+| 002 | can_enter_chapter / get_chapter_context | Logic | Done | ADR-0026 |
+| 003 | complete_chapter + GSM narrative.* 独占写入 | Integration | Done | ADR-0026 |
+| 004 | is_boss_unlocked / on_boss_defeated | Logic | Done | ADR-0026 |
 
 ## Overview
 

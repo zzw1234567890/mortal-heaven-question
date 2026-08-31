@@ -3,16 +3,16 @@
 > **Layer**: Feature
 > **GDD**: `design/gdd/ending-branch-system.md`
 > **Architecture Module**: 叙事子系统 — EndingEvaluator（嵌入 StorySystem 非 Autoload）
-> **Status**: Backlog
+> **Status**: Done
 > **Stories**: 3 stories（标题级预创建——AC 待 `/dev-story` 填充）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | EndingEvaluator 纯函数工具类 + evaluate_ending | Logic | Not Started | ADR-0029 |
-| 002 | _calculate_scores / _resolve_tie 评分与平局 | Logic | Not Started | ADR-0029 |
-| 003 | _determine_variant / _generate_epilogue 变体与尾声 | Logic | Not Started | ADR-0029 |
+| 001 | EndingEvaluator 纯函数工具类 + evaluate_ending | Logic | Done | ADR-0029 |
+| 002 | _calculate_scores / _resolve_tie 评分与平局 | Logic | Done | ADR-0029 |
+| 003 | _determine_variant / _generate_epilogue 变体与尾声 | Logic | Done | ADR-0029 |
 
 ## Overview
 

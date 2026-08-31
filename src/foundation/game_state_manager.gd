@@ -228,8 +228,18 @@ func clear_exploration_navigation() -> void:
 	_atomic_writes.clear_exploration_navigation()
 func unlock_talent(talent_id: StringName) -> void:
 	_atomic_writes.unlock_talent(talent_id)
+func set_talent(talent_id: StringName, magnitude: int) -> void:
+	_atomic_writes.set_talent(talent_id, magnitude)
 func advance_chapter(chapter_id: StringName) -> void:
 	_atomic_writes.advance_chapter(chapter_id)
+func add_required_event_completion(event_id: StringName) -> void:
+	_atomic_writes.add_required_event_completion(event_id)
+func set_narrative_boss_unlocked(value: bool) -> void:
+	_atomic_writes.set_narrative_boss_unlocked(value)
+func set_narrative_boss_defeated(value: bool) -> void:
+	_atomic_writes.set_narrative_boss_defeated(value)
+func set_ending_chosen(branch_id: StringName) -> void:
+	_atomic_writes.set_ending_chosen(branch_id)
 func _set_tribulation_state(state: int) -> void:
 	_atomic_writes._set_tribulation_state(state)
 func _set_consecutive_tribulation_failures(count: int) -> void:

@@ -10,9 +10,9 @@
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | generate_candidates 候选属性生成 | Logic | Not Started | ADR-0030 |
-| 002 | inscribe / apply_inscription 铭刻编排 | Logic | Not Started | ADR-0030 |
-| 003 | inscription_cost / dismantle_inscription_refund 成本 | Logic | Not Started | ADR-0030 |
+| 001 | generate_candidates 候选属性生成 | Logic | Done | ADR-0030 |
+| 002 | inscribe / apply_inscription 铭刻编排 | Logic | Done | ADR-0030 |
+| 003 | inscription_cost / dismantle_inscription_refund 成本 | Logic | Done | ADR-0030 |
 
 ## Overview
 

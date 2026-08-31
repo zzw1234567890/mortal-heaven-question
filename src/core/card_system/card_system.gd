@@ -108,6 +108,14 @@ func get_template(id: StringName) -> CardTemplate:
 	return templates.get(id, null) as CardTemplate
 
 
+## 检查模板是否存在——IdentitySelectionSystem.apply_identity 前置校验用。[br]
+## [br][param id] 模板 ID。[br]
+## [br][b]返回[/b]: [code]true[/code] 模板存在，[code]false[/code] 不存在。[br]
+## [br]来源: ADR-0022 §apply_identity ② 卡牌模板有效性校验。
+func has_template(id: StringName) -> bool:
+	return templates.has(id)
+
+
 ## 按类型筛选模板。[br]
 ## [br][b]复杂度[/b]: O(n) 遍历——非热路径（仅收藏浏览/战利品生成调用）。[br]
 ## [br][param type]: CardType 枚举值（int——避免 class_name 依赖，CardSystem 不声明 class_name）。[br]

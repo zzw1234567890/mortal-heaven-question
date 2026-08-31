@@ -100,6 +100,7 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"resources": {"ling_shi": 0, "ling_cai": {"low": 0, "medium": 0, "high": 0, "top": 0}, "dan_yao_sui_pian": 0},
 				"identity_id": "",
 				"talents": [],
+				"talent_map": {},
 				"unavailable_characters": {},
 				"tribulation_state": 0,
 				"consecutive_tribulation_failures": 0,
@@ -124,7 +125,17 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"map_states": {},
 			}
 		"narrative":
-			return {"current_chapter": "", "completed_chapters": [], "story_flags": {}}
+			return {
+				"current_chapter": "",
+				"current_chapter_progress": {
+					"completed_required_events": [],
+					"boss_unlocked": false,
+					"boss_defeated": false,
+					"ending_chosen": "",
+				},
+				"completed_chapters": [],
+				"story_flags": {},
+			}
 		"session":
 			return {"current_scene": "", "scene_id": 0, "ui_state": {}, "input_locks": []}
 	return {}

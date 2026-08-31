@@ -29,7 +29,7 @@ Engine: Godot 4.6.3
 | deck-editing-system | Feature | 卡组编辑系统 | deck-editing-system.md | 4 stories | Complete |
 | alchemy-crafting-system | Feature | 炼丹炼器系统 | alchemy-crafting-system.md | 4 stories | Backlog |
 | inscription-system | Feature | 法宝铭刻系统 | inscription-system.md | 3 stories | Backlog |
-| identity-selection-system | Feature | 开局身份选择系统 | identity-selection-system.md | 3 stories | Backlog |
+| identity-selection-system | Feature | 开局身份选择系统 | identity-selection-system.md | 3 stories | Complete |
 | reincarnation-talent-system | Feature | 轮回天赋系统 | reincarnation-talent-system.md | 3 stories | Backlog |
 | achievement-system | Feature | 成就系统 | achievement-system.md | 3 stories | Backlog |
 | story-system | Feature | 剧情系统 | story-system.md | 4 stories | Backlog |

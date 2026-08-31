@@ -41,6 +41,8 @@ ExplorationSystem="*res://src/feature/exploration_system.gd"
 CultivationSystem="*res://src/feature/cultivation_system.gd"
 DeckEditingSystem="*res://src/feature/deck_editing_system.gd"
 TribulationSystem="*res://src/feature/tribulation_system.gd"
+IdentitySelectionSystem="*res://src/feature/identity_selection_system.gd"
+StorySystem="*res://src/feature/story_system.gd"
 
 [display]
 

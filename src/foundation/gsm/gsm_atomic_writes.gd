@@ -669,6 +669,26 @@ func unlock_talent(talent_id: StringName) -> void:
 	_gsm._buffer_change("player.talents", old_talents, talents)
 
 
+## 写入身份天赋效果——键值映射制（ADR-0022 §天赋效果）。[br]
+## [br][b]仅 IdentitySelectionSystem.apply_identity() 调用[/b]——注册身份专属天赋[br]
+## 到 [code]player.talent_map[/code] 键值注册表。[br]
+## [br]下游系统通过 [code]GSM.player.talent_map.get(talent_id, 0)[/code] 查询——O(1) 字典查找。[br]
+## [br][param talent_id] 天赋 ID（如 [code]&"ling_shi_boost"[/code]）。[br]
+## [br][param magnitude] 天赋强度值（如 15 表示 +15%）。[br]
+## [br][b]覆盖语义[/b]: 同 ID 已存在则覆盖（最后一局的身份选择胜出）。[br]
+## [br][b]Cat 1 信号[/b]: 写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0022 §GSM 第二层扩展方法 + GDD §公式#1 天赋效果注册。
+func set_talent(talent_id: StringName, magnitude: int) -> void:
+	var talent_map: Dictionary = _gsm.player.get("talent_map", {})
+	var old_val: Variant = talent_map.get(talent_id, null)
+	if old_val != null and int(old_val) == magnitude:
+		return  # 值无变化——去重
+	talent_map[talent_id] = magnitude
+	if not _gsm.player.has("talent_map"):
+		_gsm.player["talent_map"] = talent_map
+	_gsm._buffer_change("player.talent_map.%s" % talent_id, old_val, magnitude)
+
+
 ## 推进章节——写入 narrative.current_chapter + completed_chapters。[br]
 ## [br]若 [code]narrative.current_chapter[/code] 非空且与新章节不同，将旧章节 append 到 [code]completed_chapters[/code]。[br]
 ## [br][param chapter_id] 新章节 ID。[br]
@@ -690,6 +710,84 @@ func advance_chapter(chapter_id: StringName) -> void:
 	_gsm.narrative.current_chapter = chapter_str
 	_gsm._buffer_change("narrative.current_chapter", old_current, chapter_str)
 	_gsm._buffer_change("narrative.completed_chapters", old_completed, _gsm.narrative.completed_chapters)
+
+
+## 追加必经事件完成——写入 narrative.current_chapter_progress.completed_required_events（ADR-0026）。
+## [br][param event_id] 已完成的必经事件 ID。[br]
+## [br][b]去重[/b]：已存在的事件不重复追加。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0026 §GSM 第二层新增方法。
+func add_required_event_completion(event_id: StringName) -> void:
+	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
+	if progress.is_empty():
+		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
+		_gsm.narrative["current_chapter_progress"] = progress
+
+	var events: Array = progress.get("completed_required_events", [])
+	if events.has(event_id):
+		return  # 去重
+
+	var old_events: Array = events.duplicate()
+	events.append(event_id)
+	progress["completed_required_events"] = events
+	_gsm._buffer_change("narrative.current_chapter_progress.completed_required_events", old_events, events)
+
+
+## 原子写入 BOSS 解锁状态——仅 StorySystem 调用（ADR-0026）。
+## [br][param value] BOSS 是否已解锁。[br]
+## [br][b]去重[/b]：同值不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0026 §GSM 第二层新增方法。
+func set_narrative_boss_unlocked(value: bool) -> void:
+	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
+	if progress.is_empty():
+		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
+		_gsm.narrative["current_chapter_progress"] = progress
+
+	var old_val: bool = bool(progress.get("boss_unlocked", false))
+	if old_val == value:
+		return
+
+	progress["boss_unlocked"] = value
+	_gsm._buffer_change("narrative.current_chapter_progress.boss_unlocked", old_val, value)
+
+
+## 原子写入 BOSS 击败状态——仅 StorySystem 调用（ADR-0026）。
+## [br][param value] BOSS 是否已击败。[br]
+## [br][b]去重[/b]：同值不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0026 §GSM 第二层新增方法。
+func set_narrative_boss_defeated(value: bool) -> void:
+	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
+	if progress.is_empty():
+		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
+		_gsm.narrative["current_chapter_progress"] = progress
+
+	var old_val: bool = bool(progress.get("boss_defeated", false))
+	if old_val == value:
+		return
+
+	progress["boss_defeated"] = value
+	_gsm._buffer_change("narrative.current_chapter_progress.boss_defeated", old_val, value)
+
+
+## 原子写入结局分支选择——仅 StorySystem 调用（ADR-0026）。
+## [br][param branch_id] 玩家选择的结局分支 ID。[br]
+## [br][b]去重[/b]：同值不写入。[br]
+## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
+## [br]来源: ADR-0026 §GSM 第二层新增方法。
+func set_ending_chosen(branch_id: StringName) -> void:
+	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
+	if progress.is_empty():
+		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
+		_gsm.narrative["current_chapter_progress"] = progress
+
+	var old_val: String = str(progress.get("ending_chosen", ""))
+	if old_val == str(branch_id):
+		return
+
+	progress["ending_chosen"] = str(branch_id)
+	_gsm._buffer_change("narrative.current_chapter_progress.ending_chosen", old_val, str(branch_id))
 
 
 ## 原子写入渡劫状态——仅 TribulationSystem 调用。[br]
