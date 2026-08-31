@@ -1,6 +1,6 @@
 # Epics Index
 
-Last Updated: 2026-08-28
+Last Updated: 2026-08-31
 Engine: Godot 4.6.3
 
 | Epic | Layer | System | GDD | Stories | Status |
@@ -23,10 +23,10 @@ Engine: Godot 4.6.3
 | binding-system | Feature | 功法/法宝绑定系统 | binding-system.md | 4 stories | Complete |
 | formation-system | Feature | 阵法系统 | formation-system.md | 4 stories | Complete |
 | ai-system | Feature | AI系统（敌方AI） | ai-system.md | 4 stories | Complete |
-| exploration-system | Feature | 探索系统 | exploration-system.md | 5 stories | Backlog |
-| cultivation-system | Feature | 修为养成系统 | cultivation-system.md | 4 stories | Backlog |
-| tribulation-system | Feature | 渡劫突破系统 | tribulation-system.md | 4 stories | Backlog |
-| deck-editing-system | Feature | 卡组编辑系统 | deck-editing-system.md | 4 stories | Backlog |
+| exploration-system | Feature | 探索系统 | exploration-system.md | 5 stories | Complete |
+| cultivation-system | Feature | 修为养成系统 | cultivation-system.md | 4 stories | Complete |
+| tribulation-system | Feature | 渡劫突破系统 | tribulation-system.md | 4 stories | Complete |
+| deck-editing-system | Feature | 卡组编辑系统 | deck-editing-system.md | 4 stories | Complete |
 | alchemy-crafting-system | Feature | 炼丹炼器系统 | alchemy-crafting-system.md | 4 stories | Backlog |
 | inscription-system | Feature | 法宝铭刻系统 | inscription-system.md | 3 stories | Backlog |
 | identity-selection-system | Feature | 开局身份选择系统 | identity-selection-system.md | 3 stories | Backlog |
