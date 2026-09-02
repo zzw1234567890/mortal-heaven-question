@@ -1,14 +1,14 @@
 # Active Session State
 
 <!-- STATUS -->
-Epic: Sprint 7 QA
-Feature: Sprint 7 签收
-Task: Sprint 7 全部 14 Story 完成——准备 QA 签收
+Epic: Sprint 7 完成
+Feature: 里程碑达成
+Task: Sprint 7 + meta-layer-complete 里程碑已交付——准备 Sprint 8 规划
 <!-- /STATUS -->
 
 ## 当前任务
 
-Sprint 7 全部 14/14 Story 实现完成。全量测试通过（135 scripts / 2366 tests / 1 pending）。准备 QA 计划与签收。
+Sprint 7 全部 14/14 Story 实现完成并提交。meta-layer-complete 里程碑达成。全量测试通过（135 scripts / 2367 tests / 0 failing）。准备 Sprint 8 规划。
 
 ## Sprint 7 完成范围
 
@@ -22,37 +22,41 @@ Sprint 7 全部 14/14 Story 实现完成。全量测试通过（135 scripts / 23
 - Scripts: 135 / Tests: 2367 / Passing: 2366 / Pending: 1 / Failing: 0 / Asserts: 8984
 - 新增 140 测试（14 Story × 10 AC）
 
-## 新增文件清单
+## 提交记录
 
-### 源代码（6 个实现文件）
-- `src/meta/progression_system.gd` — Autoload #12，6 域存储（~480 行）
-- `src/feature/reincarnation_talent_system.gd` — 20 天赋节点 + 轮回结算（~300 行）
-- `src/feature/achievement_system.gd` — 62 成就 + 判定引擎（~350 行）
-- `src/feature/dialogue/dialogue_player.gd` — 播放编排 + 条件评估（~200 行）
-- `src/feature/dialogue/dialogue_database.gd` — 对话树数据访问（~80 行）
-- `src/feature/dialogue/bark_manager.gd` — bark 池管理（~100 行）
+- `96b8fa6` — feat: Sprint 7 Meta 层+叙事收束 4 Epic 14 Story 完成（48 files, +6071 行）
+- `fcea036` — chore: Sprint 7 完成定义全部勾选
 
-### 测试文件（14 个测试 + 3 个 mock）
-- `tests/unit/progression_system/` — 5 测试文件 + save_load_mock.gd
-- `tests/unit/reincarnation_talent_system/` — 3 测试文件 + progression_mock.gd
-- `tests/unit/achievement_system/` — 3 测试文件 + progression_mock.gd
-- `tests/unit/dialogue_system/` — 3 测试文件 + event_mock.gd
+## 里程碑状态
 
-### 修改文件
-- `project.godot` — 注册 ProgressionSystem Autoload
+| 里程碑 | 状态 | 完成日期 |
+|--------|:----:|:--------:|
+| foundation-layer-complete | ✅ Completed | 2026-08-05 |
+| core-layer-complete | ✅ Completed | 2026-08-09 |
+| meta-layer-complete | ✅ Completed | 2026-09-02 |
 
-## Autoload 注册
+## Epic 完成状态
 
-- ProgressionSystem #12：`res://src/meta/progression_system.gd`（新增 1 个）
+全部 30 个 Epic 均为 Complete（Backlog 状态已清零）。
 
 ## 待办
 
-- Sprint 7 QA 计划与签收
-- Sprint 7 代码提交
+- Sprint 8 规划
+- 遗留技术债务（非阻塞）：
+  - Feature 层文件超 300 行重构
+  - CardSystem 掉落规则接线
+  - RealmSystem 天劫 Boss 配置接线
+  - StatusEffectSystem 心魔 debuff 接线
+  - InputManager 锁管理接线
+  - DialoguePlayer 条件评估器 8 种条件类型接线
 
 ---
 
 ## 历史会话摘要
+
+### Sprint 7（Meta 层+叙事收束）— 14 story，已签收 APPROVED WITH CONDITIONS
+- progression-system / reincarnation-talent-system / achievement-system / dialogue-system
+- 全量：135 scripts / 2367 tests / 0 failing
 
 ### Sprint 6（Feature 层叙事经济线）— 17 story，已签收 APPROVED WITH CONDITIONS
 - identity-selection-system / alchemy-crafting-system / inscription-system / story-system / ending-branch-system

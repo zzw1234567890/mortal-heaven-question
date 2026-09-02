@@ -1,6 +1,6 @@
 # Epics Index
 
-Last Updated: 2026-08-31
+Last Updated: 2026-09-02
 Engine: Godot 4.6.3
 
 | Epic | Layer | System | GDD | Stories | Status |
@@ -27,11 +27,11 @@ Engine: Godot 4.6.3
 | cultivation-system | Feature | 修为养成系统 | cultivation-system.md | 4 stories | Complete |
 | tribulation-system | Feature | 渡劫突破系统 | tribulation-system.md | 4 stories | Complete |
 | deck-editing-system | Feature | 卡组编辑系统 | deck-editing-system.md | 4 stories | Complete |
-| alchemy-crafting-system | Feature | 炼丹炼器系统 | alchemy-crafting-system.md | 4 stories | Backlog |
-| inscription-system | Feature | 法宝铭刻系统 | inscription-system.md | 3 stories | Backlog |
+| alchemy-crafting-system | Feature | 炼丹炼器系统 | alchemy-crafting-system.md | 4 stories | Complete |
+| inscription-system | Feature | 法宝铭刻系统 | inscription-system.md | 3 stories | Complete |
 | identity-selection-system | Feature | 开局身份选择系统 | identity-selection-system.md | 3 stories | Complete |
-| reincarnation-talent-system | Feature | 轮回天赋系统 | reincarnation-talent-system.md | 3 stories | Backlog |
-| achievement-system | Feature | 成就系统 | achievement-system.md | 3 stories | Backlog |
-| story-system | Feature | 剧情系统 | story-system.md | 4 stories | Backlog |
-| dialogue-system | Feature | 对话系统 | dialogue-system.md | 3 stories | Backlog |
-| ending-branch-system | Feature | 结局分支系统 | ending-branch-system.md | 3 stories | Backlog |
+| reincarnation-talent-system | Feature | 轮回天赋系统 | reincarnation-talent-system.md | 3 stories | Complete |
+| achievement-system | Feature | 成就系统 | achievement-system.md | 3 stories | Complete |
+| story-system | Feature | 剧情系统 | story-system.md | 4 stories | Complete |
+| dialogue-system | Feature | 对话系统 | dialogue-system.md | 3 stories | Complete |
+| ending-branch-system | Feature | 结局分支系统 | ending-branch-system.md | 3 stories | Complete |
