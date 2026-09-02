@@ -92,7 +92,7 @@
 - [x] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS (`/team-qa sprint`)
 - [x] 已交付特性中无 S1 或 S2 的 bug
 - [x] 任何偏差已更新设计文档
-- [ ] 代码已审查并合并
+- [x] 代码已审查并合并
 - [x] 1 个新 Autoload 已注册且顺序验证通过（ProgressionSystem #12）
 
 ## 关键依赖链
