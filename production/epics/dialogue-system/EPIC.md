@@ -10,9 +10,9 @@
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | DialoguePlayer + DialogueDatabase 数据结构 | Logic | Not Started | ADR-0027 |
-| 002 | start_dialogue / select_option / advance 播放编排 | Logic | Not Started | ADR-0027 |
-| 003 | BarkManager + play_bark + get_bark_history | Logic | Not Started | ADR-0027 |
+| 001 | DialoguePlayer + DialogueDatabase 数据结构 | Logic | Done | ADR-0027 |
+| 002 | start_dialogue / select_option / advance 播放编排 | Logic | Done | ADR-0027 |
+| 003 | BarkManager + play_bark + get_bark_history | Logic | Done | ADR-0027 |
 
 ## Overview
 

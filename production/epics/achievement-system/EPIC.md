@@ -3,16 +3,16 @@
 > **Layer**: Feature
 > **GDD**: `design/gdd/achievement-system.md`
 > **Architecture Module**: 成长与元进度子系统 — 跨局元进度（经 ProgressionSystem）
-> **Status**: Backlog
+> **Status**: Done
 > **Stories**: 3 stories（标题级预创建——AC 待 `/dev-story` 填充）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | Achievement 实例 + 解锁状态管理 | Logic | Not Started | ADR-0012 |
-| 002 | check(criteria) 判定引擎 | Logic | Not Started | ADR-0012 |
-| 003 | get_achievements 查询 + 图鉴集成 | Integration | Not Started | ADR-0012 |
+| 001 | Achievement 实例 + 解锁状态管理 | Logic | Done | ADR-0012 |
+| 002 | check(criteria) 判定引擎 | Logic | Done | ADR-0012 |
+| 003 | get_achievements 查询 + 图鉴集成 | Integration | Done | ADR-0012 |
 
 ## Overview
 

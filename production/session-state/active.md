@@ -1,76 +1,62 @@
 # Active Session State
 
 <!-- STATUS -->
-Epic: Sprint 6
-Feature: ending-branch-system
-Task: Sprint 6 全部 17/17 Story 完成——全量测试通过，待 QA 签收
+Epic: Sprint 7 QA
+Feature: Sprint 7 签收
+Task: Sprint 7 全部 14 Story 完成——准备 QA 签收
 <!-- /STATUS -->
 
 ## 当前任务
 
-Sprint 6 叙事经济线全部 17/17 Story 完成。全量测试通过（121 scripts / 2227 tests / 2226 passing / 1 pending / 0 failing）。
+Sprint 7 全部 14/14 Story 实现完成。全量测试通过（135 scripts / 2366 tests / 1 pending）。准备 QA 计划与签收。
 
-## Sprint 6 完成定义
+## Sprint 7 完成范围
 
-- [x] 所有必须完成的任务已完成（17 项）
-- [x] 所有任务通过验收标准
-- [ ] QA 计划已存在
-- [x] 所有逻辑/集成类故事有通过的单元/集成测试（167 新增测试）
-- [x] 冒烟检查已通过（121 scripts / 2227 tests / 0 failing）
-- [ ] QA 签收报告
-- [x] 已交付特性中无 S1 或 S2 的 bug
-- [ ] 任何偏差已更新设计文档
-- [ ] 代码已审查并合并
-- [x] 2 个新 Autoload 已注册且顺序验证通过（IdentitySelectionSystem #21 + StorySystem #25）
+- **progression-system**（5 Story）：ProgressionSystem Autoload #12——域存储 + 6 领域 API + 信号 + SaveLoad 集成
+- **reincarnation-talent-system**（3 Story）：天赋树 + unlock_talent + settle_run 轮回结算
+- **achievement-system**（3 Story）：62 成就 + 判定引擎 + 查询图鉴
+- **dialogue-system**（3 Story）：DialoguePlayer + 播放编排 + BarkManager
 
-## 已完成的 Epic（5 Epic 17 Story）
+## 全量测试基线（Sprint 7 结束）
 
-1. **identity-selection-system**（3 Story）：身份模板 + apply_identity 编排 + 查询 API
-2. **alchemy-crafting-system**（4 Story）：配方表 + 炼制编排 + 品质属性 + 重掷
-3. **inscription-system**（3 Story）：候选生成 + 铭刻编排 + 成本返还
-4. **story-system**（4 Story）：章节模板 + 章节上下文 + GSM narrative 域写入 + Boss 解锁
-5. **ending-branch-system**（3 Story）：EndingEvaluator + 评分平局 + 变体尾声
+- Scripts: 135 / Tests: 2367 / Passing: 2366 / Pending: 1 / Failing: 0 / Asserts: 8984
+- 新增 140 测试（14 Story × 10 AC）
 
-## 新增测试明细
+## 新增文件清单
 
-- identity-selection-system：28 tests
-- alchemy-crafting-system：39 tests
-- inscription-system：34 tests（3 文件）
-- story-system：40 tests（4 文件）
-- ending-branch-system：53 tests（3 文件）
-- GSM narrative 域扩展：
-  - gsm_atomic_writes.gd：+4 方法（add_required_event_completion / set_narrative_boss_unlocked / set_narrative_boss_defeated / set_ending_chosen）
-  - game_state_manager.gd：+4 薄转发 wrapper
-  - gsm_serializer.gd：narrative 域默认值扩展
+### 源代码（6 个实现文件）
+- `src/meta/progression_system.gd` — Autoload #12，6 域存储（~480 行）
+- `src/feature/reincarnation_talent_system.gd` — 20 天赋节点 + 轮回结算（~300 行）
+- `src/feature/achievement_system.gd` — 62 成就 + 判定引擎（~350 行）
+- `src/feature/dialogue/dialogue_player.gd` — 播放编排 + 条件评估（~200 行）
+- `src/feature/dialogue/dialogue_database.gd` — 对话树数据访问（~80 行）
+- `src/feature/dialogue/bark_manager.gd` — bark 池管理（~100 行）
 
-## 全量测试基线
+### 测试文件（14 个测试 + 3 个 mock）
+- `tests/unit/progression_system/` — 5 测试文件 + save_load_mock.gd
+- `tests/unit/reincarnation_talent_system/` — 3 测试文件 + progression_mock.gd
+- `tests/unit/achievement_system/` — 3 测试文件 + progression_mock.gd
+- `tests/unit/dialogue_system/` — 3 测试文件 + event_mock.gd
 
-- Scripts: 121 / Tests: 2227 / Passing: 2226 / Pending: 1 / Failing: 0 / Asserts: 8318
-- 零回归（对比 Sprint 5 基线 104 scripts / 2060 tests）
-- 新增 17 scripts / 167 tests
+### 修改文件
+- `project.godot` — 注册 ProgressionSystem Autoload
 
-## Autoload 注册（project.godot）
+## Autoload 注册
 
-- IdentitySelectionSystem #21：`res://src/feature/identity_selection_system.gd`
-- StorySystem #25：`res://src/feature/story_system.gd`
-- AlchemyCraftingSystem / InscriptionSystem / EndingEvaluator：RefCounted 服务类，不注册 Autoload
-
-## 关键实现决策
-
-- InscriptionSystem 使用 RefCounted + class_name + static func 模式（ADR-0030）
-- StorySystem 为 narrative.* 域独占写入者（ADR-0026），扩展 GSM 第二层
-- EndingEvaluator 为 RefCounted 工具类，通关时实例化（ADR-0029）
-- GSM 第二层新增 4 个 narrative.* 原子写入方法
-- Godot 4.x RefCounted.get() 只接受 1 个参数——使用 _safe_get_str/_safe_get_int/_safe_get_array 辅助方法
+- ProgressionSystem #12：`res://src/meta/progression_system.gd`（新增 1 个）
 
 ## 待办
 
-- Sprint 6 QA 计划与签收
-- Sprint 5 技术债务遗留（非阻塞）：3 个文件超 300 行重构 / CardSystem 掉落规则接线 / RealmSystem 天劫 Boss 配置接线 / StatusEffectSystem 心魔 debuff 接线 / InputManager 锁管理接线
+- Sprint 7 QA 计划与签收
+- Sprint 7 代码提交
 
 ---
 
 ## 历史会话摘要
+
+### Sprint 6（Feature 层叙事经济线）— 17 story，已签收 APPROVED WITH CONDITIONS
+- identity-selection-system / alchemy-crafting-system / inscription-system / story-system / ending-branch-system
+- 全量：121 scripts / 2227 tests / 0 failing
 
 ### Sprint 5（Feature 层探索经济线）— 17 story，已签收 APPROVED WITH CONDITIONS
 - exploration-system / cultivation-system / tribulation-system / deck-editing-system

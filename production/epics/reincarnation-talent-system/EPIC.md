@@ -3,16 +3,16 @@
 > **Layer**: Feature
 > **GDD**: `design/gdd/reincarnation-talent-system.md`
 > **Architecture Module**: 成长与元进度子系统 — 跨局元进度（经 ProgressionSystem）
-> **Status**: Backlog
+> **Status**: Done
 > **Stories**: 3 stories（标题级预创建——AC 待 `/dev-story` 填充）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | PlayerTalents 天赋树 + 查询 API | Logic | Not Started | ADR-0012 |
-| 002 | unlock_talent / get_active_talents | Logic | Not Started | ADR-0012 |
-| 003 | settle_run 轮回结算（跨局天赋继承） | Integration | Not Started | ADR-0012 |
+| 001 | PlayerTalents 天赋树 + 查询 API | Logic | Done | ADR-0012 |
+| 002 | unlock_talent / get_active_talents | Logic | Done | ADR-0012 |
+| 003 | settle_run 轮回结算（跨局天赋继承） | Integration | Done | ADR-0012 |
 
 ## Overview
 
