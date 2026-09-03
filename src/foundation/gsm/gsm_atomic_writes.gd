@@ -12,10 +12,18 @@ extends RefCounted
 ## 指向 GSM 父节点的引用。
 var _gsm: Node = null
 
+## 战斗域写入子模块（Sprint 8 Story 8-11 拆分）。
+var _battle_writes: RefCounted = null
+
+## 探索域写入子模块（Sprint 8 Story 8-11 拆分）。
+var _exploration_writes: RefCounted = null
+
 
 ## 绑定 GSM 父节点引用。
 func init(gsm: Node) -> void:
 	_gsm = gsm
+	_battle_writes = load("res://src/foundation/gsm/gsm_battle_writes.gd").new(gsm)
+	_exploration_writes = load("res://src/foundation/gsm/gsm_exploration_writes.gd").new(gsm)
 
 
 ## 修为增加——仅 CultivationSystem 调用。
@@ -82,224 +90,30 @@ func _set_resource_ling_cai(quality: int, value: int) -> void:
 ## [br][b]去重[/b]：同值不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
 ## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
 ## [br]来源: ADR-0015 §GSM 第二层扩展。
+# === 战斗域写入（委托 → GSMBattleWrites）===================================
+
 func _set_battle_cost(current_cost: int, max_cost: int) -> void:
-	if _gsm.battle == null:
-		push_warning("GSM._set_battle_cost: 无活跃战斗，拒绝写入")
-		return
-
-	var old_current: int = _gsm.battle.get("current_cost", 0)
-	var old_max: int = _gsm.battle.get("max_cost", 0)
-
-	if old_current == current_cost and old_max == max_cost:
-		return  # 值无变化——去重
-
-	_gsm.battle.current_cost = current_cost
-	_gsm.battle.max_cost = max_cost
-
-	_gsm._buffer_change("battle.current_cost", old_current, current_cost)
-	_gsm._buffer_change("battle.max_cost", old_max, max_cost)
-
-
-## 原子写入战斗状态快照——仅 StatusEffectSystem 调用（战斗结束导出）。[br]
-## [br][b]窄范围[/b]：仅写入 battle.status_snapshot——不操作 battle 域其他字段。[br]
-## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
-## [br][b]去重[/b]：同值（深层相等）不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播（展平路径 [code]"battle.status_snapshot"[/code]）。[br]
-## [br]来源: ADR-0011 §snapshot 导出 §GSM 例外模式。
+	_battle_writes._set_battle_cost(current_cost, max_cost)
 func _set_battle_status_snapshot(snapshot: Array) -> void:
-	if _gsm.battle == null:
-		push_warning("GSM._set_battle_status_snapshot: 无活跃战斗，拒绝写入")
-		return
-
-	var old_snapshot: Array = _gsm.battle.get("status_snapshot", [])
-	if _gsm._deep_equal(old_snapshot, snapshot):
-		return  # 值无变化——去重
-
-	_gsm.battle.status_snapshot = snapshot
-	_gsm._buffer_change("battle.status_snapshot", old_snapshot, snapshot)
-
-
-## 原子写入战斗阵位快照——仅 DeploymentSystem 调用（战斗结束导出）。[br]
-## [br][b]窄范围[/b]：仅写入 battle.deployment_snapshot——不操作 battle 域其他字段。[br]
-## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
-## [br][b]去重[/b]：同值（深层相等）不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播（展平路径 [code]"battle.deployment_snapshot"[/code]）。[br]
-## [br]来源: ADR-0016 §GSM 边界 §snapshot 导出。
+	_battle_writes._set_battle_status_snapshot(snapshot)
 func _set_battle_deployment_snapshot(snapshot: Dictionary) -> void:
-	if _gsm.battle == null:
-		push_warning("GSM._set_battle_deployment_snapshot: 无活跃战斗，拒绝写入")
-		return
-
-	var old_snapshot: Dictionary = _gsm.battle.get("deployment_snapshot", {})
-	if _gsm._deep_equal(old_snapshot, snapshot):
-		return  # 值无变化——去重
-
-	_gsm.battle.deployment_snapshot = snapshot
-	_gsm._buffer_change("battle.deployment_snapshot", old_snapshot, snapshot)
-
-
-## 原子写入不可用角色列表——仅 DeploymentSystem 调用（战斗结束存档持久化入口）。[br]
-## [br][b]窄范围[/b]：仅写入 player.unavailable_characters——不操作 player 域其他字段。[br]
-## [br][b]去重[/b]：同值（深层相等）不写入。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播（展平路径 [code]"player.unavailable_characters"[/code]）。[br]
-## [br]来源: ADR-0016 §不可用角色生命周期 §跨战斗持久。
+	_battle_writes._set_battle_deployment_snapshot(snapshot)
 func _set_player_unavailable_characters(data: Dictionary) -> void:
-	var old: Dictionary = _gsm.player.get("unavailable_characters", {})
-	if _gsm._deep_equal(old, data):
-		return  # 值无变化——去重
-
-	_gsm.player.unavailable_characters = data
-	_gsm._buffer_change("player.unavailable_characters", old, data)
-
-
-## 原子写入战斗绑定快照——仅 BindingManager 调用（战斗结束导出）。[br]
-## [br][b]窄范围[/b]：仅写入 battle.bindings——不操作 battle 域其他字段。[br]
-## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
-## [br][b]去重[/b]：同值（深层相等）不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播（展平路径 [code]"battle.bindings"[/code]）。[br]
-## [br]来源: ADR-0013 §GSM 边界 §serialize_all。
+	_battle_writes._set_player_unavailable_characters(data)
 func _set_battle_bindings(snapshot: Array) -> void:
-	if _gsm.battle == null:
-		push_warning("GSM._set_battle_bindings: 无活跃战斗，拒绝写入")
-		return
-
-	# 首次写入——battle 中尚无 bindings 键，跳过去重确保键被创建
-	if not _gsm.battle.has("bindings"):
-		_gsm.battle.bindings = snapshot
-		_gsm._buffer_change("battle.bindings", [], snapshot)
-		return
-
-	var old: Array = _gsm.battle.get("bindings", [])
-	if _gsm._deep_equal(old, snapshot):
-		return  # 值无变化——去重
-
-	_gsm.battle.bindings = snapshot
-	_gsm._buffer_change("battle.bindings", old, snapshot)
-
-
-## 原子写入战斗阵法快照——仅 FormationSystem 调用（战斗结束导出）。[br]
-## [br][b]窄范围[/b]：仅写入 battle.formation_snapshot——不操作 battle 域其他字段。[br]
-## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
-## [br][b]去重[/b]：同值（深层相等）不写入。[br]
-## [br][b]首次写入[/b]：battle 无 formation_snapshot 键时跳过去重直接创建。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0024 §GSM 边界 §serialize_all。
+	_battle_writes._set_battle_bindings(snapshot)
 func _set_battle_formation_snapshot(snapshot: Dictionary) -> void:
-	if _gsm.battle == null:
-		push_warning("GSM._set_battle_formation_snapshot: 无活跃战斗，拒绝写入")
-		return
-
-	if not _gsm.battle.has("formation_snapshot"):
-		_gsm.battle.formation_snapshot = snapshot
-		_gsm._buffer_change("battle.formation_snapshot", {}, snapshot)
-		return
-
-	var old: Dictionary = _gsm.battle.get("formation_snapshot", {})
-	if _gsm._deep_equal(old, snapshot):
-		return  # 值无变化——去重
-
-	_gsm.battle.formation_snapshot = snapshot
-	_gsm._buffer_change("battle.formation_snapshot", old, snapshot)
-
-
-## 原子写入战斗阶段——仅 CombatSystem 调用。[br]
-## [br][b]窄范围[/b]：仅写入 battle.phase——不操作 battle 域其他字段。[br]
-## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
-## [br][b]去重[/b]：同值不写入，避免无意义 [signal GameStateManager.batch_updated]。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0008 §GSM battle.* 域写入所有权例外。
+	_battle_writes._set_battle_formation_snapshot(snapshot)
 func _set_battle_phase(phase: int) -> void:
-	if _gsm.battle == null:
-		push_warning("GSM._set_battle_phase: 无活跃战斗，拒绝写入")
-		return
-
-	var old_phase: int = int(_gsm.battle.get("phase", 0))
-	if old_phase == phase:
-		return  # 值无变化——去重
-
-	_gsm.battle.phase = phase
-	_gsm._buffer_change("battle.phase", old_phase, phase)
-
-
-## 原子递增战斗回合数——仅 CombatSystem 调用。[br]
-## [br][b]窄范围[/b]：仅写入 battle.turn——不操作 battle 域其他字段。[br]
-## [br][b]null 守卫[/b]：battle 非活跃时 push_warning 并返回。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0008 §GSM battle.* 域写入所有权例外。
+	_battle_writes._set_battle_phase(phase)
 func _increment_battle_turn() -> void:
-	if _gsm.battle == null:
-		push_warning("GSM._increment_battle_turn: 无活跃战斗，拒绝写入")
-		return
-
-	var old_turn: int = int(_gsm.battle.get("turn", 1))
-	_gsm.battle.turn = old_turn + 1
-	_gsm._buffer_change("battle.turn", old_turn, old_turn + 1)
-
-
-## 原子写入战斗活跃标志——仅 CombatSystem 调用。[br]
-## [br][b]active=true 时创建 battle 域[/b]：若 battle == null，初始化默认 battle 字典[br]
-## （phase=PREPARATION, turn=1, is_active=true, player_field=[], enemy_field=[]）。[br]
-## [br][b]active=false 时清理 battle 域[/b]：ADR-0008 §GSM 边界要求 _set_battle_active(false)[br]
-## 同时清理 battle.* 域（设为 null）——battle_end() 调用本方法即完成全部清理。[br]
-## [br][b]去重[/b]：同值不写入。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0008 §GSM battle.* 域写入所有权例外。
+	_battle_writes._increment_battle_turn()
 func _set_battle_active(active: bool) -> void:
-	if active:
-		# active=true：如果 battle 域不存在，初始化默认值
-		if _gsm.battle == null:
-			_gsm.battle = {
-				"is_active": true,
-				"phase": 0,  # CombatPhase.PREPARATION
-				"turn": 1,
-				"current_cost": 0,
-				"max_cost": 0,
-				"player_field": [],
-				"enemy_field": [],
-				"result": null,
-			}
-			_gsm._buffer_change("battle", null, _gsm.battle)
-			return
-		# battle 域已存在——仅更新 is_active
-		var old_active: bool = bool(_gsm.battle.get("is_active", false))
-		if old_active == active:
-			return  # 值无变化——去重
-		_gsm.battle.is_active = active
-		_gsm._buffer_change("battle.is_active", old_active, active)
-	else:
-		# active=false：清理 battle 域（设为 null）——ADR-0008 §GSM 边界
-		if _gsm.battle == null:
-			push_warning("GSM._set_battle_active: 无活跃战斗，拒绝写入")
-			return
-		var old_battle: Dictionary = _gsm.battle
-		_gsm.battle = null
-		_gsm._buffer_change("battle", old_battle, null)
-
-
-## 战斗开始——仅 CombatSystem 调用。Cat 2a 生命周期信号，立即发射不缓冲。
+	_battle_writes._set_battle_active(active)
 func battle_start(config: Dictionary) -> void:
-	if _gsm.battle != null:
-		push_warning("GSM.battle_start: 已有活跃战斗，拒绝重复调用")
-		return
-
-	_gsm.battle = {
-		"config": config.duplicate(true),
-		"player_snapshot": _gsm.player.duplicate(true),
-		"collection_snapshot": _gsm.collection.duplicate(true),
-		"snapshot_realm": _gsm.player.realm,
-	}
-
-	_gsm.battle_started.emit(config.duplicate(true))
-
-
-## 战斗结束——仅 CombatSystem 调用。Cat 2a 生命周期信号，立即发射不缓冲。
+	_battle_writes.battle_start(config)
 func battle_end(result: Dictionary) -> void:
-	if _gsm.battle == null:
-		push_warning("GSM.battle_end: 没有活跃战斗，拒绝调用")
-		return
-
-	_gsm.battle = null
-	_gsm.battle_ended.emit(result.duplicate(true))
+	_battle_writes.battle_end(result)
 
 
 ## 身份设置——仅 IdentitySelectionSystem 调用。
@@ -550,110 +364,20 @@ func restore_action_points(amount: int) -> void:
 	_gsm._buffer_change("exploration.action_points", old_val, _gsm.exploration.action_points)
 
 
-# === 探索导航状态（ADR-0014 §GSM 写入契约）===================================
+# === 探索导航域写入（委托 → GSMExplorationWrites）===========================
 
-## 设置当前地图——写入 exploration.current_map 并重置 node_position 为入口。[br]
-## [br][b]仅 ExplorationSystem.enter_map() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
-## [br][param map_id] 地图 ID。[br]
-## [br][b]batch_updated[/b]：current_map + node_position 两条路径变更帧末传播。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
 func set_exploration_map(map_id: StringName) -> void:
-	var old_map: StringName = _gsm.exploration.get("current_map", &"")
-	var old_pos: Dictionary = _gsm.exploration.get("node_position", {}).duplicate(true)
-	var new_pos: Dictionary = {"layer": 0, "idx": 0}
-
-	_gsm.exploration.current_map = map_id
-	_gsm.exploration.node_position = new_pos.duplicate(true)
-
-	_gsm._buffer_change("exploration.current_map", old_map, map_id)
-	_gsm._buffer_change("exploration.node_position", old_pos, new_pos)
-
-
-## 更新节点位置——写入 exploration.node_position。[br]
-## [br][b]仅 ExplorationSystem.move_to_node() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
-## [br][param layer] 层级。[br]
-## [br][param idx] 层内索引。[br]
-## [br][b]batch_updated[/b]：node_position 路径变更帧末传播。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
+	_exploration_writes.set_exploration_map(map_id)
 func set_exploration_position(layer: int, idx: int) -> void:
-	var old_pos: Dictionary = _gsm.exploration.get("node_position", {}).duplicate(true)
-	var new_pos: Dictionary = {"layer": layer, "idx": idx}
-
-	_gsm.exploration.node_position = new_pos.duplicate(true)
-	_gsm._buffer_change("exploration.node_position", old_pos, new_pos)
-
-
-## 追加已访问节点——写入 exploration.visited_nodes（去重）。[br]
-## [br][b]仅 ExplorationSystem.move_to_node() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
-## [br][param node_id] 节点 ID。[br]
-## [br][b]去重[/b]：已存在不追加，不触发 buffer_change。[br]
-## [br][b]batch_updated[/b]：visited_nodes 路径变更帧末传播。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
+	_exploration_writes.set_exploration_position(layer, idx)
 func add_visited_node(node_id: int) -> void:
-	var visited: Array = _gsm.exploration.get("visited_nodes", [])
-	if visited.has(node_id):
-		return  # 去重
-	var old_visited: Array = visited.duplicate()
-	visited.append(node_id)
-	_gsm._buffer_change("exploration.visited_nodes", old_visited, visited)
-
-
-## 设置行动力——同时写入 exploration.action_points + max_action_points。[br]
-## [br][b]仅 ExplorationSystem.enter_map() / 恢复节点调用[/b]——ADR-0014 §GSM 写入契约。[br]
-## [br][param current] 当前行动力。[br]
-## [br][param max_ap] 行动力上限。[br]
-## [br][b]batch_updated[/b]：action_points + max_action_points 两条路径变更帧末传播。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
+	_exploration_writes.add_visited_node(node_id)
 func set_exploration_ap(current: int, max_ap: int) -> void:
-	var old_current: int = int(_gsm.exploration.get("action_points", 0))
-	var old_max: int = int(_gsm.exploration.get("max_action_points", 0))
-
-	_gsm.exploration.action_points = current
-	_gsm.exploration.max_action_points = max_ap
-
-	_gsm._buffer_change("exploration.action_points", old_current, current)
-	_gsm._buffer_change("exploration.max_action_points", old_max, max_ap)
-
-
-## 合并写入地图状态——更新 exploration.map_states[map_id] 子字段。[br]
-## [br][b]仅 ExplorationSystem 调用[/b]——用于 entry_count、collected_* 等跨地图累计数据。[br]
-## [br][param map_id] 地图 ID。[br]
-## [br][param changes] 要合并的子字段 Dictionary。[br]
-## [br][b]batch_updated[/b]：map_states.<map_id> 路径变更帧末传播。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
+	_exploration_writes.set_exploration_ap(current, max_ap)
 func update_exploration_map_state(map_id: StringName, changes: Dictionary) -> void:
-	var map_states: Dictionary = _gsm.exploration.get("map_states", {})
-	var key_str: String = str(map_id)
-	var old_state: Dictionary = (map_states.get(map_id, {}) as Dictionary).duplicate(true)
-
-	if not map_states.has(map_id):
-		map_states[map_id] = {}
-	var target: Dictionary = map_states[map_id]
-	for k in changes:
-		target[k] = changes[k]
-
-	var new_state: Dictionary = target.duplicate(true)
-	_gsm._buffer_change("exploration.map_states.%s" % key_str, old_state, new_state)
-
-
-## 清除导航状态——重置 current_map/node_position/visited_nodes，保留 map_states。[br]
-## [br][b]仅 ExplorationSystem.end_exploration() 调用[/b]——ADR-0014 §决策 5 探索结束结算。[br]
-## [br]导航字段重置为默认值（current_map=&"", node_position={layer:0,idx:0}, visited_nodes=[]），[br]
-## map_states（跨地图累计数据——entry_count、collected_*、is_first_clear）保留。[br]
-## [br][b]batch_updated[/b]：3 条路径变更帧末传播。[br]
-## [br]来源: ADR-0014 §决策 5 探索结束结算。
+	_exploration_writes.update_exploration_map_state(map_id, changes)
 func clear_exploration_navigation() -> void:
-	var old_map: StringName = _gsm.exploration.get("current_map", &"")
-	var old_pos: Dictionary = _gsm.exploration.get("node_position", {}).duplicate(true)
-	var old_visited: Array = (_gsm.exploration.get("visited_nodes", []) as Array).duplicate()
-
-	_gsm.exploration.current_map = &""
-	_gsm.exploration.node_position = {"layer": 0, "idx": 0}
-	_gsm.exploration.visited_nodes = []
-
-	_gsm._buffer_change("exploration.current_map", old_map, &"")
-	_gsm._buffer_change("exploration.node_position", old_pos, {"layer": 0, "idx": 0})
-	_gsm._buffer_change("exploration.visited_nodes", old_visited, [])
+	_exploration_writes.clear_exploration_navigation()
 
 
 ## 解锁天赋——写入 player.talents（去重 append）。[br]

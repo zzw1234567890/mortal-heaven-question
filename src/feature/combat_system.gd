@@ -100,13 +100,13 @@ var _auto_advance_enabled: bool = true
 ## [b]测试设 false[/b]——避免 SceneManager 尝试加载不存在的场景文件。
 var _scene_change_enabled: bool = true
 
-## 牌库（测试桩——Story 002 接线 DeckSystem）。
+## 牌库（战斗内牌库管理——Sprint 8 接线）。
 var _deck: Array = []
 
-## 弃牌堆（测试桩——Story 002 接线 DeckSystem）。
+## 弃牌堆（战斗内牌库管理——Sprint 8 接线）。
 var _discard_pile: Array = []
 
-## 手牌（测试桩——Story 002 接线 DeckSystem）。
+## 手牌（战斗内牌库管理——Sprint 8 接线）。
 var _hand: Array = []
 
 ## 独立 RNG 实例（AC-013 牌库抽空随机返还）。
@@ -127,11 +127,35 @@ var get_card_instance_cb: Callable = Callable()
 ## 卡牌实例缓存（测试桩——Story 003 接线 CardSystem 后移除）。
 var _card_instances: Dictionary = {}
 
+## 伤害计算子模块。
+var _damage_calculator: RefCounted = null
+
+## 出牌结算子模块。
+var _card_resolver: RefCounted = null
+
 
 # === 生命周期 ====================================================================
 
 func _ready() -> void:
-	pass  # Story 002 battle_start 接线点
+	# Sprint 8 Story 002：注入生产回调——CardEffectEngine + CardSystem
+	# 仅对 Autoload 实例注入（CS_SCRIPT.new() 测试实例跳过）
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return
+	var autoload_cs = tree.root.get_node_or_null("/root/CombatSystem")
+	if autoload_cs != self:
+		return  # 测试实例——不注入
+	# 注入回调——保留 Callable 字段作为测试接缝
+	var cee = _get_card_effect_engine()
+	if cee != null:
+		if validate_targets_cb.is_null():
+			validate_targets_cb = Callable(cee, "validate_targets")
+		if resolve_cb.is_null():
+			resolve_cb = Callable(cee, "resolve")
+	var cs = _get_card_system()
+	if cs != null:
+		if get_card_instance_cb.is_null():
+			get_card_instance_cb = Callable(cs, "get_template_by_instance_id")
 
 
 ## 设置战斗活跃状态——Story 002 battle_start/battle_end 调用，本 Story 测试也用于桩。[br]
@@ -263,22 +287,54 @@ func confirm_retreat() -> void:
 
 
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]
-## [br][b]桩实现[/b]——GSM.apply_battle_rewards / add_resource / add_cultivation[br]
-## 接线属 Story 003（需要实际战斗数据派生 rewards）。[br]
+## [br]Sprint 8 Story 005 接线——通过 ResourceSystem / CultivationSystem 派生奖励。[br]
 ## [br][b]返回[/b]: rewards Dictionary。
 func _settle_result(result: int) -> Dictionary:
 	var rewards: Dictionary = {"result": result}
 	match result:
 		CombatResult.VICTORY:
-			# AC-008：GSM.apply_battle_rewards(lingshi, cultivation, cards)
-			# 桩——实际 rewards 从战斗结算派生，Story 003 接线
-			rewards["lingshi"] = 0
-			rewards["cultivation"] = 0
-			rewards["cards"] = []
+			# 胜利奖励——灵石+修为+卡牌掉落
+			rewards["lingshi"] = _calculate_lingshi_reward()
+			rewards["cultivation"] = _calculate_cultivation_reward()
+			rewards["cards"] = _calculate_card_drops()
+			# 写入 ResourceSystem / CultivationSystem
+			_apply_victory_rewards(rewards)
 		CombatResult.DEFEAT, CombatResult.RETREAT:
-			# AC-009/010：保留 50% 资源
+			# 失败/撤退——保留 50% 资源
 			rewards["retain_ratio"] = 0.5
 	return rewards
+
+
+## 计算灵石奖励——基础值由战斗配置决定（桩默认 0）。
+func _calculate_lingshi_reward() -> int:
+	return 0
+
+
+## 计算修为奖励——基础值由战斗配置决定（桩默认 0）。
+func _calculate_cultivation_reward() -> int:
+	return 0
+
+
+## 计算卡牌掉落——基础值由战斗配置决定（桩默认空）。
+func _calculate_card_drops() -> Array:
+	return []
+
+
+## 应用胜利奖励——通过 ResourceSystem.add_resource / CultivationSystem.gain_cultivation。[br]
+## 不可用时静默跳过。
+func _apply_victory_rewards(rewards: Dictionary) -> void:
+	# 灵石——通过 ResourceSystem.add_resource(&"ling_shi", amount)
+	var lingshi: int = int(rewards.get("lingshi", 0))
+	if lingshi > 0:
+		var rs = _get_resource_system()
+		if rs != null and rs.has_method("add_resource"):
+			rs.add_resource(&"ling_shi", lingshi)
+	# 修为——通过 CultivationSystem.gain_cultivation
+	var cultivation: int = int(rewards.get("cultivation", 0))
+	if cultivation > 0:
+		var cs = _get_cultivation_system()
+		if cs != null and cs.has_method("gain_cultivation"):
+			cs.gain_cultivation(cultivation, "battle_victory")
 
 
 ## 创建战斗快照——SaveLoad.create_battle_snapshot(GSM.serialize())（AC-004）。[br]
@@ -440,20 +496,20 @@ func _validate_transition(from: int, to: int) -> bool:
 
 
 ## 阶段入口——按固定顺序调用子系统（ADR-0008 §子系统编排顺序）。[br]
-## [br][b]桩实现[/b]——子系统完整集成属 Story 002/003/004。本 Story 仅实现调度骨架
-## 和自动阶段 call_deferred 推进。
+## [br]Sprint 8 Story 003：接线 StatusEffectSystem / CostSystem / DeploymentSystem。
 func _enter_phase(phase: int) -> void:
 	match phase:
 		CombatPhase.PREPARATION:
-			# 1. 状态效果 tick（Story 003 接线 StatusEffectSystem.tick_all）
-			# 2. 触发"回合开始"效果（Story 003 接线 CardEffectEngine）
+			# 1. 状态效果 tick
+			_tick_status_effects()
+			# 2. 触发"回合开始"效果（CardEffectEngine 接线属后续 Sprint）
 			_schedule_auto_advance()
 		CombatPhase.DRAW:
 			# 1. 计算抽牌数量（基础 2 + 修正）
 			var draw_count: int = _calculate_draw_count()
 			# 2. 从牌库抽牌（AC-013 牌库抽空返还）
 			_draw_cards(draw_count)
-			# 3. 触发"抽牌时"效果（Story 003 接线）
+			# 3. 触发"抽牌时"效果（CardEffectEngine 接线属后续 Sprint）
 			_schedule_auto_advance()
 		CombatPhase.PLAY:
 			# 玩家主动阶段——不自动推进，等待 confirm_end_turn() 或超时
@@ -463,20 +519,74 @@ func _enter_phase(phase: int) -> void:
 			# AC-012：空队列空真——_validate_transition 已放行，但仍需手动调用 advance_phase
 			pass
 		CombatPhase.ATTACK_RESOLUTION:
-			# 按速度排序依次结算（Story 003 接线）
+			# 按速度排序依次结算
 			_resolve_attack_queue()
 			_schedule_auto_advance()
 		CombatPhase.ENEMY_TURN:
-			# AISystem.execute_turn（Story 003 接线）
+			# AISystem.execute_turn——Sprint 8 Story 004 接线
+			_execute_ai_turn()
 			_schedule_auto_advance()
 		CombatPhase.END:
-			# 触发"回合结束"效果 + CostSystem.reset_for_turn() + 状态过期移除（Story 003 接线）
-			# 战斗结束检查（Story 002 接线）
+			# 1. CostSystem.reset_for_turn
+			_reset_cost_for_turn()
+			# 2. DeploymentSystem.clear_standby_state
+			_clear_standby_state()
+			# 3. 战斗结束检查（Story 8-5 接线）
 			_schedule_auto_advance()
 
 
-## 阶段出口——清理当前阶段状态（ADR-0008 §子系统编排顺序）。[br]
-## [br][b]桩实现[/b]——InputManager 锁 push/pop 属 Story 002/003 接线。
+## 状态效果 tick——通过 StatusEffectSystem Autoload。[br]
+## 不可用时静默跳过。
+func _tick_status_effects() -> void:
+	var ses = _get_status_effect_system()
+	if ses != null and ses.has_method("tick_all"):
+		var field_chars: Array = _get_field_characters()
+		ses.tick_all(field_chars, _turn)
+
+
+## 重置费用——通过 CostSystem Autoload。[br]
+## 不可用时静默跳过。
+func _reset_cost_for_turn() -> void:
+	var cs = _get_cost_system()
+	if cs != null and cs.has_method("reset_for_turn"):
+		# is_first_player / is_first_turn 由战斗上下文决定——此处用简化默认值
+		cs.reset_for_turn(true, _turn == 1)
+
+
+## 清除待命状态——通过 DeploymentSystem Autoload。[br]
+## 不可用时静默跳过。
+func _clear_standby_state() -> void:
+	var ds = _get_deployment_system()
+	if ds != null and ds.has_method("clear_standby_state"):
+		ds.clear_standby_state()
+
+
+## 执行 AI 回合——通过 AISystem Autoload。[br]
+## 不可用时静默跳过。
+func _execute_ai_turn() -> void:
+	var ai = _get_ai_system()
+	if ai != null and ai.has_method("execute_turn"):
+		var field_state: Dictionary = _build_field_state()
+		ai.execute_turn(field_state)
+
+
+## 构建场上状态快照——供 AISystem.execute_turn 使用。
+func _build_field_state() -> Dictionary:
+	var ds = _get_deployment_system()
+	if ds != null and ds.has_method("get_field"):
+		return {"characters": ds.get_field(), "turn": _turn}
+	return {"characters": [], "turn": _turn}
+
+
+## 获取场上角色列表——通过 DeploymentSystem Autoload。
+func _get_field_characters() -> Array:
+	var ds = _get_deployment_system()
+	if ds != null and ds.has_method("get_field"):
+		return ds.get_field()
+	return []
+
+
+## 阶段出口——清理当前阶段状态（ADR-0008 §子系统编排顺序）。
 func _exit_phase(phase: int) -> void:
 	match phase:
 		CombatPhase.PLAY:
@@ -486,7 +596,7 @@ func _exit_phase(phase: int) -> void:
 		CombatPhase.ATTACK_RESOLUTION:
 			_attack_queue.clear()
 		CombatPhase.END:
-			# 清除"已行动"和"待命"标记（Story 003 接线 DeploymentSystem）
+			# 清除"已行动"和"待命"标记——已由 _clear_standby_state 在 _enter_phase(END) 处理
 			pass
 
 
@@ -532,19 +642,40 @@ func set_timer_exceeded() -> void:
 
 # === 阶段条件检查 ================================================================
 
-## 检查手牌中是否有任何可支付费用的卡牌（AC-006 条件）。
-## [br][b]桩实现[/b]——Story 002/003 接线 CostSystem.can_afford 后替换。[br]
-## [br]当前桩语义：手牌非空即返回 true——不检查费用。[br]
-## 接线 CostSystem 后改为遍历手牌调用 can_afford。
+## 检查手牌中是否有任何可支付费用的卡牌（AC-006 条件）。[br]
+## 遍历手牌调用 CostSystem.can_afford——Sprint 8 Story 004 接线。[br]
+## CostSystem 不可用时回退旧逻辑（手牌非空即 true）。
 func _can_afford_any_card() -> bool:
-	return not _hand.is_empty()
+	if _hand.is_empty():
+		return false
+	var cs = _get_cost_system()
+	if cs == null or not cs.has_method("can_afford"):
+		return not _hand.is_empty()  # 回退
+	for card in _hand:
+		var cost: int = _get_card_cost(card)
+		if cs.can_afford(cost):
+			return true
+	return false
 
 
 ## 检查所有可攻击角色是否已分配目标（AC-007/012 空真条件）。[br]
-## [br][b]桩实现[/b]——Story 003 接线 DeploymentSystem 后替换。[br]
-## [br]当前策略：攻击队列为空时返回 true（首回合所有角色待命，空真）。
+## Sprint 8 Story 004 接线——查询 DeploymentSystem 待命角色。[br]
+## 攻击队列非空时返回 false（玩家正在分配目标）。[br]
+## 攻击队列空时查 DeploymentSystem：有待命角色则 false，无则 true。
 func _all_characters_targeted() -> bool:
-	return _attack_queue.is_empty()
+	# 攻击队列非空——玩家正在分配目标，尚未全部完成
+	if not _attack_queue.is_empty():
+		return false
+	# 攻击队列空——查 DeploymentSystem 是否有待命角色
+	var ds = _get_deployment_system()
+	if ds != null and ds.has_method("get_field") and ds.has_method("is_standby"):
+		var field: Array = ds.get_field()
+		for char_entry in field:
+			var char_id: int = _extract_character_id(char_entry)
+			if char_id >= 0 and ds.is_standby(char_id):
+				return false  # 有待命角色未分配目标
+	# 队列空且无待命角色——空真
+	return true
 
 
 ## 计算抽牌数量——基础 2 张（GDD §2 抽牌规则）。[br]
@@ -556,7 +687,6 @@ func _calculate_draw_count() -> int:
 # === 抽牌 + 牌库抽空返还（AC-013）================================================
 
 ## 从牌库抽 n 张牌到手牌——牌库抽空时从弃牌堆随机返还 1 张到牌库底部。[br]
-## [br][b]桩实现[/b]——内部 _deck/_discard_pile/_hand 数组管理，Story 002 接线 DeckSystem 后替换。[br]
 ## [br]来源: GDD §2 抽牌规则 / AC-013。
 func _draw_cards(count: int) -> void:
 	for i in range(count):
@@ -576,7 +706,61 @@ func _draw_cards(count: int) -> void:
 		_hand.append(drawn)
 
 
-## 设置牌库/弃牌堆/手牌（测试桩注入——Story 002 接线 DeckSystem 后移除）。
+## 初始化战斗牌库——接收卡组 ID 列表并洗牌。[br]
+## [br][param card_ids] 卡组卡牌实例 ID 列表。[br]
+## [br]洗牌使用 _rng——set_rng_seed 后确定性可复现。
+func init_deck(card_ids: Array) -> void:
+	_deck = card_ids.duplicate()
+	_discard_pile.clear()
+	_hand.clear()
+	# Fisher-Yates 洗牌
+	var n: int = _deck.size()
+	for i in range(n - 1, 0, -1):
+		var j: int = _rng.randi_range(0, i)
+		var tmp = _deck[i]
+		_deck[i] = _deck[j]
+		_deck[j] = tmp
+
+
+## 弃牌——将手牌中的指定卡牌移到弃牌堆。[br]
+## [br][param card_instance_id] 卡牌实例 ID。
+func discard_card(card_instance_id: int) -> void:
+	for i in range(_hand.size() - 1, -1, -1):
+		var card = _hand[i]
+		var cid: Variant = null
+		if card is Dictionary:
+			cid = card.get("card_instance_id", card.get("instance_id", -1))
+		elif card is int:
+			cid = card
+		elif card != null and card.has_method("get"):
+			cid = card.get("card_instance_id", -1)
+		if cid == card_instance_id:
+			_hand.remove_at(i)
+			_discard_pile.append(card)
+			return
+	push_warning("CombatSystem: discard_card card_instance_id=%d not found in hand" % card_instance_id)
+
+
+## 洗牌——将弃牌堆全部洗回牌库，弃牌堆清空。
+func shuffle_discard_into_deck() -> void:
+	while not _discard_pile.is_empty():
+		var idx: int = _rng.randi_range(0, _discard_pile.size() - 1)
+		var card = _discard_pile[idx]
+		_discard_pile.remove_at(idx)
+		_deck.append(card)
+
+
+## 添加卡牌到牌库底部（绑定卡阵亡洗回——BindingManager 回调）。
+func add_card_to_deck(card_instance_id: int) -> void:
+	_deck.append(card_instance_id)
+
+
+## 添加卡牌到弃牌堆（绑定卡覆盖进弃牌——BindingManager 回调）。
+func add_card_to_discard(card_instance_id: int) -> void:
+	_discard_pile.append(card_instance_id)
+
+
+## 设置牌库/弃牌堆/手牌（[b]deprecated[/b]——测试注入用，生产代码使用 init_deck）。
 func set_deck_state(deck: Array, discard: Array, hand: Array) -> void:
 	_deck = deck.duplicate()
 	_discard_pile = discard.duplicate()
@@ -593,17 +777,17 @@ func get_attack_queue() -> Array:
 	return _attack_queue
 
 
-## 返回牌库（测试桩——Story 002 接线 DeckSystem 后移除）。
+## 返回牌库（查询 API）。
 func get_deck() -> Array:
 	return _deck
 
 
-## 返回弃牌堆（测试桩——Story 002 接线 DeckSystem 后移除）。
+## 返回弃牌堆（查询 API）。
 func get_discard_pile() -> Array:
 	return _discard_pile
 
 
-## 返回手牌（测试桩——Story 002 接线 DeckSystem 后移除）。
+## 返回手牌（查询 API）。
 func get_hand() -> Array:
 	return _hand
 
@@ -624,142 +808,52 @@ func get_hand() -> Array:
 ## [br][param target_indices] 目标索引列表。[br]
 ## [br][b]返回[/b]: true 出牌成功，false 被拒绝。
 func play_card(card_instance_id: int, target_indices: Array) -> bool:
-	# AC-001：阶段守卫
-	if _phase != CombatPhase.PLAY:
-		push_warning("CombatSystem: play_card() called outside PLAY phase (current=%d)" % _phase)
-		return false
-
-	# 卡牌获取
-	var card = _get_card_instance(card_instance_id)
-	if card == null:
-		push_warning("CombatSystem: play_card() card_instance_id=%d not found" % card_instance_id)
-		return false
-
-	var cost: int = int(_get_card_cost(card))
-
-	# AC-002：费用验证——不通过不扣费不结算
-	if not _can_afford(cost):
-		push_warning("CombatSystem: play_card() cost=%d unaffordable" % cost)
-		return false
-
-	# AC-003：目标验证——不通过不扣费
-	var targets = _resolve_targets(card, target_indices)
-	if not _validate_targets(card, targets):
-		push_warning("CombatSystem: play_card() target validation failed")
-		return false
-
-	# AC-004：扣费（直接调用——需要保证）
-	_spend(cost)
-
-	# AC-005：效果结算（直接调用——需要结果列表）
-	var results = _resolve_effects(card, targets)
-
-	# AC-006：阵亡检查
-	_check_and_process_deaths(results)
-
-	# 从手牌移除已打出的卡牌
-	_remove_card_from_hand(card_instance_id)
-
-	# AC-007：空手牌 + 无费可出 → 自动结束出牌
-	if _hand.is_empty() and not _can_afford_any_card():
-		advance_phase()
-
-	return true
+	return _get_card_resolver().play_card(card_instance_id, target_indices)
 
 
-## 获取卡牌实例——优先注入回调，回退到内部缓存（测试桩）。
+## 获取卡牌实例——委托给 _card_resolver 子模块。
 func _get_card_instance(card_instance_id: int) -> Variant:
-	if get_card_instance_cb.is_valid():
-		return get_card_instance_cb.call(card_instance_id)
-	return _card_instances.get(card_instance_id, null)
+	return _get_card_resolver()._get_card_instance(card_instance_id)
 
 
-## 获取卡牌费用——从卡牌数据中读取 cost 字段。[br]
-## [br][b]桩实现[/b]——Story 003 接线 CardSystem 后卡牌结构标准化。[br]
-## [br]当前策略：读取 card["cost"] 或 card.template["cost"]，默认 0。
+## 获取卡牌费用——委托给 _card_resolver 子模块。
 func _get_card_cost(card: Variant) -> int:
-	if card is Dictionary:
-		if card.has("cost"):
-			return int(card["cost"])
-		if card.has("template") and card["template"] is Dictionary and card["template"].has("cost"):
-			return int(card["template"]["cost"])
-	# 对象类型——尝试动态分派
-	if card.has_method("get_cost"):
-		return int(card.get_cost())
-	push_warning("CombatSystem: _get_card_cost unrecognized card format, defaulting to 0")
-	return 0
+	return _get_card_resolver()._get_card_cost(card)
 
 
-## 费用验证——通过 CostSystem Autoload 检查。[br]
-## [br][b]桩实现[/b]——CostSystem 不可用时返回 true（0 费卡牌始终可出）。
+## 费用验证——委托给 _card_resolver 子模块。
 func _can_afford(cost: int) -> bool:
-	var cs = _get_cost_system()
-	if cs != null and cs.has_method("can_afford"):
-		return cs.can_afford(cost)
-	return true  # 桩——无 CostSystem 时不限制
+	return _get_card_resolver()._can_afford(cost)
 
 
-## 扣费——通过 CostSystem Autoload 执行。[br]
-## [br][b]桩实现[/b]——CostSystem 不可用时静默跳过。
+## 扣费——委托给 _card_resolver 子模块。
 func _spend(cost: int) -> void:
-	var cs = _get_cost_system()
-	if cs != null and cs.has_method("spend"):
-		cs.spend(cost)
+	_get_card_resolver()._spend(cost)
 
 
-## 目标解析——将 target_indices 转换为目标对象列表。[br]
-## [br][b]桩实现[/b]——Story 003 接线后由 CardEffectEngine 验证目标合法性。[br]
-## [br]当前策略：直接返回 target_indices（测试桩不解析角色/阵位）。
+## 目标解析——委托给 _card_resolver 子模块。
 func _resolve_targets(card: Variant, target_indices: Array) -> Array:
-	return target_indices.duplicate()
+	return _get_card_resolver()._resolve_targets(card, target_indices)
 
 
-## 目标验证——通过注入回调或 CardEffectEngine 验证。[br]
-## [br][b]桩实现[/b]——validate_targets_cb 未注入时返回 true。
+## 目标验证——委托给 _card_resolver 子模块。
 func _validate_targets(card: Variant, targets: Array) -> bool:
-	if validate_targets_cb.is_valid():
-		return bool(validate_targets_cb.call(card, targets))
-	return true
+	return _get_card_resolver()._validate_targets(card, targets)
 
 
-## 效果结算——通过注入回调或 CardEffectEngine 执行。[br]
-## [br][b]桩实现[/b]——resolve_cb 未注入时返回空 Array。[br]
-## [br][b]返回[/b]: 结果列表 Array[Dictionary]。
+## 效果结算——委托给 _card_resolver 子模块。
 func _resolve_effects(card: Variant, targets: Array) -> Array:
-	if resolve_cb.is_valid():
-		return resolve_cb.call(card, targets)
-	return []
+	return _get_card_resolver()._resolve_effects(card, targets)
 
 
-## 阵亡检查——遍历结算结果，处理 HP ≤ 0 的角色。[br]
-## [br][b]桩实现[/b]——Story 004 接线 character_died 信号发射。[br]
-## [br]当前策略：遍历 results 检查 is_kill 字段，发射 character_died 信号。
+## 阵亡检查——委托给 _card_resolver 子模块。
 func _check_and_process_deaths(results: Array) -> void:
-	for result in results:
-		if result is Dictionary and result.get("is_kill", false):
-			var char_id: int = int(result.get("target_id", -1))
-			if char_id < 0:
-				push_warning("CombatSystem: _check_and_process_deaths skipping result with invalid target_id")
-				continue
-			var side: int = int(result.get("side", 0))
-			var binding_ids: Array = result.get("binding_card_ids", [])
-			_emit_safe(&"character_died", [char_id, side, binding_ids])
+	_get_card_resolver()._check_and_process_deaths(results)
 
 
-## 从手牌移除已打出的卡牌。
+## 从手牌移除已打出的卡牌——委托给 _card_resolver 子模块。
 func _remove_card_from_hand(card_instance_id: int) -> void:
-	for i in range(_hand.size() - 1, -1, -1):
-		var card = _hand[i]
-		# 兼容 Dictionary 和对象类型
-		var cid: Variant = null
-		if card is Dictionary:
-			cid = card.get("card_instance_id", card.get("instance_id", -1))
-		elif card.has_method("get"):
-			cid = card.get("card_instance_id", -1)
-		if cid == card_instance_id:
-			_hand.remove_at(i)
-			return
-	push_warning("CombatSystem: _remove_card_from_hand card_instance_id=%d not found in hand" % card_instance_id)
+	_get_card_resolver()._remove_card_from_hand(card_instance_id)
 
 
 ## 设置卡牌实例缓存（测试桩注入——Story 003 接线 CardSystem 后移除）。
@@ -777,68 +871,27 @@ func set_hand(hand: Array) -> void:
 ## 攻击队列结算——Phase 4 ATTACK_RESOLUTION 入口。[br]
 ## [br]遍历 _attack_queue，对每条攻击记录调用 calculate_damage 计算伤害，[br]
 ## 发射 attack_resolved 信号（Cat 2b 具名字典格式——ADR-0007）。[br]
-## [br][b]桩实现[/b]——Story 003 接线后由 CardEffectEngine 驱动实际伤害结算。[br]
-## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def, attacker_realm, defender_realm, is_kill}[/code][br]
-## [br][b]技术债[/b]：is_kill 当前从队列条目读取（桩），Story 003 接线后应从目标 HP 派生。
+## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def, attacker_realm, defender_realm, target_hp}[/code][br]
+## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。
 func _resolve_attack_queue() -> void:
-	for entry in _attack_queue:
-		if not (entry is Dictionary):
-			continue
-		var attacker_id: int = int(entry.get("attacker_id", -1))
-		var target_id: int = int(entry.get("target_id", -1))
-		if attacker_id < 0 or target_id < 0:
-			push_warning("CombatSystem: _resolve_attack_queue skipping entry with invalid id")
-			continue
-		var atk: int = int(entry.get("attacker_atk", 0))
-		var def: int = int(entry.get("target_def", 0))
-		var atk_realm: int = int(entry.get("attacker_realm", 1))
-		var def_realm: int = int(entry.get("defender_realm", 1))
-		var dmg_result: Dictionary = calculate_damage(atk, def, atk_realm, def_realm)
-		var is_kill: bool = bool(entry.get("is_kill", false))
-		# AC-005：attack_resolved 使用具名字典格式（ADR-0007 >3 参数规则）
-		var payload: Dictionary = {
-			"attacker_id": attacker_id,
-			"target_id": target_id,
-			"damage": dmg_result["final_damage"],
-			"is_kill": is_kill,
-		}
-		_emit_safe(&"attack_resolved", [payload])
+	_get_damage_calculator().resolve_attack_queue()
 
 
 # === 伤害计算（AC-008~012）=======================================================
 
-## 计算最终伤害——`max(1, ATK - DEF) × realm_penalty`（AC-008/009）。[br]
+## 计算最终伤害——委托给 _damage_calculator 子模块。[br]
 ## [br][param attacker_atk] 攻击者攻击力。[br]
 ## [br][param target_def] 目标防御力。[br]
 ## [br][param attacker_realm] 攻击者境界等级。[br]
 ## [br][param defender_realm] 防御者境界等级。[br]
-## [br][b]返回[/b]: [code]{actual_damage, realm_penalty, final_damage}[/code] Dictionary。[br]
-## [br][b]方向性约定[/b]：GDD §3 规定压制仅影响玩家→敌方的伤害。本函数作为纯函数
-## 不校验调用方向——方向性由调用方保证（玩家攻击时玩家为 attacker）。
+## [br][b]返回[/b]: [code]{actual_damage, realm_penalty, final_damage}[/code] Dictionary。
 func calculate_damage(attacker_atk: int, target_def: int, attacker_realm: int, defender_realm: int) -> Dictionary:
-	# AC-008：actual_damage = max(1, ATK - DEF)
-	var actual_damage: int = maxi(1, attacker_atk - target_def)
-	# AC-009~012：realm_penalty 来自 RealmSystem.realm_penalty
-	var penalty: float = _get_realm_penalty(attacker_realm, defender_realm)
-	# AC-009：final_damage = floor(actual_damage × realm_penalty)
-	var final_damage: int = floori(float(actual_damage) * penalty)
-	# 最低保底 1 点伤害
-	final_damage = maxi(1, final_damage)
-	return {
-		"actual_damage": actual_damage,
-		"realm_penalty": penalty,
-		"final_damage": final_damage,
-	}
+	return _get_damage_calculator().calculate_damage(attacker_atk, target_def, attacker_realm, defender_realm)
 
 
-## 获取境界压制系数——通过 RealmSystem Autoload。[br]
-## [br][b]桩实现[/b]——RealmSystem 不可用时返回 1.0（无压制）。[br]
-## [br][b]方向性约定[/b]：压制仅影响玩家→敌方（GDD §3），调用方保证方向。
+## 获取境界压制系数——委托给 _damage_calculator 子模块。
 func _get_realm_penalty(attacker_realm: int, defender_realm: int) -> float:
-	var rs = _get_realm_system()
-	if rs != null and rs.has_method("realm_penalty"):
-		return float(rs.realm_penalty(attacker_realm, defender_realm))
-	return 1.0
+	return _get_damage_calculator()._get_realm_penalty(attacker_realm, defender_realm)
 
 
 ## 查找 CostSystem Autoload。
@@ -855,6 +908,89 @@ func _get_realm_system() -> Node:
 	if tree == null or tree.root == null:
 		return null
 	return tree.root.get_node_or_null("/root/RealmSystem")
+
+
+## 查找 CardEffectEngine Autoload。
+func _get_card_effect_engine() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/CardEffectEngine")
+
+
+## 查找 CardSystem Autoload。
+func _get_card_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/CardSystem")
+
+
+## 查找 StatusEffectSystem Autoload。
+func _get_status_effect_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/StatusEffectSystem")
+
+
+## 查找 DeploymentSystem Autoload。
+func _get_deployment_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/DeploymentSystem")
+
+
+## 查找 AISystem Autoload。
+func _get_ai_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/AISystem")
+
+
+## 查找 ResourceSystem Autoload。
+func _get_resource_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/ResourceSystem")
+
+
+## 查找 CultivationSystem Autoload。
+func _get_cultivation_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/CultivationSystem")
+
+
+## 从角色条目提取 character_id——兼容 Dictionary / 对象。
+func _extract_character_id(char_entry: Variant) -> int:
+	if char_entry is Dictionary:
+		return int(char_entry.get("character_id", char_entry.get("id", -1)))
+	if char_entry is Object and char_entry.has_method("get"):
+		return int(char_entry.get("character_id", -1))
+	if char_entry is int:
+		return char_entry
+	return -1
+
+
+# === 子模块获取（惰性初始化）===================================================
+
+## 获取伤害计算子模块实例。
+func _get_damage_calculator() -> RefCounted:
+	if _damage_calculator == null:
+		_damage_calculator = preload("res://src/feature/combat/combat_damage_calculator.gd").new(self)
+	return _damage_calculator
+
+
+## 获取出牌结算子模块实例。
+func _get_card_resolver() -> RefCounted:
+	if _card_resolver == null:
+		_card_resolver = preload("res://src/feature/combat/combat_card_resolver.gd").new(self)
+	return _card_resolver
 
 
 # === 查询 API ===================================================================

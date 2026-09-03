@@ -1,12 +1,12 @@
 extends Node
-## ExplorationSystem —— 探索系统 Autoload（ADR-0014 #14）。
+## ExplorationSystem —— 探索系统 Autoload（ADR-0014 #19）。
 ##
 ## Feature 层 Autoload。程序化 DAG 地图生成 + 节点导航 + 子系统委托调度。[br]
-## 本文件持有 [method generate_map] 程序化 DAG 生成 + 地图难度配置 + 加权随机分配 +
-## 边连接连通性保证 + 独立路径验证。[br]
-## [br][b]本 Story 范围[/b]（5-1）：纯 DAG 生成逻辑——不写入 GSM、不处理导航、不触发事件。[br]
-## [b]已注册进 project.godot[/b]——Autoload #19（ExplorationSystem）。[br]
-## [br]来源: ADR-0014 §决策 2 程序化 DAG 生成 / GDD exploration-system.md §2-3。
+## DAG 生成算法委托给 [ExplorationDAGBuilder]（RefCounted 子模块），[br]
+## 经济计算委托给 [ExplorationEconomy]（RefCounted 子模块）。[br]
+## [br][b]已注册进 project.godot[/b]——Autoload #19（ExplorationSystem）。[br]
+## [br]来源: ADR-0014 §决策 2 程序化 DAG 生成 / GDD exploration-system.md §2-3。[br]
+## [br]Sprint 8 Story 8-9：DAG 生成 + 经济计算拆分到子模块。
 
 
 # === 枚举 ========================================================================
@@ -31,6 +31,14 @@ enum MapDifficulty {
 	MEDIUM = 1,    ## 中——5 层，2-4 节点/层
 	HIGH = 2,      ## 高——5 层，3-4 节点/层
 	VERY_HIGH = 3, ## 极高——6 层，3-4 节点/层
+}
+
+## 探索结束原因枚举。
+enum EndReason {
+	BOSS_DEFEATED,  ## Boss 击败——通关奖励结算
+	BATTLE_LOST,    ## 战斗失败——修为保留 50%
+	AP_DEPLETED,    ## 行动力耗尽——全额保留
+	PLAYER_QUIT,    ## 玩家主动退出——全额保留
 }
 
 
@@ -70,10 +78,9 @@ var generate_shop_inventory_cb: Callable = Callable()
 var get_seed_cb: Callable = Callable()
 
 
-# === 地图难度配置 =================================================================
+# === 常量（保留在主文件——测试通过 es.get 访问）==============================
 
 ## 默认地图难度配置表——按 MapDifficulty 枚举索引。
-## 每项含 layers / min_nodes / max_nodes / elite_count / shop_count / event_count / weights。
 const DIFFICULTY_CONFIGS: Array = [
 	{  # LOW
 		"layers": 4, "min_nodes": 2, "max_nodes": 3,
@@ -97,100 +104,48 @@ const DIFFICULTY_CONFIGS: Array = [
 	},
 ]
 
+## AP=0 豁免节点类型集合——不消耗行动力且行动力不足时仍可移动。
+const AP_EXEMPT_TYPES: Array = [NodeType.TELEPORT, NodeType.ACTION_SPRING, NodeType.BOSS]
 
-# === DAG 生成（Story 001）=======================================================
+## 永久免费地图列表——每个境界 1 张，重入始终免费（GDD §1 经济安全阀）。
+const PERMANENT_FREE_MAPS: Dictionary = {
+	&"qing_yun_jian_zong": 1,   # 青云剑宗（炼气）
+	&"sui_xing_wai_huan": 2,    # 碎星外环（筑基）
+	&"xi_yu_gu_lin": 3,         # 西域古林（金丹）
+	&"mu_lan_cao_yuan": 4,      # 慕兰草原（元婴）
+	&"gui_xu_fu_yun_lu": 5,     # 归墟·浮云陆（化神）
+}
 
-## 程序化生成 DAG 地图——加权随机分配 + 确定性边连接 + 后处理约束验证。[br]
-## [br][param map_id] 地图 ID（用于 seed 计算）。[br]
-## [br][param player_realm] 玩家境界等级（用于配置衍生）。[br]
-## [br][param entry_count] 本局该地图进入次数（用于 seed 计算）。[br]
-## [br][b]返回[/b]: [code]{graph, nodes, layers, boss_node_id, path_count}[/code] Dictionary。[br]
-## [br]来源: ADR-0014 §决策 2 / GDD §3。
+## 重入费用基价表——按 MapDifficulty 枚举索引（GDD §公式 10）。
+const REENTRY_BASE_COSTS: Array = [30, 60, 100, 150]  # LOW/MEDIUM/HIGH/VERY_HIGH
+
+## 通关奖励基价表——按 MapDifficulty 枚举索引（GDD §公式 5）。
+const CLEAR_REWARDS: Array = [
+	{"ling_shi": 50,  "cultivation": 50},   # LOW
+	{"ling_shi": 100, "cultivation": 80},   # MEDIUM
+	{"ling_shi": 200, "cultivation": 120},  # HIGH
+	{"ling_shi": 300, "cultivation": 150},  # VERY_HIGH
+]
+
+
+# === 子模块实例 ===================================================================
+
+## DAG 生成器子模块。
+var _dag_builder: RefCounted = null
+
+## 经济计算子模块。
+var _economy: RefCounted = null
+
+
+# === DAG 生成（委托给 ExplorationDAGBuilder）===================================
+
+## 程序化生成 DAG 地图——委托给 _dag_builder 子模块。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][param player_realm] 玩家境界等级。[br]
+## [br][param entry_count] 本局该地图进入次数。[br]
+## [br][b]返回[/b]: [code]{graph, nodes, layers, boss_node_id, path_count}[/code] Dictionary。
 func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 1) -> Dictionary:
-	# Phase 1：读取配置
-	var config: Dictionary = _get_map_config(map_id, player_realm)
-
-	# 初始化 RNG——seed = base_seed XOR map_id.hash() XOR entry_count
-	var base_seed: int = _get_seed()
-	var map_hash: int = hash(map_id)
-	_rng.seed = base_seed ^ map_hash ^ entry_count
-
-	# Phase 2：生成 DAG 骨架
-	var total_layers: int = int(config.get("layers", 5))
-	var min_n: int = int(config.get("min_nodes", 2))
-	var max_n: int = int(config.get("max_nodes", 4))
-	var nodes_per_layer: Array = []
-	for i in range(total_layers):
-		if i == 0 or i == total_layers - 1:
-			nodes_per_layer.append(1)
-		else:
-			nodes_per_layer.append(_rng.randi_range(min_n, max_n))
-
-	# 生成节点 ID——格式: layer * 100 + idx
-	var all_nodes: Array = []
-	for layer in range(total_layers):
-		for idx in range(nodes_per_layer[layer]):
-			all_nodes.append(layer * 100 + idx)
-
-	# Phase 3：分配节点类型
-	var node_types: Dictionary = _assign_node_types(all_nodes, nodes_per_layer, config, total_layers)
-
-	# Phase 4：边连接 + 连通性验证 + ≥2 独立路径（迭代重试，不递归——避免栈下溢）
-	var graph: Dictionary = _build_edges(all_nodes, nodes_per_layer, total_layers)
-	var sink_id: int = all_nodes[all_nodes.size() - 1]
-	var path_count: int = _count_vertex_disjoint_paths(graph, 0, sink_id)
-
-	# 独立路径不足时先添加交叉边（最多 2 次）
-	var cross_retry: int = 0
-	while path_count < 2 and cross_retry < 2:
-		_add_cross_edges(graph, nodes_per_layer, total_layers)
-		path_count = _count_vertex_disjoint_paths(graph, 0, sink_id)
-		cross_retry += 1
-
-	# 仍不足时整体重新生成（最多 2 次，迭代而非递归）
-	var regen_retry: int = 0
-	while path_count < 2 and regen_retry < 2:
-		regen_retry += 1
-		# 重置 RNG seed 并加扰重试计数，避免相同图重复生成
-		_rng.seed = (base_seed ^ map_hash ^ entry_count) + regen_retry
-		nodes_per_layer = []
-		for i in range(total_layers):
-			if i == 0 or i == total_layers - 1:
-				nodes_per_layer.append(1)
-			else:
-				nodes_per_layer.append(_rng.randi_range(min_n, max_n))
-		all_nodes = []
-		for layer in range(total_layers):
-			for idx in range(nodes_per_layer[layer]):
-				all_nodes.append(layer * 100 + idx)
-		node_types = _assign_node_types(all_nodes, nodes_per_layer, config, total_layers)
-		graph = _build_edges(all_nodes, nodes_per_layer, total_layers)
-		sink_id = all_nodes[all_nodes.size() - 1]
-		path_count = _count_vertex_disjoint_paths(graph, 0, sink_id)
-		cross_retry = 0
-		while path_count < 2 and cross_retry < 2:
-			_add_cross_edges(graph, nodes_per_layer, total_layers)
-			path_count = _count_vertex_disjoint_paths(graph, 0, sink_id)
-			cross_retry += 1
-	if path_count < 2:
-		push_warning("ExplorationSystem: map %s path_count=%d < 2 after retries" % [map_id, path_count])
-
-	# Phase 5：填充节点内容
-	var node_details: Dictionary = _fill_node_content(all_nodes, node_types, nodes_per_layer, total_layers, map_id, player_realm)
-
-	# Phase 6：返回图结构
-	_node_graph = graph.duplicate(true)
-	_node_details = node_details.duplicate(true)
-	_map_config = config.duplicate(true)
-
-	var boss_id: int = (total_layers - 1) * 100
-	return {
-		"graph": graph,
-		"nodes": node_details,
-		"layers": nodes_per_layer,
-		"boss_node_id": boss_id,
-		"path_count": path_count,
-	}
+	return _get_dag_builder().generate_map(map_id, player_realm, entry_count)
 
 
 # === 节点导航（Story 003）=====================================================
@@ -212,9 +167,6 @@ signal boss_node_reached(boss_data: Dictionary)
 
 ## Cat 2b 信号——到达商店/回复/灵泉/渡劫台/传送节点，UI 按 interaction_type 分发（ADR-0014 §决策 3）。
 signal node_interaction_triggered(node_id: int, interaction_type: StringName, payload: Dictionary)
-
-## AP=0 豁免节点类型集合——不消耗行动力且行动力不足时仍可移动。
-const AP_EXEMPT_TYPES: Array = [NodeType.TELEPORT, NodeType.ACTION_SPRING, NodeType.BOSS]
 
 ## 节点导航——从 from_node 移动到 to_node。[br]
 ## [br][b]验证链路[/b]（短路求值）：可达性 → 已访问 → 行动力。[br]
@@ -515,217 +467,6 @@ func _get_seed() -> int:
 	return 42
 
 
-## 加权随机分配节点类型——排除超限类型后重新加权。
-func _assign_node_types(all_nodes: Array, nodes_per_layer: Array, config: Dictionary, total_layers: int) -> Dictionary:
-	var weights: Dictionary = config.get("weights", {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5})
-	var max_elite: int = int(config.get("elite_count", 2))
-	var max_shop: int = int(config.get("shop_count", 1))
-	var elite_assigned: int = 0
-	var shop_assigned: int = 0
-	var node_types: Dictionary = {}
-
-	for node_id in all_nodes:
-		var layer: int = node_id / 100
-		if layer == 0:
-			node_types[node_id] = NodeType.ENTRY
-		elif layer == total_layers - 1:
-			node_types[node_id] = NodeType.BOSS
-		else:
-			var adjusted_weights: Dictionary = weights.duplicate()
-			if elite_assigned >= max_elite:
-				adjusted_weights.erase("elite")
-			if shop_assigned >= max_shop:
-				adjusted_weights.erase("shop")
-			var type_str: String = _weighted_random(adjusted_weights)
-			var ntype: int = _string_to_node_type(type_str)
-			node_types[node_id] = ntype
-			if ntype == NodeType.ELITE:
-				elite_assigned += 1
-			elif ntype == NodeType.SHOP:
-				shop_assigned += 1
-	return node_types
-
-
-## 加权随机选择——返回权重最大的键。
-func _weighted_random(weights: Dictionary) -> String:
-	var total: int = 0
-	for key in weights:
-		total += int(weights[key])
-	if total <= 0:
-		return "combat"
-	var roll: int = _rng.randi_range(1, total)
-	var cumulative: int = 0
-	for key in weights:
-		cumulative += int(weights[key])
-		if roll <= cumulative:
-			return key
-	return weights.keys()[0]
-
-
-## 字符串节点类型名→枚举值。
-func _string_to_node_type(type_str: String) -> int:
-	match type_str:
-		"combat": return NodeType.COMBAT
-		"event": return NodeType.EVENT
-		"shop": return NodeType.SHOP
-		"rest": return NodeType.REST
-		"elite": return NodeType.ELITE
-		_: return NodeType.COMBAT
-
-
-## 构建边连接——每层每个节点至少连接上层 1 个节点。
-func _build_edges(all_nodes: Array, nodes_per_layer: Array, total_layers: int) -> Dictionary:
-	var graph: Dictionary = {}
-	for node_id in all_nodes:
-		graph[node_id] = []
-
-	# 从第 1 层开始，每个节点连接上层 1-2 个节点
-	for layer in range(1, total_layers):
-		var prev_layer: int = layer - 1
-		var prev_count: int = nodes_per_layer[prev_layer]
-		var curr_count: int = nodes_per_layer[layer]
-		for idx in range(curr_count):
-			var node_id: int = layer * 100 + idx
-			# 至少连接上层 1 个节点
-			var parent_idx: int = _rng.randi_range(0, prev_count - 1)
-			var parent_id: int = prev_layer * 100 + parent_idx
-			if not graph[parent_id].has(node_id):
-				graph[parent_id].append(node_id)
-			# 50% 概率连接第二个父节点（如果上层有 ≥2 节点）
-			if prev_count >= 2 and _rng.randf() < 0.5:
-				var parent2_idx: int = (parent_idx + 1) % prev_count
-				var parent2_id: int = prev_layer * 100 + parent2_idx
-				if not graph[parent2_id].has(node_id):
-					graph[parent2_id].append(node_id)
-
-	# 确保上层每个节点都有至少 1 个子节点（避免孤儿父节点）
-	for layer in range(total_layers - 1):
-		var next_layer: int = layer + 1
-		var next_count: int = nodes_per_layer[next_layer]
-		for idx in range(nodes_per_layer[layer]):
-			var node_id: int = layer * 100 + idx
-			if graph[node_id].is_empty():
-				# 连接下层第一个节点
-				var child_id: int = next_layer * 100 + 0
-				graph[node_id].append(child_id)
-	return graph
-
-
-## 添加交叉边——增加独立路径数。
-func _add_cross_edges(graph: Dictionary, nodes_per_layer: Array, total_layers: int) -> void:
-	for layer in range(1, total_layers):
-		var prev_layer: int = layer - 1
-		var prev_count: int = nodes_per_layer[prev_layer]
-		for idx in range(nodes_per_layer[layer]):
-			var node_id: int = layer * 100 + idx
-			# 尝试连接额外的父节点
-			for parent_idx in range(prev_count):
-				var parent_id: int = prev_layer * 100 + parent_idx
-				if not graph[parent_id].has(node_id):
-					if _rng.randf() < 0.3:
-						graph[parent_id].append(node_id)
-
-
-## 计算顶点不相交路径数——简化版：BFS 找路径 + 移除中间顶点 + 重复。[br]
-## [br]DAG 中顶点不相交路径数 = 找一条路径→移除中间顶点→再找→直到找不到。[br]
-## 最多查找 max_paths 条（防止无限循环）。
-func _count_vertex_disjoint_paths(graph: Dictionary, source: int, sink: int) -> int:
-	# 深拷贝图（不修改原图）
-	var working: Dictionary = graph.duplicate(true)
-	var path_count: int = 0
-	var max_paths: int = 10
-	while path_count < max_paths:
-		var path: Array = _bfs_path(working, source, sink)
-		if path.is_empty():
-			break
-		path_count += 1
-		# 移除中间顶点（保留 source 和 sink）
-		for i in range(1, path.size() - 1):
-			var mid: int = path[i]
-			working.erase(mid)
-		# 从所有邻接列表中移除已删顶点
-		for parent_id in working:
-			var children: Array = working[parent_id]
-			for c in range(children.size() - 1, -1, -1):
-				if not working.has(children[c]):
-					children.remove_at(c)
-	return path_count
-
-
-## BFS 寻找路径——返回 source→sink 的节点 ID 路径。[br]
-## [br]注意：visited 检查必须包裹 parent 赋值和 queue.append，[br]
-## 否则已访问节点会被反复入队导致 BFS 无法终止→栈崩溃。
-func _bfs_path(graph: Dictionary, source: int, sink: int) -> Array:
-	if source == sink:
-		return [source]
-	var queue: Array = [source]
-	var visited: Dictionary = {source: true}
-	var parent: Dictionary = {source: -1}
-	while not queue.is_empty():
-		var u: int = queue.pop_front()
-		if not graph.has(u):
-			continue
-		for v in graph[u]:
-			if not visited.has(v):
-				visited[v] = true
-				parent[v] = u
-				if v == sink:
-					# 回溯路径
-					var path: Array = []
-					var curr: int = v
-					while curr != -1:
-						path.push_front(curr)
-						curr = int(parent.get(curr, -1))
-					return path
-				queue.append(v)
-	return []
-
-
-## 填充节点内容——战斗=敌人阵容、事件=pool、商店=库存。
-func _fill_node_content(all_nodes: Array, node_types: Dictionary, nodes_per_layer: Array, total_layers: int, map_id: StringName, player_realm: int) -> Dictionary:
-	var details: Dictionary = {}
-	for node_id in all_nodes:
-		var layer: int = node_id / 100
-		var idx: int = node_id % 100
-		var ntype: int = int(node_types.get(node_id, NodeType.COMBAT))
-		var detail: Dictionary = {
-			"type": ntype,
-			"layer": layer,
-			"idx": idx,
-		}
-		match ntype:
-			NodeType.ENTRY:
-				detail["label"] = "入口"
-			NodeType.BOSS:
-				detail["label"] = "Boss"
-			NodeType.COMBAT, NodeType.ELITE:
-				if generate_enemy_roster_cb.is_valid():
-					detail["enemy_roster"] = generate_enemy_roster_cb.call(map_id, player_realm, ntype == NodeType.ELITE)
-				else:
-					detail["enemy_roster"] = []
-			NodeType.EVENT:
-				# 不分配具体事件——仅记录 pool
-				if get_event_pool_cb.is_valid():
-					detail["event_pool"] = get_event_pool_cb.call(map_id, player_realm)
-				else:
-					detail["event_pool"] = []
-			NodeType.SHOP:
-				if generate_shop_inventory_cb.is_valid():
-					detail["inventory"] = generate_shop_inventory_cb.call(player_realm)
-				else:
-					detail["inventory"] = {}
-			NodeType.REST:
-				detail["label"] = "回复点"
-			NodeType.ACTION_SPRING:
-				detail["label"] = "行动力泉"
-			NodeType.TELEPORT:
-				detail["label"] = "传送"
-			NodeType.TRIBULATION:
-				detail["label"] = "渡劫台"
-		details[node_id] = detail
-	return details
-
-
 # === 测试桩 API ==================================================================
 
 ## 设置 RNG seed（确定性测试用）。
@@ -741,93 +482,21 @@ func get_node_details() -> Dictionary:
 	return _node_details
 
 
-# === 经济计算 + 事件分配（Story 005）===========================================
+# === 经济计算（委托给 ExplorationEconomy）=======================================
 
-## 探索结束原因枚举。
-enum EndReason {
-	BOSS_DEFEATED,  ## Boss 击败——通关奖励结算
-	BATTLE_LOST,    ## 战斗失败——修为保留 50%
-	AP_DEPLETED,    ## 行动力耗尽——全额保留
-	PLAYER_QUIT,    ## 玩家主动退出——全额保留
-}
-
-## 永久免费地图列表——每个境界 1 张，重入始终免费（GDD §1 经济安全阀）。
-const PERMANENT_FREE_MAPS: Dictionary = {
-	&"qing_yun_jian_zong": 1,   # 青云剑宗（炼气）
-	&"sui_xing_wai_huan": 2,    # 碎星外环（筑基）
-	&"xi_yu_gu_lin": 3,         # 西域古林（金丹）
-	&"mu_lan_cao_yuan": 4,      # 慕兰草原（元婴）
-	&"gui_xu_fu_yun_lu": 5,     # 归墟·浮云陆（化神）
-}
-
-## 重入费用基价表——按 MapDifficulty 枚举索引（GDD §公式 10）。
-const REENTRY_BASE_COSTS: Array = [30, 60, 100, 150]  # LOW/MEDIUM/HIGH/VERY_HIGH
-
-## 通关奖励基价表——按 MapDifficulty 枚举索引（GDD §公式 5）。
-const CLEAR_REWARDS: Array = [
-	{"ling_shi": 50,  "cultivation": 50},   # LOW
-	{"ling_shi": 100, "cultivation": 80},   # MEDIUM
-	{"ling_shi": 200, "cultivation": 120},  # HIGH
-	{"ling_shi": 300, "cultivation": 150},  # VERY_HIGH
-]
-
-## 计算地图重入传送费（GDD §公式 10）。[br]
-## [br][param map_id] 地图 ID。[br]
-## [br][b]返回[/b]: 灵石费用（0=免费）。[br]
-## [br][b]规则[/b]: 首次进入免费；永久免费地图始终 0；后续按 base×multiplier。[br]
-## [br]来源: ADR-0014 §决策 4 + GDD §公式 10。
+## 计算地图重入传送费——委托给 _economy 子模块。
 func calculate_reentry_cost(map_id: StringName) -> int:
-	# 永久免费地图——始终 0
-	if PERMANENT_FREE_MAPS.has(map_id):
-		return 0
-	var stored_count: int = _get_entry_count(map_id)
-	var entry_count: int = stored_count + 1  # 本次进入的序号（1=首次, 2=第二次, ...）
-	# 首次进入免费
-	if entry_count <= 1:
-		return 0
-	# 获取地图难度
-	var config: Dictionary = _get_map_config(map_id, _get_player_realm())
-	var difficulty: int = _get_difficulty_from_config(config)
-	var base: int = REENTRY_BASE_COSTS[difficulty]
-	# multiplier = min(1.0 + (entry_count - 2) * 0.5, 3.0)
-	var multiplier: float = 1.0 + (entry_count - 2) * 0.5
-	multiplier = minf(multiplier, 3.0)
-	return int(floor(base * multiplier))
+	return _get_economy().calculate_reentry_cost(map_id)
 
 
-## 计算地图通关奖励（GDD §公式 5+6）。[br]
-## [br][param map_id] 地图 ID。[br]
-## [br][param is_first_clear] 是否首次通关。[br]
-## [br][param player_realm] 玩家境界。[br]
-## [br][param map_max_realm] 地图最高允许境界。[br]
-## [br][b]返回[/b]: [code]{ling_shi, cultivation, extra}[/code] Dictionary。[br]
-## [br][b]规则[/b]: 灵石受境界差额惩罚；修为不受。[br]
-## [br]来源: ADR-0014 §决策 4 + GDD §公式 5+6。
+## 计算地图通关奖励——委托给 _economy 子模块。
 func calculate_map_clear_rewards(map_id: StringName, is_first_clear: bool, player_realm: int, map_max_realm: int) -> Dictionary:
-	var config: Dictionary = _get_map_config(map_id, player_realm)
-	var difficulty: int = _get_difficulty_from_config(config)
-	var base: Dictionary = CLEAR_REWARDS[difficulty]
-	var penalty: float = realm_gap_penalty(player_realm, map_max_realm)
-	var rewards: Dictionary = {
-		"ling_shi": int(floor(base["ling_shi"] * penalty)),
-		"cultivation": int(base["cultivation"]),  # 修为不受惩罚
-	}
-	if is_first_clear:
-		rewards["extra"] = config.get("first_clear_reward", {})
-	return rewards
+	return _get_economy().calculate_map_clear_rewards(map_id, is_first_clear, player_realm, map_max_realm)
 
 
-## 境界差额惩罚系数（GDD §公式 6）。[br]
-## [br][param player_L] 玩家实际境界。[br]
-## [br][param map_max_L] 地图最高允许境界。[br]
-## [br][b]返回[/b]: float [0.1, 1.0]——灵石惩罚系数。[br]
-## [br][b]规则[/b]: gap<=0→1.0；gap>=1→max(0.1, 1.0-gap*0.3)。[br]
-## [br]来源: ADR-0014 §决策 4 + GDD §公式 6。
+## 境界差额惩罚系数——委托给 _economy 子模块。
 func realm_gap_penalty(player_L: int, map_max_L: int) -> float:
-	var gap: int = player_L - map_max_L
-	if gap <= 0:
-		return 1.0
-	return maxf(0.1, 1.0 - gap * 0.3)
+	return _get_economy().realm_gap_penalty(player_L, map_max_L)
 
 
 ## 收集资源——累积到 map_states[current_map].collected_*。[br]
@@ -995,15 +664,17 @@ func _get_map_max_realm(map_id: StringName) -> int:
 	return int(config.get("max_realm", 1))
 
 
-## 从配置获取难度索引。
-func _get_difficulty_from_config(config: Dictionary) -> int:
-	var layers: int = int(config.get("layers", 5))
-	match layers:
-		4: return 0  # LOW
-		6: return 3  # VERY_HIGH
-		5:
-			var min_n: int = int(config.get("min_nodes", 2))
-			if min_n >= 3:
-				return 2  # HIGH
-			return 1  # MEDIUM
-		_: return 1  # MEDIUM fallback
+# === 子模块获取（惰性初始化）===================================================
+
+## 获取 DAG 生成器子模块实例。
+func _get_dag_builder() -> RefCounted:
+	if _dag_builder == null:
+		_dag_builder = preload("res://src/feature/exploration/exploration_dag_builder.gd").new(self)
+	return _dag_builder
+
+
+## 获取经济计算子模块实例。
+func _get_economy() -> RefCounted:
+	if _economy == null:
+		_economy = preload("res://src/feature/exploration/exploration_economy.gd").new(self)
+	return _economy

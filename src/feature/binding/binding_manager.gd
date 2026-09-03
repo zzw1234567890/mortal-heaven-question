@@ -26,6 +26,53 @@ extends Node
 # 控制清单 2026-08-05 规则）。
 
 
+# === 存根回调注入（Sprint 8 Story 8-7）=========================================
+##
+## _ready() 在 Autoload 实例上注入 8 个回调到 CardEffectEngine + CombatSystem。[br]
+## BM_SCRIPT.new() 测试实例不触发 _ready()（未加入 SceneTree），不注入——保留 Callable 接缝。
+## 测试通过 bm.set("effect_register_cb", ...) 覆盖注入的回调，行为不变。
+
+func _ready() -> void:
+	# 仅 Autoload 实例注入（BM_SCRIPT.new() 未加入 SceneTree 不触发 _ready）
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return
+	var autoload_bm = tree.root.get_node_or_null("/root/BindingManager")
+	if autoload_bm != self:
+		return  # 非 Autoload 实例——不注入
+	_inject_callbacks()
+
+
+## 惰性注入回调——_ready() 或脚本替换后调用。[br]
+## 仅在 Callable 为空时填充，不覆盖测试注入的回调。
+func _inject_callbacks() -> void:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return
+	# 注入回调到 CardEffectEngine
+	var cee = tree.root.get_node_or_null("/root/CardEffectEngine")
+	if cee != null:
+		if effect_register_cb.is_null():
+			effect_register_cb = Callable(cee, "register_persistent_effect")
+		if effect_remove_cb.is_null():
+			effect_remove_cb = Callable(cee, "remove_effects_by_source")
+		if effect_suspend_cb.is_null():
+			effect_suspend_cb = Callable(cee, "suspend_effects_by_source")
+		if effect_restore_cb.is_null():
+			effect_restore_cb = Callable(cee, "restore_effects_by_source")
+		if stat_bonus_cb.is_null():
+			stat_bonus_cb = Callable(cee, "get_stat_bonus")
+		if card_exists_cb.is_null():
+			card_exists_cb = Callable(cee, "card_exists")
+	# 注入回调到 CombatSystem（牌库操作）
+	var cs = tree.root.get_node_or_null("/root/CombatSystem")
+	if cs != null:
+		if card_shuffle_cb.is_null():
+			card_shuffle_cb = Callable(cs, "add_card_to_deck")
+		if card_discard_cb.is_null():
+			card_discard_cb = Callable(cs, "add_card_to_discard")
+
+
 # === Cat 2b 生命周期信号（ADR-0013 §Cat 2b 信号，经 GSM._emit_signal_safe 路由）====
 #
 ## 绑定成功——新卡落位（含 is_native 标志，CombatUI 据此创建图标/动画 + 本命星标）。
@@ -175,6 +222,9 @@ var _next_binding_id: int = 1
 ## 绑定位上限缓存——[code]{slot_type: limit}[/code]。由 [method cache_slot_limits] 在战斗开始时填充。
 ## 战斗期间从 RealmSystem 缓存，不运行时重查（ADR-0013 §绑定上限缓存）。
 var _slot_limits: Dictionary = {}
+
+## 序列化子模块——惰性初始化（Sprint 8 Story 8-12 拆分）。
+var _serializer: RefCounted = null
 
 # === 存根回调（Story 004 / 战斗 Epic 注入真实实现，sprint §风险登记 存根策略）=====
 
@@ -635,66 +685,19 @@ func _query_stat_bonus(card_instance_id: int, stat_name: String) -> float:
 
 # === 序列化 / 反序列化 / 快照导出（Story 004）=================================
 
-## 序列化全部活跃绑定记录——战斗结束时导出快照（AC-001）。[br]
-## 遍历 [member _bindings] 全部 BindingRecord → 序列化为 Dictionary 列表。[br]
-## 含全部字段：binding_id / card_instance_id / card_template_id / card_name / card_rarity /
-## slot_type / slot_index / bound_character_id / is_native / native_multiplier /
-## activated_turn / is_suspended / stack_slots / stack_count。[br]
-## [br][b]返回[/b]: [code]{"bindings": Array[Dictionary]}[/code]——快照根节点含 bindings 列表。
-## [b]性能[/b]：化神期峰值 ~180 BindingRecord → ~36KB，battle_end 非热路径一次性执行。
-## [b]card_name / card_rarity[/b]：本 Story 无 CardSystem 模板查询，两字段保持默认空值
-## （延后同 Story 002 C6——战斗 Epic 接 CardSystem 后填充）。
+## 序列化全部活跃绑定记录——委托给 _serializer 子模块。
 func serialize_all() -> Dictionary:
-	var records: Array = []
-	for binding_id: int in _bindings.keys():
-		var record: BindingRecord = _bindings[binding_id]
-		records.append(_serialize_record(record))
-	return {"bindings": records}
+	return _get_serializer().serialize_all()
 
 
-## 从快照恢复 BindingRecord——读档 / 战斗快照恢复（AC-003/AC-004）。[br]
-## [b]尽力而为策略[/b]：逐条验证 card_instance_id（通过 [member card_exists_cb]），
-## 失败跳过 + push_warning，其余正常恢复——不阻塞整体恢复。[br]
-## [b]键归一[/b]：快照经 JSON round-trip 后 int-key 可能变 String——binding_id
-## 统一 [code]int()[/code] 转换（同 DeploymentSystem deserialize 先例）。[br]
-## [br][param data] 快照 Dictionary（[code]{"bindings": [...]}[/code]）。
+## 从快照恢复 BindingRecord——委托给 _serializer 子模块。
 func deserialize_all(data: Dictionary) -> void:
-	_clear_all()
-	var raw_bindings: Variant = data.get("bindings", [])
-	if not raw_bindings is Array:
-		push_warning("BindingManager.deserialize_all: 快照无 bindings 数组——跳过")
-		return
-	for entry: Variant in raw_bindings:
-		if not entry is Dictionary:
-			continue
-		var d: Dictionary = entry
-		var card_instance_id: int = int(d.get("card_instance_id", -1))
-		if card_instance_id < 0:
-			push_warning("BindingManager.deserialize_all: 条目缺 card_instance_id——跳过")
-			continue
-		if not _query_card_exists(card_instance_id):
-			push_warning("BindingManager.deserialize_all: card_instance_id=%d 不存在——跳过"
-				% card_instance_id)
-			continue
-		var record: BindingRecord = _deserialize_record(d)
-		if record == null:
-			continue
-		_register_binding(record)
-		# 叠层实例的 _card_to_character 映射——_register_binding 仅注册主实例，
-		# 叠层实例需逐条补充（同 stack_card 路径的手动注册）
-		for cid: int in record.stack_slots:
-			if cid != record.card_instance_id:
-				_card_to_character[cid] = record.bound_character_id
+	_get_serializer().deserialize_all(data)
 
 
-## 写绑定快照至 GSM battle.bindings（战斗结束导出委托，AC-002）。[br]
-## GSM 不可用时静默跳过（is_instance_valid + has_method 双守卫）。[br]
-## [br]来源: ADR-0013 §GSM 边界 §serialize_all。
+## 写绑定快照至 GSM——委托给 _serializer 子模块。
 func write_snapshot_to_gsm() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null or not gsm.has_method("_set_battle_bindings"):
-		return  # GSM 不可用——静默跳过
-	gsm.call("_set_battle_bindings", serialize_all()["bindings"])
+	_get_serializer().write_snapshot_to_gsm()
 
 
 ## 查询单条绑定的预计算乘积上下文（AC-009）。[br]
@@ -722,40 +725,9 @@ func get_binding_context(card_instance_id: int) -> Dictionary:
 
 # === 内部辅助：序列化 / 反序列化 / GSM ==========================
 
-## 从快照 Dictionary 重建单条 BindingRecord。[br]
-## [b]键归一[/b]：int-key 统一 [code]int()[/code] 转换。[br]
-## [br][b]返回[/b]: 重建的 BindingRecord；非法数据返回 null。
+## 从快照 Dictionary 重建单条 BindingRecord——委托给 _serializer 子模块。
 func _deserialize_record(d: Dictionary) -> BindingRecord:
-	var record: BindingRecord = BindingRecord.new()
-	record.binding_id = int(d.get("binding_id", _next_binding_id))
-	if record.binding_id >= _next_binding_id:
-		_next_binding_id = record.binding_id + 1
-	record.card_instance_id = int(d.get("card_instance_id", -1))
-	if record.card_instance_id < 0:
-		return null
-	record.card_template_id = StringName(d.get("card_template_id", &""))
-	record.card_name = str(d.get("card_name", ""))
-	record.card_rarity = int(d.get("card_rarity", 0))
-	record.slot_type = int(d.get("slot_type", BindingRecord.BindingSlot.GONGFA))
-	record.slot_index = int(d.get("slot_index", 0))
-	record.bound_character_id = int(d.get("bound_character_id", -1))
-	if record.bound_character_id < 0:
-		return null
-	record.is_native = bool(d.get("is_native", false))
-	record.native_multiplier = float(d.get("native_multiplier", 1.0))
-	record.activated_turn = int(d.get("activated_turn", 0))
-	record.is_suspended = bool(d.get("is_suspended", false))
-	var raw_slots: Variant = d.get("stack_slots", [record.card_instance_id])
-	if raw_slots is Array:
-		var slots: Array[int] = []
-		for cid: Variant in raw_slots:
-			slots.append(int(cid))
-		record.stack_slots = slots
-	else:
-		var single: Array[int] = [record.card_instance_id]
-		record.stack_slots = single
-	record.stack_count = int(d.get("stack_count", 1))
-	return record
+	return _get_serializer()._deserialize_record(d)
 
 
 ## 清空全部三索引（deserialize 前置清理）。
@@ -774,3 +746,10 @@ func _get_gsm() -> Node:
 	if tree == null or tree.root == null:
 		return null
 	return tree.root.get_node_or_null("/root/GameStateManager")
+
+
+## 惰性获取序列化子模块（Sprint 8 Story 8-12 拆分）。
+func _get_serializer() -> RefCounted:
+	if _serializer == null:
+		_serializer = load("res://src/feature/binding/binding_serializer.gd").new(self)
+	return _serializer

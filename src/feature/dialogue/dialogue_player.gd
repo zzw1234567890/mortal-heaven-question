@@ -213,7 +213,8 @@ func _check_and_skip_conditions() -> void:
 
 ## 评估单个条件。[br]
 ## 支持 10 种条件类型：story_flag / realm / faction / card_owned / [br]
-## identity / chapter_completed / relation / has_item / combat_result / always。
+## identity / chapter_completed / relation / has_item / combat_result / always。[br]
+## [br]Sprint 8 Story 8-13：接线到 GSM 查询，替换桩 return true。
 func _evaluate_condition(cond: Dictionary) -> bool:
 	var cond_type: String = str(cond.get("type", ""))
 	match cond_type:
@@ -222,18 +223,75 @@ func _evaluate_condition(cond: Dictionary) -> bool:
 		"story_flag":
 			if _event_system == null:
 				return false
-			var flag_name: String = str(cond.get("flag", ""))
+			var flag_name: String = str(cond.get("flag", cond.get("target", "")))
 			var op: String = str(cond.get("operator", "=="))
 			var expected: Variant = cond.get("value", true)
 			var actual: Variant = null
 			if _event_system.has_method("get_flag"):
 				actual = _event_system.get_flag(flag_name)
 			return _compare_values(actual, op, expected)
-		"realm", "faction", "card_owned", "identity", \
-		"chapter_completed", "relation", "has_item", "combat_result":
-			return true  # 桩——需游戏状态上下文，后续接线
+		"identity":
+			var actual: Variant = GameStateManager.get_state("player.identity_id")
+			return _compare_values(actual, str(cond.get("operator", "==")), cond.get("value", ""))
+		"realm":
+			var actual: float = float(GameStateManager.get_state("player.realm"))
+			return _compare_numeric(actual, str(cond.get("operator", ">=")), float(cond.get("value", 0)))
+		"faction":
+			var flags: Variant = GameStateManager.get_state("narrative.story_flags")
+			var actual: String = ""
+			if flags is Dictionary and flags.has("player_faction"):
+				actual = str(flags["player_faction"])
+			return actual == str(cond.get("value", ""))
+		"card_owned":
+			var owned_cards: Variant = GameStateManager.get_state("collection.owned_cards")
+			if owned_cards is Array:
+				for card in owned_cards:
+					if card is Dictionary and str(card.get("template_id", "")) == str(cond.get("value", "")):
+						return true
+					elif str(card) == str(cond.get("value", "")):
+						return true
+			return false
+		"chapter_completed":
+			var completed: Variant = GameStateManager.get_state("narrative.completed_chapters")
+			if completed is Array:
+				return completed.has(str(cond.get("value", "")))
+			return false
+		"relation":
+			var relations: Variant = GameStateManager.get_state("narrative.relations")
+			var target: String = str(cond.get("target", ""))
+			if relations is Dictionary and relations.has(target):
+				return float(relations[target]) >= float(cond.get("value", 0))
+			return false
+		"has_item":
+			var resources: Variant = GameStateManager.get_state("player.resources")
+			var target: String = str(cond.get("target", ""))
+			if resources is Dictionary and resources.has(target):
+				var raw: Variant = resources[target]
+				if raw is Dictionary:
+					var total: int = int(raw.get("low", 0)) + int(raw.get("medium", 0)) + int(raw.get("high", 0)) + int(raw.get("top", 0))
+					return float(total) >= float(cond.get("value", 0))
+				return float(raw) >= float(cond.get("value", 0))
+			return false
+		"combat_result":
+			var battle: Variant = GameStateManager.get_state("battle")
+			if battle == null or not battle is Dictionary:
+				return false
+			return str(battle.get("last_result", "")) == str(cond.get("value", ""))
 		_:
 			return true  # 未知条件类型——默认可见
+
+
+## 比较数值——支持 ==, !=, >=, <=, >, <（Sprint 8 Story 8-13 新增）。[br]
+## 默认 >= 兼容 GDD §条件判定流程 realm 的默认 operator。
+func _compare_numeric(actual: float, op: String, expected: float) -> bool:
+	match op:
+		"==": return actual == expected
+		"!=": return actual != expected
+		">=": return actual >= expected
+		"<=": return actual <= expected
+		">":  return actual > expected
+		"<":  return actual < expected
+		_:    return actual >= expected
 
 
 ## 比较两个值。
