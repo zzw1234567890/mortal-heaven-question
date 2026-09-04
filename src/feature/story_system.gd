@@ -11,6 +11,9 @@ extends Node
 ## [br][b]Story 6-14 范围[/b]：is_boss_unlocked + on_boss_defeated。[br]
 ## [br]来源: ADR-0026 §决策 1/2/4 / GDD story-system.md §2/§4/§6/§公式2。
 
+## 章节完成编排子模块（惰性初始化，Sprint 10 Story 5 拆分）。
+var _chapter_ops: RefCounted = null
+
 
 # === 章节模板（const Dictionary——编译时常量，运行时只读）==================
 
@@ -269,6 +272,13 @@ func _get_gsm() -> Node:
 	return tree.root.get_node_or_null("/root/GameStateManager")
 
 
+## 惰性获取章节编排子模块（Sprint 10 Story 5 拆分）。
+func _get_chapter_ops() -> RefCounted:
+	if _chapter_ops == null:
+		_chapter_ops = load("res://src/feature/story/story_chapter_ops.gd").new(self)
+	return _chapter_ops
+
+
 # === 章节完成编排（Story 6-13）==============================================
 
 ## 章节完成信号——Cat 2b。ExplorationSystem 监听以解锁下一章地图。
@@ -291,74 +301,7 @@ signal game_victory()
 ## [br][b]流程[/b]: 校验前置→查分支 flag→委托 EventSystem 写 story_flags→追加 completed_chapters→推进下一章→发射信号。[br]
 ## [br]来源: ADR-0026 §决策 1 + GDD §4。
 func complete_chapter(branch_id: StringName) -> bool:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return false
-
-	var narrative: Dictionary = gsm.narrative
-	var progress: Dictionary = narrative.get("current_chapter_progress", {})
-
-	# 1. 校验前置条件——BOSS 已击败
-	if not bool(progress.get("boss_defeated", false)):
-		return false
-
-	# 2. 校验前置条件——结局已选择
-	var ending: String = str(progress.get("ending_chosen", ""))
-	if ending.is_empty():
-		return false
-
-	var current_chapter: StringName = StringName(narrative.get("current_chapter", ""))
-	var chapter: Dictionary = CHAPTER_TEMPLATES.get(current_chapter, {})
-	if chapter.is_empty():
-		return false
-
-	# 3. 查找结局分支，设置 story_flags（委托 EventSystem / GSM set_narrative_flag）
-	var branches: Array = chapter.get("ending_branches", [])
-	var found_branch: Dictionary = {}
-	for b: Dictionary in branches:
-		if str(b.get("branch_id", "")) == str(branch_id):
-			found_branch = b
-			break
-	if found_branch.is_empty():
-		return false
-
-	var flags_to_set: Dictionary = found_branch.get("flag_to_set", {})
-	for flag: StringName in flags_to_set:
-		gsm.set_narrative_flag(flag, flags_to_set[flag])
-
-	# 4. 追加当前章节到 completed_chapters
-	var completed: Array = narrative.get("completed_chapters", [])
-	if not completed.has(current_chapter):
-		completed.append(current_chapter)
-		narrative["completed_chapters"] = completed
-		gsm._buffer_change("narrative.completed_chapters", completed.duplicate(), completed)
-
-	# 5. 推进下一章或触发通关
-	var next_chapter: StringName = chapter["completion"]["unlock_next_chapter"]
-	var is_final: bool = str(next_chapter).is_empty()
-
-	if is_final:
-		# 最终章——发射 game_victory 而非 chapter_completed
-		GameStateManager._emit_signal_safe(self, &"game_victory", [])
-		return true
-
-	# 推进到下一章
-	gsm.advance_chapter(next_chapter)
-	# 重置 chapter_progress
-	var new_progress: Dictionary = {
-		"completed_required_events": [],
-		"boss_unlocked": false,
-		"boss_defeated": false,
-		"ending_chosen": "",
-	}
-	var old_progress: Dictionary = narrative.get("current_chapter_progress", {}).duplicate()
-	narrative["current_chapter_progress"] = new_progress
-	gsm._buffer_change("narrative.current_chapter_progress", old_progress, new_progress)
-
-	# 发射 chapter_completed Cat 2b 信号
-	GameStateManager._emit_signal_safe(self, &"chapter_completed", [current_chapter, branch_id])
-
-	return true
+	return _get_chapter_ops().complete_chapter(branch_id)
 
 
 # === BOSS 解锁判定与击败处理（Story 6-14）==================================
@@ -367,30 +310,7 @@ func complete_chapter(branch_id: StringName) -> bool:
 ## [br][b]返回[/b]: [code]true[/code] 所有必经事件已完成；[code]false[/code] 未全部完成或无当前章节。[br]
 ## [br]来源: ADR-0026 §关键接口 is_boss_unlocked + GDD §公式 2。
 func is_boss_unlocked() -> bool:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return false
-
-	var current_chapter: StringName = StringName(gsm.narrative.get("current_chapter", ""))
-	if str(current_chapter).is_empty():
-		return false
-
-	var chapter: Dictionary = CHAPTER_TEMPLATES.get(current_chapter, {})
-	if chapter.is_empty():
-		return false
-
-	var required_events: Array = chapter.get("required_events", [])
-	if required_events.is_empty():
-		return true  # 无必经事件——自动解锁
-
-	var progress: Dictionary = gsm.narrative.get("current_chapter_progress", {})
-	var completed: Array = progress.get("completed_required_events", [])
-
-	for event_id: StringName in required_events:
-		if not completed.has(event_id):
-			return false
-
-	return true
+	return _get_chapter_ops().is_boss_unlocked()
 
 
 ## BOSS 击败处理——设置 boss_defeated=true 并发射 boss_unlocked 信号（ADR-0026）。[br]
@@ -398,21 +318,5 @@ func is_boss_unlocked() -> bool:
 ## [br][b]流程[/b]: 校验解锁状态→写入 boss_defeated→发射 Cat 2b 信号。[br]
 ## [br]来源: ADR-0026 §关键接口 on_boss_defeated + GDD §3。
 func on_boss_defeated() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return
-
-	# 1. 校验 BOSS 已解锁
-	if not is_boss_unlocked():
-		push_warning("StorySystem.on_boss_defeated: BOSS 尚未解锁，必经事件未全部完成")
-		return
-
-	# 2. 写入 boss_defeated=true
-	gsm.set_narrative_boss_defeated(true)
-
-	# 3. 发射 boss_unlocked Cat 2b 信号
-	var current_chapter: StringName = StringName(gsm.narrative.get("current_chapter", ""))
-	var chapter: Dictionary = CHAPTER_TEMPLATES.get(current_chapter, {})
-	var boss_id: StringName = StringName(str(chapter.get("chapter_boss", {}).get("boss_id", "")))
-	GameStateManager._emit_signal_safe(self, &"boss_unlocked", [current_chapter, boss_id])
+	_get_chapter_ops().on_boss_defeated()
 

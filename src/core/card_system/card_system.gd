@@ -28,6 +28,9 @@ const DEFAULT_TEMPLATE_PATH: StringName = &"res://assets/cards/templates/"
 ## 每帧最多查询的异步加载状态数——节流上限（222/10 ≈ 23 帧 ≈ 380ms @ 60fps）。
 const MAX_PER_FRAME: int = 10
 
+## 序列化子模块（Sprint 10 Story 6 拆分）。
+const _Serializer := preload("res://src/core/card_system/card_serializer.gd")
+
 ## 章节字符串 → 章节编号映射（ADR-0026 5 章结构）。
 ## 用于 create_instance 将 GSM.narrative.current_chapter (String) 解析为 CardInstance.acquired_chapter (int)。
 ## 未匹配或空字符串 → 0（表示"章节未开始/未知"）。
@@ -282,17 +285,7 @@ func _resolve_chapter_number(chapter_str: String) -> int:
 ## [br][param inst]: 待序列化的卡牌实例。[br]
 ## [br][b]返回[/b]: 含全部 9 字段的 Dictionary，inscriptions 为深拷贝（避免共享引用）。
 func serialize_instance(inst: CardInstance) -> Dictionary:
-	return {
-		"card_instance_id": inst.card_instance_id,
-		"template_id": inst.template_id,
-		"level": inst.level,
-		"inscriptions": inst.inscriptions.duplicate(true),
-		"breakthrough_layers": inst.breakthrough_layers,
-		"binding_target_id": inst.binding_target_id,
-		"acquired_chapter": inst.acquired_chapter,
-		"acquired_event_id": inst.acquired_event_id,
-		"acquired_method": inst.acquired_method,
-	}
+	return _Serializer.serialize_instance(inst)
 
 
 ## 从 [Dictionary] 反序列化为 [CardInstance]——恢复全部 9 字段。[br]
@@ -306,17 +299,7 @@ func serialize_instance(inst: CardInstance) -> Dictionary:
 ## [br][param data]: 序列化的 Dictionary（可能来自 JSON 反序列化，字段类型可能为 String）。[br]
 ## [br][b]返回[/b]: 恢复的 CardInstance 实例。
 func deserialize_instance(data: Dictionary) -> CardInstance:
-	var inst: CardInstance = CardInstance.new()
-	inst.card_instance_id = _get_int_field(data, "card_instance_id", 0)
-	inst.template_id = _to_stringname(data.get("template_id", &""))
-	inst.level = _get_int_field(data, "level", 1)
-	inst.inscriptions = _get_inscriptions_field(data, "inscriptions")
-	inst.breakthrough_layers = _get_int_field(data, "breakthrough_layers", 0)
-	inst.binding_target_id = _to_stringname(data.get("binding_target_id", &""))
-	inst.acquired_chapter = _get_int_field(data, "acquired_chapter", 0)
-	inst.acquired_event_id = _to_stringname(data.get("acquired_event_id", &""))
-	inst.acquired_method = _get_int_field(data, "acquired_method", 0)
-	return inst
+	return _Serializer.deserialize_instance(data)
 
 
 ## 批量反序列化——将存档中的 Dictionary 数组重构为 CardInstance 数组。[br]
@@ -327,40 +310,7 @@ func deserialize_instance(data: Dictionary) -> CardInstance:
 ## NOTE: 返回裸 Array 而非 Array[CardInstance]——GDScript 4.6 在不声明 class_name 的
 ## 脚本中跨文件 typed array 返回类型解析不稳定（同 get_templates_by_type 先例）。
 func reconstitute_instances(dicts: Array) -> Array:
-	var result: Array = []
-	result.resize(dicts.size())
-	for i: int in range(dicts.size()):
-		result[i] = deserialize_instance(dicts[i])
-	return result
-
-
-## 从 Dictionary 读取 int 字段——AC-009 类型不匹配容错。[br]
-## [br][b]策略[/b]：[br]
-##   - int 类型 → 直接返回[br]
-##   - float 类型 → [code]int()[/code] 截断转换（JSON 数字可能为 float）[br]
-##   - String 类型且为数字 → [code]int()[/code] 转换（兼容 JSON 数字字符串）[br]
-##   - String 类型且非数字 → [method @GlobalScope.push_error] + 返回默认值[br]
-##   - 其他类型 → [method @GlobalScope.push_error] + 返回默认值[br]
-## [br][param data]: 源 Dictionary。[br]
-## [br][param key]: 字段键名。[br]
-## [br][param default_value]: 类型不匹配或缺失时的默认值。[br]
-## [br][b]返回[/b]: int 字段值或默认值。
-func _get_int_field(data: Dictionary, key: String, default_value: int) -> int:
-	if not data.has(key):
-		return default_value
-	var value: Variant = data[key]
-	if typeof(value) == TYPE_INT:
-		return value
-	if typeof(value) == TYPE_FLOAT:
-		return int(value)
-	if typeof(value) == TYPE_STRING:
-		var s: String = value
-		if s.is_valid_int():
-			return int(s)
-		push_error("CardSystem.deserialize_instance: 字段 '%s' 类型不匹配（String 非数字 '%s'）——使用默认值 %d" % [key, s, default_value])
-		return default_value
-	push_error("CardSystem.deserialize_instance: 字段 '%s' 类型不匹配（期望 int，实际类型 %d）——使用默认值 %d" % [key, typeof(value), default_value])
-	return default_value
+	return _Serializer.reconstitute_instances(dicts)
 
 
 ## 将 Variant 值安全转换为 StringName——处理 JSON 往返产生的 String/null。[br]
@@ -375,24 +325,6 @@ func _to_stringname(value: Variant) -> StringName:
 	if value is String:
 		return StringName(value)
 	return &""
-
-
-## 从 Dictionary 读取 inscriptions 字段——显式深拷贝 + null/类型容错。[br]
-## [br]AC-002 元素级深拷贝：[method Array.duplicate] 递归拷贝 Array 容器及内部 Dictionary 元素，
-## 避免反序列化后的实例修改影响原存档 Dictionary。[br]
-## [br]容错：null 或非 Array 值（存档损坏）→ 空数组，不崩溃。[br]
-## [br][param data]: 源 Dictionary。[br]
-## [br][param key]: 字段键名。[br]
-## [br][b]返回[/b]: 深拷贝的 Array[Dictionary]，或空数组（值缺失/无效时）。
-func _get_inscriptions_field(data: Dictionary, key: String) -> Array[Dictionary]:
-	var raw: Variant = data.get(key, [])
-	if not raw is Array:
-		return []
-	var result: Array[Dictionary] = []
-	for item: Variant in raw:
-		if item is Dictionary:
-			result.append((item as Dictionary).duplicate(true))
-	return result
 
 
 ## 校验加载的资源是否为有效的 CardTemplate 模板。[br]

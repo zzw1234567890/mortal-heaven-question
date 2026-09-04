@@ -134,6 +134,9 @@ var _test_mode: bool = false
 ## tree_changed 信号可能在非场景切换场景下触发——此标志位作为语义校验。
 var _phase3_in_progress: bool = false
 
+## 转换管线子模块（惰性初始化，Sprint 10 Story 7 拆分）。
+var _transition: RefCounted = null
+
 ## === 依赖注入 ==================================================================
 
 ## 注入的 GSM 引用。null 时使用 GameStateManager Autoload。
@@ -183,6 +186,13 @@ func _get_save_load() -> Node:
 	if _save_load != null:
 		return _save_load
 	return SaveLoadSystem
+
+
+## 惰性获取转换管线子模块（Sprint 10 Story 7 拆分）。
+func _get_transition() -> RefCounted:
+	if _transition == null:
+		_transition = load("res://src/foundation/scene_transition.gd").new(self)
+	return _transition
 
 ## === 公共 API ==================================================================
 
@@ -268,80 +278,14 @@ func _emit_post_transition(from: int, to: int) -> void:
 ## [br]AC-7（Story 004）：[b]优雅降级[/b]——加载画面缺失时跳过加载画面，直接加载目标场景。[br]
 ## [b]错误恢复[/b]: 目标场景缺失 → 清理状态 + 回退 MAIN_MENU。
 func _execute_transition(from: int, to: int) -> void:
-	# 测试模式：跳过异步场景加载——直接执行 Phase 4-5
-	if _test_mode:
-		_execute_post_load(from, to, SCENE_PATHS[to])
-		return
-
-	# Phase 3 —— LOAD（两段式：加载画面 → 目标场景）
-	var loading_path: String = SCENE_PATHS[SceneID.LOADING]
-	var target_path: String = SCENE_PATHS[to]
-
-	# Step 1: 切换到加载画面
-	var err1: int = get_tree().change_scene_to_file(loading_path)
-	if err1 != OK:
-		# AC-7: 优雅降级——加载画面缺失，直接加载目标场景。
-		# 不调用 _cleanup_on_error——保留 Phase 2 锁和 _transitioning 状态。
-		# 设置 _phase3_in_progress = true 让 Phase 4 守卫正常通过——加载画面虽未启动，
-		# 但标志位为 true 表示管线应正常完成 Phase 4-5（而非错误中止）。
-		push_error("SceneManager: 无法加载 loading_screen.tscn（err=%d）——跳过加载画面，直接加载目标场景" % err1)
-		_phase3_in_progress = true
-	else:
-		# 加载画面加载成功——设置标志位（AC-3 步骤 2）
-		_phase3_in_progress = true
-
-		await get_tree().tree_changed
-		# tree_changed 后再检查：若 Phase 3 被外部中断则清理
-		if not _phase3_in_progress:
-			return
-
-		# 向加载画面注入上下文（同步调用，AC-2）
-		_inject_loading_context(from, to)
-
-	# Step 2: 切换到目标场景（正常路径和降级路径共用）
-	var err2: int = get_tree().change_scene_to_file(target_path)
-	if err2 != OK:
-		# AC-5: 目标场景不存在——记录错误，尝试回退 MAIN_MENU
-		push_error("SceneManager: 目标场景不存在：%s（err=%d）" % [target_path, err2])
-		_cleanup_on_error(&"target_scene_missing")
-		# 尝试回退到主菜单
-		var fallback_ok: bool = request_scene_change(_current_scene_id, SceneID.MAIN_MENU, TransitionType.GAME_TO_MENU)
-		if not fallback_ok:
-			push_error("SceneManager: 回退主菜单也失败——手动恢复")
-		return
-
-	await get_tree().tree_changed
-
-	# Phase 4 —— POST-LOAD（双重保底：检查 _phase3_in_progress）
-	if not _phase3_in_progress:
-		# AC-6: await 异常中断——tree_changed 到达但标志位已被外部清除
-		push_error("SceneManager: Phase 3 异常中断——强制清理")
-		_cleanup_on_error(&"phase3_aborted")
-		return
-
-	# 防御性校验：确认当前场景路径匹配
-	var current: Node = get_tree().current_scene
-	if current == null or current.scene_file_path != target_path:
-		push_error("SceneManager: tree_changed 后场景路径不匹配（期望=%s, 实际=%s）" % [
-				target_path,
-				current.scene_file_path if current != null else "null"])
-		_cleanup_on_error(&"path_mismatch")
-		return
-
-	_execute_post_load(from, to, target_path)
+	_get_transition()._execute_transition(from, to)
 
 
 ## 错误恢复——统一清理入口。[br]
 ## 恢复 _transitioning + _transition_type + _phase3_in_progress 到初始状态，
 ## 并强制释放 TRANSITION 级输入锁，防止死锁和锁泄漏。
 func _cleanup_on_error(reason: StringName) -> void:
-	_transitioning = false
-	_transition_type = TransitionType.NONE
-	_phase3_in_progress = false
-
-	var im: Node = _get_im()
-	if im != null and im.has_method("pop_lock"):
-		im.pop_lock(&"scene_manager")
+	_get_transition()._cleanup_on_error(reason)
 
 
 ## 向加载画面场景注入上下文（from, to, type）。[br]
@@ -350,9 +294,7 @@ func _cleanup_on_error(reason: StringName) -> void:
 ## [code]change_scene_to_file(target)[/code] 之前调用。[br]
 ## [br][b]AC-2[/b]（Story 004）：上下文传递为同步调用——不依赖 [code]_ready()[/code] 的 await。
 func _inject_loading_context(from: int, to: int) -> void:
-	var loading_scene: Node = get_tree().current_scene
-	if loading_scene != null and loading_scene.has_method("set_context"):
-		loading_scene.set_context(from, to, _transition_type)
+	_get_transition()._inject_loading_context(from, to)
 
 
 ## Phase 4-5 同步执行体。[br]
@@ -361,29 +303,7 @@ func _inject_loading_context(from: int, to: int) -> void:
 ## [br]Phase 4: GSM 写入 → 解锁输入 → 发射 [signal post_transition]。[br]
 ## Phase 5: [_current_scene_id] = [param to], [_transitioning] = false, [_transition_type] = NONE.
 func _execute_post_load(from: int, to: int, target_path: String) -> void:
-	# Phase 4 —— GSM 写入
-	var gsm: Node = _get_gsm()
-	if gsm != null and gsm.has_method("set_session_scene"):
-		# 通过 GSM 第二层原子方法——触发 batch_updated（生产路径）
-		gsm.set_session_scene(to, target_path)
-	elif gsm != null and "session" in gsm:
-		# 测试 mock 回退——mock 对象无 GSM 缓冲层，直接赋值
-		gsm.session.current_scene = target_path
-		gsm.session.scene_id = to
-
-	# 解锁输入（AC-3：顺序——GSM 写入 → post_transition → pop_lock）
-	var im_ok: Node = _get_im()
-	if im_ok != null and im_ok.has_method("pop_lock"):
-		im_ok.pop_lock(&"scene_manager")
-
-	# 发射 post_transition（必须在新场景 ready 后、第一个 _process 前）
-	_emit_post_transition(from, to)
-
-	# Phase 5 —— FINALIZE
-	_current_scene_id = to
-	_transitioning = false
-	_transition_type = TransitionType.NONE
-	_phase3_in_progress = false
+	_get_transition()._execute_post_load(from, to, target_path)
 
 
 ## 创建全屏不透明 ColorRect 用于目标场景的淡入保护。[br]

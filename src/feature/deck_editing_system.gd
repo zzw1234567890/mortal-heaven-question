@@ -38,8 +38,27 @@ var _resource_override: Node = null
 ## 当前战利品选项缓存——generate_loot_options 生成，apply_loot_choice 消费。
 var _loot_options: Array = []
 
+## 坊市操作子模块（惰性初始化）。
+var _shop: RefCounted = null
+
+## 摘要查询子模块（惰性初始化）。
+var _summary: RefCounted = null
+
 
 # === 卡组校验 API（纯函数——不修改 GSM 状态）==================================
+
+## 惰性获取坊市操作子模块。
+func _get_shop() -> RefCounted:
+	if _shop == null:
+		_shop = load("res://src/feature/deck/deck_shop.gd").new(self)
+	return _shop
+
+
+## 惰性获取摘要查询子模块。
+func _get_summary() -> RefCounted:
+	if _summary == null:
+		_summary = load("res://src/feature/deck/deck_summary.gd").new(self)
+	return _summary
 
 ## 检查是否可以添加卡牌到卡组——境界上限 + 天赋修正 + 当前张数比较。[br]
 ## [br][param count] 要添加的卡牌数量。[br]
@@ -240,40 +259,21 @@ func get_default_deck(identity_id: int) -> Array:
 ## [br][b]返回[/b]: [code]{total, limit, is_full, is_minimal}[/code] Dictionary。[br]
 ## [br]来源: ADR-0023 §查询接口 + GDD §核心规则 #5/#7。
 func get_deck_summary() -> Dictionary:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return {"total": 0, "limit": 0, "is_full": false, "is_minimal": true}
-	var total: int = gsm.deck.get("current_deck", []).size()
-	var limit: int = get_deck_limit()
-	return {
-		"total": total,
-		"limit": limit,
-		"is_full": total >= limit,
-		"is_minimal": total <= MINIMUM_DECK_SIZE,
-	}
+	return _get_summary().get_deck_summary()
 
 
 ## 获取当前缓存的战利品选项——供 UI 展示。[br]
 ## [br][b]返回[/b]: Array[Dictionary] 副本——generate_loot_options 后缓存。[br]
 ## [br]来源: ADR-0023 §战利品操作 + GDD §核心规则 #2。
 func get_loot_options() -> Array:
-	return _loot_options.duplicate(true)
+	return _get_summary().get_loot_options()
 
 
 ## 获取卡组综合状态——供 UI 一次性刷新。[br]
 ## [br][b]返回[/b]: [code]{deck_count, deck_limit, is_full, remove_count, can_delete, delete_cost}[/code] Dictionary。[br]
 ## [br]来源: ADR-0023 §查询接口 + GDD §核心规则 #3/#7。
 func get_deck_status() -> Dictionary:
-	var summary: Dictionary = get_deck_summary()
-	var can_remove: Dictionary = can_remove_from_deck(1)
-	return {
-		"deck_count": summary["total"],
-		"deck_limit": summary["limit"],
-		"is_full": summary["is_full"],
-		"remove_count": get_session_remove_count(),
-		"can_delete": can_remove["allowed"],
-		"delete_cost": get_delete_cost(),
-	}
+	return _get_summary().get_deck_status()
 
 
 # === 内部辅助 ====================================================================
@@ -315,11 +315,7 @@ func _get_resource_system() -> Node:
 ## [br][b]注意[/b]: session_remove_count 是已执行次数，delete_card_cost 期望次数从 1 开始。[br]
 ## [br]来源: ADR-0023 §坊市操作 + GDD §核心规则 #3 ②散功。
 func get_delete_cost() -> int:
-	var rs: Node = _get_resource_system()
-	if rs == null or not rs.has_method("delete_card_cost"):
-		return 50  # 默认基价
-	var count: int = get_session_remove_count() + 1  # 下一次散功次数
-	return rs.delete_card_cost(count)
+	return _get_shop().get_delete_cost()
 
 
 ## 执行散功——支付灵石永久移除一张卡牌。[br]
@@ -328,29 +324,7 @@ func get_delete_cost() -> int:
 ## [br][b]流程[/b]: get_delete_cost → can_spend → remove_cards → spend_resource → session_remove_count+1。[br]
 ## [br]来源: ADR-0023 §execute_delete + GDD §核心规则 #3 ②散功。
 func execute_delete(card_id: int) -> bool:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		push_warning("DeckEditingSystem.execute_delete: GSM 不可用")
-		return false
-	var rs: Node = _get_resource_system()
-	if rs == null:
-		push_warning("DeckEditingSystem.execute_delete: ResourceSystem 不可用")
-		return false
-	var cost: int = get_delete_cost()
-	# 灵石不足时拒绝
-	if rs.has_method("can_spend") and not rs.can_spend(&"ling_shi", cost):
-		push_warning("DeckEditingSystem.execute_delete: 灵石不足（需要 %d）" % cost)
-		return false
-	# 移除卡牌（含最低张数保护）
-	if not remove_cards_from_deck([card_id], "shop_delete", "散功"):
-		return false
-	# 扣除灵石
-	if rs.has_method("spend_resource"):
-		rs.spend_resource(&"ling_shi", cost)
-	# 递增散功计数
-	var new_count: int = get_session_remove_count() + 1
-	gsm._set_deck_session_remove_count(new_count)
-	return true
+	return _get_shop().execute_delete(card_id)
 
 
 ## 获取拆解价值——委托 ResourceSystem.dismantle_value。[br]
@@ -358,12 +332,7 @@ func execute_delete(card_id: int) -> bool:
 ## [br][b]返回[/b]: 拆解所得灵石数。[br]
 ## [br]来源: ADR-0023 §get_sell_price + GDD §核心规则 #3 ③拆解。
 func get_sell_price(card_id: int) -> int:
-	var rs: Node = _get_resource_system()
-	if rs == null or not rs.has_method("dismantle_value"):
-		return 10  # 默认白色拆解值
-	# 桩阶段——用默认 rarity=1(白), level=1
-	# 后续接线：从 CardSystem.get_instance(card_id) 查询 rarity + level
-	return rs.dismantle_value(1, 1)
+	return _get_shop().get_sell_price(card_id)
 
 
 ## 执行拆解——移除卡牌并获取灵石。[br]
@@ -372,22 +341,7 @@ func get_sell_price(card_id: int) -> int:
 ## [br][b]流程[/b]: get_sell_price → remove_cards → add_resource。[br]
 ## [br]来源: ADR-0023 §execute_sell + GDD §核心规则 #3 ③拆解。
 func execute_sell(card_id: int) -> bool:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		push_warning("DeckEditingSystem.execute_sell: GSM 不可用")
-		return false
-	var rs: Node = _get_resource_system()
-	if rs == null:
-		push_warning("DeckEditingSystem.execute_sell: ResourceSystem 不可用")
-		return false
-	var price: int = get_sell_price(card_id)
-	# 移除卡牌（含最低张数保护）
-	if not remove_cards_from_deck([card_id], "shop_sell", "拆解"):
-		return false
-	# 增加灵石
-	if rs.has_method("add_resource"):
-		rs.add_resource(&"ling_shi", price)
-	return true
+	return _get_shop().execute_sell(card_id)
 
 
 # === 战利品编排（Story 5-15 桩实现）===========================================

@@ -53,6 +53,9 @@ const MAX_INSCRIPTIONS: int = 3
 ## 中级灵材品质值（与 ResourceSystem.LingCaiQuality.MEDIUM 一致）。
 const LING_CAI_MEDIUM: int = 2
 
+## 候选生成子模块（Sprint 10 Story 4 拆分）。
+const _Candidates := preload("res://src/feature/inscription/inscription_candidates.gd")
+
 
 # === 测试注入覆盖（static var——测试时注入 mock，运行时为 null 走 Autoload）===
 
@@ -100,61 +103,7 @@ const SUBSTAT_WEIGHTS: Dictionary = {
 ## [br][b]流程[/b]: 有效已有列表→基础权重→定向加权→境界加成/T4移除→费用-1特殊处理→已有属性减半→不放回抽取。[br]
 ## [br]来源: ADR-0030 §generate_candidates + GDD §3。
 static func generate_candidates(existing: Array, realm_level: int, to_replace_idx: int, direction: int, rng: RandomNumberGenerator) -> Array:
-	# Step 1: 构建有效已有列表（排除被替换属性）
-	var effective: Array = []
-	for i: int in range(existing.size()):
-		if i != to_replace_idx:
-			var entry: Dictionary = existing[i]
-			effective.append(str(entry.get("type", "")))
-
-	# Step 2: 从权重表复制基础权重
-	var weights: Dictionary = {}
-	for key: String in SUBSTAT_WEIGHTS:
-		weights[key] = int(SUBSTAT_WEIGHTS[key]["weight"])
-
-	# Step 2.5: 定向铭刻方向加权（在境界加成前应用）
-	if direction == Direction.ATTACK:
-		for key: String in ["atk+1", "crit+3", "crit_dmg+5"]:
-			if weights.has(key):
-				weights[key] = floori(weights[key] * DIRECTION_BONUS_MULTIPLIER)
-	elif direction == Direction.DEFENSE:
-		for key: String in ["def+1", "hp+2"]:
-			if weights.has(key):
-				weights[key] = floori(weights[key] * DIRECTION_BONUS_MULTIPLIER)
-		if realm_level >= 2 and weights.has("regen+1"):
-			weights["regen+1"] = floori(weights["regen+1"] * DIRECTION_BONUS_MULTIPLIER)
-	elif direction == Direction.TACTICAL:
-		for key: String in ["lifesteal+2", "weakness"]:
-			if weights.has(key):
-				weights[key] = floori(weights[key] * DIRECTION_BONUS_MULTIPLIER)
-		if realm_level >= 2:
-			if weights.has("armor_break"):
-				weights["armor_break"] = floori(weights["armor_break"] * DIRECTION_BONUS_MULTIPLIER)
-			if weights.has("mana_extract"):
-				weights["mana_extract"] = floori(weights["mana_extract"] * DIRECTION_BONUS_MULTIPLIER)
-
-	# Step 3: 境界加成或 T4 移除
-	if realm_level >= 2:
-		var bonus: int = floori(realm_level * 2)
-		for key: String in ["cost-1", "regen+1", "armor_break", "mana_extract"]:
-			if weights.has(key):
-				weights[key] += bonus
-	else:
-		# 炼气期：移除 T4 属性
-		for key: String in ["cost-1", "regen+1", "armor_break", "mana_extract"]:
-			weights.erase(key)
-
-	# Step 3.5: 费用-1 已存在时完全移除（不叠加→死抽候选不应出现）
-	if effective.has("cost-1"):
-		weights.erase("cost-1")
-
-	# Step 4: 已有相同属性权重减半（作用于已含加成后的权重，max(1,...) 防归零）
-	for stat: String in effective:
-		if weights.has(stat) and int(weights[stat]) > 0:
-			weights[stat] = maxi(1, floori(int(weights[stat]) * DUPLICATE_PENALTY_MULTIPLIER))
-
-	# Step 5: 不放回抽取 3 个互不相同的候选
-	return _weighted_sample_without_replacement(weights, CANDIDATE_COUNT, rng)
+	return _Candidates.generate_candidates(existing, realm_level, to_replace_idx, direction, rng)
 
 
 ## 加权不放回抽取——从权重字典中抽取 N 个互不相同的键（ADR-0030）。[br]
@@ -164,42 +113,7 @@ static func generate_candidates(existing: Array, realm_level: int, to_replace_id
 ## [br][b]返回[/b]: Array[String]——互不相同的候选键列表（最多 min(pool_size, count) 个）。[br]
 ## [br]来源: ADR-0030 §_weighted_sample_without_replacement。
 static func _weighted_sample_without_replacement(weights: Dictionary, count: int, rng: RandomNumberGenerator) -> Array:
-	var pool: Array = weights.keys()
-	var result: Array = []
-	var take: int = mini(count, pool.size())
-
-	for _i: int in range(take):
-		if pool.is_empty():
-			break
-
-		# 计算总权重
-		var total_weight: float = 0.0
-		for key: String in pool:
-			total_weight += int(weights[key])
-
-		if total_weight <= 0.0:
-			# 所有权重为 0——直接取第一个
-			result.append(pool[0])
-			pool.pop_at(0)
-			continue
-
-		# 加权抽取
-		var roll: float = rng.randf() * total_weight
-		var accumulated: float = 0.0
-		var chosen_idx: int = -1
-		for j: int in range(pool.size()):
-			accumulated += int(weights[pool[j]])
-			if roll < accumulated:
-				chosen_idx = j
-				break
-
-		if chosen_idx < 0:
-			chosen_idx = pool.size() - 1
-
-		result.append(pool[chosen_idx])
-		pool.pop_at(chosen_idx)
-
-	return result
+	return _Candidates._weighted_sample_without_replacement(weights, count, rng)
 
 
 # === 候选生成中间结果查询（测试用——返回计算后的权重字典）=====================
@@ -212,59 +126,7 @@ static func _weighted_sample_without_replacement(weights: Dictionary, count: int
 ## [br][b]返回[/b]: Dictionary——变换后的权重字典（键=属性名，值=权重值）。[br]
 ## [br]来源: ADR-0030 §generate_candidates 测试辅助。
 static func get_candidate_weights(existing: Array, realm_level: int, to_replace_idx: int, direction: int) -> Dictionary:
-	# Step 1: 构建有效已有列表
-	var effective: Array = []
-	for i: int in range(existing.size()):
-		if i != to_replace_idx:
-			var entry: Dictionary = existing[i]
-			effective.append(str(entry.get("type", "")))
-
-	# Step 2: 复制基础权重
-	var weights: Dictionary = {}
-	for key: String in SUBSTAT_WEIGHTS:
-		weights[key] = int(SUBSTAT_WEIGHTS[key]["weight"])
-
-	# Step 2.5: 定向加权
-	if direction == Direction.ATTACK:
-		for key: String in ["atk+1", "crit+3", "crit_dmg+5"]:
-			if weights.has(key):
-				weights[key] = floori(weights[key] * DIRECTION_BONUS_MULTIPLIER)
-	elif direction == Direction.DEFENSE:
-		for key: String in ["def+1", "hp+2"]:
-			if weights.has(key):
-				weights[key] = floori(weights[key] * DIRECTION_BONUS_MULTIPLIER)
-		if realm_level >= 2 and weights.has("regen+1"):
-			weights["regen+1"] = floori(weights["regen+1"] * DIRECTION_BONUS_MULTIPLIER)
-	elif direction == Direction.TACTICAL:
-		for key: String in ["lifesteal+2", "weakness"]:
-			if weights.has(key):
-				weights[key] = floori(weights[key] * DIRECTION_BONUS_MULTIPLIER)
-		if realm_level >= 2:
-			if weights.has("armor_break"):
-				weights["armor_break"] = floori(weights["armor_break"] * DIRECTION_BONUS_MULTIPLIER)
-			if weights.has("mana_extract"):
-				weights["mana_extract"] = floori(weights["mana_extract"] * DIRECTION_BONUS_MULTIPLIER)
-
-	# Step 3: 境界加成或 T4 移除
-	if realm_level >= 2:
-		var bonus: int = floori(realm_level * 2)
-		for key: String in ["cost-1", "regen+1", "armor_break", "mana_extract"]:
-			if weights.has(key):
-				weights[key] += bonus
-	else:
-		for key: String in ["cost-1", "regen+1", "armor_break", "mana_extract"]:
-			weights.erase(key)
-
-	# Step 3.5: 费用-1 已存在时完全移除
-	if effective.has("cost-1"):
-		weights.erase("cost-1")
-
-	# Step 4: 已有属性权重减半
-	for stat: String in effective:
-		if weights.has(stat) and int(weights[stat]) > 0:
-			weights[stat] = maxi(1, floori(int(weights[stat]) * DUPLICATE_PENALTY_MULTIPLIER))
-
-	return weights
+	return _Candidates.get_candidate_weights(existing, realm_level, to_replace_idx, direction)
 
 
 # === 铭刻费用与拆解返还（纯函数）==============================================

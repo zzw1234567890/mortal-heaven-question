@@ -65,11 +65,33 @@ var _immunity_flags: Dictionary = {}
 ## 暂挂状态从 _instances/_by_target 迁出，冻结倒计时（tick_all 不递减）。
 var _suspended: Dictionary = {}
 
+## 快照子模块（惰性初始化）。
+var _snapshot: RefCounted = null
+
+## 暂挂子模块（惰性初始化）。
+var _suspend: RefCounted = null
+
 
 # === 内置虚方法 ===================================================================
 
 func _ready() -> void:
 	_load_templates_from(DEFAULT_TEMPLATE_PATH)
+
+
+# === 子模块惰性初始化 ============================================================
+
+## 快照子模块惰性初始化。
+func _get_snapshot() -> RefCounted:
+	if _snapshot == null:
+		_snapshot = load("res://src/core/status_effect/status_effect_snapshot.gd").new(self)
+	return _snapshot
+
+
+## 暂挂子模块惰性初始化。
+func _get_suspend() -> RefCounted:
+	if _suspend == null:
+		_suspend = load("res://src/core/status_effect/status_effect_suspend.gd").new(self)
+	return _suspend
 
 
 # === 公共 API =====================================================================
@@ -182,49 +204,21 @@ func get_active_count(target_id: int) -> int:
 ##            value/current_stacks/source_card_instance_id/priority/is_hidden/metadata。[br]
 ## [br][b]来源[/b]: ADR-0011 §snapshot 导出。
 func export_snapshot() -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	var statuses: Array = []
-	for status_id: int in _instances:
-		var status: StatusInstance = _instances[status_id]
-		if status.is_expired:
-			continue  # 排除过期状态（AC-002）
-		statuses.append(status)
-	# 按 target_id 升序分组（AC-003）
-	statuses.sort_custom(func(a: StatusInstance, b: StatusInstance) -> bool:
-		return a.target_id < b.target_id
-	)
-	for status: StatusInstance in statuses:
-		result.append(_serialize_status(status))
-	return result
+	return _get_snapshot().export_snapshot()
 
 
 ## 写入快照到 GSM battle 域（GSM 例外——仅快照不存活跃实例）。[br]
 ## [br]GSM 不可用时静默跳过（is_instance_valid + has_method 双守卫）。[br]
 ## [br][b]来源[/b]: ADR-0011 §GSM 例外模式。
 func write_snapshot_to_gsm() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null or not gsm.has_method("_set_battle_status_snapshot"):
-		return  # GSM 不可用——静默跳过（AC-005）
-	var snapshot: Array[Dictionary] = export_snapshot()
-	gsm.call("_set_battle_status_snapshot", snapshot)
+	_get_snapshot().write_snapshot_to_gsm()
 
 
 ## 暂挂状态——将实例从活跃注册表迁入 _suspended，冻结倒计时。[br]
 ## [br][param status_id] 状态实例 ID。[br]
 ## [br][b]返回[/b]: 暂挂成功 true；不存在返回 false（不报错）。
 func suspend_status(status_id: int) -> bool:
-	var status: StatusInstance = _instances.get(status_id, null)
-	if status == null:
-		return false
-	# 从 _instances + _by_target 移除（不发射 status_removed——暂挂非移除）
-	_instances.erase(status_id)
-	var ids: Array = _by_target.get(status.target_id, [])
-	ids.erase(status_id)
-	if ids.is_empty():
-		_by_target.erase(status.target_id)
-	# 迁入 _suspended
-	_suspended[status_id] = status
-	return true
+	return _get_suspend().suspend_status(status_id)
 
 
 ## 恢复暂挂状态——将实例从 _suspended 迁回活跃注册表，恢复倒计时。[br]
@@ -232,49 +226,21 @@ func suspend_status(status_id: int) -> bool:
 ## [br][param status_id] 状态实例 ID。[br]
 ## [br][b]返回[/b]: 恢复成功 true；不存在返回 false（不报错）。
 func restore_status(status_id: int) -> bool:
-	var status: StatusInstance = _suspended.get(status_id, null)
-	if status == null:
-		return false
-	# 20 上限检查——恢复前若已满，驱逐（AC-014）
-	if get_active_count(status.target_id) >= MAX_ACTIVE_STATUSES_PER_CHARACTER:
-		_evict_lowest(status.target_id)
-	# 迁回活跃
-	_suspended.erase(status_id)
-	_register_instance(status)
-	return true
+	return _get_suspend().restore_status(status_id)
 
 
 ## 恢复目标的所有暂挂状态——按 priority 降序 + applied_turn 升序（稳定性保证）。[br]
 ## [br][param target_id] 目标角色实例 ID。[br]
 ## [br][b]来源[/b]: ADR-0011 §暂挂/恢复 §排序契约（AC-013）。
 func restore_all_suspended(target_id: int) -> void:
-	var suspended_ids: Array[int] = []
-	for status_id: int in _suspended:
-		var status: StatusInstance = _suspended[status_id]
-		if status.target_id == target_id:
-			suspended_ids.append(status_id)
-	# 排序：priority 降序（大数值=高优先级先恢复）+ applied_turn 升序
-	suspended_ids.sort_custom(func(a: int, b: int) -> bool:
-		var sa: StatusInstance = _suspended[a]
-		var sb: StatusInstance = _suspended[b]
-		if sa.priority != sb.priority:
-			return sa.priority > sb.priority  # 高 priority 先恢复
-		return sa.applied_turn < sb.applied_turn  # 旧 applied_turn 先恢复
-	)
-	for status_id: int in suspended_ids:
-		restore_status(status_id)
+	_get_suspend().restore_all_suspended(target_id)
 
 
 ## 获取目标的暂挂状态列表。[br]
 ## [br][param target_id] 目标角色实例 ID。[br]
 ## [br][b]返回[/b]: Array[int]——暂挂 status_id 列表；无暂挂返回空数组。
 func get_suspended_statuses(target_id: int) -> Array[int]:
-	var result: Array[int] = []
-	for status_id: int in _suspended:
-		var status: StatusInstance = _suspended[status_id]
-		if status.target_id == target_id:
-			result.append(status_id)
-	return result
+	return _get_suspend().get_suspended_statuses(target_id)
 
 
 ## 导入快照重建状态（round-trip 反序列化）。[br]
@@ -282,32 +248,7 @@ func get_suspended_statuses(target_id: int) -> Array[int]:
 ## 重建 StatusInstance 并注册到 _instances/_by_target——保留原 id 若未冲突，否则分配新 id。[br]
 ## [br][param snapshot] Array[Dictionary]——export_snapshot 的输出格式。
 func import_snapshot(snapshot: Array) -> void:
-	for entry: Dictionary in snapshot:
-		if entry.get("is_expired", false):
-			continue  # 跳过过期条目
-		var instance: StatusInstance = StatusInstance.new()
-		# 保留原 id（若未冲突）——否则由注册时分配
-		var original_id: int = int(entry.get("id", 0))
-		if original_id != 0 and not _instances.has(original_id) and not _suspended.has(original_id):
-			instance.id = original_id
-			if original_id >= _next_status_id:
-				_next_status_id = original_id + 1
-		else:
-			instance.id = _next_status_id
-			_next_status_id += 1
-		instance.template_id = entry.get("template_id", &"") as StringName
-		instance.target_id = int(entry.get("target_id", 0))
-		instance.duration = int(entry.get("duration", 0))
-		instance.applied_turn = int(entry.get("applied_turn", -1))
-		instance.value = float(entry.get("value", 0.0))
-		instance.base_value = float(entry.get("base_value", 0.0))
-		instance.current_stacks = int(entry.get("current_stacks", 1))
-		instance.source_card_instance_id = int(entry.get("source_card_instance_id", 0))
-		instance.priority = int(entry.get("priority", 0))
-		instance.is_hidden = bool(entry.get("is_hidden", false))
-		instance.is_expired = false
-		instance.metadata = entry.get("metadata", {}) as Dictionary
-		_register_instance(instance)
+	_get_snapshot().import_snapshot(snapshot)
 
 
 ## 检查目标是否有指定模板的状态。[br]
@@ -461,35 +402,6 @@ func _check_immunity(target_id: int, template: StatusTemplate) -> Dictionary:
 		return {blocked = true, immune_level = "element"}
 
 	return {blocked = false, immune_level = ""}
-
-
-## 序列化单个状态实例为 Dictionary。[br]
-## [br][b]返回[/b]: 含全部可序列化字段的 Dictionary。
-func _serialize_status(status: StatusInstance) -> Dictionary:
-	return {
-		id = status.id,
-		template_id = status.template_id,
-		target_id = status.target_id,
-		duration = status.duration,
-		applied_turn = status.applied_turn,
-		value = status.value,
-		base_value = status.base_value,
-		current_stacks = status.current_stacks,
-		source_card_instance_id = status.source_card_instance_id,
-		priority = status.priority,
-		is_hidden = status.is_hidden,
-		is_expired = status.is_expired,
-		metadata = status.metadata,
-	}
-
-
-## 动态获取 GSM Autoload 节点。[br]
-## 用 SceneTree.root 查找而非硬引用全局名 GSM——避免测试环境无 Autoload 时崩溃。
-func _get_gsm() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/GameStateManager")
 
 
 ## 查找目标身上已存在的同名状态实例。[br]
