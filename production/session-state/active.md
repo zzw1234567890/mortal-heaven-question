@@ -1,82 +1,73 @@
 # Active Session State
 
 <!-- STATUS -->
-Epic: Sprint 7 完成
-Feature: 里程碑达成
-Task: Sprint 7 + meta-layer-complete 里程碑已交付——准备 Sprint 8 规划
+Epic: tech-debt-cleanup
+Feature: 文件重构第四轮
+Task: Sprint 11 完成——等待用户指示提交
 <!-- /STATUS -->
 
 ## 当前任务
 
-Sprint 7 全部 14/14 Story 实现完成并提交。meta-layer-complete 里程碑达成。全量测试通过（135 scripts / 2367 tests / 0 failing）。准备 Sprint 8 规划。
+Sprint 10 + Sprint 11 全部完成。共 10 个文件重构 Story + 2 个 QA 签收 Story。全量测试零回归（143 scripts / 2455 tests / 0 failing）。所有工作未提交——等待用户指示。
 
-## Sprint 7 完成范围
+## Sprint 11 完成范围（技术债务清理第四轮）
 
-- **progression-system**（5 Story）：ProgressionSystem Autoload #12——域存储 + 6 领域 API + 信号 + SaveLoad 集成
-- **reincarnation-talent-system**（3 Story）：天赋树 + unlock_talent + settle_run 轮回结算
-- **achievement-system**（3 Story）：62 成就 + 判定引擎 + 查询图鉴
-- **dialogue-system**（3 Story）：DialoguePlayer + 播放编排 + BarkManager
+- **input_manager.gd 拆分**（Story 1）：`input_lock_stack.gd` (130 行)
+- **faction_system.gd 拆分**（Story 2）：`faction_field_stats.gd` (58 行)
+- **ending_evaluator.gd 拆分**（Story 3）：`ending_epilogue.gd` (93 行)
+- **QA 签收**（Story 4）：APPROVED
 
-## 全量测试基线（Sprint 7 结束）
+## Sprint 10 完成范围（技术债务清理第三轮）
 
-- Scripts: 135 / Tests: 2367 / Passing: 2366 / Pending: 1 / Failing: 0 / Asserts: 8984
-- 新增 140 测试（14 Story × 10 AC）
+- 7 个文件重构 Story + QA 签收 APPROVED
+- 超限文件从 17 个减少到 10 个
 
-## 提交记录
+## 全量测试基线（Sprint 11 结束）
 
-- `96b8fa6` — feat: Sprint 7 Meta 层+叙事收束 4 Epic 14 Story 完成（48 files, +6071 行）
-- `fcea036` — chore: Sprint 7 完成定义全部勾选
+- Scripts: 143 / Tests: 2455 / Passing: 2454 / Pending: 1 / Failing: 0 / Asserts: 9195
 
-## 里程碑状态
+## 待提交文件清单
 
-| 里程碑 | 状态 | 完成日期 |
-|--------|:----:|:--------:|
-| foundation-layer-complete | ✅ Completed | 2026-08-05 |
-| core-layer-complete | ✅ Completed | 2026-08-09 |
-| meta-layer-complete | ✅ Completed | 2026-09-02 |
+### 修改的源文件（10 个）
+- src/core/card_system/card_system.gd
+- src/core/faction_system.gd
+- src/core/status_effect/status_effect_system.gd
+- src/feature/ai_system.gd
+- src/feature/deck_editing_system.gd
+- src/feature/ending_evaluator.gd
+- src/feature/inscription_system.gd
+- src/feature/story_system.gd
+- src/foundation/input_manager.gd
+- src/foundation/scene_manager.gd
 
-## Epic 完成状态
+### 新增的子模块源文件（14 个）
+- src/core/card_system/card_serializer.gd
+- src/core/faction_system/faction_field_stats.gd
+- src/core/status_effect/status_effect_snapshot.gd
+- src/core/status_effect/status_effect_suspend.gd
+- src/feature/ai/ai_roster_factory.gd
+- src/feature/deck/deck_shop.gd
+- src/feature/deck/deck_summary.gd
+- src/feature/ending/ending_epilogue.gd
+- src/feature/inscription/inscription_candidates.gd
+- src/feature/story/story_chapter_ops.gd
+- src/foundation/input_lock_stack.gd
+- src/foundation/scene_transition.gd
 
-全部 30 个 Epic 均为 Complete（Backlog 状态已清零）。
+### 新增的 Story/QA 文档（12 个）
+- production/epics/file-refactor/story-001-input-lock-split.md
+- production/epics/file-refactor/story-001-status-effect-split.md
+- production/epics/file-refactor/story-002-ai-roster-split.md
+- production/epics/file-refactor/story-002-faction-stats-split.md
+- production/epics/file-refactor/story-003-deck-shop-split.md
+- production/epics/file-refactor/story-003-ending-epilogue-split.md
+- production/epics/file-refactor/story-004-inscription-candidates-split.md
+- production/epics/file-refactor/story-005-story-chapter-split.md
+- production/epics/file-refactor/story-006-card-serializer-split.md
+- production/epics/file-refactor/story-007-scene-transition-split.md
+- production/epics/qa/story-001-sprint-10-qa.md
+- production/epics/qa/story-001-sprint-11-qa.md
 
-## 待办
-
-- Sprint 8 规划
-- 遗留技术债务（非阻塞）：
-  - Feature 层文件超 300 行重构
-  - CardSystem 掉落规则接线
-  - RealmSystem 天劫 Boss 配置接线
-  - StatusEffectSystem 心魔 debuff 接线
-  - InputManager 锁管理接线
-  - DialoguePlayer 条件评估器 8 种条件类型接线
-
----
-
-## 历史会话摘要
-
-### Sprint 7（Meta 层+叙事收束）— 14 story，已签收 APPROVED WITH CONDITIONS
-- progression-system / reincarnation-talent-system / achievement-system / dialogue-system
-- 全量：135 scripts / 2367 tests / 0 failing
-
-### Sprint 6（Feature 层叙事经济线）— 17 story，已签收 APPROVED WITH CONDITIONS
-- identity-selection-system / alchemy-crafting-system / inscription-system / story-system / ending-branch-system
-- 全量：121 scripts / 2227 tests / 0 failing
-
-### Sprint 5（Feature 层探索经济线）— 17 story，已签收 APPROVED WITH CONDITIONS
-- exploration-system / cultivation-system / tribulation-system / deck-editing-system
-- 全量：104 scripts / 2060 tests / 0 failing
-
-### Sprint 4（Feature 层战斗子系统）— 25 story + 1 task，已签收 APPROVED WITH CONDITIONS
-- combat-system / card-effect-engine / deployment-system / binding-system / formation-system / ai-system
-- 全量：85 scripts / 1668 tests / 0 failing
-
-### Sprint 3（Foundation 层 GSM 拆分 + EventSystem）— 12/12 story，已签收 APPROVED
-- GSM 拆分为 4 文件（282 + 429 + 141 + 311 行）
-- EventSystem 链式事件 + story flags + owner 资源模板
-- 全量：62 scripts / 1146 tests / 0 failing
-
-### Sprint 2（Foundation 层 Core 系统）— 14/14 story，已签收 APPROVED
-- CardSystem / CostSystem / ResourceSystem / FactionSystem / StatusEffectSystem / RealmSystem / SchoolSystem
-
-### Sprint 1（Foundation 层基础架构）— 15/15 story，已签收 APPROVED
-- GameStateManager / InputManager / SceneManager / SaveLoadSystem / EventSystem 基础
+### 新增的 Sprint 文档（2 个）
+- production/sprints/sprint-10.md
+- production/sprints/sprint-11.md

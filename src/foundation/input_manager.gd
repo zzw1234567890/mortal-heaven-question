@@ -71,6 +71,9 @@ class LockEntry:
 ## 深度极少超过 2，O(n) 遍历 n≤4 在性能预算内。
 var _lock_stack: Array[LockEntry] = []
 
+## 锁栈管理子模块（Sprint 11 Story 1 拆分）。
+var _lock_stack_module: RefCounted = null
+
 ## is_action_blocked 的内置分类映射表。
 ## 键 = 动作名，值 = [ActionType, DeviceType]。
 ## 调用方亦可直接调用 is_input_allowed() 替代此映射表。
@@ -89,6 +92,14 @@ func _ready() -> void:
 	_lock_stack = []
 	if is_inside_tree():
 		get_tree().tree_changed.connect(_on_tree_changed)
+
+
+## 惰性获取锁栈管理子模块（Sprint 11 Story 1 拆分）。
+func _get_lock_stack_module() -> RefCounted:
+	if _lock_stack_module == null:
+		var script: GDScript = load("res://src/foundation/input_lock_stack.gd")
+		_lock_stack_module = script.new(self)
+	return _lock_stack_module
 
 
 ## 节点退出时断开 tree_changed 连接、清除锁栈并执行最终 GSM 同步。
@@ -117,68 +128,23 @@ func _exit_tree() -> void:
 ##                  并跳过（不增加栈元素）。这是代码 bug 的早期检测——调用方可能丢失了
 ##                  [method pop_lock] 调用。
 func push_lock(type: LockType, source: StringName, device_mask: int = DEVICE_ALL) -> void:
-	# 重复 push 检测——同一 source 重复 push 意味着代码 bug（丢失 pop_lock）
-	for entry in _lock_stack:
-		if entry.source == source:
-			push_warning("InputManager: duplicate push_lock(%s) from '%s' —— "
-					% [LockType.find_key(type), source]
-					+ "可能丢失了 pop_lock() 调用。跳过本次 push。")
-			return
-
-	var entry := LockEntry.new()
-	entry.type = type
-	entry.source = source
-	entry.device_mask = device_mask
-	_lock_stack.append(entry)
-
-	print("InputManager: push %s lock (source: '%s', stack depth: %d)"
-			% [LockType.find_key(type), source, _lock_stack.size()])
-
-	_sync_to_gsm()
+	_get_lock_stack_module().push_lock(type, source, device_mask)
 
 
-## 弹出一个输入锁。从栈尾向前查找匹配 [param source] 的条目并移除（LIFO 顺序）。
-##
-## [param source] 调用方标识——必须与 [method push_lock] 的参数一致。
-##
-## [b]边缘情况[/b]: 如果栈中不存在匹配 [param source] 的条目，记录 [code]push_warning[/code]
+## 弹出一个输入锁。从栈尾向前查找匹配 [param source] 的条目并移除（LIFO 顺序）。[br]
+## [br][param source] 调用方标识——必须与 [method push_lock] 的参数一致。[br]
+## [br][b]边缘情况[/b]: 如果栈中不存在匹配 [param source] 的条目，记录 [code]push_warning[/code]
 ##                  但栈不变。调用方可能已通过 [method clear_locks] 移除，或传入了错误的 source。
 func pop_lock(source: StringName) -> void:
-	for i in range(_lock_stack.size() - 1, -1, -1):
-		if _lock_stack[i].source == source:
-			var removed_type: LockType = _lock_stack[i].type
-			_lock_stack.remove_at(i)
-			print("InputManager: pop %s lock (source: '%s', stack depth: %d)"
-					% [LockType.find_key(removed_type), source, _lock_stack.size()])
-			_sync_to_gsm()
-			return
-
-	push_warning("InputManager: pop_lock('%s') called but source not found in stack —— "
-			% source + "可能已通过 clear_locks() 移除，或传入了错误的 source。")
+	_get_lock_stack_module().pop_lock(source)
 
 
-## 清除锁栈中的条目。
-##
-## [param source] 如果为空字符串（默认），则清除全部锁。
-##               如果非空，则仅移除 source 匹配的条目。
-##
-## [b]使用场景[/b]: 场景变更时 SceneManager 调用 [code]clear_locks()[/code]（无参）重置所有锁。
-##             在 Story 003 中，此方法还将连接 SceneTree.tree_changed 信号自动清除。
+## 清除锁栈中的条目。[br]
+## [br][param source] 如果为空字符串（默认），则清除全部锁。[br]
+##               如果非空，则仅移除 source 匹配的条目。[br]
+## [br][b]使用场景[/b]: 场景变更时 SceneManager 调用 [code]clear_locks()[/code]（无参）重置所有锁。
 func clear_locks(source: StringName = "") -> void:
-	if source == "":
-		var count := _lock_stack.size()
-		_lock_stack.clear()
-		if count > 0:
-			print("InputManager: clear_locks() — 清除了全部 %d 个锁" % count)
-	else:
-		var old_size := _lock_stack.size()
-		_lock_stack = _lock_stack.filter(func(e: LockEntry) -> bool: return e.source != source)
-		var removed := old_size - _lock_stack.size()
-		if removed > 0:
-			print("InputManager: clear_locks('%s') — 清除了 %d 个锁，剩余 %d 个"
-					% [source, removed, _lock_stack.size()])
-
-	_sync_to_gsm()
+	_get_lock_stack_module().clear_locks(source)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -271,25 +237,14 @@ func get_current_lock() -> int:
 ##             [code]{"type": LockType, "source": StringName, "device_mask": int}[/code]。
 ##             返回的是快照副本——调用方修改不会影响内部栈。
 func get_lock_stack() -> Array[Dictionary]:
-	var snapshot: Array[Dictionary] = []
-	for entry in _lock_stack:
-		snapshot.append({
-			"type": entry.type,
-			"source": entry.source,
-			"device_mask": entry.device_mask,
-		})
-	return snapshot
+	return _get_lock_stack_module().get_lock_stack()
 
 
-## 检查栈中是否存在指定 [param source] 的锁条目。
-##
-## [b]使用场景[/b]: MODAL 弹窗在处理内部输入前调用 [code]has_lock(&"my_source")[/code]
-##             以确认自己仍是活跃的模态拥有者（Story 002/004 中完整使用）。
+## 检查栈中是否存在指定 [param source] 的锁条目。[br]
+## [br][b]使用场景[/b]: MODAL 弹窗在处理内部输入前调用 [code]has_lock(&"my_source")[/code]
+##             以确认自己仍是活跃的模态拥有者。
 func has_lock(source: StringName) -> bool:
-	for entry in _lock_stack:
-		if entry.source == source:
-			return true
-	return false
+	return _get_lock_stack_module().has_lock(source)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -358,13 +313,10 @@ func _sync_to_gsm() -> void:
 	GameStateManager.set_input_locks(serialized)
 
 ## 场景树变更回调——场景切换时自动清除输入锁。[br]
-## [br]
-## 由 [method Node._ready] 连接至 [signal SceneTree.tree_changed]。[br]
+## [br]由 [method Node._ready] 连接至 [signal SceneTree.tree_changed]。[br]
 ## [b]优化[/b]: 仅当栈非空时清除——避免不必要的 GSM 写入。
 func _on_tree_changed() -> void:
-	if not _lock_stack.is_empty():
-		_lock_stack.clear()
-		_sync_to_gsm()
+	_get_lock_stack_module().on_tree_changed()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 输入分发（路径 A + B）—— Story 003

@@ -131,6 +131,9 @@ const _CARD_SYSTEM_PATH: String = "/root/CardSystem"
 ## 测试用它注入未加入场景树的 CardSystem 实例，避免 _ready() 触发模板目录加载清空测试夹具。
 var _test_card_system: Node = null
 
+## 场上统计子模块（惰性初始化，Sprint 11 Story 2 拆分）。
+var _field_stats: RefCounted = null
+
 
 # === 查询 API ====================================================================
 
@@ -259,7 +262,7 @@ func check_condition(requirement: Dictionary) -> bool:
 ## [br][b]返回[/b]: 关系为 [constant FactionRelation.HOSTILE] 则 true。[br]
 ## [br][b]来源[/b]: ADR-0018 §关键接口 §判定 API。
 func is_hostile_to(card_a_instance_id: int, card_b_instance_id: int) -> bool:
-	return get_alignment_relation(card_a_instance_id, card_b_instance_id) == FactionRelation.HOSTILE
+	return _get_field_stats().is_hostile_to(card_a_instance_id, card_b_instance_id)
 
 
 ## 两角色阵营关系 —— 三层关系判定（SAME/HOSTILE/NEUTRAL）。[br]
@@ -271,14 +274,7 @@ func is_hostile_to(card_a_instance_id: int, card_b_instance_id: int) -> bool:
 ## [br][b]返回[/b]: [code]0/1/2[/code]（SAME/HOSTILE/NEUTRAL）。[br]
 ## [br][b]来源[/b]: ADR-0018 §关键接口 §判定 API + GDD §公式 2。
 func get_alignment_relation(a_instance_id: int, b_instance_id: int) -> int:
-	var a_major: StringName = _first_major_alignment(a_instance_id)
-	var b_major: StringName = _first_major_alignment(b_instance_id)
-
-	if a_major.is_empty() or b_major.is_empty():
-		return FactionRelation.NEUTRAL  # 跨阵营角色 → 中立
-	if a_major == b_major:
-		return FactionRelation.SAME
-	return FactionRelation.HOSTILE
+	return _get_field_stats().get_alignment_relation(a_instance_id, b_instance_id)
 
 
 # === 内部辅助 ====================================================================
@@ -295,6 +291,13 @@ func _get_card_system() -> Node:
 	if tree == null or tree.root == null:
 		return null
 	return tree.root.get_node_or_null(_CARD_SYSTEM_PATH)
+
+
+## 惰性获取场上统计子模块（Sprint 11 Story 2 拆分）。
+func _get_field_stats() -> RefCounted:
+	if _field_stats == null:
+		_field_stats = load("res://src/core/faction_system/faction_field_stats.gd").new(self)
+	return _field_stats
 
 
 ## 获取场上存活角色列表 —— 跨 Epic 依赖 CardSystem。[br]
@@ -316,16 +319,3 @@ func _get_instance_id(char_instance: Variant) -> int:
 	if char_instance is Dictionary and char_instance.has("card_instance_id"):
 		return int(char_instance["card_instance_id"])
 	return 0
-
-
-## 取角色的首个非空大阵营推导值 —— 用于 [method get_alignment_relation]。[br]
-## [br]遍历角色标签，返回第一个 [method derive_major_alignment] 非空的标签推导结果；[br]
-## 跨阵营标签（[code]parent_alignment=&""[/code]）推导为空，自动跳过。[br]
-## [br][b]返回[/b]: 大阵营 tag_id，或 [code]&""[/code]（角色无大阵营归属）。
-func _first_major_alignment(character_id: int) -> StringName:
-	var tags: Array[StringName] = get_tags_of_character(character_id)
-	for tag in tags:
-		var derived: StringName = derive_major_alignment(tag)
-		if not derived.is_empty():
-			return derived
-	return &""
