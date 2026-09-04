@@ -126,6 +126,27 @@ func set_deploy_turn(turn: int) -> void:
 	_deploy_turn = turn
 
 
+# === 子模块（Sprint 9 Story 3 拆分）=================================================
+
+## 序列化子模块——惰性初始化。
+var _serializer: RefCounted = null
+
+## 光环查询子模块——惰性初始化。
+var _aura: RefCounted = null
+
+## 惰性获取序列化子模块。
+func _get_serializer() -> RefCounted:
+	if _serializer == null:
+		_serializer = load("res://src/feature/formation/formation_serializer.gd").new(self)
+	return _serializer
+
+## 惰性获取光环查询子模块。
+func _get_aura() -> RefCounted:
+	if _aura == null:
+		_aura = load("res://src/feature/formation/formation_aura.gd").new(self)
+	return _aura
+
+
 # === 部署 API ==================================================================
 
 ## 部署阵法卡到阵法区（AC-001~004）。[br]
@@ -474,194 +495,26 @@ func _on_field_changed(_character_id: int = -1, _slot_index: int = -1, _extra: V
 # === 光环查询（Story 003）====================================================
 
 ## 战斗热路径 O(1) 查询——计算角色从归属阵法获得的总光环加成（AC-001/002）。[br]
-## 梯度阵法实时计算当前场上同阵营人数 → 确定效果等级 → 返回梯度值。[br]
-## 固定阵法从 [code]effect_config[stat_name][/code] 读取。[br]
-## [br][param character_id] 角色 ID。[br]
-## [br][param stat_name] 属性名（如 "hp"/"def"/"atk"）。[br]
-## [br][b]返回[/b]: [code]{total_bonus: float, breakdown: Array}[/code]——未归属/非 ACTIVE 返回 0。[br]
-## [br]来源: ADR-0024 §关键接口 §梯度阵法动态效果计算。
+## 委托给 formation_aura.gd 子模块（Sprint 9 Story 3 拆分）。
 func get_aura_bonus(character_id: int, stat_name: String) -> Dictionary:
-	if not _affiliations.has(character_id):
-		return {"total_bonus": 0.0, "breakdown": []}
-	var formation_id: int = _affiliations[character_id]
-	if not is_formation_active(formation_id):
-		return {"total_bonus": 0.0, "breakdown": []}
-	var slot: Dictionary = _get_slot_by_formation(formation_id)
-	if slot.is_empty():
-		return {"total_bonus": 0.0, "breakdown": []}
-	var aura_scope: int = slot.get("aura_scope", AuraScope.AFFILIATED_CHARACTERS)
-	var bonus: float = 0.0
-	var breakdown: Array = []
-	# 梯度阵法——requirement 含 tag_id + max_level > 0 时走梯度计算
-	var requirement: Dictionary = slot.get("requirement", {})
-	var max_level: int = int(slot.get("max_level", 0))
-	if max_level > 0 and requirement.has("tag_id"):
-		bonus = _calculate_gradient_aura(formation_id, stat_name)
-	else:
-		# 固定阵法——从 effect_config 读取
-		bonus = _get_fixed_bonus(slot, stat_name)
-	if bonus != 0.0:
-		breakdown.append({
-			"formation_id": formation_id,
-			"template_id": slot.get("template_id", &""),
-			"aura_scope": aura_scope,
-			"bonus": bonus,
-			"stat": stat_name,
-		})
-	return {"total_bonus": bonus, "breakdown": breakdown}
-
-
-## 梯度阵法光环加成——实时计算当前场上同阵营人数（AC-003~007）。[br]
-## [b]公式[/b]: [code]effect_value = base_value × min(count_on_field(tag_id) - 1, max_level)[/code][br]
-## 门槛 ≥2 人——不足返回 0.0。[br]
-## [br][param formation_id] 阵法 ID。[br]
-## [br][param stat_name] 属性名（固定阵法 effect_config 的 key，梯度阵法不区分 stat）。[br]
-## [br][b]返回[/b]: 梯度效果值 float。[br]
-## [br]来源: ADR-0024 §梯度阵法动态效果计算。
-func _calculate_gradient_aura(formation_id: int, _stat_name: String) -> float:
-	var slot: Dictionary = _get_slot_by_formation(formation_id)
-	if slot.is_empty():
-		return 0.0
-	var requirement: Dictionary = slot.get("requirement", {})
-	var tag_id: StringName = requirement.get("tag_id", &"")
-	if tag_id.is_empty():
-		return 0.0
-	var count_on_field: int = _query_count_on_field(tag_id)
-	if count_on_field < 2:
-		return 0.0
-	var max_level: int = int(slot.get("max_level", 0))
-	if max_level <= 0:
-		return 0.0
-	var effect_level: int = mini(count_on_field - 1, max_level)
-	var base_value: float = float(slot.get("base_value", 0.0))
-	return base_value * float(effect_level)
-
-
-## 固定阵法属性增益——从 effect_config 读取指定 stat 的加成值。[br]
-## [br][param slot] 阵法位 Dictionary。[br]
-## [br][param stat_name] 属性名。[br]
-## [br][b]返回[/b]: 加成值 float（无配置返回 0.0）。
-func _get_fixed_bonus(slot: Dictionary, stat_name: String) -> float:
-	if fixed_bonus_cb.is_valid():
-		return float(fixed_bonus_cb.call(slot.get("formation_id", -1), stat_name))
-	var effect_config: Dictionary = slot.get("effect_config", {})
-	return float(effect_config.get(stat_name, 0.0))
-
-
-## 查询场上某阵营角色数——优先 count_on_field_cb，否则走 FactionSystem。[br]
-## [br][param tag_id] 阵营标签 ID。[br]
-## [br][b]返回[/b]: 场上该阵营角色数 int。
-func _query_count_on_field(tag_id: StringName) -> int:
-	if count_on_field_cb.is_valid():
-		return int(count_on_field_cb.call(tag_id))
-	var fs: Node = _get_faction_system()
-	if fs != null and fs.has_method("count_on_field"):
-		return int(fs.call("count_on_field", tag_id))
-	return 0
+	return _get_aura().get_aura_bonus(character_id, stat_name)
 
 
 # === 序列化 / 反序列化 / 快照导出（Story 004）=================================
 
-## 序列化全部阵位数据 + 归属关系——战斗结束时导出快照（AC-001）。[br]
-## [br][b]返回[/b]: [code]{slots: Array, affiliations: Dictionary, next_formation_id: int}[/code]——
-## slots 为 3 阵位序列化列表（StringName→String 转换确保 JSON 可序列化）。[br]
-## [br]来源: ADR-0024 §GSM 边界 §serialize_all。
+## 序列化全部阵位数据 + 归属关系——委托给 formation_serializer.gd 子模块（Sprint 9 Story 3 拆分）。
 func serialize_all() -> Dictionary:
-	var slots_data: Array = []
-	for i in range(MAX_SLOTS):
-		slots_data.append(_serialize_slot(_slots[i]))
-	var aff_data: Dictionary = {}
-	for char_id: int in _affiliations.keys():
-		aff_data[char_id] = _affiliations[char_id]
-	return {
-		"slots": slots_data,
-		"affiliations": aff_data,
-		"next_formation_id": _next_formation_id,
-	}
+	return _get_serializer().serialize_all()
 
 
-## 序列化单个阵位——StringName→String 确保 JSON 可序列化（ADR-0002 存档规范）。
-func _serialize_slot(slot: Dictionary) -> Dictionary:
-	return {
-		"formation_id": slot.get("formation_id", -1),
-		"card_instance_id": slot.get("card_instance_id", -1),
-		"template_id": str(slot.get("template_id", &"")),
-		"state": slot.get("state", SlotState.EMPTY),
-		"deployed_turn": slot.get("deployed_turn", -1),
-		"requirement": (slot.get("requirement", {}) as Dictionary).duplicate(true),
-		"aura_scope": slot.get("aura_scope", AuraScope.AFFILIATED_CHARACTERS),
-		"effect_config": (slot.get("effect_config", {}) as Dictionary).duplicate(true),
-		"max_level": slot.get("max_level", 0),
-		"base_value": slot.get("base_value", 0.0),
-		"affiliated_chars": (slot.get("affiliated_chars", []) as Array).duplicate(true),
-	}
-
-
-## 从快照恢复阵位状态 + 归属关系（AC-003/004）。[br]
-## 逐条验证 affiliations 中的 character_id——验证失败跳过 + push_warning（不阻塞阵法自身状态恢复）。[br]
-## [br][param data] 快照 Dictionary（含 slots/affiliations/next_formation_id）。
+## 从快照恢复阵位状态 + 归属关系——委托给 formation_serializer.gd 子模块。
 func deserialize_all(data: Dictionary) -> void:
-	_reset_slots()
-	_affiliations.clear()
-	var slots_data: Array = data.get("slots", [])
-	for i in range(mini(slots_data.size(), MAX_SLOTS)):
-		_slots[i] = _deserialize_slot(slots_data[i])
-	var aff_data: Dictionary = data.get("affiliations", {})
-	for key: Variant in aff_data.keys():
-		var char_id: int = int(key)
-		var formation_id: int = int(aff_data[key])
-		if _validate_character_exists(char_id):
-			_affiliations[char_id] = formation_id
-		else:
-			push_warning("FormationSystem.deserialize_all: character_id=%d 不存在，跳过归属关系" % char_id)
-	# 重建 affiliated_chars 派生索引——以 _affiliations 为唯一真理来源（lead-programmer C1 / qa-lead GAP-001）
-	for i in range(MAX_SLOTS):
-		_slots[i]["affiliated_chars"] = []
-	for char_id: int in _affiliations.keys():
-		var slot: Dictionary = _get_slot_by_formation(_affiliations[char_id])
-		if not slot.is_empty() and slot.has("affiliated_chars"):
-			(slot["affiliated_chars"] as Array).append(char_id)
-	_next_formation_id = int(data.get("next_formation_id", 1))
+	_get_serializer().deserialize_all(data)
 
 
-## 反序列化单个阵位——键归一（int/String key 均接受，JSON round-trip 安全）。[br]
-## 对嵌套集合字段做类型守卫——快照损坏时回退默认值（lead-programmer C3）。
-func _deserialize_slot(slot_data: Dictionary) -> Dictionary:
-	var slot: Dictionary = _make_empty_slot()
-	slot["formation_id"] = int(slot_data.get("formation_id", -1))
-	slot["card_instance_id"] = int(slot_data.get("card_instance_id", -1))
-	slot["template_id"] = StringName(str(slot_data.get("template_id", "")))
-	slot["state"] = int(slot_data.get("state", SlotState.EMPTY))
-	slot["deployed_turn"] = int(slot_data.get("deployed_turn", -1))
-	var req: Variant = slot_data.get("requirement", {})
-	slot["requirement"] = (req as Dictionary).duplicate(true) if req is Dictionary else {}
-	slot["aura_scope"] = int(slot_data.get("aura_scope", AuraScope.AFFILIATED_CHARACTERS))
-	var ec: Variant = slot_data.get("effect_config", {})
-	slot["effect_config"] = (ec as Dictionary).duplicate(true) if ec is Dictionary else {}
-	slot["max_level"] = int(slot_data.get("max_level", 0))
-	slot["base_value"] = float(slot_data.get("base_value", 0.0))
-	var ac: Variant = slot_data.get("affiliated_chars", [])
-	slot["affiliated_chars"] = (ac as Array).duplicate(true) if ac is Array else []
-	return slot
-
-
-## 验证角色是否存在——优先 character_exists_cb，否则默认 true。[br]
-## [br][param character_id] 角色 ID。[br]
-## [br][b]返回[/b]: true 表示存在。
-func _validate_character_exists(character_id: int) -> bool:
-	if character_exists_cb.is_valid():
-		return bool(character_exists_cb.call(character_id))
-	return true
-
-
-## 写阵法快照至 GSM battle.formation_snapshot（战斗结束导出委托）。[br]
-## [br]GSM 不可用时静默跳过（is_instance_valid + has_method 双守卫）。[br]
-## [br]来源: ADR-0024 §GSM 边界 §serialize_all。
+## 写阵法快照至 GSM battle.formation_snapshot——委托给 formation_serializer.gd 子模块。
 func write_snapshot_to_gsm() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null or not gsm.has_method("_set_battle_formation_snapshot"):
-		return  # GSM 不可用——静默跳过
-	gsm.call("_set_battle_formation_snapshot", serialize_all())
+	_get_serializer().write_snapshot_to_gsm()
 
 
 ## 动态获取 GSM Autoload 节点（同 DeploymentSystem 先例）。

@@ -57,67 +57,37 @@ var _initialized_and_loaded: bool = false
 ## Autoload #12 _ready()——利用 Godot 顺序 _ready() 保证。[br]
 ## SaveLoadSystem (#4) 已完成 _ready()，直接调用 load_progression()。
 func _ready() -> void:
-	_init_empty_stores()
-	var data: Dictionary = _load_progression_data()
-	initialize(data)
+	_get_serializer().init_empty_stores()
+	var data: Dictionary = _get_serializer().load_progression_data()
+	_get_serializer().initialize(data)
 	_initialized_and_loaded = true
 	progression_initialized.emit()
 
 
-## 初始化 6 个空领域存储。
+## 序列化子模块——惰性初始化（Sprint 9 Story 6 拆分）。
+var _serializer: RefCounted = null
+
+## 惰性获取序列化子模块。
+func _get_serializer() -> RefCounted:
+	if _serializer == null:
+		_serializer = load("res://src/meta/progression/progression_serializer.gd").new(self)
+	return _serializer
+
+
+## 初始化 6 个空领域存储——委托给子模块。
 func _init_empty_stores() -> void:
-	_achievements = {}
-	_talents = {
-		"points_available": 0,
-		"total_earned": 0,
-		"unlocked": [],
-		"equipped": [],
-		"total_reincarnations": 0,
-		"victories": 0,
-	}
-	_card_gallery = {}
-	_endings = {}
-	_stats = {}
-	_meta = {
-		"highest_realm_ever": "",
-		"total_playtime_seconds": 0,
-		"total_completions": 0,
-	}
+	_get_serializer().init_empty_stores()
 
 
-## 从 SaveLoadSystem 加载 progression 数据。[br]
-## 测试可通过 _save_load_override 注入 mock。
+## 从 SaveLoadSystem 加载 progression 数据——委托给子模块。
 func _load_progression_data() -> Dictionary:
-	if _save_load_override != null:
-		return _save_load_override.load_progression()
-	if Engine.has_singleton("SaveLoadSystem") or true:
-		var sl: Node = _get_save_load_system()
-		if sl != null and sl.has_method("load_progression"):
-			return sl.load_progression()
-	return {}
+	return _get_serializer().load_progression_data()
 
 
 ## 从 progression.dat 的已解析 JSON 填充全部 6 个域。[br]
 ## 缺失字段 → 默认值填充（向前兼容）。
 func initialize(data: Dictionary) -> void:
-	_achievements = _safe_dict(data, "achievements", {})
-	_talents = _safe_dict(data, "talents", {
-		"points_available": 0,
-		"total_earned": 0,
-		"unlocked": [],
-		"equipped": [],
-		"total_reincarnations": 0,
-		"victories": 0,
-	})
-	_card_gallery = _safe_dict(data, "card_gallery", _safe_dict(data, "unlocked_cards", {}))
-	_endings = _safe_dict(data, "endings", {})
-	_stats = _safe_dict(data, "statistics", {})
-	_meta = _safe_dict(data, "meta", {
-		"highest_realm_ever": _safe_str(data, "highest_realm", ""),
-		"total_playtime_seconds": _safe_int(data, "total_playtime_seconds", 0),
-		"total_completions": 0,
-	})
-	_dirty = false
+	_get_serializer().initialize(data)
 
 
 # === 序列化（供 SaveLoadSystem 使用）==========================================
@@ -125,22 +95,14 @@ func initialize(data: Dictionary) -> void:
 ## 返回全量 progression 数据的 JSON 兼容 Dictionary。[br]
 ## 不包含 _dirty / _batch_depth / _initialized_and_loaded 内部标志。
 func serialize() -> Dictionary:
-	return {
-		"achievements": _achievements.duplicate(true),
-		"talents": _talents.duplicate(true),
-		"card_gallery": _card_gallery.duplicate(true),
-		"endings": _endings.duplicate(true),
-		"statistics": _stats.duplicate(true),
-		"meta": _meta.duplicate(true),
-	}
+	return _get_serializer().serialize()
 
 
 ## 从 progression.dat 的已解析 JSON 填充全部 6 个域。[br]
 ## 缺失字段 → 默认值填充（向前兼容）。[br]
 ## [b]返回[/b]: true 表示反序列化成功。
 func deserialize(data: Dictionary) -> bool:
-	initialize(data)
-	return true
+	return _get_serializer().deserialize(data)
 
 
 ## 成就定义注册表——由 AchievementSystem 在运行时注册。
@@ -491,30 +453,4 @@ func _get_save_load_system() -> Node:
 	return null
 
 
-# === 静态安全辅助 ==============================================================
-
-## 安全读取字典中的 Dictionary 字段——缺失时返回默认值。
-static func _safe_dict(data: Dictionary, key: String, default_val: Dictionary) -> Dictionary:
-	if data.has(key):
-		var val: Variant = data[key]
-		if val is Dictionary:
-			return val
-	return default_val
-
-
-## 安全读取字典中的 String 字段——缺失时返回默认值。
-static func _safe_str(data: Dictionary, key: String, default_val: String) -> String:
-	if data.has(key):
-		var val: Variant = data[key]
-		if val is String:
-			return val
-	return default_val
-
-
-## 安全读取字典中的 int 字段——缺失时返回默认值。
-static func _safe_int(data: Dictionary, key: String, default_val: int) -> int:
-	if data.has(key):
-		var val: Variant = data[key]
-		if val is int or val is float:
-			return int(val)
-	return default_val
+# --- 序列化/初始化辅助（已提取到 progression_serializer.gd 子模块）---

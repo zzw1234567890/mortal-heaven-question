@@ -10,6 +10,9 @@ extends RefCounted
 ## [br][b]Story 6-4 范围[/b]：配方表 + 查询 API。[br]
 ## [br]来源: ADR-0028 §关键接口 / GDD alchemy-crafting-system.md §1-2。
 
+## 品质掷骰子模块（Sprint 9 Story 5 拆分）—— preload 避免依赖 class_name 全局注册。
+const _QualityRoller := preload("res://src/feature/alchemy/alchemy_quality_roller.gd")
+
 
 # === 灵材品质常量（与 ResourceSystem.LingCaiQuality 值一致）==================
 
@@ -226,99 +229,43 @@ static func get_all_artifact_recipes() -> Array[Dictionary]:
 	return result
 
 
-# === 品质掷骰纯函数（Story 6-6 实现）===========================================
+# === 品质掷骰纯函数（Story 6-6 实现——委托给 _QualityRoller 子模块）========
 
-## 品质掷骰——首次掷骰（GDD §1 品质概率公式）。[br]
-## [br][param recipe_base_rarity] 配方基础稀有度 [1, 5]。[br]
-## [br][param alchemy_level] 当前炼丹/炼器等级 [0, 4]。[br]
-## [br][param bonuses] 外部加成（万象真人+0.15 + 材料溢出+0.10/级）。[br]
-## [br][param rng] 独立 RNG 实例。[br]
-## [br][b]返回[/b]: QualityOutcome——DOWNGRADE/STANDARD/UPGRADE。[br]
-## [br]来源: GDD §1 品质概率公式 + ADR-0028 §quality_roll。
+## 品质掷骰——首次掷骰（GDD §1 品质概率公式）。委托给 _QualityRoller 子模块（Sprint 9 Story 5 拆分）。
 static func quality_roll(recipe_base_rarity: int, alchemy_level: int, bonuses: float, rng: RandomNumberGenerator) -> QualityOutcome:
-	var high_chance: float = minf(0.10 + alchemy_level * 0.05 + bonuses, 0.8)
-	var low_chance: float = 0.1 if recipe_base_rarity > 1 else 0.0
-	var roll: float = rng.randf()
-	if roll < low_chance:
-		return QualityOutcome.DOWNGRADE
-	if roll < low_chance + high_chance:
-		return QualityOutcome.UPGRADE
-	return QualityOutcome.STANDARD
+	var result: int = _QualityRoller.quality_roll(recipe_base_rarity, alchemy_level, bonuses, rng)
+	return result as QualityOutcome
 
 
-## 品质重掷——玩家选择重掷后的二次掷骰（GDD §1b 品质重掷公式）。[br]
-## [br]升品概率 +15%，降品概率升至 25%。[br]
-## [br][param recipe_base_rarity] 配方基础稀有度。[br]
-## [br][param alchemy_level] 当前炼丹/炼器等级。[br]
-## [br][param bonuses] 外部加成。[br]
-## [br][param rng] 独立 RNG 实例。[br]
-## [br][b]返回[/b]: QualityOutcome。[br]
-## [br]来源: GDD §1b 品质重掷公式 + ADR-0028 §quality_reroll。
+## 品质重掷——玩家选择重掷后的二次掷骰（GDD §1b 品质重掷公式）。委托给 _QualityRoller 子模块。
 static func quality_reroll(recipe_base_rarity: int, alchemy_level: int, bonuses: float, rng: RandomNumberGenerator) -> QualityOutcome:
-	var high_chance: float = minf(0.10 + alchemy_level * 0.05 + bonuses + 0.15, 0.8)
-	var low_chance: float = 0.25 if recipe_base_rarity > 1 else 0.0
-	var roll: float = rng.randf()
-	if roll < low_chance:
-		return QualityOutcome.DOWNGRADE
-	if roll < low_chance + high_chance:
-		return QualityOutcome.UPGRADE
-	return QualityOutcome.STANDARD
+	var result: int = _QualityRoller.quality_reroll(recipe_base_rarity, alchemy_level, bonuses, rng)
+	return result as QualityOutcome
 
 
-## 获取品质修改后的稀有度（GDD §1 品质概率公式）。[br]
-## [br][param recipe_base_rarity] 配方基础稀有度。[br]
-## [br][param outcome] 品质掷骰结果。[br]
-## [br][b]返回[/b]: 最终稀有度（钳制在 [1, 5]）。[br]
-## [br]来源: GDD §1 + ADR-0028 §resolve_final_rarity。
+## 获取品质修改后的稀有度（GDD §1 品质概率公式）。委托给 _QualityRoller 子模块。
 static func resolve_final_rarity(recipe_base_rarity: int, outcome: QualityOutcome) -> int:
-	match outcome:
-		QualityOutcome.DOWNGRADE:
-			return maxi(recipe_base_rarity - 1, 1)
-		QualityOutcome.UPGRADE:
-			return mini(recipe_base_rarity + 1, 5)
-		_:
-			return recipe_base_rarity
+	return _QualityRoller.resolve_final_rarity(recipe_base_rarity, int(outcome))
 
 
-## 品质倍率映射——QualityOutcome → float。[br]
-## [br][param outcome] 品质掷骰结果。[br]
-## [br][b]返回[/b]: 0.8 / 1.0 / 1.3。[br]
-## [br]来源: GDD §0 + ADR-0028 §QUALITY_MOD。
+## 品质倍率映射——QualityOutcome → float。委托给 _QualityRoller 子模块。
 static func _quality_mod_from_outcome(outcome: QualityOutcome) -> float:
-	return float(QUALITY_MOD.get(outcome, 1.0))
+	return _QualityRoller.quality_mod_from_outcome(int(outcome))
 
 
-## 丹药效果缩放（GDD §2 丹药效果缩放）。[br]
-## [br][param base_value] 丹药基础效果值。[br]
-## [br][param quality_mod] 品质倍率 {0.8, 1.0, 1.3}。[br]
-## [br][param bonus_pct] 炼丹精通加成（炼丹等级≥2时+0.1）。[br]
-## [br][b]返回[/b]: 最终效果值（至少 1）。[br]
-## [br]来源: GDD §2 + ADR-0028 §pill_effect。
+## 丹药效果缩放（GDD §2 丹药效果缩放）。委托给 _QualityRoller 子模块。
 static func pill_effect(base_value: int, quality_mod: float, bonus_pct: float) -> int:
-	return maxi(1, floori(base_value * quality_mod * (1.0 + bonus_pct)))
+	return _QualityRoller.pill_effect(base_value, quality_mod, bonus_pct)
 
 
-## 法宝属性生成（GDD §3 法宝属性生成）。[br]
-## [br][param rarity] 产出稀有度 [1, 5]（白=1→暗金=5）。[br]
-## [br][param quality_mod] 品质倍率 {0.8, 1.0, 1.3}。[br]
-## [br][b]返回[/b]: {atk: int, def: int} Dictionary。[br]
-## [br]来源: GDD §3 + ADR-0028 §forge_artifact_stat。
+## 法宝属性生成（GDD §3 法宝属性生成）。委托给 _QualityRoller 子模块。
 static func forge_artifact_stat(rarity: int, quality_mod: float) -> Dictionary:
-	const BASE_ATK: PackedInt32Array = [1, 3, 4, 6, 10]
-	const BASE_DEF: PackedInt32Array = [1, 2, 3, 5, 8]
-	var idx: int = clampi(rarity, 1, 5) - 1
-	return {
-		"atk": maxi(1, floori(BASE_ATK[idx] * quality_mod)),
-		"def": maxi(0, floori(BASE_DEF[idx] * quality_mod)),
-	}
+	return _QualityRoller.forge_artifact_stat(rarity, quality_mod)
 
 
-## 九转金丹累积阈值（GDD §5 九转金丹递减收益）。[br]
-## [br][param craft_count] 当前累计炼制颗数。[br]
-## [br][b]返回[/b]: 第 N 次 +1HP 所需累计颗数 = N×(N+1)/2。[br]
-## [br]来源: GDD §5 + ADR-0028 §jindan_cumulative_threshold。
+## 九转金丹累积阈值（GDD §5 九转金丹递减收益）。委托给 _QualityRoller 子模块。
 static func jindan_cumulative_threshold(craft_count: int) -> int:
-	return craft_count * (craft_count + 1) / 2
+	return _QualityRoller.jindan_cumulative_threshold(craft_count)
 
 
 # === 炼制编排（Story 6-5）=====================================================

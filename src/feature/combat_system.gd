@@ -133,6 +133,9 @@ var _damage_calculator: RefCounted = null
 ## 出牌结算子模块。
 var _card_resolver: RefCounted = null
 
+## 阶段管理子模块——惰性初始化（Sprint 9 Story 8 拆分）。
+var _phase_manager: RefCounted = null
+
 
 # === 生命周期 ====================================================================
 
@@ -460,156 +463,64 @@ func advance_phase() -> bool:
 	return true
 
 
-## 计算下一阶段——END(6) 回绕到 PREPARATION(0)，其余 +1。
+## 计算下一阶段——委托给 combat_phase_manager.gd 子模块（Sprint 9 Story 8 拆分）。
 func _compute_next_phase(current: int) -> int:
-	if current >= CombatPhase.END:
-		return CombatPhase.PREPARATION
-	return current + 1
+	return _get_phase_manager().compute_next_phase(current)
 
 
-## 阶段转换验证矩阵（ADR-0008 §验证矩阵）。[br]
-## [br]无条件推进：0→1, 1→2, 4→5, 5→6, 6→0。[br]
-## [br]条件推进：2→3（player_confirmed_end || timer_exceeded || hand_empty && !can_afford_any），[br]
-## 3→4（all_characters_targeted || player_confirmed_skip || attack_queue.is_empty()）。[br]
-## [br][b]6→0 无条件说明[/b]：ADR §验证矩阵将 6→0 列为"战斗未结束"条件式，但 ADR §关键接口
-## 伪代码 default 分支为 `return true`——实现遵循伪代码，战斗结束检查由
-## `_enter_phase(END)` 桩内部 battle_end() 兜底（Story 002 接线）。battle_end() 设
-## _is_active=false 使后续 advance_phase() 在非活跃守卫处拒绝。[br]
-## [br][b]3→4 空队列守护[/b]：`_attack_queue.is_empty()` 子句为空队列边界守护——与 ADR
-## §边界情况"空队列→all_characters_targeted() 空真"一致；Story 003 接线
-## `_all_characters_targeted()` 真实逻辑后此子句仍作为防御性短路保留。
+## 阶段转换验证矩阵（ADR-0008 §验证矩阵）——委托给子模块。
 func _validate_transition(from: int, to: int) -> bool:
-	match from:
-		CombatPhase.PLAY:
-			# AC-006：出牌→攻击声明
-			return (_player_confirmed_end
-				or _phase_timer_exceeded
-				or (_hand.is_empty() and not _can_afford_any_card()))
-		CombatPhase.ATTACK_DECLARATION:
-			# AC-007/012：攻击声明→结算——空队列空真自动推进
-			return (_all_characters_targeted()
-				or _player_confirmed_attack_skip
-				or _attack_queue.is_empty())
-		_:
-			# AC-005：0→1, 1→2, 4→5, 5→6, 6→0 无条件
-			return true
+	return _get_phase_manager().validate_transition(from, to)
 
 
-## 阶段入口——按固定顺序调用子系统（ADR-0008 §子系统编排顺序）。[br]
-## [br]Sprint 8 Story 003：接线 StatusEffectSystem / CostSystem / DeploymentSystem。
+## 阶段入口——按固定顺序调用子系统（ADR-0008 §子系统编排顺序）。委托给子模块。
 func _enter_phase(phase: int) -> void:
-	match phase:
-		CombatPhase.PREPARATION:
-			# 1. 状态效果 tick
-			_tick_status_effects()
-			# 2. 触发"回合开始"效果（CardEffectEngine 接线属后续 Sprint）
-			_schedule_auto_advance()
-		CombatPhase.DRAW:
-			# 1. 计算抽牌数量（基础 2 + 修正）
-			var draw_count: int = _calculate_draw_count()
-			# 2. 从牌库抽牌（AC-013 牌库抽空返还）
-			_draw_cards(draw_count)
-			# 3. 触发"抽牌时"效果（CardEffectEngine 接线属后续 Sprint）
-			_schedule_auto_advance()
-		CombatPhase.PLAY:
-			# 玩家主动阶段——不自动推进，等待 confirm_end_turn() 或超时
-			_phase_timer_exceeded = false
-		CombatPhase.ATTACK_DECLARATION:
-			# 玩家主动阶段——不自动推进，等待 confirm_attack_targets()
-			# AC-012：空队列空真——_validate_transition 已放行，但仍需手动调用 advance_phase
-			pass
-		CombatPhase.ATTACK_RESOLUTION:
-			# 按速度排序依次结算
-			_resolve_attack_queue()
-			_schedule_auto_advance()
-		CombatPhase.ENEMY_TURN:
-			# AISystem.execute_turn——Sprint 8 Story 004 接线
-			_execute_ai_turn()
-			_schedule_auto_advance()
-		CombatPhase.END:
-			# 1. CostSystem.reset_for_turn
-			_reset_cost_for_turn()
-			# 2. DeploymentSystem.clear_standby_state
-			_clear_standby_state()
-			# 3. 战斗结束检查（Story 8-5 接线）
-			_schedule_auto_advance()
+	_get_phase_manager().enter_phase(phase)
 
 
-## 状态效果 tick——通过 StatusEffectSystem Autoload。[br]
-## 不可用时静默跳过。
-func _tick_status_effects() -> void:
-	var ses = _get_status_effect_system()
-	if ses != null and ses.has_method("tick_all"):
-		var field_chars: Array = _get_field_characters()
-		ses.tick_all(field_chars, _turn)
-
-
-## 重置费用——通过 CostSystem Autoload。[br]
-## 不可用时静默跳过。
-func _reset_cost_for_turn() -> void:
-	var cs = _get_cost_system()
-	if cs != null and cs.has_method("reset_for_turn"):
-		# is_first_player / is_first_turn 由战斗上下文决定——此处用简化默认值
-		cs.reset_for_turn(true, _turn == 1)
-
-
-## 清除待命状态——通过 DeploymentSystem Autoload。[br]
-## 不可用时静默跳过。
-func _clear_standby_state() -> void:
-	var ds = _get_deployment_system()
-	if ds != null and ds.has_method("clear_standby_state"):
-		ds.clear_standby_state()
-
-
-## 执行 AI 回合——通过 AISystem Autoload。[br]
-## 不可用时静默跳过。
-func _execute_ai_turn() -> void:
-	var ai = _get_ai_system()
-	if ai != null and ai.has_method("execute_turn"):
-		var field_state: Dictionary = _build_field_state()
-		ai.execute_turn(field_state)
-
-
-## 构建场上状态快照——供 AISystem.execute_turn 使用。
-func _build_field_state() -> Dictionary:
-	var ds = _get_deployment_system()
-	if ds != null and ds.has_method("get_field"):
-		return {"characters": ds.get_field(), "turn": _turn}
-	return {"characters": [], "turn": _turn}
-
-
-## 获取场上角色列表——通过 DeploymentSystem Autoload。
-func _get_field_characters() -> Array:
-	var ds = _get_deployment_system()
-	if ds != null and ds.has_method("get_field"):
-		return ds.get_field()
-	return []
-
-
-## 阶段出口——清理当前阶段状态（ADR-0008 §子系统编排顺序）。
+## 阶段出口——清理当前阶段状态。委托给子模块。
 func _exit_phase(phase: int) -> void:
-	match phase:
-		CombatPhase.PLAY:
-			_player_confirmed_end = false
-		CombatPhase.ATTACK_DECLARATION:
-			_player_confirmed_attack_skip = false
-		CombatPhase.ATTACK_RESOLUTION:
-			_attack_queue.clear()
-		CombatPhase.END:
-			# 清除"已行动"和"待命"标记——已由 _clear_standby_state 在 _enter_phase(END) 处理
-			pass
+	_get_phase_manager().exit_phase(phase)
 
 
-## 自动阶段调度——call_deferred 推进（ADR-0008 §准备阶段调度模式）。[br]
-## [br][b]区别于 ADR-0007 的 call_deferred 禁令[/b]：此处用于编排调度（确保每阶段至少 1 帧渲染），
-## 而非信号处理器内部打破信号链——ADR-0008 明确声明合法。[br]
-## [br][b]测试时禁用[/b]——_auto_advance_enabled=false 时跳过，手动控制 advance_phase。
+## 自动阶段调度——委托给子模块。
 func _schedule_auto_advance() -> void:
-	if not _auto_advance_enabled:
-		return
-	if not _is_active:
-		return
-	advance_phase.call_deferred()
+	_get_phase_manager()._schedule_auto_advance()
+
+
+## 状态效果 tick——委托给子模块。
+func _tick_status_effects() -> void:
+	_get_phase_manager()._tick_status_effects()
+
+
+## 重置费用——委托给子模块。
+func _reset_cost_for_turn() -> void:
+	_get_phase_manager()._reset_cost_for_turn()
+
+
+## 清除待命状态——委托给子模块。
+func _clear_standby_state() -> void:
+	_get_phase_manager()._clear_standby_state()
+
+
+## 执行 AI 回合——委托给子模块。
+func _execute_ai_turn() -> void:
+	_get_phase_manager()._execute_ai_turn()
+
+
+## 构建场上状态快照——委托给子模块。
+func _build_field_state() -> Dictionary:
+	return _get_phase_manager()._build_field_state()
+
+
+## 获取场上角色列表——委托给子模块。
+func _get_field_characters() -> Array:
+	return _get_phase_manager()._get_field_characters()
+
+
+## 计算抽牌数量——委托给子模块。
+func _calculate_draw_count() -> int:
+	return _get_phase_manager()._calculate_draw_count()
 
 
 # === 手动确认 API（Phase 2/3 玩家交互入口）========================================
@@ -676,12 +587,6 @@ func _all_characters_targeted() -> bool:
 				return false  # 有待命角色未分配目标
 	# 队列空且无待命角色——空真
 	return true
-
-
-## 计算抽牌数量——基础 2 张（GDD §2 抽牌规则）。[br]
-## [br][b]桩实现[/b]——Story 002 接线后补后手补偿 +3 逻辑。
-func _calculate_draw_count() -> int:
-	return 2
 
 
 # === 抽牌 + 牌库抽空返还（AC-013）================================================
@@ -991,6 +896,13 @@ func _get_card_resolver() -> RefCounted:
 	if _card_resolver == null:
 		_card_resolver = preload("res://src/feature/combat/combat_card_resolver.gd").new(self)
 	return _card_resolver
+
+
+## 获取阶段管理子模块实例（Sprint 9 Story 8 拆分）。
+func _get_phase_manager() -> RefCounted:
+	if _phase_manager == null:
+		_phase_manager = preload("res://src/feature/combat/combat_phase_manager.gd").new(self)
+	return _phase_manager
 
 
 # === 查询 API ===================================================================

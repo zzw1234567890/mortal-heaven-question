@@ -67,6 +67,12 @@ var _unavailable_characters: Dictionary = {}
 ## 在 [method setup_field] 中重置（ADR-0016 §风险缓解）。
 var _front_line_breached_emitted: bool = false
 
+## 序列化子模块——惰性初始化（Sprint 9 Story 1 拆分）。
+var _serializer: RefCounted = null
+
+## 阵位分配子模块——惰性初始化（Sprint 9 Story 1 拆分）。
+var _slot_allocator: RefCounted = null
+
 
 # === 信号声明（Cat 2b）=============================================================
 
@@ -472,90 +478,29 @@ func _emit_character_revived(character_id: int) -> void:
 
 # === 战斗结束快照导出 / 读档恢复（ADR-0016 §GSM 边界）=============================
 
-## 战斗结束时序列化阵位——导出纯 Dictionary 快照至 GSM.battle.deployment_snapshot。[br]
-## [br]6 个阵位逐槽序列化，state 用 FieldState 枚举名 String 序列化（可读性 + 前向兼容）。[br]
-## [br][b]返回[/b]: [code]{slot_index: {character_id, is_front, state, deploy_turn}, ...}[/code]——
-## 纯原始类型，无 RefCounted/Node 引用（可直接 JSON 序列化）。[br]
-## [br]来源: ADR-0016 §关键接口 serialize_field。
+## 战斗结束时序列化阵位——委托给 _serializer 子模块。
 func serialize_field() -> Dictionary:
-	var result: Dictionary = {}
-	for slot in range(SLOT_COUNT):
-		var entry: Dictionary = _field[slot]
-		result[slot] = {
-			"character_id": entry["character_id"],
-			"is_front": entry["is_front"],
-			"state": _state_to_string(entry["state"]),
-			"deploy_turn": entry["deploy_turn"],
-		}
-	return result
+	return _get_serializer().serialize_field()
 
 
-## 从快照恢复阵位——读档 / 战斗快照恢复入口。[br]
-## [br]快照格式同 [method serialize_field] 输出。[br]
-## [br][b]安全处理[/b]：空/无效 data 不崩溃——缺字段的 slot 用空位默认值填充；缺 slot 保持空位。[br]
-## [br][b]键归一[/b]：内存快照用 int key，JSON round-trip 后 key 变 String——两者均接受（避免读档静默丢阵位）。[br]
-## [br][param data] [method serialize_field] 输出的快照 Dictionary。
+## 从快照恢复阵位——委托给 _serializer 子模块。
 func deserialize_field(data: Dictionary) -> void:
-	_reset_field()
-	if data.is_empty():
-		return  # 空快照——保持全空阵位
-	for slot in range(SLOT_COUNT):
-		# 键归一：内存快照用 int key，JSON round-trip 后 key 变 String——两者均接受（C-1 修复）
-		var entry: Variant = null
-		if data.has(slot):
-			entry = data[slot]
-		elif data.has(str(slot)):
-			entry = data[str(slot)]
-		else:
-			continue  # 缺 slot——保持空位
-		if not entry is Dictionary:
-			continue  # 非法 entry——保持空位
-		var cid: int = int(entry.get("character_id", -1))
-		var is_front: bool = bool(entry.get("is_front", _is_front(slot)))
-		var state: FieldState = _state_from_string(entry.get("state", "EMPTY"))
-		var deploy_turn: int = int(entry.get("deploy_turn", -1))
-		_field[slot] = {
-			"character_id": cid,
-			"is_front": is_front,
-			"deploy_turn": deploy_turn,
-			"state": state,
-		}
+	_get_serializer().deserialize_field(data)
 
 
-## 战斗结束时同步不可用角色列表至 GSM——存档持久化入口。[br]
-## [br]GSM 不可用时静默跳过（is_instance_valid + has_method 双守卫）。[br]
-## [br]来源: ADR-0016 §不可用角色生命周期 §跨战斗持久。
+## 战斗结束时同步不可用角色列表至 GSM——委托给 _serializer 子模块。
 func sync_unavailable_to_gsm() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null or not gsm.has_method("_set_player_unavailable_characters"):
-		return  # GSM 不可用——静默跳过
-	gsm.call("_set_player_unavailable_characters", _unavailable_characters.duplicate(true))
+	_get_serializer().sync_unavailable_to_gsm()
 
 
-## 从 GSM 存档数据恢复不可用角色列表——读档时。[br]
-## [br][b]安全处理[/b]：非法 entry（非 Dictionary）跳过，缺字段填充默认值。[br]
-## [br][param data] GSM.player.unavailable_characters 快照 Dictionary。
+## 从 GSM 存档数据恢复不可用角色列表——委托给 _serializer 子模块。
 func load_unavailable_from_gsm(data: Dictionary) -> void:
-	_unavailable_characters.clear()
-	for cid: Variant in data.keys():
-		var entry: Variant = data[cid]
-		if not entry is Dictionary:
-			continue  # 非法 entry——跳过
-		_unavailable_characters[int(cid)] = {
-			"death_turn": int(entry.get("death_turn", 0)),
-			"death_battle_id": str(entry.get("death_battle_id", "")),
-			"revival_methods": entry.get("revival_methods", []),
-		}
+	_get_serializer().load_unavailable_from_gsm(data)
 
 
-## 写阵位快照至 GSM battle.deployment_snapshot（战斗结束导出委托）。[br]
-## [br]GSM 不可用时静默跳过（is_instance_valid + has_method 双守卫）。[br]
-## [br]来源: ADR-0016 §GSM 边界 §snapshot 导出。
+## 写阵位快照至 GSM——委托给 _serializer 子模块。
 func write_snapshot_to_gsm() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null or not gsm.has_method("_set_battle_deployment_snapshot"):
-		return  # GSM 不可用——静默跳过
-	gsm.call("_set_battle_deployment_snapshot", serialize_field())
+	_get_serializer().write_snapshot_to_gsm()
 
 
 ## 动态获取 GSM Autoload 节点。[br]
@@ -566,6 +511,20 @@ func _get_gsm() -> Node:
 	if tree == null or tree.root == null:
 		return null
 	return tree.root.get_node_or_null("/root/GameStateManager")
+
+
+## 惰性获取序列化子模块（Sprint 9 Story 1 拆分）。
+func _get_serializer() -> RefCounted:
+	if _serializer == null:
+		_serializer = load("res://src/feature/deployment/deployment_serializer.gd").new(self)
+	return _serializer
+
+
+## 惰性获取阵位分配子模块（Sprint 9 Story 1 拆分）。
+func _get_slot_allocator() -> RefCounted:
+	if _slot_allocator == null:
+		_slot_allocator = load("res://src/feature/deployment/deployment_slot_allocator.gd").new(self)
+	return _slot_allocator
 
 
 # === 内部 =========================================================================
@@ -582,71 +541,9 @@ func _reset_field() -> void:
 		}
 
 
-## 阵位分配——手动布局优先，未指定角色按「前排队列填满后才填后排」分配（GDD §2 关键规则）。[br]
-## [br]自动分配算法（前排配额上限，按 [constant FRONT_CAPACITY_BY_MAX_DEPLOY]）：[br]
-##   - 前 N 个未指定角色放前排（N = 境界前排配额，直到配额用尽）[br]
-##   - 剩余角色放后排（前排优先顺序：前1→前2→前3→后1→后2→后3）[br]
-## [br][param character_ids] 上场角色 ID 列表。[br]
-## [br][param layout] 手动前后排分配 [code]{char_id: is_front}[/code]。[br]
-## [br][b]返回[/b]: [code]{character_id: slot_index}[/code]。
+## 阵位分配——委托给 _slot_allocator 子模块。
 func _assign_slots(character_ids: Array, layout: Dictionary) -> Dictionary:
-	var assignment: Dictionary = {}
-	var used: Dictionary = {}  # slot_index -> true
-	var max_deploy: int = _query_max_deploy()
-	var front_capacity: int = FRONT_CAPACITY_BY_MAX_DEPLOY.get(max_deploy, FRONT_SLOTS)
-	var front_assigned: int = 0
-
-	# 1. 手动布局优先（指定 is_front 的角色放入对应行列；计入前排配额）
-	for cid in character_ids:
-		if not layout.has(cid):
-			continue
-		var is_front: bool = layout[cid]
-		var slot: int = _find_empty_in_row(is_front, used)
-		if slot == -1:
-			slot = _find_empty_slot(used)  # 目标行已满——回退任意空位
-		assignment[cid] = slot
-		used[slot] = true
-		if is_front:
-			front_assigned += 1
-
-	# 2. 自动分配剩余角色——前排配额填满后转后排（后排优先顺序：后1→后2→后3）
-	for cid in character_ids:
-		if assignment.has(cid):
-			continue
-		var slot: int
-		if front_assigned < front_capacity:
-			slot = _find_empty_in_row(true, used)
-			if slot == -1:
-				slot = _find_empty_slot(used)
-			front_assigned += 1
-		else:
-			slot = _find_empty_in_row(false, used)
-			if slot == -1:
-				slot = _find_empty_slot(used)
-		assignment[cid] = slot
-		used[slot] = true
-	return assignment
-
-
-## 在指定行列查找空位。[br]
-## [br][param is_front] true = 前排（0,1,2）；false = 后排（3,4,5）。[br]
-## [br][param used] 已占用 slot 集合。[br]
-## [br][b]返回[/b]: 空位 slot_index；行列已满返回 -1。
-func _find_empty_in_row(is_front: bool, used: Dictionary) -> int:
-	var slots: Array = [0, 1, 2] if is_front else [3, 4, 5]
-	for s in slots:
-		if not used.has(s):
-			return s
-	return -1
-
-
-## 查找任意空位（前排优先排序）。[br]
-## [br][b]返回[/b]: 空位 slot_index；全部已满返回 -1。
-func _find_empty_slot(used: Dictionary) -> int:
-	for s in [0, 1, 2, 3, 4, 5]:
-		if not used.has(s):
-			return s
-	return -1
+	return _get_slot_allocator().assign_slots(character_ids, layout)
 
 
 ## slot_index 前后排判定——slot_index ∈ [0,2] 为前排。
