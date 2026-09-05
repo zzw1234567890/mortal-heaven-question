@@ -3,11 +3,11 @@
 > **Sprint**: 12
 > **Start Date**: 2026-09-04
 > **End Date**: 2026-09-15
-> **Status**: Active
+> **Status**: Done
 > **Focus**: 拆分所有剩余可拆分的超 300 行文件（11 个文件）
 > **Milestone**: tech-debt-cleanup（技术债务清理）
 > **Review Mode**: full
-> **Last Updated**: 2026-09-05
+> **Last Updated**: 2026-09-05（Sprint 完成——QA 签收 APPROVED）
 
 ## Sprint Goal
 
@@ -37,7 +37,7 @@
 | 9 | file-refactor | tribulation_system.gd 拆分 | `story-017-tribulation-combat-split.md` | Refactor | 0.5d | — | Done |
 | 10 | file-refactor | deployment_system.gd 拆分 | `story-018-deployment-emitter-split.md` | Refactor | 0.5d | — | Done |
 | 11 | file-refactor | formation_system.gd 拆分 | `story-019-formation-conditions-split.md` | Refactor | 0.5d | — | Done |
-| 12 | qa | Sprint 12 QA 签收 | `story-020-sprint-12-qa.md` | — | 0.5d | #1-11 | Not Started |
+| 12 | qa | Sprint 12 QA 签收 | `story-020-sprint-12-qa.md` | — | 0.5d | #1-11 | Done |
 
 **总计**：12 story，预估 8.5d（含 QA）
 
@@ -62,8 +62,8 @@
 
 ## 此冲刺的完成定义
 
-- [ ] 所有必须完成的任务已完成（12 项）
-- [ ] 所有任务通过验收标准
-- [ ] 零回归——2455 个既有测试全部通过
-- [ ] 无新增 Autoload
-- [ ] QA 签收报告：APPROVED 或 APPROVED WITH CONDITIONS
+- [x] 所有必须完成的任务已完成（12 项）
+- [x] 所有任务通过验收标准
+- [x] 零回归——2455 个既有测试全部通过
+- [x] 无新增 Autoload
+- [x] QA 签收报告：APPROVED（见 production/epics/qa/story-001-sprint-12-qa.md）
