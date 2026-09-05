@@ -88,11 +88,22 @@ var _realm_override: Node = null
 ## 结算子模块——惰性初始化（Sprint 9 Story 7 拆分）。
 var _settlement: RefCounted = null
 
+## 渡劫战斗委托子模块——惰性初始化（Sprint 12 Story 017 拆分）。
+var _combat_delegation: RefCounted = null
+
 ## 惰性获取结算子模块。
 func _get_settlement() -> RefCounted:
 	if _settlement == null:
 		_settlement = load("res://src/feature/tribulation/tribulation_settlement.gd").new(self)
 	return _settlement
+
+
+## 惰性获取渡劫战斗委托子模块（Sprint 12 Story 017 拆分）。
+func _get_combat_delegation() -> RefCounted:
+	if _combat_delegation == null:
+		_combat_delegation = load("res://src/feature/tribulation/tribulation_combat.gd").new(self)
+	return _combat_delegation
+
 
 ## 合法状态转换白名单——_validate_state_transition 使用。
 ## [br]键=当前状态，值=可转换到的状态集合。
@@ -271,72 +282,21 @@ func _ready() -> void:
 		combat.battle_ended.connect(_on_battle_ended)
 
 
-## 启动渡劫战斗——从 PREPARING → IN_COMBAT + 委托 CombatSystem。[br]
-## [br][b]流程[/b]:[br]
-##   1. 验证 PREPARING 状态[br]
-##   2. _set_state(IN_COMBAT)[br]
-##   3. 构建 tribulation_config[br]
-##   4. 调用 CombatSystem.battle_start(config)[br]
-## [br][b]注意[/b]: 不在此处 await——战斗生命周期由 CombatSystem 管理。[br]
-## [br]来源: ADR-0021 §start_tribulation_combat + GDD §3 渡劫战斗规则。
+## 启动渡劫战斗——委托给战斗委托子模块（Sprint 12 Story 017 拆分）。
 func start_tribulation_combat() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		push_warning("TribulationSystem.start_tribulation_combat: GSM 不可用")
-		return
-	var state: int = int(gsm.player.get("tribulation_state", TribulationState.NOT_READY))
-	if state != TribulationState.PREPARING:
-		push_warning("TribulationSystem.start_tribulation_combat: 当前状态非 PREPARING（%d）" % state)
-		return
-	_set_state(TribulationState.IN_COMBAT)
-	var config: Dictionary = _build_tribulation_config()
-	var combat: Node = _get_combat_system()
-	if combat == null:
-		push_warning("TribulationSystem.start_tribulation_combat: CombatSystem 不可用")
-		return
-	combat.battle_start(config)
+	_get_combat_delegation().start_tribulation_combat()
 
 
-## 构建渡劫战斗配置——传入 is_tribulation: true 标志。[br]
-## [br][b]返回[/b]: [code]{is_tribulation: true, tribulation_data: {realm_level, is_cross_realm, boss_config}}[/code] Dictionary。[br]
-## [br]来源: ADR-0021 §_build_tribulation_config + §CombatSystem 扩展契约。
+## 构建渡劫战斗配置——委托给战斗委托子模块。
 func _build_tribulation_config() -> Dictionary:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return {}
-	var realm_level: int = int(gsm.player.realm)
-	var is_cross: bool = _trib_type == TribulationType.CROSS_REALM
-	var boss_realm: int = realm_level + 1 if is_cross else realm_level
-	var boss_config: Dictionary = get_tribulation_boss_config(boss_realm)
-	return {
-		"is_tribulation": true,
-		"tribulation_data": {
-			"realm_level": realm_level,
-			"is_cross_realm": is_cross,
-			"active_pills": _active_pills.duplicate(true),
-			"boss_config": boss_config,
-		},
-	}
+	return _get_combat_delegation().build_tribulation_config()
 
 
-## 监听 CombatSystem.battle_ended——渡劫专属结算入口。[br]
+## 监听 CombatSystem.battle_ended——委托给战斗委托子模块。[br]
 ## [br][param result] 战斗结果（CombatResult.VICTORY/DEFEAT/RETREAT）。[br]
-## [br][param rewards] 奖励字典。[br]
-## [br][b]流程[/b]: 检查 tribulation_state == IN_COMBAT → VICTORY 调用 _handle_success / DEFEAT 调用 _handle_failure。[br]
-## [br][b]非渡劫战[/b]: tribulation_state != IN_COMBAT 时忽略（普通战斗不响应）。[br]
-## [br]来源: ADR-0021 §_on_battle_ended + GDD §4-5。
+## [br][param rewards] 奖励字典。
 func _on_battle_ended(result: int, rewards: Dictionary) -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return
-	var state: int = int(gsm.player.get("tribulation_state", TribulationState.NOT_READY))
-	if state != TribulationState.IN_COMBAT:
-		return  # 非渡劫战——忽略
-	# CombatResult.VICTORY=0, DEFEAT=1, RETREAT=2（渡劫战中撤退不可用——仅 DEFEAT）
-	if result == 0:  # CombatResult.VICTORY
-		_handle_tribulation_success()
-	else:  # DEFEAT or RETREAT
-		_handle_tribulation_failure()
+	_get_combat_delegation().on_battle_ended(result, rewards)
 
 
 # === 渡劫丹管理（Story 5-12）=================================================
