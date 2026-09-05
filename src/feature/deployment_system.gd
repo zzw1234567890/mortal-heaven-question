@@ -73,6 +73,9 @@ var _serializer: RefCounted = null
 ## 阵位分配子模块——惰性初始化（Sprint 9 Story 1 拆分）。
 var _slot_allocator: RefCounted = null
 
+## 信号发射子模块——惰性初始化（Sprint 12 Story 018 拆分）。
+var _emitter: RefCounted = null
+
 
 # === 信号声明（Cat 2b）=============================================================
 
@@ -425,55 +428,25 @@ func is_game_over(roster: Array) -> bool:
 	return true
 
 
-# === 信号发射包装（ADR-0007）=======================================================
+# === 信号发射包装（委托 → DeploymentEmitter，Sprint 12 Story 018 拆分）============
 
-## 发射 [signal character_deployed]——经 GSM._emit_signal_safe 路由（Cat 2b）。[br]
-## GSM 不可用时（测试 mock）回退直接 emit。
 func _emit_character_deployed(character_id: int, slot_index: int, is_front: bool, deploy_turn: int) -> void:
-	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
-		GameStateManager.get_script()._emit_signal_safe(self, &"character_deployed", [character_id, slot_index, is_front, deploy_turn])
-	else:
-		character_deployed.emit(character_id, slot_index, is_front, deploy_turn)
+	_get_emitter().emit_character_deployed(character_id, slot_index, is_front, deploy_turn)
 
-
-## 发射 [signal character_removed]——经 GSM._emit_signal_safe 路由。
 func _emit_character_removed(character_id: int, slot_index: int, reason: String) -> void:
-	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
-		GameStateManager.get_script()._emit_signal_safe(self, &"character_removed", [character_id, slot_index, reason])
-	else:
-		character_removed.emit(character_id, slot_index, reason)
+	_get_emitter().emit_character_removed(character_id, slot_index, reason)
 
-
-## 发射 [signal front_line_breached]——经 GSM._emit_signal_safe 路由。
 func _emit_front_line_breached() -> void:
-	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
-		GameStateManager.get_script()._emit_signal_safe(self, &"front_line_breached", [])
-	else:
-		front_line_breached.emit()
+	_get_emitter().emit_front_line_breached()
 
-
-## 发射 [signal standby_cleared]——经 GSM._emit_signal_safe 路由。
 func _emit_standby_cleared(character_ids: Array) -> void:
-	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
-		GameStateManager.get_script()._emit_signal_safe(self, &"standby_cleared", [character_ids])
-	else:
-		standby_cleared.emit(character_ids)
+	_get_emitter().emit_standby_cleared(character_ids)
 
-
-## 发射 [signal character_unavailable]——经 GSM._emit_signal_safe 路由。
 func _emit_character_unavailable(character_id: int) -> void:
-	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
-		GameStateManager.get_script()._emit_signal_safe(self, &"character_unavailable", [character_id])
-	else:
-		character_unavailable.emit(character_id)
+	_get_emitter().emit_character_unavailable(character_id)
 
-
-## 发射 [signal character_revived]——经 GSM._emit_signal_safe 路由。
 func _emit_character_revived(character_id: int) -> void:
-	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
-		GameStateManager.get_script()._emit_signal_safe(self, &"character_revived", [character_id])
-	else:
-		character_revived.emit(character_id)
+	_get_emitter().emit_character_revived(character_id)
 
 
 # === 战斗结束快照导出 / 读档恢复（ADR-0016 §GSM 边界）=============================
@@ -525,6 +498,13 @@ func _get_slot_allocator() -> RefCounted:
 	if _slot_allocator == null:
 		_slot_allocator = load("res://src/feature/deployment/deployment_slot_allocator.gd").new(self)
 	return _slot_allocator
+
+
+## 惰性获取信号发射子模块（Sprint 12 Story 018 拆分）。
+func _get_emitter() -> RefCounted:
+	if _emitter == null:
+		_emitter = load("res://src/feature/deployment/deployment_emitter.gd").new(self)
+	return _emitter
 
 
 # === 内部 =========================================================================
