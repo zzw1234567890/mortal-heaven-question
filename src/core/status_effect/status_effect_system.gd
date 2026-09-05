@@ -20,6 +20,12 @@ extends Node
 ##
 ## 来源: ADR-0011。
 
+## 免疫机制子模块（Sprint 12 Story 016 拆分）——static 方法集合。
+const _Immunity := preload("res://src/core/status_effect/status_effect_immunity.gd")
+
+## 施加管线子模块（Sprint 12 Story 016 拆分）。
+var _lifecycle: RefCounted = null
+
 # === 信号声明（Cat 2b）============================================================
 
 ## 状态成功施加到目标时发射。
@@ -94,6 +100,13 @@ func _get_suspend() -> RefCounted:
 	return _suspend
 
 
+## 施加管线子模块惰性初始化（Sprint 12 Story 016 拆分）。
+func _get_lifecycle() -> RefCounted:
+	if _lifecycle == null:
+		_lifecycle = load("res://src/core/status_effect/status_effect_lifecycle.gd").new(self)
+	return _lifecycle
+
+
 # === 公共 API =====================================================================
 
 ## 施加状态到目标——完整管线。[br]
@@ -118,65 +131,7 @@ func apply_status(
 	overrides: Dictionary = {},
 	current_turn: int = -1
 ) -> Dictionary:
-	var template: StatusTemplate = get_status_template(template_id)
-	if template == null:
-		return {applied = false, status_id = 0, reason = "unknown_template"}
-
-	# 阶段 1：免疫检查（3 级短路）
-	var immune_result: Dictionary = _check_immunity(target_id, template)
-	if immune_result.blocked:
-		status_immunity_blocked.emit(target_id, template_id, immune_result.immune_level)
-		return {applied = false, status_id = 0, reason = "immune"}
-
-	# 阶段 2：同名查找 → 叠加判定
-	var existing: StatusInstance = _find_existing(target_id, template_id)
-	if existing != null:
-		match template.stack_rule:
-			StatusTemplate.StackRule.REFRESH:
-				existing.duration = template.base_duration
-				# overrides.value 覆盖（若有指定）
-				if overrides.has("value"):
-					existing.value = float(overrides["value"])
-				status_updated.emit(target_id, existing.id, {duration = existing.duration, value = existing.value})
-				return {applied = true, status_id = existing.id, reason = "refreshed"}
-
-			StatusTemplate.StackRule.CUMULATIVE:
-				if existing.current_stacks < template.max_stacks:
-					existing.current_stacks += 1
-					status_updated.emit(target_id, existing.id, {current_stacks = existing.current_stacks})
-					return {applied = true, status_id = existing.id, reason = "stacked"}
-				else:
-					return {applied = false, status_id = existing.id, reason = "max_stacks"}
-
-			StatusTemplate.StackRule.INDEPENDENT:
-				pass  # 跳过叠加——走 NEW 路径
-			_:
-				pass  # 未知叠加规则——走 NEW 路径
-
-	# 阶段 3：NEW 路径——20 上限检查
-	if get_active_count(target_id) >= MAX_ACTIVE_STATUSES_PER_CHARACTER:
-		_evict_lowest(target_id)
-
-	# 阶段 4：创建新实例 + 注册
-	var instance: StatusInstance = StatusInstance.new()
-	instance.id = _next_status_id
-	_next_status_id += 1
-	instance.template_id = template_id
-	instance.target_id = target_id
-	instance.duration = template.base_duration
-	instance.applied_turn = current_turn
-	instance.base_value = template.base_value
-	instance.value = float(overrides.get("value", template.base_value))
-	instance.current_stacks = 1
-	instance.source_card_instance_id = source_card_instance_id
-	instance.priority = template.default_priority
-	instance.is_hidden = false
-	instance.is_expired = false
-	instance.metadata = template.metadata.duplicate(true)
-
-	_register_instance(instance)
-	status_applied.emit(target_id, instance.id, template_id, instance.current_stacks, "new")
-	return {applied = true, status_id = instance.id, reason = "new"}
+	return _get_lifecycle().apply_status(target_id, template_id, source_card_instance_id, overrides, current_turn)
 
 
 ## 获取目标的所有活跃 status_id 列表。[br]
@@ -315,28 +270,20 @@ func get_status_template(template_id: StringName) -> StatusTemplate:
 	return _templates.get(template_id, null) as StatusTemplate
 
 
-## 设置免疫标志。[br]
+## 设置免疫标志——委托给 _Immunity static 方法（Sprint 12 Story 016 拆分）。[br]
 ## [br][param target_id] 目标角色实例 ID。[br]
 ## [param level] 免疫级别——"type"/"template"/"element"。[br]
 ## [param key] 免疫键值——StatusType 枚举值（type 级）/ template_id（template 级）/ element 字符串（element 级）。[br]
 ## [br][b]来源[/b]: ADR-0011 §免疫机制。
 func set_immunity(target_id: int, level: String, key: Variant) -> void:
-	if not _immunity_flags.has(target_id):
-		_immunity_flags[target_id] = {type = {}, template = {}, element = {}}
-	var target_flags: Dictionary = _immunity_flags[target_id]
-	if level in target_flags:
-		target_flags[level][key] = true
+	_Immunity.set_immunity(_immunity_flags, target_id, level, key)
 
 
-## 清除免疫标志。[br]
+## 清除免疫标志——委托给 _Immunity static 方法。[br]
 ## [br]参数同 [method set_immunity]。清除不存在的免疫不报错（幂等）。[br]
 ## [br][b]来源[/b]: ADR-0011 §免疫机制。
 func clear_immunity(target_id: int, level: String, key: Variant) -> void:
-	if not _immunity_flags.has(target_id):
-		return
-	var target_flags: Dictionary = _immunity_flags[target_id]
-	if level in target_flags:
-		target_flags[level].erase(key)
+	_Immunity.clear_immunity(_immunity_flags, target_id, level, key)
 
 
 # === 内部辅助 ====================================================================
@@ -376,69 +323,21 @@ func _remove_expired_statuses(target_id: int) -> void:
 		_remove_instance(status_id, "expired")
 
 
-## 3 级免疫短路检查——type → template → element。[br]
-## [br][b]返回[/b]: [code]{blocked: bool, immune_level: String}[/code]。[br]
-## 首个命中的级别立即返回；全部未命中返回 blocked=false。
+## 3 级免疫短路检查——委托给 _Immunity static 方法（Sprint 12 Story 016 拆分）。[br]
+## [br][b]返回[/b]: [code]{blocked: bool, immune_level: String}[/code]。
 func _check_immunity(target_id: int, template: StatusTemplate) -> Dictionary:
-	if not _immunity_flags.has(target_id):
-		return {blocked = false, immune_level = ""}
-
-	var flags: Dictionary = _immunity_flags[target_id]
-
-	# 级别 1：type 免疫（如 POISON/BUFF/DEBUFF/SPECIAL）
-	var type_flags: Dictionary = flags.get("type", {})
-	if type_flags.get(template.type, false):
-		return {blocked = true, immune_level = "type"}
-
-	# 级别 2：template 免疫（如 poison_3）
-	var template_flags: Dictionary = flags.get("template", {})
-	if template_flags.get(template.template_id, false):
-		return {blocked = true, immune_level = "template"}
-
-	# 级别 3：element 免疫（如 FIRE/ICE）
-	var element_flags: Dictionary = flags.get("element", {})
-	var element: String = template.metadata.get("element", "")
-	if element != "" and element_flags.get(element, false):
-		return {blocked = true, immune_level = "element"}
-
-	return {blocked = false, immune_level = ""}
+	return _Immunity.check_immunity(_immunity_flags, target_id, template)
 
 
-## 查找目标身上已存在的同名状态实例。[br]
-## [br][b]返回[/b]: [StatusInstance] 或 [code]null[/code]（不存在）。
+## 查找目标身上已存在的同名状态实例——委托给施加管线子模块（Story 016 拆分）。
 func _find_existing(target_id: int, template_id: StringName) -> StatusInstance:
-	var ids: Array = _by_target.get(target_id, [])
-	for id in ids:
-		var status = _instances[id]
-		if status.template_id == template_id:
-			return status
-	return null
+	return _get_lifecycle().find_existing(target_id, template_id)
 
 
-## 溢出驱逐——按 priority 升序 + applied_turn 升序选首个移除。[br]
-## [br]驱逐策略（ADR-0011 §活跃上限驱逐）：遍历 _by_target[target_id] →[br]
-## 排序（priority ASC, applied_turn ASC）→ 移除首位 → 发射 status_removed(reason="overflow")。[br]
-## [br][b]确定性[/b]：同 priority 取 applied_turn 最旧；同 applied_turn 取 priority 最低。
+## 溢出驱逐——委托给施加管线子模块（Story 016 拆分）。[br]
+## suspend 子模块经 _parent.call("_evict_lowest") 动态调用——保留委托。
 func _evict_lowest(target_id: int) -> void:
-	var ids: Array = _by_target.get(target_id, [])
-	if ids.is_empty():
-		return
-
-	# 收集所有状态以便排序
-	var candidates: Array = []
-	for id in ids:
-		var status = _instances[id]
-		candidates.append({status_id = status.id, priority = status.priority, applied_turn = status.applied_turn})
-
-	# 排序：priority 升序（数值最小=最低优先级，优先驱逐）→ applied_turn 升序（最旧优先驱逐）
-	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		if a.priority != b.priority:
-			return a.priority < b.priority  # 数值小（低优先级）排前面（优先驱逐）
-		return a.applied_turn < b.applied_turn  # 旧 applied_turn 排前面
-	)
-
-	var to_evict: int = candidates[0].status_id
-	_remove_instance(to_evict, "overflow")
+	_get_lifecycle().evict_lowest(target_id)
 
 
 ## 从角色实例对象提取 target_id——兼容 int/Dictionary/Object。
