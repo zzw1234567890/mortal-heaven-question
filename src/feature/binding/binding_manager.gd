@@ -107,6 +107,9 @@ var _by_character: Dictionary = {}
 ## O(1) 反向查询 [method get_character_by_card]。
 var _card_to_character: Dictionary[int, int] = {}
 
+## 槽位操作子模块（Sprint 12 Story 2 拆分）。
+var _slot_ops: RefCounted = null
+
 
 # === 私有方法：索引原子同步 ======================================================
 
@@ -519,110 +522,52 @@ func compute_effective_value(base_value: int, native_multiplier: float, stack_mu
 
 # === 内部辅助 ====================================================================
 
-## 构造 BindingRecord——填充标识/槽位/叠层字段。[br]
-## [b]card_name / card_rarity 延后[/b]：本 Story 无 CardSystem 模板查询（绑定生命周期走存根），
-## 两字段保持默认空值；Story 004 接 CardSystem 后由 [method bind_card] 填充模板数据。[br]
-## [br][b]返回[/b]: 新 BindingRecord（binding_id 已分配，stack_count=1，stack_slots=[card_instance_id]）。
+## 惰性获取槽位操作子模块（Sprint 12 Story 2 拆分）。
+func _get_slot_ops() -> RefCounted:
+	if _slot_ops == null:
+		_slot_ops = load("res://src/feature/binding/binding_slot_ops.gd").new(self)
+	return _slot_ops
+
+
+## 构造 BindingRecord——薄委托到 _slot_ops 子模块（Sprint 12 Story 2 拆分）。
 func _make_record(card_instance_id: int, template_id: StringName, character_id: int, slot_type: int, slot_index: int) -> BindingRecord:
-	var record: BindingRecord = BindingRecord.new()
-	record.binding_id = _next_binding_id
-	_next_binding_id += 1
-	record.card_instance_id = card_instance_id
-	record.card_template_id = template_id
-	record.slot_type = slot_type
-	record.slot_index = slot_index
-	record.bound_character_id = character_id
-	record.activated_turn = 0
-	var slots: Array[int] = [card_instance_id]
-	record.stack_slots = slots
-	record.stack_count = 1
-	return record
+	return _get_slot_ops().make_record(card_instance_id, template_id, character_id, slot_type, slot_index) as BindingRecord
 
 
-## 本命判定（AC-005）——[code]native_owner[/code] 匹配角色 card_id + 同类型本命位未占用 → 本命。[br]
-## 匹配采用下划线分段边界匹配（card_id 命名 [code]{type}_{name}_{variant}[/code]，
-## native_owner 匹配 name 段——两侧以下划线锚定，避免子串误匹配）。[br]
-## [br][b]返回[/b]: [code]{is_native, native_multiplier}[/code]。
+## 本命判定——薄委托到 _slot_ops 子模块。
 func _determine_native(character_id: int, native_owner: StringName, character_card_id: StringName, slot_type: int) -> Dictionary:
-	if native_owner == &"":
-		return {"is_native": false, "native_multiplier": 1.0}
-	if not _native_matches(character_card_id, native_owner):
-		return {"is_native": false, "native_multiplier": 1.0}
-	if _has_native_binding(character_id, slot_type):
-		return {"is_native": false, "native_multiplier": 1.0}
-	return {"is_native": true, "native_multiplier": NATIVE_MULTIPLIER}
+	return _get_slot_ops().determine_native(character_id, native_owner, character_card_id, slot_type)
 
 
-## 本命分段匹配——[code]native_owner[/code] 作为下划线分隔的完整段出现在 [code]character_card_id[/code] 中。[br]
-## 两侧以下划线锚定（[code]"_" + owner + "_"[/code] in [code]"_" + card_id + "_"[/code]），
-## 消除子串误匹配（如 native_owner="yuan" 不会误配 "xi_yuan"）。[br]
-## [br][b]返回[/b]: true 表示匹配。
+## 本命分段匹配——薄委托到 _slot_ops 子模块。
 func _native_matches(character_card_id: StringName, native_owner: StringName) -> bool:
-	var card_seg: String = "_" + String(character_card_id) + "_"
-	var owner_seg: String = "_" + String(native_owner) + "_"
-	return card_seg.contains(owner_seg)
+	return _get_slot_ops().native_matches(character_card_id, native_owner)
 
 
-## 检查角色某类型本命位是否已被占用。[br]
-## [br][b]返回[/b]: true 表示已有 is_native 绑定。
+## 检查角色某类型本命位是否已被占用——薄委托到 _slot_ops 子模块。
 func _has_native_binding(character_id: int, slot_type: int) -> bool:
-	for binding_id: int in get_binding_ids_by_character(character_id):
-		if not _bindings.has(binding_id):
-			continue
-		var record: BindingRecord = _bindings[binding_id]
-		if record.slot_type == slot_type and record.is_native:
-			return true
-	return false
+	return _get_slot_ops().has_native_binding(character_id, slot_type)
 
 
-## 统计角色某类型的已占用槽位数（同名叠加共享一位，不计 stack_count）。[br]
-## [br][b]返回[/b]: 已占用槽位数。
+## 统计角色某类型的已占用槽位数——薄委托到 _slot_ops 子模块。
 func _count_bound_slots(character_id: int, slot_type: int) -> int:
-	var count: int = 0
-	for binding_id: int in get_binding_ids_by_character(character_id):
-		if _bindings.has(binding_id) and (_bindings[binding_id] as BindingRecord).slot_type == slot_type:
-			count += 1
-	return count
+	return _get_slot_ops().count_bound_slots(character_id, slot_type)
 
 
-## 查找角色已绑定的同名卡（按模板 ID 判定）。[br]
-## [br][b]返回[/b]: 同名 BindingRecord 或 null。
+## 查找角色已绑定的同名卡——薄委托到 _slot_ops 子模块。
 func _find_same_template_binding(character_id: int, template_id: StringName) -> BindingRecord:
-	for binding_id: int in get_binding_ids_by_character(character_id):
-		if _bindings.has(binding_id):
-			var record: BindingRecord = _bindings[binding_id]
-			if record.card_template_id == template_id:
-				return record
-	return null
+	return _get_slot_ops().find_same_template_binding(character_id, template_id) as BindingRecord
 
 
-## 查找角色某槽位上的绑定记录。[br]
-## [br][b]返回[/b]: BindingRecord 或 null。
+## 查找角色某槽位上的绑定记录——薄委托到 _slot_ops 子模块。
 func _find_binding_at_slot(character_id: int, slot_index: int) -> BindingRecord:
-	for binding_id: int in get_binding_ids_by_character(character_id):
-		if _bindings.has(binding_id):
-			var record: BindingRecord = _bindings[binding_id]
-			if record.slot_index == slot_index:
-				return record
-	return null
+	return _get_slot_ops().find_binding_at_slot(character_id, slot_index) as BindingRecord
 
 
-## 查找某类型的第一个空闲槽位索引（0..limit-1）。[br]
-## [br][b]返回[/b]: 空闲 slot_index；全满时 [code]push_error[/code] 并返回 -1
-## （防御——调用方 [method bind_card] / [method can_bind] 已在校验后保证有空位，不应触发）。
+## 查找某类型的第一个空闲槽位索引——薄委托到 _slot_ops 子模块。
 func _find_free_slot_index(character_id: int, slot_type: int, limit: int) -> int:
-	var occupied: Dictionary = {}
-	for binding_id: int in get_binding_ids_by_character(character_id):
-		if _bindings.has(binding_id):
-			var record: BindingRecord = _bindings[binding_id]
-			if record.slot_type == slot_type:
-				occupied[record.slot_index] = true
-	for slot_index: int in range(limit):
-		if not occupied.has(slot_index):
-			return slot_index
-	push_error("_find_free_slot_index: 槽位已满仍被调用（character_id=%d, slot_type=%d, limit=%d）"
-			% [character_id, slot_type, limit])
-	return -1
+	return _get_slot_ops().find_free_slot_index(character_id, slot_type, limit)
+
 
 
 ## 序列化单条绑定记录（供 [method remove_all_bindings] 返回 + 未来 Story 004 serialize_all）。[br]

@@ -18,12 +18,16 @@ var _battle_writes: RefCounted = null
 ## 探索域写入子模块（Sprint 8 Story 8-11 拆分）。
 var _exploration_writes: RefCounted = null
 
+## 叙事域写入子模块（Sprint 12 Story 012 拆分）。
+var _narrative_writes: RefCounted = null
+
 
 ## 绑定 GSM 父节点引用。
 func init(gsm: Node) -> void:
 	_gsm = gsm
 	_battle_writes = load("res://src/foundation/gsm/gsm_battle_writes.gd").new(gsm)
 	_exploration_writes = load("res://src/foundation/gsm/gsm_exploration_writes.gd").new(gsm)
+	_narrative_writes = load("res://src/foundation/gsm/gsm_narrative_writes.gd").new(gsm)
 
 
 ## 修为增加——仅 CultivationSystem 调用。
@@ -299,19 +303,7 @@ func set_session_scene(id: int, path: String) -> void:
 	_gsm._buffer_change("session.current_scene", old_path, path)
 
 
-## story_flags 写入——仅 [b]EventSystem.set_flag()[/b] 调用（ADR-0003 唯一写入者契约）。[br]
-## [br][b]委托链[/b]: EventSystem.set_flag() → 此方法 → [method GameStateManager._buffer_change] → 帧末 [signal GameStateManager.batch_updated]。[br]
-## [br]相同值重复写入不缓冲变更（去重），减少 SaveLoad 误触发自动存档。[br]
-## [br][param flag] flag 键名；[param value] flag 值（Variant——仅接口处使用，不在 Resource @export 中使用）。[br]
-## [br][b]示例[/b]: [code]GameStateManager.set_narrative_flag(&"chapter_1", true)[/code]
-func set_narrative_flag(flag: StringName, value: Variant) -> void:
-	var old: Variant = _gsm.narrative.story_flags.get(flag, null)
-	if old == value:
-		return
-	_gsm.narrative.story_flags[flag] = value
-	_gsm._buffer_change("narrative.story_flags.%s" % flag, old, value)
-
-
+## story_flags 写入——委托给 _narrative_writes 子模块（Sprint 12 Story 012 拆分）。
 ## 移除卡牌实例——按 card_instance_id 查找并从 collection.owned_cards 移除。[br]
 ## [br][b]校验跳过模式[/b]：若 [member GameStateManager.validation_enabled] 为 false，拒绝写入并返回 false。[br]
 ## [br]兼容 [code]card_instance_id[/code]（ADR-0006 权威字段）与 [code]instance_id[/code] 两种字段命名。[br]
@@ -380,6 +372,22 @@ func clear_exploration_navigation() -> void:
 	_exploration_writes.clear_exploration_navigation()
 
 
+# === 叙事域写入（委托 → GSMNarrativeWrites，Sprint 12 Story 012 拆分）=========
+
+func set_narrative_flag(flag: StringName, value: Variant) -> void:
+	_narrative_writes.set_narrative_flag(flag, value)
+func advance_chapter(chapter_id: StringName) -> void:
+	_narrative_writes.advance_chapter(chapter_id)
+func add_required_event_completion(event_id: StringName) -> void:
+	_narrative_writes.add_required_event_completion(event_id)
+func set_narrative_boss_unlocked(value: bool) -> void:
+	_narrative_writes.set_narrative_boss_unlocked(value)
+func set_narrative_boss_defeated(value: bool) -> void:
+	_narrative_writes.set_narrative_boss_defeated(value)
+func set_ending_chosen(branch_id: StringName) -> void:
+	_narrative_writes.set_ending_chosen(branch_id)
+
+
 ## 解锁天赋——写入 player.talents（去重 append）。[br]
 ## [br][param talent_id] 天赋 ID。[br]
 ## [br][b]示例[/b]: [code]GameStateManager.unlock_talent(&"talent_003")[/code]
@@ -412,106 +420,6 @@ func set_talent(talent_id: StringName, magnitude: int) -> void:
 		_gsm.player["talent_map"] = talent_map
 	_gsm._buffer_change("player.talent_map.%s" % talent_id, old_val, magnitude)
 
-
-## 推进章节——写入 narrative.current_chapter + completed_chapters。[br]
-## [br]若 [code]narrative.current_chapter[/code] 非空且与新章节不同，将旧章节 append 到 [code]completed_chapters[/code]。[br]
-## [br][param chapter_id] 新章节 ID。[br]
-## [br][b]示例[/b]: [code]GameStateManager.advance_chapter(&"chapter_2")[/code]
-func advance_chapter(chapter_id: StringName) -> void:
-	var chapter_str: String = str(chapter_id)
-	if chapter_str.is_empty():
-		push_warning("GSM.advance_chapter: chapter_id 为空，拒绝写入")
-		return
-
-	var old_current: String = _gsm.narrative.current_chapter
-	if old_current == chapter_str:
-		return  # 相同章节——去重
-
-	var old_completed: Array = _gsm.narrative.completed_chapters.duplicate()
-	if not old_current.is_empty():
-		_gsm.narrative.completed_chapters.append(old_current)
-
-	_gsm.narrative.current_chapter = chapter_str
-	_gsm._buffer_change("narrative.current_chapter", old_current, chapter_str)
-	_gsm._buffer_change("narrative.completed_chapters", old_completed, _gsm.narrative.completed_chapters)
-
-
-## 追加必经事件完成——写入 narrative.current_chapter_progress.completed_required_events（ADR-0026）。
-## [br][param event_id] 已完成的必经事件 ID。[br]
-## [br][b]去重[/b]：已存在的事件不重复追加。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0026 §GSM 第二层新增方法。
-func add_required_event_completion(event_id: StringName) -> void:
-	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
-	if progress.is_empty():
-		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
-		_gsm.narrative["current_chapter_progress"] = progress
-
-	var events: Array = progress.get("completed_required_events", [])
-	if events.has(event_id):
-		return  # 去重
-
-	var old_events: Array = events.duplicate()
-	events.append(event_id)
-	progress["completed_required_events"] = events
-	_gsm._buffer_change("narrative.current_chapter_progress.completed_required_events", old_events, events)
-
-
-## 原子写入 BOSS 解锁状态——仅 StorySystem 调用（ADR-0026）。
-## [br][param value] BOSS 是否已解锁。[br]
-## [br][b]去重[/b]：同值不写入。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0026 §GSM 第二层新增方法。
-func set_narrative_boss_unlocked(value: bool) -> void:
-	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
-	if progress.is_empty():
-		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
-		_gsm.narrative["current_chapter_progress"] = progress
-
-	var old_val: bool = bool(progress.get("boss_unlocked", false))
-	if old_val == value:
-		return
-
-	progress["boss_unlocked"] = value
-	_gsm._buffer_change("narrative.current_chapter_progress.boss_unlocked", old_val, value)
-
-
-## 原子写入 BOSS 击败状态——仅 StorySystem 调用（ADR-0026）。
-## [br][param value] BOSS 是否已击败。[br]
-## [br][b]去重[/b]：同值不写入。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0026 §GSM 第二层新增方法。
-func set_narrative_boss_defeated(value: bool) -> void:
-	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
-	if progress.is_empty():
-		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
-		_gsm.narrative["current_chapter_progress"] = progress
-
-	var old_val: bool = bool(progress.get("boss_defeated", false))
-	if old_val == value:
-		return
-
-	progress["boss_defeated"] = value
-	_gsm._buffer_change("narrative.current_chapter_progress.boss_defeated", old_val, value)
-
-
-## 原子写入结局分支选择——仅 StorySystem 调用（ADR-0026）。
-## [br][param branch_id] 玩家选择的结局分支 ID。[br]
-## [br][b]去重[/b]：同值不写入。[br]
-## [br][b]Cat 1 信号[/b]：写入后通过 [signal GameStateManager.batch_updated] 帧末传播。[br]
-## [br]来源: ADR-0026 §GSM 第二层新增方法。
-func set_ending_chosen(branch_id: StringName) -> void:
-	var progress: Dictionary = _gsm.narrative.get("current_chapter_progress", {})
-	if progress.is_empty():
-		progress = {"completed_required_events": [], "boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""}
-		_gsm.narrative["current_chapter_progress"] = progress
-
-	var old_val: String = str(progress.get("ending_chosen", ""))
-	if old_val == str(branch_id):
-		return
-
-	progress["ending_chosen"] = str(branch_id)
-	_gsm._buffer_change("narrative.current_chapter_progress.ending_chosen", old_val, str(branch_id))
 
 
 ## 原子写入渡劫状态——仅 TribulationSystem 调用。[br]

@@ -13,6 +13,9 @@ extends RefCounted
 ## 品质掷骰子模块（Sprint 9 Story 5 拆分）—— preload 避免依赖 class_name 全局注册。
 const _QualityRoller := preload("res://src/feature/alchemy/alchemy_quality_roller.gd")
 
+## 配方查询子模块（Sprint 12 Story 1 拆分）——配方表+查询 API。
+const _Recipes := preload("res://src/feature/alchemy/alchemy_recipes.gd")
+
 
 # === 灵材品质常量（与 ResourceSystem.LingCaiQuality 值一致）==================
 
@@ -68,165 +71,42 @@ const QUALITY_MOD: Dictionary = {
 }
 
 
-# === 配方表（const Dictionary——编译时常量，运行时只读）=========================
-
-## 炼丹配方表——4 个配方（GDD §1a 炼丹配方）。[br]
-## 键 = 配方 ID（String），值 = 配方 Dictionary。[br]
-## [br]来源: GDD alchemy-crafting-system.md §1a。
-const ALCHEMY_RECIPES: Dictionary = {
-	# 回春丹——低级灵材×2，蓝色，回复 4HP
-	"hui_chun_dan": {
-		"name": "回春丹",
-		"materials": {LING_CAI_LOW: 2},
-		"rarity": RARITY_BLUE,
-		"card_type": "pill",
-		"template_id": "pill_hui_chun_dan",
-		"base_effect": 4,
-		"unlock_level": 0,
-		"stack_limit": 3,
-	},
-	# 玉灵丹——中级灵材×2 + 低级灵材×1，紫色，回复 8HP+驱散1负面
-	"yu_ling_dan": {
-		"name": "玉灵丹",
-		"materials": {LING_CAI_MEDIUM: 2, LING_CAI_LOW: 1},
-		"rarity": RARITY_PURPLE,
-		"card_type": "pill",
-		"template_id": "pill_yu_ling_dan",
-		"base_effect": 8,
-		"unlock_level": 1,
-		"stack_limit": 3,
-	},
-	# 天罗丹——高级灵材×2 + 中级灵材×1，金色，回复全体 6HP+驱散全部负面
-	"tian_luo_dan": {
-		"name": "天罗丹",
-		"materials": {LING_CAI_HIGH: 2, LING_CAI_MEDIUM: 1},
-		"rarity": RARITY_GOLD,
-		"card_type": "pill",
-		"template_id": "pill_tian_luo_dan",
-		"base_effect": 6,
-		"unlock_level": 2,
-		"stack_limit": 3,
-	},
-	# 九转金丹——顶级灵材×2 + 高级灵材×1，暗金，永久+1最大HP+回复满血
-	"jiu_zhuan_jin_dan": {
-		"name": "九转金丹",
-		"materials": {LING_CAI_TOP: 2, LING_CAI_HIGH: 1},
-		"rarity": RARITY_DARK_GOLD,
-		"card_type": "pill",
-		"template_id": "pill_jiu_zhuan_jin_dan",
-		"base_effect": 1,
-		"unlock_level": 3,
-		"stack_limit": 1,
-	},
-}
-
-## 炼器配方表——4 个配方（GDD §2a 炼器配方）。[br]
-## 键 = 配方 ID（String），值 = 配方 Dictionary。[br]
-## [br]来源: GDD alchemy-crafting-system.md §2a。
-const ARTIFACT_RECIPES: Dictionary = {
-	# 基础法器——低级灵材×3，蓝色
-	"ji_chu_fa_qi": {
-		"name": "基础法器",
-		"materials": {LING_CAI_LOW: 3},
-		"rarity": RARITY_BLUE,
-		"card_type": "artifact",
-		"template_id": "artifact_ji_chu_fa_qi",
-		"base_atk": 3,
-		"base_def": 2,
-		"unlock_level": 0,
-	},
-	# 中品法器——中级灵材×3，紫色
-	"zhong_pin_fa_qi": {
-		"name": "中品法器",
-		"materials": {LING_CAI_MEDIUM: 3},
-		"rarity": RARITY_PURPLE,
-		"card_type": "artifact",
-		"template_id": "artifact_zhong_pin_fa_qi",
-		"base_atk": 4,
-		"base_def": 3,
-		"unlock_level": 1,
-	},
-	# 上品法器——高级灵材×3，金色
-	"shang_pin_fa_qi": {
-		"name": "上品法器",
-		"materials": {LING_CAI_HIGH: 3},
-		"rarity": RARITY_GOLD,
-		"card_type": "artifact",
-		"template_id": "artifact_shang_pin_fa_qi",
-		"base_atk": 6,
-		"base_def": 5,
-		"unlock_level": 2,
-	},
-	# 通天灵宝——顶级灵材×3 + 高级灵材×1，暗金
-	"tong_tian_ling_bao": {
-		"name": "通天灵宝",
-		"materials": {LING_CAI_TOP: 3, LING_CAI_HIGH: 1},
-		"rarity": RARITY_DARK_GOLD,
-		"card_type": "artifact",
-		"template_id": "artifact_tong_tian_ling_bao",
-		"base_atk": 10,
-		"base_def": 8,
-		"unlock_level": 3,
-	},
-}
+# === 配方表已提取到 alchemy_recipes.gd 子模块（Sprint 12 Story 1）================
+# 配方表数据归属在 alchemy_recipes.gd；此处保留 const 引用以兼容测试直接访问 AS.ALCHEMY_RECIPES。
+const ALCHEMY_RECIPES: Dictionary = _Recipes.ALCHEMY_RECIPES
+const ARTIFACT_RECIPES: Dictionary = _Recipes.ARTIFACT_RECIPES
 
 
 # === 配方查询 API（Story 6-4）=================================================
 
-## 检查炼丹配方是否存在。[br]
-## [br][param recipe_id] 配方 ID。[br]
-## [br][b]返回[/b]: [code]true[/code] 配方存在，[code]false[/code] 不存在。[br]
-## [br]来源: ADR-0028 §关键接口。
+## 检查炼丹配方是否存在。委托给 _Recipes 子模块（Sprint 12 Story 1 拆分）。
 static func has_pill_recipe(recipe_id: String) -> bool:
-	return ALCHEMY_RECIPES.has(recipe_id)
+	return _Recipes.has_pill_recipe(recipe_id)
 
 
-## 检查炼器配方是否存在。[br]
-## [br][param recipe_id] 配方 ID。[br]
-## [br][b]返回[/b]: [code]true[/code] 配方存在，[code]false[/code] 不存在。[br]
-## [br]来源: ADR-0028 §关键接口。
+## 检查炼器配方是否存在。委托给 _Recipes 子模块。
 static func has_artifact_recipe(recipe_id: String) -> bool:
-	return ARTIFACT_RECIPES.has(recipe_id)
+	return _Recipes.has_artifact_recipe(recipe_id)
 
 
-## 获取炼丹配方数据。[br]
-## [br][param recipe_id] 配方 ID。[br]
-## [br][b]返回[/b]: 完整配方 Dictionary，无效 ID 返回空字典。[br]
-## [br]来源: ADR-0028 §关键接口。
+## 获取炼丹配方数据。委托给 _Recipes 子模块。
 static func get_pill_recipe(recipe_id: String) -> Dictionary:
-	return ALCHEMY_RECIPES.get(recipe_id, {})
+	return _Recipes.get_pill_recipe(recipe_id)
 
 
-## 获取炼器配方数据。[br]
-## [br][param recipe_id] 配方 ID。[br]
-## [br][b]返回[/b]: 完整配方 Dictionary，无效 ID 返回空字典。[br]
-## [br]来源: ADR-0028 §关键接口。
+## 获取炼器配方数据。委托给 _Recipes 子模块。
 static func get_artifact_recipe(recipe_id: String) -> Dictionary:
-	return ARTIFACT_RECIPES.get(recipe_id, {})
+	return _Recipes.get_artifact_recipe(recipe_id)
 
 
-## 获取全部炼丹配方列表。[br]
-## [br][b]返回[/b]: Array[Dictionary]——4 个配方的列表副本。[br]
-## [br]来源: ADR-0028 §关键接口。
+## 获取全部炼丹配方列表。委托给 _Recipes 子模块。
 static func get_all_pill_recipes() -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	for key: String in ALCHEMY_RECIPES:
-		var entry: Dictionary = ALCHEMY_RECIPES[key].duplicate()
-		entry["recipe_id"] = key
-		result.append(entry)
-	return result
+	return _Recipes.get_all_pill_recipes()
 
 
-## 获取全部炼器配方列表。[br]
-## [br][b]返回[/b]: Array[Dictionary]——4 个配方的列表副本。[br]
-## [br]来源: ADR-0028 §关键接口。
+## 获取全部炼器配方列表。委托给 _Recipes 子模块。
 static func get_all_artifact_recipes() -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	for key: String in ARTIFACT_RECIPES:
-		var entry: Dictionary = ARTIFACT_RECIPES[key].duplicate()
-		entry["recipe_id"] = key
-		result.append(entry)
-	return result
+	return _Recipes.get_all_artifact_recipes()
 
 
 # === 品质掷骰纯函数（Story 6-6 实现——委托给 _QualityRoller 子模块）========
@@ -280,7 +160,7 @@ static func jindan_cumulative_threshold(craft_count: int) -> int:
 ## [br]来源: ADR-0028 §craft_pill + GDD §1b/§1c。
 static func craft_pill(recipe_id: String, quality_bonuses: float, rng: RandomNumberGenerator, is_dadao_active: bool = false) -> Dictionary:
 	# 1. 查配方
-	var recipe: Dictionary = ALCHEMY_RECIPES.get(recipe_id, {})
+	var recipe: Dictionary = _Recipes.get_pill_recipe(recipe_id)
 	if recipe.is_empty():
 		return {"result": CraftResult.INVALID_RECIPE}
 
@@ -355,7 +235,7 @@ static func craft_pill(recipe_id: String, quality_bonuses: float, rng: RandomNum
 ## [br]来源: ADR-0028 §craft_artifact + GDD §2b。
 static func craft_artifact(recipe_id: String, quality_bonuses: float, rng: RandomNumberGenerator, is_dadao_active: bool = false) -> Dictionary:
 	# 1. 查配方
-	var recipe: Dictionary = ARTIFACT_RECIPES.get(recipe_id, {})
+	var recipe: Dictionary = _Recipes.get_artifact_recipe(recipe_id)
 	if recipe.is_empty():
 		return {"result": CraftResult.INVALID_RECIPE}
 
@@ -478,9 +358,9 @@ static func _get_deck_editing_system() -> Node:
 ## [br]来源: ADR-0028 §apply_reroll + GDD §1b 品质重掷公式。
 static func apply_reroll(recipe_id: String, quality_bonuses: float, rng: RandomNumberGenerator, existing_instance_id: int = 0) -> Dictionary:
 	# 1. 查配方——炼丹和炼器配方都可能重掷
-	var recipe: Dictionary = ALCHEMY_RECIPES.get(recipe_id, {})
+	var recipe: Dictionary = _Recipes.get_pill_recipe(recipe_id)
 	if recipe.is_empty():
-		recipe = ARTIFACT_RECIPES.get(recipe_id, {})
+		recipe = _Recipes.get_artifact_recipe(recipe_id)
 	if recipe.is_empty():
 		return {"result": CraftResult.INVALID_RECIPE}
 
