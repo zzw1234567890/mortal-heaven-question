@@ -28,15 +28,15 @@
 |:--|------|:--|------|:--:|:--:|:--:|:--:|
 | 1 | file-refactor | alchemy_system.gd 拆分 | `story-009-alchemy-recipes-split.md` | Refactor | 0.5d | — | Done |
 | 2 | file-refactor | binding_manager.gd 拆分 | `story-010-binding-slot-ops-split.md` | Refactor | 1.0d | — | Done |
-| 3 | file-refactor | exploration_system.gd 拆分 | `story-011-exploration-map-flush-split.md` | Refactor | 1.0d | — | Not Started |
-| 4 | file-refactor | gsm_atomic_writes.gd 拆分 | `story-012-gsm-writes-split.md` | Refactor | 1.0d | — | Not Started |
-| 5 | file-refactor | identity_selection_system.gd 拆分 | `story-013-identity-queries-split.md` | Refactor | 0.5d | — | Not Started |
-| 6 | file-refactor | school_conditions.gd 拆分 | `story-014-school-condition-faction-split.md` | Refactor | 0.5d | — | Not Started |
-| 7 | file-refactor | ai_system.gd 拆分 | `story-015-ai-boss-phases-split.md` | Refactor | 1.0d | — | Not Started |
-| 8 | file-refactor | status_effect_system.gd 拆分 | `story-016-status-effect-immunity-split.md` | Refactor | 0.5d | — | Not Started |
-| 9 | file-refactor | tribulation_system.gd 拆分 | `story-017-tribulation-combat-split.md` | Refactor | 0.5d | — | Not Started |
-| 10 | file-refactor | deployment_system.gd 拆分 | `story-018-deployment-emitter-split.md` | Refactor | 0.5d | — | Not Started |
-| 11 | file-refactor | formation_system.gd 拆分 | `story-019-formation-conditions-split.md` | Refactor | 0.5d | — | Not Started |
+| 3 | file-refactor | exploration_system.gd 拆分 | `story-011-exploration-map-flush-split.md` | Refactor | 1.0d | — | Done |
+| 4 | file-refactor | gsm_atomic_writes.gd 拆分 | `story-012-gsm-writes-split.md` | Refactor | 1.0d | — | Done |
+| 5 | file-refactor | identity_selection_system.gd 拆分 | `story-013-identity-queries-split.md` | Refactor | 0.5d | — | Done |
+| 6 | file-refactor | school_system.gd 流派库拆分 | `story-014-school-condition-faction-split.md` | Refactor | 0.5d | — | Done |
+| 7 | file-refactor | ai_system.gd 拆分 | `story-015-ai-boss-phases-split.md` | Refactor | 1.0d | — | Done |
+| 8 | file-refactor | status_effect_system.gd 拆分 | `story-016-status-effect-immunity-split.md` | Refactor | 0.5d | — | Done |
+| 9 | file-refactor | tribulation_system.gd 拆分 | `story-017-tribulation-combat-split.md` | Refactor | 0.5d | — | Done |
+| 10 | file-refactor | deployment_system.gd 拆分 | `story-018-deployment-emitter-split.md` | Refactor | 0.5d | — | Done |
+| 11 | file-refactor | formation_system.gd 拆分 | `story-019-formation-conditions-split.md` | Refactor | 0.5d | — | Done |
 | 12 | qa | Sprint 12 QA 签收 | `story-020-sprint-12-qa.md` | — | 0.5d | #1-11 | Not Started |
 
 **总计**：12 story，预估 8.5d（含 QA）
