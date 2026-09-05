@@ -5,6 +5,8 @@ extends RefCounted
 ## [br]来源: ADR-0017 §决策 §Boss 阶段转换 / GDD ai-system.md §7/§公式 4。[br]
 ## [br]Sprint 8 Story 8-12：从 ai_system.gd 拆分。
 
+const _Helpers = preload("res://src/feature/ai/ai_helpers.gd")
+
 ## 父节点引用——AISystem Autoload 实例。
 var _parent: Node = null
 
@@ -22,7 +24,7 @@ func _init(parent: Node = null) -> void:
 ## [br][b]返回[/b]: true 表示触发了阶段转换（调用方应跳过后续行动）。
 func check_phase_transition(enemy, field_state: Dictionary) -> bool:
 	# AC-007：击杀优先——仅 is_alive 时检查
-	if not _parent.call("_is_alive", enemy):
+	if not _Helpers.is_alive(enemy):
 		return false
 	var template = enemy.template
 	if not template.is_boss:
@@ -30,7 +32,7 @@ func check_phase_transition(enemy, field_state: Dictionary) -> bool:
 	var phase_transitions: Array = template.phase_transitions
 	if phase_transitions.is_empty():
 		return false  # 无阶段转换定义
-	var hp_pct: float = _parent.call("_get_hp_pct", enemy)
+	var hp_pct: float = _Helpers.get_hp_pct(enemy)
 	var turn: int = int(field_state.get("turn", 0))
 	var phase_idx: int = should_transition(enemy, phase_transitions, turn, hp_pct)
 	if phase_idx < 0:
@@ -111,7 +113,7 @@ func get_phase(enemy) -> int:
 ## BossPhaseMgr 查询接口——check（AC-001）。[br]
 ## [br][b]返回[/b]: 待触发阶段索引（-1 = 无转换）。
 func check(enemy, turn: int, hp_pct: float) -> int:
-	if not _parent.call("_is_alive", enemy):
+	if not _Helpers.is_alive(enemy):
 		return -1
 	var template = enemy.template
 	if not template.is_boss:

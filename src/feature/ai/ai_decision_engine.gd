@@ -6,6 +6,7 @@ extends RefCounted
 ## [br]Sprint 8 Story 8-12：从 ai_system.gd 拆分。
 
 const _SkillEntry = preload("res://assets/enemies/skill_entry.gd")
+const _Helpers = preload("res://src/feature/ai/ai_helpers.gd")
 
 ## 父节点引用——AISystem Autoload 实例。
 var _parent: Node = null
@@ -26,7 +27,7 @@ func execute_turn(field_state: Dictionary) -> Array:
 	var actions: Array = []
 	var retreated_ids: Array = []
 	for enemy in _parent.get("_enemy_roster"):
-		if not _parent.call("_is_alive", enemy):
+		if not _Helpers.is_alive(enemy):
 			continue
 		# AC-012：撤退判定（非 Boss）
 		if _check_retreat(enemy, field_state):
@@ -94,7 +95,7 @@ func _evaluate_skills(enemy, field_state: Dictionary) -> Dictionary:
 	var scored: Array = []
 	for skill in skill_pool:
 		# AC-009：冷却中 → 跳过
-		if _parent.call("_is_on_cooldown", enemy, skill):
+		if _Helpers.is_on_cooldown(enemy, skill):
 			continue
 		# AC-010：费用不足 → 跳过
 		if skill.cost > available_budget:
@@ -105,7 +106,7 @@ func _evaluate_skills(enemy, field_state: Dictionary) -> Dictionary:
 	if scored.is_empty():
 		return {"skill_id": &"basic_attack", "cost": 0, "target_type": _SkillEntry.TargetType.SINGLE_ENEMY, "skill_type": _SkillEntry.SkillType.ATTACK}
 	# 按分数降序排序
-	scored.sort_custom(_compare_by_score_desc)
+	scored.sort_custom(_Helpers.compare_by_score_desc)
 	var best = scored[0]
 	return {"skill_id": best.skill.skill_id, "cost": best.skill.cost, "target_type": best.skill.target_type, "skill_type": best.skill.skill_type}
 
@@ -156,7 +157,7 @@ func _select_target(enemy, skill_result: Dictionary, field_state: Dictionary) ->
 	var player_chars: Array = field_state.get("player_chars", [])
 	var available_targets: Array = []
 	for char_state in player_chars:
-		if _parent.call("_is_alive", char_state):
+		if _Helpers.is_alive(char_state):
 			available_targets.append(char_state)
 	# ALL_ENEMY → 全部可用目标
 	if target_type == _SkillEntry.TargetType.ALL_ENEMY:
@@ -166,7 +167,7 @@ func _select_target(enemy, skill_result: Dictionary, field_state: Dictionary) ->
 		var enemy_chars: Array = field_state.get("enemy_chars", [])
 		var allies: Array = []
 		for ally in enemy_chars:
-			if _parent.call("_is_alive", ally):
+			if _Helpers.is_alive(ally):
 				allies.append(ally)
 		return allies
 	if available_targets.is_empty():
@@ -174,11 +175,11 @@ func _select_target(enemy, skill_result: Dictionary, field_state: Dictionary) ->
 	# AC-008：嘲讽强制目标（仅攻击类技能受嘲讽限制——非攻击可绕过）
 	var skill_type: int = int(skill_result.get("skill_type", _SkillEntry.SkillType.ATTACK))
 	if skill_type == _SkillEntry.SkillType.ATTACK:
-		var taunting = _parent.call("_find_taunting", available_targets)
+		var taunting = _Helpers.find_taunting(available_targets)
 		if taunting != null:
 			return [taunting]
 	# AC-006：集火模式（focus_fire>0.5）→ HP% 最低
-	var behavior = _parent.call("_get_behavior_profile", enemy)
+	var behavior = _Helpers.get_behavior_profile(enemy)
 	if behavior != null and behavior.focus_fire > 0.5:
 		var target = _select_focus_fire_target(available_targets)
 		return [target]
@@ -192,7 +193,7 @@ func _select_focus_fire_target(targets: Array) -> Variant:
 	var best = null
 	var best_hp_pct: float = 2.0  # 超出范围确保首次赋值
 	for target in targets:
-		var hp_pct: float = _parent.call("_get_hp_pct", target)
+		var hp_pct: float = _Helpers.get_hp_pct(target)
 		if hp_pct < best_hp_pct or (hp_pct == best_hp_pct and best != null and target.defense < best.defense):
 			best = target
 			best_hp_pct = hp_pct
@@ -206,7 +207,7 @@ func _select_spread_target(targets: Array) -> Variant:
 	var total_weight: float = 0.0
 	for target in targets:
 		var w: float = 1.0
-		if _parent.call("_get_hp_pct", target) < 0.3:
+		if _Helpers.get_hp_pct(target) < 0.3:
 			w = 2.0
 		weights.append(w)
 		total_weight += w
@@ -224,7 +225,7 @@ func _check_retreat(enemy, field_state: Dictionary) -> bool:
 	var template = enemy.template
 	if template.is_boss:
 		return false
-	var behavior = _parent.call("_get_behavior_profile", enemy)
+	var behavior = _Helpers.get_behavior_profile(enemy)
 	if behavior == null or behavior.retreat_threshold <= 0.0:
 		return false
 	var ally_hp_ratio: float = float(field_state.get("ally_hp_ratio", 1.0))
@@ -233,7 +234,3 @@ func _check_retreat(enemy, field_state: Dictionary) -> bool:
 	var rng: RandomNumberGenerator = _parent.get("_rng")
 	return rng.randf() < 0.5
 
-
-## 分数降序比较器。
-func _compare_by_score_desc(a, b) -> bool:
-	return a.score > b.score

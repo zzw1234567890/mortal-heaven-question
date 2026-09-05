@@ -18,6 +18,8 @@ extends Node
 const _EnemyBattleState = preload("res://src/feature/ai/enemy_battle_state.gd")
 const _EnemyTemplate = preload("res://assets/enemies/enemy_template.gd")
 const _SkillEntry = preload("res://assets/enemies/skill_entry.gd")
+## AI 决策引擎辅助子模块（Sprint 12 Story 015 拆分）。
+const _Helpers = preload("res://src/feature/ai/ai_helpers.gd")
 
 
 # === 常量 ========================================================================
@@ -258,59 +260,10 @@ func execute_turn(field_state: Dictionary) -> Array:
 	return _get_decision_engine().execute_turn(field_state)
 
 
-## 三级智能分支分派（AC-002）。[br]
-## Boss 优先 → 精英 → 普通。
-func _decide_action(enemy, field_state: Dictionary) -> Dictionary:
-	return _get_decision_engine()._decide_action(enemy, field_state)
-
-
-## 普通敌人决策——仅技能评估 + 目标选择（AC-002）。
-func _decide_normal_action(enemy, field_state: Dictionary) -> Dictionary:
-	return _get_decision_engine()._decide_normal_action(enemy, field_state)
-
-
-## 精英敌人决策——阵法部署检查 + 技能评估 + 目标选择（AC-002）。[br]
-## _check_formation_deploy 钩子——Story 003/004 集成点，本 Story 为空桩。[br]
-## 空桩确保分支结构完整，后续 Story 仅需填充钩子实现。
-func _decide_elite_action(enemy, field_state: Dictionary) -> Dictionary:
-	return _get_decision_engine()._decide_elite_action(enemy, field_state)
-
-
-## Boss 决策——阶段转换检查 + 阵法部署 + 技能评估 + 目标选择（AC-002）。[br]
-## _check_phase_transition 实现——Story 003，检测 + 执行阶段转换。[br]
-## 转换触发时该 Boss 本回合不产出技能行动（AC-012）。
-func _decide_boss_action(enemy, field_state: Dictionary) -> Dictionary:
-	return _get_decision_engine()._decide_boss_action(enemy, field_state)
-
-
-## Boss 阶段转换检查——检测 + 执行（Story 003 实现）。[br]
-## [br][b]流程[/b]（ADR-0017 §决策引擎设计 ②）：[br]
-##   1. 仅 is_alive 时检查（击杀优先）[br]
-##   2. should_transition 遍历 phase_transitions（OR 语义 + 哨兵）[br]
-##   3. 触发则 transition 执行替换/解锁/冷却/回血 + 发射信号[br]
+## Boss 阶段转换检查——检测 + 执行（决策引擎经 _parent.call 调用）。[br]
 ## [br][b]返回[/b]: true 表示触发了阶段转换（调用方应跳过后续行动）。
 func _check_phase_transition(enemy, field_state: Dictionary) -> bool:
 	return _get_boss_phases().check_phase_transition(enemy, field_state)
-
-
-## should_transition 公式——遍历 phase_transitions，OR 语义 + 哨兵（AC-010/011）。[br]
-## [br][param phase_transitions] Boss 阶段转换列表。[br]
-## [br][param turn] 当前回合数。[br]
-## [br][param hp_pct] Boss HP 百分比。[br]
-## [br][b]返回[/b]: 待触发阶段索引（-1 = 不触发）。[br]
-## [br]公式: `(hp_below > 0 AND hp_pct <= hp_below) OR (turn_after > 0 AND turn >= turn_after)` 且 `not triggered`。[br]
-## [br]来源: GDD ai-system.md §公式 4 / Story 003 AC-010。
-func _should_transition(enemy, phase_transitions: Array, turn: int, hp_pct: float) -> int:
-	return _get_boss_phases().should_transition(enemy, phase_transitions, turn, hp_pct)
-
-
-## 执行 Boss 阶段转换——替换行为 + 解锁/锁定技能 + 冷却重置 + 回血 + 信号（AC-002~006）。[br]
-## [br][b]模板只读约定[/b]（ADR-0017）：behavior_profile/skill_pool 修改写入实例字段
-## runtime_behavior_profile/runtime_skill_pool，绝不写回 template。[br]
-## [br][param enemy] EnemyBattleState。[br]
-## [br][param phase_idx] 待执行阶段索引。
-func _do_boss_phase_transition(enemy, phase_idx: int) -> void:
-	_get_boss_phases().do_boss_phase_transition(enemy, phase_idx)
 
 
 ## BossPhaseMgr 查询接口——get_phase（AC-001）。[br]
@@ -337,97 +290,40 @@ func _check_formation_deploy(enemy, _field_state: Dictionary) -> void:
 	pass  # Story 003/004 实现
 
 
-## 技能评估——加权分数 + 修正系数 → 选 top 1~2 技能（AC-003~005/009/010）。[br]
-## [br][b]返回[/b]: Dictionary——{skill_id: StringName, cost: int, target_type: int, skill_type: int}。[br]
-## 全技能冷却/费用不足 → basic_attack 兜底。
-func _evaluate_skills(enemy, field_state: Dictionary) -> Dictionary:
-	return _get_decision_engine()._evaluate_skills(enemy, field_state)
-
-
-## 计算技能分数——base_weight × modifier（AC-003/004）。
-func _calculate_skill_score(enemy, skill, field_state: Dictionary) -> float:
-	return _get_decision_engine()._calculate_skill_score(enemy, skill, field_state)
-
-
-## 修正系数——治疗(+0.5 若友方残血) + 防御(+0.3 若前排阵亡) + 攻击(+0.4 若高威胁)（AC-004）。
-func _calculate_modifier(enemy, skill, field_state: Dictionary) -> float:
-	return _get_decision_engine()._calculate_modifier(enemy, skill, field_state)
-
-
-## 目标选择——集火/分散/嘲讽 + 多目标类型（AC-006~008）。[br]
-## 根据 skill_result.target_type 决定目标数量。[br]
-## - SELF → 返回空（由 CombatSystem 处理自身）[br]
-## - ALL_ENEMY / ALL_ALLIES → 返回全部可用目标[br]
-## - SINGLE_ENEMY / ALLY → 走集火/分散/嘲讽逻辑[br]
-## [br][b]嘲讽限制仅对攻击类技能生效[/b]（skill_type==ATTACK）——
-## 非攻击类（UTILITY/HEAL/DEFENSE/FORMATION）可绕过嘲讽（AC-008 边缘情况）。
-func _select_target(enemy, skill_result: Dictionary, field_state: Dictionary) -> Array:
-	return _get_decision_engine()._select_target(enemy, skill_result, field_state)
-
-
-## 集火模式——选择 HP% 最低的目标；同 HP% → 防御最低（AC-006）。
-func _select_focus_fire_target(targets: Array) -> Variant:
-	return _get_decision_engine()._select_focus_fire_target(targets)
-
-
-## 分散模式——加权随机，残血角色权重 ×2（AC-007）。
-func _select_spread_target(targets: Array) -> Variant:
-	return _get_decision_engine()._select_spread_target(targets)
-
-
-## 撤退判定——非 Boss + ally_hp_ratio < retreat_threshold → 50% 概率（AC-012）。
-func _check_retreat(enemy, field_state: Dictionary) -> bool:
-	return _get_decision_engine()._check_retreat(enemy, field_state)
-
-
 # === 决策引擎辅助 ===============================================================
 
-## 获取行为配置——优先实例级 runtime_behavior_profile（Boss 阶段转换后替换），[br]
-## 回退到 template.behavior_profile。避免写回模板（ADR-0017 只读约定）。
+# 以下辅助方法已提取到 ai_helpers.gd static 子模块（Sprint 12 Story 015 拆分）。
+# 保留薄委托以兼容 _parent.call() 链路与测试动态分派。
+
+## 获取行为配置——委托给 _Helpers static 方法（Sprint 12 Story 015 拆分）。
 func _get_behavior_profile(enemy) -> Resource:
-	if enemy.runtime_behavior_profile != null:
-		return enemy.runtime_behavior_profile
-	return enemy.template.behavior_profile
+	return _Helpers.get_behavior_profile(enemy)
 
 
-## 检查角色是否存活。
+## 检查角色是否存活——委托给 _Helpers static 方法。
 func _is_alive(char_state) -> bool:
-	return char_state != null and char_state.is_alive
+	return _Helpers.is_alive(char_state)
 
 
-## 检查技能是否在冷却中。
+## 检查技能是否在冷却中——委托给 _Helpers static 方法。
 func _is_on_cooldown(enemy, skill) -> bool:
-	if skill.cooldown <= 0:
-		return false
-	var cooldowns: Dictionary = enemy.skill_cooldowns
-	return int(cooldowns.get(skill.skill_id, 0)) > 0
+	return _Helpers.is_on_cooldown(enemy, skill)
 
 
-## 获取角色 HP 百分比。
+## 获取角色 HP 百分比——委托给 _Helpers static 方法。
 func _get_hp_pct(char_state) -> float:
-	if char_state.max_hp <= 0:
-		return 0.0
-	return float(char_state.current_hp) / float(char_state.max_hp)
+	return _Helpers.get_hp_pct(char_state)
 
 
-## 检查是否为攻击类技能——仅攻击类受嘲讽限制（AC-008 边缘情况）。[br]
-## 非攻击类（UTILITY/HEAL/DEFENSE/FORMATION）可绕过嘲讽作用于其他目标。[br]
-## [br][b]已废弃[/b]——改用 skill_result.skill_type 直接判断，保留供外部查询。
+## 检查是否为攻击类技能——委托给 _Helpers static 方法。[br]
+## [b]已废弃[/b]——改用 skill_result.skill_type 直接判断，保留供外部查询。
 func _is_attack_skill_by_target_type(target_type: int) -> bool:
-	return target_type == _SkillEntry.TargetType.SINGLE_ENEMY or target_type == _SkillEntry.TargetType.ALL_ENEMY
+	return _Helpers.is_attack_skill_by_target_type(target_type)
 
 
-## 查找嘲讽角色。
+## 查找嘲讽角色——委托给 _Helpers static 方法。
 func _find_taunting(targets: Array) -> Variant:
-	for target in targets:
-		if target.get("is_taunting", false):
-			return target
-	return null
-
-
-## 分数降序比较器。
-func _compare_by_score_desc(a, b) -> bool:
-	return a.score > b.score
+	return _Helpers.find_taunting(targets)
 
 
 ## Cat 2b 信号安全发射——经 GSM._emit_signal_safe 路由（ADR-0007 信号链深度追踪）。
