@@ -38,7 +38,7 @@ Engine: Godot 4.6.3
 | hud | Presentation | HUD 系统 | hud-system.md | 8 stories | Ready |
 | main-menu | Presentation | 主菜单与设置 | main-menu-system.md | 5 stories | Ready |
 | audio-manager | Presentation | 音频管理系统 | audio-system.md | 7 stories | Ready |
-| combat-ui-layout | Presentation | 战斗 UI——静态布局与角色状态卡 | combat-ui-system.md | Not yet created | Ready |
+| combat-ui-layout | Presentation | 战斗 UI——静态布局与角色状态卡 | combat-ui-system.md | 10 stories | Ready |
 | combat-ui-interaction | Presentation | 战斗 UI——手牌与交互流程 | combat-ui-system.md | Not yet created | Ready |
 | exploration-ui | Presentation | 探索 UI | exploration-ui-system.md | Not yet created | Ready |
 | deck-editing-ui | Presentation | 卡组编辑 UI | deck-editing-ui-system.md | Not yet created | Blocked（UX 规范前置） |

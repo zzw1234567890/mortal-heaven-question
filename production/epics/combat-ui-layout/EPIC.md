@@ -4,13 +4,15 @@
 > **GDD**: design/gdd/combat-ui-system.md
 > **Architecture Module**: 战斗 UI 系统（战场布局、手牌显示——`render_field()` / `show_hand()` / `highlight_targets()`）
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories combat-ui-layout`
+> **Stories**: 10 stories — see below
 
 ## Overview
 
-战斗 UI 静态侧实现：经典对峙布局（1920×1080，上敌下我）、顶部条（阶段指示器/阵法槽位）、16 角色位的角色状态卡（L0-L5 六层：头像背景/渐变遮罩/功法法宝图标竖排/HP-ATK 条/buff 境界角标/待命标记）、前后排区分（前排 100% 实线/后排 85% 虚线）以及结算面板框架。**本 epic 承载 R-02 Draw Call 关卡**——角色卡合批/图集方案在此定型并实测（16 角色满场 <200 Draw Call）。
+战斗 UI 静态侧实现：经典对峙布局（1920×1080，上敌下我）、顶部条（阶段指示器/阵法区）、16 角色位的角色状态卡（L0-L5 六层：头像背景/渐变遮罩/功法法宝图标竖排/HP-ATK 条/buff 境界角标/待命标记）、前后排区分（前排 100% 实线/后排 85% 虚线）以及结算/备战/撤退面板的视觉框架与状态判定。**本 epic 承载 R-02 Draw Call 关卡**——角色卡合批/图集方案在此定型（009a 前置）并满场实测（009b 关口）。
 
 拆分依据（PR-EPIC 2026-09-07 A1）：combat-ui-system.md 一份 GDD 拆为两个 epic（先例：systems-mapping 拆 input-manager + scene-manager）。本 epic 为静态布局侧；交互侧见 `combat-ui-interaction`。
+
+**划界裁决（2026-09-07，QL-STORY-READY）**：备战/结算/撤退三大面板的视觉框架+状态判定纯函数+信号驱动渲染归本 epic；输入锁栈+点击拖拽流转+确认后系统 API 调用归 interaction（其 EPIC.md 已同步修订）。阶段 0 指示器名=「准备」；渡劫 warning 在备战界面弹出；>7 张手牌=间距优先+角度自适应；飘字归 003/敌方手牌背面区归 006/进场动画归 001/费用动画归 005；共享纯函数模块（font_size_responsive 等）在 001 建立。
 
 ## Governing ADRs
 
@@ -37,8 +39,23 @@ This epic is complete when:
 - **R-02 关卡：战斗满场（16 角色卡+手牌+顶部条+HUD 元素）实测 Draw Call <200 且 60fps**
 - All UI stories have evidence docs with sign-off in `production/qa/evidence/`
 
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | 战场四区域布局骨架与共享纯函数模块 | Integration | Ready | ADR-0031 |
+| 002 | 角色状态卡 L0-L5 六层渲染 | UI（Logic 内核） | Ready | ADR-0031 |
+| 003 | 状态标记切换、阵亡处理与飘字 | UI（Integration） | Ready | ADR-0031 |
+| 004 | 顶部条三组件（阶段指示器/阵法区/战斗日志） | UI（Integration） | Ready | ADR-0031, ADR-0008 |
+| 005 | 费用栏与牌库/弃牌计数 | UI（Logic 内核） | Ready | ADR-0031 |
+| 006 | 手牌区弧形渲染与静态状态 | UI（Logic 内核） | Ready | ADR-0031 |
+| 007 | 备战面板（视觉框架与状态判定） | UI（Logic 内核） | Ready | ADR-0031 |
+| 008 | 结算与撤退面板框架（视觉与状态判定） | UI（Logic 内核） | Ready | ADR-0031 |
+| 009a | R-02 合批方案定型（前置架构 spike） | Visual/Feel | Ready | ADR-0031 |
+| 009b | R-02 Draw Call 满场实测关口 | Visual/Feel | Ready | ADR-0031 |
+
+**实现顺序提示**：009a 排在 002 之前（合批方案定型后 002-006 按规范实现，避免独立纹理返工）；001 最先（建立共享纯函数模块与 `tests/unit/combat_ui/` 目录）；009b 在 001-008 全部完成后执行。
+
 ## Next Step
 
-Run `/create-stories combat-ui-layout` to break this epic into implementable stories.
-
-**排期提示**（PR-EPIC 2026-09-07）：Sprint 14/15 进入——需 R-01 双焦点 spike、R-02 Draw Call 基准、hud 落地之后。
+Run `/story-readiness production/epics/combat-ui-layout/story-009a-batching-scheme.md` then `/dev-story` 开始实现。

@@ -2,35 +2,43 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: Sprint 13 表现层前置行动
-Task: 7 个表现层 epic + 里程碑文件已写入——待提交 git + /create-stories
+Feature: Sprint 13 表现层 story 创建
+Task: combat-ui-layout 10 stories 已写入；下一步 combat-ui-interaction /create-stories
 <!-- /STATUS -->
 
 ## 当前任务
 
-Sprint 13 表现层（UI）开发的前置行动执行中。5 项前置行动：
+Sprint 13 表现层 story 创建推进中（2026-09-07）：
 
-1. ✅ 边界澄清——战斗场景 HUD 隐藏/combat-ui 接管；战利品三选一归属 combat-ui
-2. ✅ GDD 评审闭环——6 个 UI GDD 全部已批准（combat-ui 13 BLOCKER、exploration-ui 6、main-menu 3、其余 lean 通过）
-3. ✅ UX 设计——combat-ui 与 exploration-ui 均已完成并通过 ux-review（APPROVED）；11 个新模式已入交互模式库
-4. ✅ 风险登记册——`production/risk-register/presentation-layer-risks.md`（10 项：R-01 双焦点🔴、R-02 Draw Call🔴、R-05 节点图性能🔴、R-03 D3D12🟡、R-04 AccessKit🟡、R-06 Ogg 循环🟡、R-09 手柄范围🟡、R-07 Glow🟢、R-08 Autoload🟢已缓解、R-10 所有权🟡已缓解）
-5. ✅ control-manifest 补充——Presentation 层规则已写入（8 必需 + 7 禁止 + 5 护栏）
-
-## combat-ui UX 规范关键决策（2026-09-07）
-
-- 布局：经典对峙布局（上敌下我），**分辨率基准 1920×1080**（用户决策：不支持 1280×720 以下）
-- 角色状态卡：头像占满卡牌背景（L0）+ 底部渐变遮罩（L1）+ 功法图标竖排左侧/法宝竖排右侧（最多各3个，L2）+ HP/ATK 底部条（L3）+ buff/debuff 左下角标（L4）+ 境界图标右下角标（L4，用户决策：不同境界用不同图标，悬停显示文字）+ 待命/已行动左上角标（L5）
-- 角色卡尺寸：前排 120×168px 100%缩放实线边框；后排 85% 缩放虚线边框
-- 引入 5 个新模式待添加到交互模式库：角色状态卡、阵法槽位、备战阵位预览、攻击目标选择、战利品选择网格
+**已完成的 epic**：
+- hud（8 stories，commit dcda76f + b622ff6）
+- main-menu（5 stories，commit d3d6662）
+- audio-manager（7 stories + hud story 008，commit b622ff6）
+- **combat-ui-layout（10 stories，本次完成，未提交）**：
+  - QL-STORY-READY（qa-lead）R1-R6 全部裁决（用户已批准）：
+    - 顶部条组成按 UX（日志+阶段指示器+阵法区+暂停按钮转发 hud）；撤退按钮右上角独立常驻
+    - 划界：面板视觉框架+状态判定纯函数+信号驱动渲染归 layout；输入锁栈+点击/拖拽流转+确认后系统 API 调用归 interaction（interaction EPIC.md Overview 已重写）
+    - 阶段 0 指示器名=「准备」；渡劫 warning 在备战界面弹出（story 008 实现弹窗本体，story 007 备战面板）
+    - >7 张手牌合成语义：间距优先+角度自适应（card_overlap_offset 求有效间距→压缩 arc_angle 使弦长匹配）——已写入 GDD 公式 2 后注释
+    - 009 拆分前置：009a 合批方案定型（排在 002 之前）+ 009b 满场实测关口
+    - font_size_responsive 等共享纯函数模块上移至 story 001；音频对接声明（set_state(IN_COMBAT)/阶段切换音/胜负音）
+    - R-02 验证策略：DC 半自动化断言（本地关卡脚本不进 CI）、60fps advisory 人工签批、峰值场景 stub 版
+  - GDD 修正 2 处（combat-ui-system.md 公式 2 合成语义+边界澄清 6 条）；UX 修正 2 处（combat-ui.md Boss 入口+导航路径）
+  - 10 stories：001 布局骨架+共享纯函数/002 角色卡 L0-L5/003 标记阵亡飘字/004 顶部条/005 费用栏/006 手牌弧形（三纯函数）/007 备战面板（4 态+阵位映射）/008 结算撤退面板（0.5s 延迟+渡劫变体）/009a 合批定型/009b DC 实测关口
+  - EPIC.md Stories 表+实现顺序提示（009a 在 002 前、009b 最后）已更新；index.md 已更新
 
 ## Git 状态
 
-- fe03ab8：表现层 GDD 评审闭环 + combat-ui UX 规范（15 文件，+1638/-100）
+- b622ff6：audio-manager 7 stories + hud story 008（已提交）
+- 工作树未提交：combat-ui-system.md + combat-ui.md（UX）+ interaction EPIC.md 划界修订 + combat-ui-layout EPIC.md + 10 stories + index.md + active.md
 
 ## 下一步
 
-- **全部 5 项前置行动已完成**（2026-09-07）
-- 运行 `/create-epics layer: presentation` → `/create-stories` → `/sprint-plan`
+- 提交本批变更
+- `/create-stories combat-ui-interaction`（下一 epic，R-01 双焦点关卡，交互侧——消费 layout 的面板框架与判定函数；含 009b 峰值场景复测关口）
+- 后续：exploration-ui
+- deck-editing-ui：须先 `/ux-design deck-editing-ui`
+- Sprint 13 前置 spike（非 story）：R-01 双焦点、R-06 Ogg 循环间隙（各 0.5-1 天）
 
 ## 全量测试基线（不变）
 
