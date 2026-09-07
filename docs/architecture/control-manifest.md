@@ -284,6 +284,41 @@
 
 ---
 
+## Presentation 层规则
+
+*适用范围：战斗 UI、探索 UI、卡组编辑 UI、HUD、主菜单与设置、音频管理*
+
+### 必需模式 (Required Patterns)
+
+- **UI 零状态所有权**：全部 UI 系统只读消费游戏状态——数据从 GSM/各系统 API 读取，变更仅通过事件触发对应系统执行 —— 来源: combat-ui.md / exploration-ui.md 数据需求
+- **事件驱动更新**：UI 刷新仅由 Cat 1（GSM 状态信号）/Cat 2b（动作通知）信号触发——禁止轮询 —— 来源: ADR-0007、UX 规范更新频率说明
+- **双焦点双视觉策略**：键盘/手柄焦点环（松石青 2px）与鼠标悬停（墨色边框加粗）独立渲染；两者同时激活时优先显示鼠标悬停态 —— 来源: combat-ui.md、ADR-0004
+- **输入锁栈判定区分设备类型**：UI 交互入口先查 `InputManager` 锁栈（`check_device_allowed(device_type)`）——弹窗打开时底层界面输入冻结 —— 来源: ADR-0004
+- **交互模式库为唯一交互规范来源**：所有交互组件引用 `design/ux/interaction-patterns.md` 已定义模式；新模式先入库再实现 —— 来源: 模式库维护规则
+- **场景切换经由 SceneManager**：UI 场景转换（节点图↔战斗等）由场景管理器唯一编排，过渡使用过渡覆盖层模式 —— 来源: ADR-0005
+- **HUD 场景可见性**：探索场景 HUD 可见（节点图侧 AP 强化显示与 HUD 同数据源）；战斗场景全局 HUD 隐藏、combat-ui 接管 —— 来源: 边界澄清决策（2026-09-05）
+- **分辨率基准 1920×1080**：布局规格以此基准设计（用户决策 2026-09-07：不支持 1280×720 以下） —— 来源: combat-ui.md / exploration-ui.md 头部
+
+### 禁止方法 (Forbidden Approaches)
+
+- **绝不让 UI 持有游戏状态副本**——显示数据每信号周期从源系统读取 —— 来源: presentation-layer-risks.md R-10
+- **绝不在 UI 内直接写 GSM/各系统状态**——通过事件触发系统 API —— 来源: presentation-layer-risks.md R-10
+- **绝不为表现层系统新增 Autoload**——25 个已超 20 软上限；UI 为场景内节点，HUD 由场景管理器挂载 —— 来源: presentation-layer-risks.md R-08、ADR-0027~0030 先例
+- **绝不绕过 InputManager 锁栈直接监听 `_gui_input()` 做游戏行为**——焦点变化的高亮可以，改变游戏状态的点击必须过锁栈 —— 来源: ADR-0004
+- **绝不硬编码 UI 文本/数值**——所有文本进本地化键，数值从数据源读取 —— 来源: coding-standards.md
+- **绝不使用独立纹理渲染 UI 图标**——统一图集（Atlas）控制 Draw Call —— 来源: presentation-layer-risks.md R-02
+- **绝不实现模式库中不存在的交互模式**——先 `/ux-design` 补规范再实现 —— 来源: 模式库维护规则
+
+### 性能护栏 (Performance Guardrails)
+
+- **Draw Call**: <200（战斗满场与节点图全图两个基准场景实测） —— 来源: presentation-layer-risks.md R-02、technical-preferences.md
+- **节点图缩放/平移**: 最坏情况（6 层×4 节点）稳定 60fps —— 来源: presentation-layer-risks.md R-05、exploration-ui.md
+- **UI 信号响应 → 视觉更新**: <1 帧（事件驱动，无跨帧延迟） —— 来源: UX 规范反馈即时性需求
+- **场景切换过渡**: 节点图→战斗 ≤2s（含迷雾加载动画 1.5s） —— 来源: exploration-ui.md AC
+- **双焦点 spike**: Sprint 13 首个 UI story 前完成（关闭 OQ-02/R-01） —— 来源: presentation-layer-risks.md R-01
+
+---
+
 ## 全局规则 (所有层)
 
 ### 命名规范

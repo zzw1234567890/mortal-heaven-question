@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13 表现层前置行动
-Task: exploration-ui UX 规范 APPROVED + 模式库 11 个新模式已入库——待 #4 风险登记册 / #5 control-manifest
+Task: 5 项前置行动全部完成——待 /create-epics layer: presentation
 <!-- /STATUS -->
 
 ## 当前任务
@@ -12,9 +12,9 @@ Sprint 13 表现层（UI）开发的前置行动执行中。5 项前置行动：
 
 1. ✅ 边界澄清——战斗场景 HUD 隐藏/combat-ui 接管；战利品三选一归属 combat-ui
 2. ✅ GDD 评审闭环——6 个 UI GDD 全部已批准（combat-ui 13 BLOCKER、exploration-ui 6、main-menu 3、其余 lean 通过）
-3. 🔨 UX 设计——**combat-ui 已完成**（UX 规范已批准：APPROVED，0 阻塞 0 建议）；exploration-ui 待设计
-4. ⏳ 风险登记册——`production/risk-register/presentation-layer-risks.md`
-5. ⏳ control-manifest 补充——表现层规则
+3. ✅ UX 设计——combat-ui 与 exploration-ui 均已完成并通过 ux-review（APPROVED）；11 个新模式已入交互模式库
+4. ✅ 风险登记册——`production/risk-register/presentation-layer-risks.md`（10 项：R-01 双焦点🔴、R-02 Draw Call🔴、R-05 节点图性能🔴、R-03 D3D12🟡、R-04 AccessKit🟡、R-06 Ogg 循环🟡、R-09 手柄范围🟡、R-07 Glow🟢、R-08 Autoload🟢已缓解、R-10 所有权🟡已缓解）
+5. ✅ control-manifest 补充——Presentation 层规则已写入（8 必需 + 7 禁止 + 5 护栏）
 
 ## combat-ui UX 规范关键决策（2026-09-07）
 
@@ -29,11 +29,8 @@ Sprint 13 表现层（UI）开发的前置行动执行中。5 项前置行动：
 
 ## 下一步
 
-- **#3 续**：为 exploration-ui 运行 `/ux-design design/ux/exploration-ui.md`
-- **待办**：5 个新模式添加到 `design/ux/interaction-patterns.md`
-- **#4**：建立风险登记册
-- **#5**：补充 control-manifest
-全部完成后运行 `/create-epics layer: presentation` → `/create-stories` → `/sprint-plan`
+- **全部 5 项前置行动已完成**（2026-09-07）
+- 运行 `/create-epics layer: presentation` → `/create-stories` → `/sprint-plan`
 
 ## 全量测试基线（不变）
 
