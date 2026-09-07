@@ -4,11 +4,13 @@
 > **GDD**: design/gdd/hud-system.md
 > **Architecture Module**: HUD 系统（顶部/底部信息条——`update_resources()` / `update_realm()` / `update_ap()`）
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories hud`
+> **Stories**: 7 stories — see below
 
 ## Overview
 
 HUD 系统实现游戏中始终可见的全局信息层——境界/修为条、灵石计数、卡组数量、行动力（探索中）以及通知/提示系统。它是表现层的依赖枢纽：combat-ui 与 exploration-ui 都消费 HUD 的子组件与数据流模式。按 ADR-0031，HUD 以 CanvasLayer 由 SceneManager 挂载（探索可见/战斗隐藏），零状态所有权，Cat 1 信号驱动更新。
+
+**边界澄清落地（2026-09-07，QL-STORY-READY）**：暂停菜单归 HUD（全局覆盖层，豁免于战斗隐藏规则，story 005）；过渡提示归 HUD（SceneManager pre_transition 驱动，story 007）；敌方境界标记归 combat-ui（不在本 epic）；音效归 audio-manager（HUD 仅触发音频事件）；AP 颜色阈值为共享纯函数（story 006，exploration-ui 复用）。
 
 ## Governing ADRs
 
@@ -25,6 +27,18 @@ TR 注册表暂无表现层条目——需求以 GDD 验收标准编号占位（
 | AC 编号 | Requirement | ADR Coverage |
 |-------|-------------|--------------|
 | AC-hud-001~011 | hud-system.md §验收标准（11 条 GIVEN/WHEN/THEN） | ADR-0031 ✅ |
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | HUD CanvasLayer 挂载与场景可见性切换 | Integration | Ready | ADR-0031 |
+| 002 | 境界+修为条组件（左上） | UI（Logic 内核） | Ready | ADR-0031 |
+| 003 | 灵石+卡组计数组件（右上） | UI（Logic 内核） | Ready | ADR-0031 |
+| 004 | 通知/提示系统 | Logic | Ready | ADR-0031 |
+| 005 | 暂停菜单（全局覆盖层） | UI（Integration 核心） | Ready | ADR-0031 |
+| 006 | 探索 HUD 右下信息组（AP/地图名/层数） | UI（Logic 内核） | Ready | ADR-0031 |
+| 007 | 场景切换过渡提示 | UI（Logic 映射） | Ready | ADR-0031 |
 
 ## Definition of Done
 
