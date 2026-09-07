@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13 表现层 story 创建
-Task: combat-ui-layout 10 stories 已写入；下一步 combat-ui-interaction /create-stories
+Task: combat-ui-interaction 9 stories 已写入；下一步 exploration-ui /create-stories
 <!-- /STATUS -->
 
 ## 当前任务
@@ -14,30 +14,34 @@ Sprint 13 表现层 story 创建推进中（2026-09-07）：
 - hud（8 stories，commit dcda76f + b622ff6）
 - main-menu（5 stories，commit d3d6662）
 - audio-manager（7 stories + hud story 008，commit b622ff6）
-- **combat-ui-layout（10 stories，本次完成，未提交）**：
-  - QL-STORY-READY（qa-lead）R1-R6 全部裁决（用户已批准）：
-    - 顶部条组成按 UX（日志+阶段指示器+阵法区+暂停按钮转发 hud）；撤退按钮右上角独立常驻
-    - 划界：面板视觉框架+状态判定纯函数+信号驱动渲染归 layout；输入锁栈+点击/拖拽流转+确认后系统 API 调用归 interaction（interaction EPIC.md Overview 已重写）
-    - 阶段 0 指示器名=「准备」；渡劫 warning 在备战界面弹出（story 008 实现弹窗本体，story 007 备战面板）
-    - >7 张手牌合成语义：间距优先+角度自适应（card_overlap_offset 求有效间距→压缩 arc_angle 使弦长匹配）——已写入 GDD 公式 2 后注释
-    - 009 拆分前置：009a 合批方案定型（排在 002 之前）+ 009b 满场实测关口
-    - font_size_responsive 等共享纯函数模块上移至 story 001；音频对接声明（set_state(IN_COMBAT)/阶段切换音/胜负音）
-    - R-02 验证策略：DC 半自动化断言（本地关卡脚本不进 CI）、60fps advisory 人工签批、峰值场景 stub 版
-  - GDD 修正 2 处（combat-ui-system.md 公式 2 合成语义+边界澄清 6 条）；UX 修正 2 处（combat-ui.md Boss 入口+导航路径）
-  - 10 stories：001 布局骨架+共享纯函数/002 角色卡 L0-L5/003 标记阵亡飘字/004 顶部条/005 费用栏/006 手牌弧形（三纯函数）/007 备战面板（4 态+阵位映射）/008 结算撤退面板（0.5s 延迟+渡劫变体）/009a 合批定型/009b DC 实测关口
-  - EPIC.md Stories 表+实现顺序提示（009a 在 002 前、009b 最后）已更新；index.md 已更新
+- combat-ui-layout（10 stories，commit be59216）
+- **combat-ui-interaction（9 stories，本次完成，未提交）**：
+  - QL-STORY-READY（qa-lead）12 BLOCKING + 10 ADVISORY 全部裁决（用户已批准）：
+    - B1：GDD 边界情况行 527 MOUSE_FILTER_IGNORE → STOP 修正（与 §12 统一）
+    - B2：结束出牌按钮——底部条右侧新增（layout story 005 补渲染位 AC+实现说明+Out of Scope）
+    - B3/B4/B5：备战面板瞬态+一次性提交（battle_start config 扩展含 character_ids+layout）+替换对象=已选角色列表二次选择
+    - B6：战斗日志交互并入 story 008（更名「牌库/弃牌堆/日志面板交互」）
+    - B7：005/006 补键盘/手柄路径（EPIC DoD 全覆盖）
+    - B8：数字键需目标卡=临时目标选择态（Enter 确认/ESC 取消）；>7 张映射=当前可见窗口 7 张
+    - B9：ESC 仲裁归 story 001（锁栈 get_current_lock 判定最上层面板）
+    - B10：story 001 收窄为基建基座（stub 弹窗验证机制，实际接入归 002-008，009 回归）
+    - B11：撤退按钮 GAMEPLAY+ANIMATION 锁期间排队执行
+    - B12：loot_skipped 补 GDD AC（含二次确认）
+    - GDD 边界澄清补充二（9 条）已写入 combat-ui-system.md；§12 表费用栏/牌库行统一为点击展开
+  - 9 stories：001 输入锁栈基座+ESC 仲裁（resolve_esc_target 纯函数）/002 悬停预览互斥（HoverExclusionMachine）/003 拖拽出牌（DragStateMachine+结束出牌点击）/004 键盘手柄（digit_key_to_card_index 窗口映射）/005 目标选择（TargetSelectionModel 空真语义）/006 备战交互流（DeployDraftModel 瞬态零写入断言）/007 结算撤退持久写入（委托链断言）/008 牌库弃牌日志面板/009 峰值复测+拖拽 D3D12 烟雾（R-01/R-02 收口）
+  - EPIC.md Stories 表+裁决落地记录已更新；index.md 已更新
 
 ## Git 状态
 
-- b622ff6：audio-manager 7 stories + hud story 008（已提交）
-- 工作树未提交：combat-ui-system.md + combat-ui.md（UX）+ interaction EPIC.md 划界修订 + combat-ui-layout EPIC.md + 10 stories + index.md + active.md
+- be59216：combat-ui-layout 10 stories（已提交）
+- 工作树未提交：combat-ui-system.md（边界澄清补充二+B1/B12 修正+§12 统一）+ combat-ui-layout/story-005（结束出牌按钮补记）+ combat-ui-interaction EPIC.md + 9 stories + index.md + active.md
 
 ## 下一步
 
 - 提交本批变更
-- `/create-stories combat-ui-interaction`（下一 epic，R-01 双焦点关卡，交互侧——消费 layout 的面板框架与判定函数；含 009b 峰值场景复测关口）
-- 后续：exploration-ui
-- deck-editing-ui：须先 `/ux-design deck-editing-ui`
+- `/create-stories exploration-ui`（下一 epic——GDD exploration-ui-system.md APPROVED，UX 规范已有）
+- deck-editing-ui：须先 `/ux-design deck-editing-ui`（其 story 将 Blocked）
+- 全部 epic 有 story 后：/sprint-plan
 - Sprint 13 前置 spike（非 story）：R-01 双焦点、R-06 Ogg 循环间隙（各 0.5-1 天）
 
 ## 全量测试基线（不变）

@@ -37,6 +37,7 @@
 - [ ] 临时费用用完消失：绿色数字淡出动画，基础费用不变
 - [ ] 牌库剩余/弃牌堆计数数字显示正确（点击展开归 interaction）
 - [ ] 费用变更信号驱动更新，非轮询
+- [ ] 「结束出牌」按钮渲染位：底部条右侧（仅阶段 2 可见/可点，其余阶段隐藏；GDD 边界澄清补充二 2026-09-07）——渲染与启用态归本 story，鼠标点击/键盘/手柄确认流转归 interaction epic
 
 ---
 
@@ -50,6 +51,7 @@
 - 消耗动画：cost 变更信号 → 数字跳动 Tween 0.2s + 粒子消散（D3D12 烟雾项）。
 - 临时费用消失：temporary 归零信号 → 绿色数字淡出。
 - 牌库/弃牌计数：订阅卡牌系统信号更新数字。
+- 「结束出牌」按钮：仅阶段 2（phase_changed 信号驱动显示/隐藏）；启用态常亮（player_confirmed_end 无前置条件）——按钮本体渲染归本 story，点击后的 `player_confirmed_end` 推进归 interaction 003/004。
 
 ---
 
@@ -58,7 +60,7 @@
 *Handled by neighbouring stories — do not implement here:*
 
 - Story 001: 底部条容器
-- interaction epic: 牌库/弃牌点击展开详情、面板间 0ms 切换
+- interaction epic: 牌库/弃牌点击展开详情、面板间 0ms 切换、「结束出牌」按钮点击流转（player_confirmed_end）
 - audio-manager epic: 费用消耗音
 - 手牌灰显判定（费用不足的手牌状态）：story 006
 

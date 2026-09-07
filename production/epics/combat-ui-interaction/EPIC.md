@@ -4,7 +4,7 @@
 > **GDD**: design/gdd/combat-ui-system.md
 > **Architecture Module**: 战斗 UI 系统（手牌显示、攻击目标选择——`show_hand()` / `highlight_targets()`）
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories combat-ui-interaction`
+> **Stories**: 9 stories — see below
 
 ## Overview
 
@@ -41,8 +41,22 @@ This epic is complete when:
 - 纯键盘与手柄路径全覆盖（combat-ui.md 无障碍章节）
 - All UI stories have evidence docs with sign-off in `production/qa/evidence/`
 
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | 输入锁栈接入基座与 ESC 仲裁（基建 story） | Integration | Ready | ADR-0004, ADR-0031 |
+| 002 | 手牌悬停预览与悬浮详情面板互斥 | UI（Logic 内核） | Ready | ADR-0031 |
+| 003 | 鼠标拖拽出牌流转 | Integration | Ready | ADR-0004, ADR-0008 |
+| 004 | 键盘快捷与手柄出牌路径 | Integration | Ready | ADR-0004 |
+| 005 | 攻击目标选择交互（模式 A 点击式） | Integration | Ready | ADR-0008, ADR-0016 |
+| 006 | 备战面板交互流（瞬态+一次性提交） | Integration | Ready | ADR-0016, ADR-0031 |
+| 007 | 结算与撤退确认流（持久写入） | Integration | Ready | ADR-0031, ADR-0023 |
+| 008 | 牌库/弃牌堆/日志面板交互 | UI | Ready | ADR-0031 |
+| 009 | 峰值场景复测与拖拽 D3D12 烟雾（R-01/R-02 收口） | Visual/Feel | Ready | ADR-0031 |
+
+**QL-STORY-READY 裁决落地（2026-09-07）**：12 项 BLOCKING 全部裁决——结束出牌按钮（layout 005 补渲染位）、备战瞬态+一次性提交+替换二次选择（B3/B4/B5）、数字键需目标卡子流程+>7 张窗口映射（B8）、ESC 仲裁归 001（B9）、story 001 收窄为基建基座（B10）、撤退 GAMEPLAY 排队（B11）、MOUSE_FILTER_STOP 统一（B1）、loot_skipped 补 GDD AC（B12）、战斗日志交互并入 008（B6）、键盘/手柄路径补入 005/006（B7）。GDD 边界澄清补充二（9 条）已写入。
+
 ## Next Step
 
-Run `/create-stories combat-ui-interaction` to break this epic into implementable stories.
-
-**排期提示**（PR-EPIC 2026-09-07）：Sprint 14/15 进入——依赖 combat-ui-layout 布局框架 + R-01 spike 结论。
+Run `/story-readiness production/epics/combat-ui-interaction/story-001-input-lock-base.md` then `/dev-story` 开始实现（前置：R-01 双焦点 spike）。
