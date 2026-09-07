@@ -3,46 +3,49 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13 表现层 story 创建
-Task: combat-ui-interaction 9 stories 已写入；下一步 exploration-ui /create-stories
+Task: exploration-ui 10 stories 已写入；下一步 deck-editing-ui 的 /ux-design 前置
 <!-- /STATUS -->
 
 ## 当前任务
 
-Sprint 13 表现层 story 创建推进中（2026-09-07）：
+Sprint 13 表现层 story 创建推进中（2026-09-08）：
 
-**已完成的 epic**：
+**已完成的 epic**（story 创建层面）：
 - hud（8 stories，commit dcda76f + b622ff6）
 - main-menu（5 stories，commit d3d6662）
 - audio-manager（7 stories + hud story 008，commit b622ff6）
 - combat-ui-layout（10 stories，commit be59216）
-- **combat-ui-interaction（9 stories，本次完成，未提交）**：
-  - QL-STORY-READY（qa-lead）12 BLOCKING + 10 ADVISORY 全部裁决（用户已批准）：
-    - B1：GDD 边界情况行 527 MOUSE_FILTER_IGNORE → STOP 修正（与 §12 统一）
-    - B2：结束出牌按钮——底部条右侧新增（layout story 005 补渲染位 AC+实现说明+Out of Scope）
-    - B3/B4/B5：备战面板瞬态+一次性提交（battle_start config 扩展含 character_ids+layout）+替换对象=已选角色列表二次选择
-    - B6：战斗日志交互并入 story 008（更名「牌库/弃牌堆/日志面板交互」）
-    - B7：005/006 补键盘/手柄路径（EPIC DoD 全覆盖）
-    - B8：数字键需目标卡=临时目标选择态（Enter 确认/ESC 取消）；>7 张映射=当前可见窗口 7 张
-    - B9：ESC 仲裁归 story 001（锁栈 get_current_lock 判定最上层面板）
-    - B10：story 001 收窄为基建基座（stub 弹窗验证机制，实际接入归 002-008，009 回归）
-    - B11：撤退按钮 GAMEPLAY+ANIMATION 锁期间排队执行
-    - B12：loot_skipped 补 GDD AC（含二次确认）
-    - GDD 边界澄清补充二（9 条）已写入 combat-ui-system.md；§12 表费用栏/牌库行统一为点击展开
-  - 9 stories：001 输入锁栈基座+ESC 仲裁（resolve_esc_target 纯函数）/002 悬停预览互斥（HoverExclusionMachine）/003 拖拽出牌（DragStateMachine+结束出牌点击）/004 键盘手柄（digit_key_to_card_index 窗口映射）/005 目标选择（TargetSelectionModel 空真语义）/006 备战交互流（DeployDraftModel 瞬态零写入断言）/007 结算撤退持久写入（委托链断言）/008 牌库弃牌日志面板/009 峰值复测+拖拽 D3D12 烟雾（R-01/R-02 收口）
+- combat-ui-interaction（9 stories，commit 92f564e）
+- **exploration-ui（10 stories，本次完成，未提交）**：
+  - QL-STORY-READY（qa-lead）10 BLOCKING + 9 ADVISORY 全部裁决（用户已批准）：
+    - B1：回复点回复量 30%→50%（以 exploration-system.md 公式 7 为真理源，修 UI GDD 3 处）
+    - B2：ap_bar_color 补 GRAY 分支（current==0 守卫优先）+恰界语义统一（0.3 黄/0.1 红）——GDD 3 处修正
+    - B3：Boss 警示改「撤退视为战败——保留 50% 本局修为」（80% 为渡劫专属）；战力展示采用角色数版本（数值对比无 API 依据）——GDD+UX 共 5 处修正
+    - B4：弹窗时序裁决「先移动后弹窗」（与 ADR-0014 信号流一致）；删除 GDD「先弹确认框」分支与「高亮待选」残留
+    - B5：渡劫台弹窗补 GDD §4b 规格（80% 警示朱砂红）+§4c 分发表；传送节点暂缓（exploration-system #5 机制未闭合）；事件节点显式排除
+    - B6：map_cleared 单一发射者（探索系统）——UX 事件表勘误（结算确认改 map_clear_acknowledged，防双重入账）
+    - B7：地图选择布局以 UX 横向滚动为准（GDD 网格→横向滚动）；费用明细扩 get_map_list() 载荷（reentry_base/multiplier）
+    - B8：返回恢复流（战斗/事件/商店返回节点图恢复态）+战败路径单一化（战败→DEFEAT_SCREEN→地图选择）归 story 008
+    - B9：商店为 UI overlay 非场景切换（免新增 TransitionType 枚举）
+    - B10：教程覆盖归 story 005
+  - 10 stories：001 节点图渲染基座+R-05 性能基准（stub 最坏情况 60fps 关卡）/002 地图选择（横向滚动+重入确认）/003 节点图数据接入与六态渲染（node_type_to_icon）/004 AP 指示器（ap_bar_color 纯函数单测 BLOCKING）/005 移动交互流+教程覆盖/006 五类节点弹窗（分发表+事件节点排除断言）/007 Boss 确认与进入战斗（50% 警示）/008 通关结算+探索结束+返回恢复流（防双重入账断言）/009 辅助面板（解锁提示/状态概览/卡组查看只读）/010 峰值复测+全流程终验（11 界面闭环+双输入路径）
   - EPIC.md Stories 表+裁决落地记录已更新；index.md 已更新
 
 ## Git 状态
 
-- be59216：combat-ui-layout 10 stories（已提交）
-- 工作树未提交：combat-ui-system.md（边界澄清补充二+B1/B12 修正+§12 统一）+ combat-ui-layout/story-005（结束出牌按钮补记）+ combat-ui-interaction EPIC.md + 9 stories + index.md + active.md
+- 92f564e：combat-ui-interaction 9 stories（已提交）
+- 工作树未提交：exploration-ui-system.md（B1/B2/B3/B4/B5/B7 修正 11 处）+ exploration-ui.md（B2/B3/B6 勘误 6 处）+ exploration-ui EPIC.md + 10 stories + index.md + active.md
 
 ## 下一步
 
 - 提交本批变更
-- `/create-stories exploration-ui`（下一 epic——GDD exploration-ui-system.md APPROVED，UX 规范已有）
-- deck-editing-ui：须先 `/ux-design deck-editing-ui`（其 story 将 Blocked）
+- deck-editing-ui：须先 `/ux-design deck-editing-ui`（其 story 将 Blocked——无 UX 规范）
 - 全部 epic 有 story 后：/sprint-plan
 - Sprint 13 前置 spike（非 story）：R-01 双焦点、R-06 Ogg 循环间隙（各 0.5-1 天）
+- 依赖上报清单（story 实现时跟进）：
+  - get_map_list() 载荷扩展 reentry_base/reentry_multiplier（story 002 依赖——Feature 层工作）
+  - 传送节点机制裁决（exploration-system #5 单向/双向）→ 后补传送弹窗 story
+  - 渡劫战败返回链若需新 TransitionType → 上报 ADR-0005 修订
 
 ## 全量测试基线（不变）
 

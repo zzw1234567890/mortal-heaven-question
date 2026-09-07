@@ -4,7 +4,7 @@
 > **GDD**: design/gdd/exploration-ui-system.md
 > **Architecture Module**: 探索 UI 系统（地图视图、节点渲染——`render_map()` / `show_event(event)`）
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories exploration-ui`
+> **Stories**: 10 stories — see below
 
 ## Overview
 
@@ -40,6 +40,23 @@ This epic is complete when:
 
 ## Next Step
 
-Run `/create-stories exploration-ui` to break this epic into implementable stories.
+Run `/story-readiness production/epics/exploration-ui/story-001-node-graph-base-r05-benchmark.md` then `/dev-story` 开始实现（001 为 R-05 性能关卡，须最先完成）。
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | 节点图渲染基座与 R-05 性能基准（stub 数据） | Visual/Feel | Ready | ADR-0031 |
+| 002 | 地图选择界面 | UI | Ready | ADR-0031, ADR-0014 |
+| 003 | 节点图数据接入与节点状态渲染 | Integration | Ready | ADR-0031, ADR-0014 |
+| 004 | 行动力指示器（ap_bar_color 纯函数） | UI（Logic 内核） | Ready | ADR-0031 |
+| 005 | 节点移动交互流与教程覆盖 | Integration | Ready | ADR-0031, ADR-0014 |
+| 006 | 节点交互弹窗（战斗/商店/灵泉/回复/渡劫台） | Integration | Ready | ADR-0014, ADR-0031 |
+| 007 | Boss 战前确认与进入战斗流 | Integration | Ready | ADR-0005, ADR-0014 |
+| 008 | 通关结算、探索结束与返回恢复流 | Integration | Ready | ADR-0014, ADR-0005 |
+| 009 | 辅助面板（解锁提示/状态概览/卡组查看） | UI | Ready | ADR-0031 |
+| 010 | 峰值复测与全流程终验 | Visual/Feel | Ready | ADR-0031 |
+
+**QL-STORY-READY 裁决落地（2026-09-08）**：10 项 BLOCKING 全部裁决——B1 回复量 30%→50%（以 exploration-system 公式 7 为准）；B2 ap_bar_color 补 GRAY 分支+恰界语义统一（0.3 黄/0.1 红/0 灰）；B3 Boss 警示改 50% 修为+战力采用角色数版本（80% 为渡劫专属）；B4 弹窗时序裁决「先移动后弹窗」（与 ADR-0014 信号流一致，删除「高亮待选」残留）；B5 渡劫台弹窗补规格（§4b）+分发表（§4c）+传送节点暂缓（机制未闭合）；B6 map_cleared 单一发射者（UX 事件表勘误为 map_clear_acknowledged）；B7 地图选择布局以 UX 横向滚动为准+费用明细扩 get_map_list 载荷；B8 返回恢复流+战败路径单一化归 story 008；B9 商店为 UI overlay 非场景切换（免新增 TransitionType）；B10 教程覆盖归 story 005。GDD 修正 11 处 + UX 勘误 6 处已落地。
 
 **排期提示**（PR-EPIC 2026-09-07）：Sprint 14/15 进入——需三个 spike（R-01/R-02/R-03）出结论、hud 落地之后。节点图性能 story 排首位。
