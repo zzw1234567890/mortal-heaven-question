@@ -1,6 +1,6 @@
 # Epics Index
 
-Last Updated: 2026-09-02
+Last Updated: 2026-09-07
 Engine: Godot 4.6.3
 
 | Epic | Layer | System | GDD | Stories | Status |
@@ -35,3 +35,10 @@ Engine: Godot 4.6.3
 | story-system | Feature | 剧情系统 | story-system.md | 4 stories | Complete |
 | dialogue-system | Feature | 对话系统 | dialogue-system.md | 3 stories | Complete |
 | ending-branch-system | Feature | 结局分支系统 | ending-branch-system.md | 3 stories | Complete |
+| hud | Presentation | HUD 系统 | hud-system.md | Not yet created | Ready |
+| main-menu | Presentation | 主菜单与设置 | main-menu-system.md | Not yet created | Ready |
+| audio-manager | Presentation | 音频管理系统 | audio-system.md | Not yet created | Ready |
+| combat-ui-layout | Presentation | 战斗 UI——静态布局与角色状态卡 | combat-ui-system.md | Not yet created | Ready |
+| combat-ui-interaction | Presentation | 战斗 UI——手牌与交互流程 | combat-ui-system.md | Not yet created | Ready |
+| exploration-ui | Presentation | 探索 UI | exploration-ui-system.md | Not yet created | Ready |
+| deck-editing-ui | Presentation | 卡组编辑 UI | deck-editing-ui-system.md | Not yet created | Blocked（UX 规范前置） |

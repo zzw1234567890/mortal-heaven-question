@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13 表现层前置行动
-Task: 5 项前置行动全部完成——待 /create-epics layer: presentation
+Task: 7 个表现层 epic + 里程碑文件已写入——待提交 git + /create-stories
 <!-- /STATUS -->
 
 ## 当前任务
