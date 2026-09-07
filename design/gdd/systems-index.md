@@ -49,10 +49,10 @@
 | 28 | 对话系统 | 叙事 (Narrative) | Vertical Slice | 已设计 | dialogue-system.md | 剧情系统 |
 | 29 | 结局分支系统 | 叙事 (Narrative) | Full Vision | 已设计 | ending-branch-system.md | 剧情系统 |
 | 30 | 战斗UI系统 | UI | MVP | 已设计 (Approved) | combat-ui-system.md | 战斗系统 |
-| 31 | 探索UI系统（地图） | UI | MVP | 已设计 | exploration-ui-system.md | 探索系统 |
-| 32 | 卡组编辑UI | UI | MVP | 已设计 | deck-editing-ui-system.md | 卡组编辑系统 |
-| 33 | HUD系统 | UI | MVP | 已设计 | hud-system.md | 所有系统 |
-| 34 | 主菜单与设置 | UI | MVP | 已设计 | main-menu-system.md | 游戏状态管理器 |
+| 31 | 探索UI系统（地图） | UI | MVP | 已设计 (Approved) | exploration-ui-system.md | 探索系统 |
+| 32 | 卡组编辑UI | UI | MVP | 已设计 (Approved) | deck-editing-ui-system.md | 卡组编辑系统 |
+| 33 | HUD系统 | UI | MVP | 已设计 (Approved) | hud-system.md | 所有系统 |
+| 34 | 主菜单与设置 | UI | MVP | 已设计 (Approved) | main-menu-system.md | 游戏状态管理器 |
 | 35 | 音频管理系统 | 音频 (Audio) | MVP | 已设计 (Approved) | audio-system.md | 事件系统、游戏状态管理器、战斗系统、探索系统、UI系统、渡劫突破系统、设置系统 |
 | 36 | 成就系统 | 元 (Meta) | Full Vision | 已设计 (Approved) | achievement-system.md | 存档系统 |
 

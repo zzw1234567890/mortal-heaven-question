@@ -1,6 +1,6 @@
 # 音频管理系统 (Audio Management System)
 
-> **状态 (Status)**：设计中 (In Design)
+> **状态 (Status)**：已批准 (Approved)（2026-09-06 审查修订后）
 > **作者 (Author)**：Claude Code + 用户
 > **最后更新 (Last Updated)**：2026-07-23
 > **最后验证 (Last Verified)**：—
