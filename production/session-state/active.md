@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13 表现层前置行动
-Task: combat-ui UX 规范完成——exploration-ui 待设计
+Task: exploration-ui UX 规范 APPROVED + 模式库 11 个新模式已入库——待 #4 风险登记册 / #5 control-manifest
 <!-- /STATUS -->
 
 ## 当前任务
