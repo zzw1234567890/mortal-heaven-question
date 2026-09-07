@@ -39,6 +39,9 @@ TR 注册表暂无表现层条目——需求以 GDD 验收标准编号占位（
 | 005 | 暂停菜单（全局覆盖层） | UI（Integration 核心） | Ready | ADR-0031 |
 | 006 | 探索 HUD 右下信息组（AP/地图名/层数） | UI（Logic 内核） | Ready | ADR-0031 |
 | 007 | 场景切换过渡提示 | UI（Logic 映射） | Ready | ADR-0031 |
+| 008 | F1 静音状态图标 | UI | Ready | ADR-0031 |
+
+*story 008 为 audio-manager QL-STORY-READY 归属裁决补充（2026-09-07）：audio 发 `mute_state_changed` 信号，HUD 渲染图标。*
 
 ## Definition of Done
 

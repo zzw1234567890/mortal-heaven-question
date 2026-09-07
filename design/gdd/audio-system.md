@@ -172,7 +172,7 @@ Godot 的 `AudioServer.set_bus_volume_db(bus_idx, volume_db)` 以 dB 为单位�
   - 0 — 装饰性 (Ambient SFX、装饰音)
   - 1 — 功能性 (卡牌出牌声、脚步声)
   - 2 — 关键性 (命中确认、警告音) —— 永远不会被淘汰，如果12个槽全是优先级2的SFX则拒绝新请求并记录日志
-- 同 `sfx_id` 冷却时间：**50ms**（按 `sfx_id` 独立计时，非跨类型共享）。冷却窗口内在第2次请求被静默丢弃，第3次及之后同样丢弃。冷却到期后接受下一次请求。日志信号：`sfx_cooldown_discarded(sfx_id, elapsed_ms)`
+- 同 `sfx_id` 冷却时间：**50ms**（按 `sfx_id` 独立计时，非跨类型共享）。冷却窗口定义为 `elapsed < 50ms`（窗口内第 2 次及之后的请求被静默丢弃）；`elapsed >= 50ms`（含恰好 50ms）接受请求并重置计时。日志信号：`sfx_cooldown_discarded(sfx_id, elapsed_ms)`
 - 战斗中攻击 SFX 最小间隔：**100ms**——防止多角色同时攻击时音效堆叠
 - 随机化（防"机关枪效应"）：每次播放时 `pitch_scale` ±10% 随机（0.9-1.1），`volume_db` ±3dB 随机。可通过 `options` 参数覆盖
 
@@ -281,7 +281,7 @@ AudioState → 读取过渡矩阵 → 执行对应音频动作（交叉淡入淡
 | **主菜单** (MAIN_MENU) | 游戏启动 | 主菜单BGM（循环） |
 | **身份选择** (IDENTITY_SELECT) | 开局选择身份 | 主菜单BGM继续，降低至 -6dB |
 | **卡组编辑** (DECK_EDITING) | 编辑卡组 | 静默BGM（可选低音量古琴氛围），卡牌放入/移出SFX |
-| **修为养成** (CULTIVATING) | 消耗修为点 | BGM保持低音量，修为条里程碑提示音 |
+| **修为养成** (CULTIVATING) | 消耗修为点 | BGM降低至 -12dB（0.5s），退出恢复前一状态 BGM（0.5s）；修为条里程碑提示音 |
 | **探索中** (EXPLORING) | 玩家在地图上移动 | 地图BGM + 环境音 + 探索SFX |
 | **战斗中** (IN_COMBAT) | 回合制对战 | 战斗BGM + 战斗SFX（环境音 -8dB） |
 | **渡劫战中** (IN_TRIBULATION) | 渡劫Boss战 | 渡劫BGM + 渡劫SFX（环境音 -8dB） |
@@ -307,7 +307,7 @@ AudioState → 读取过渡矩阵 → 执行对应音频动作（交叉淡入淡
 | 事件→战斗 | 探索BGM快速淡出(0.3s) | 战斗BGM淡入(0.5s)，环境音 -8dB |
 | 战斗→通关结算 | 战斗BGM淡出(0.3s) | 胜利BGM淡入(0.5s) |
 | 战斗→战败 | 战斗BGM快速渐弱(0.5s) | 战败BGM淡入(0.3s) |
-| 探索→渡劫 | 探索BGM淡出(0.3s) | 渡劫BGM淡入(0.3s) |
+| 探索→渡劫 | 探索BGM淡出(0.3s) | 渡劫BGM淡入(0.3s)——**顺序执行**（先淡出完成再淡入，Boss 战冲击感例外） |
 | 渡劫战中→通关结算 | 渡劫BGM淡出(0.3s) | 胜利BGM淡入(0.5s) |
 | 渡劫战中→战败 | 渡劫BGM淡出(0.5s) | 战败BGM淡入(0.3s) |
 | 暂停→任意状态 | `resume_all()` — 从暂停点恢复所有音频 | — |
@@ -317,6 +317,8 @@ AudioState → 读取过渡矩阵 → 执行对应音频动作（交叉淡入淡
 | 通关结算→主菜单 | 胜利BGM淡出(1.0s) | 主菜单BGM淡入(1.5s) |
 | 任意→卡组编辑 | BGM降低至 -12dB（0.5s） | — |
 | 卡组编辑→任意 | 恢复前一状态BGM | — |
+| 任意→修为养成 | BGM降低至 -12dB（0.5s） | — |
+| 修为养成→任意 | 恢复前一状态BGM（0.5s） | — |
 
 标记 N/A 的转换（不会在游戏中发生）：
 - 商店中→战斗中（商店不触发战斗）
@@ -439,8 +441,7 @@ Tween 过渡:
 | 5 | **F1 快速连打(Spam)** | `toggle_mute()` 内部使用 debounce 200ms——200ms内的重复调用被忽略。防止静音/恢复状态抖动 |
 | 6 | **F1 静音后场景切换** | 静音状态为全局持久——新场景BGM同样静音。取消静音后恢复 |
 | 7 | **游戏窗口失焦/最小化** | 默认所有音频继续播放（不暂停）。可在设置中添加"后台静音"选项(默认关) |
-| 8 | **音频设备热插拔** | Godot `AudioServer` 自动处理设备切换。不崩溃。播放中的音频继续在新设备上输出 |
-| 9 | **设置中拖动音量滑动条为0%** | 该总线完全静音(volume_db = -80)，但不停止播放（BGM继续循环只是听不到）。与F1的Master Mute不同——F1是停止Master输出 |
+| 8 | **音频设备热插拔** | Godot `AudioServer` 自动处理设备切换。不崩溃。播放中的音频继续在新设备上输出 || 9 | **设置中拖动音量滑动条为0%** | 该总线完全静音(volume_db = -80)，但不停止播放（BGM继续循环只是听不到）。与F1静音机制相同（Master volume_db = -80），区别仅在作用范围：滑条 0% 影响单总线，F1 影响整个 Master 输出 |
 | 10 | **存档时BGM正在播放** | 存档记录当前BGM ID和播放位置(ms)。读档后恢复到存档时的BGM和位置，继续播放 |
 | 11 | **读档后场景不匹配** | 如果存档中的BGM与读档后场景不匹配，优先播放当前场景的默认BGM（忽略存档BGM） |
 | 12 | **同一BGM重复请求** | 如果请求的 `bgm_id` 与当前播放相同 → 忽略（不重新开始，不交叉淡入淡出到自己） |
@@ -547,7 +548,7 @@ Tween 过渡:
 - **AC-BGM-03**：GIVEN 探索BGM正在播放，WHEN 触发战斗场景切换，THEN 探索BGM在 0.5s 内淡出至 -80dB，同时战斗BGM在 0.5s 内从 -80dB 淡入至 0dB
 - **AC-BGM-04**：GIVEN 战斗BGM正在播放，WHEN 战斗以胜利结束进入结算，THEN 战斗BGM在 0.3s 内淡出至 -80dB，`bgm_victory` 在 0.5s 内从 -80dB 淡入至 0dB
 - **AC-BGM-05**：GIVEN 战斗BGM正在播放，WHEN 战斗以战败结束，THEN 战斗BGM在 0.5s 内渐弱至 -80dB，`bgm_defeat` 在 0.3s 内从 -80dB 淡入至 0dB
-- **AC-BGM-06**：GIVEN 探索BGM正在播放，WHEN 进入商店，THEN BGM Bus `volume_db` 在 0.5s 内降低至 -10dB（BGM继续播放不停止），商店环境音在 0.5s 内淡入至 -10dB
+- **AC-BGM-06**：GIVEN 探索BGM正在播放，WHEN 进入商店，THEN BGM Bus `volume_db` 在 0.5s 内降低至 -10dB（BGM继续播放不停止），商店环境音在 0.5s 内淡入，Ambient Bus `volume_db` 相对默认 -10dB 再降 -6dB（即 -16dB）
 - **AC-BGM-07**：GIVEN 在商店中，WHEN 离开商店回到探索，THEN BGM Bus `volume_db` 在 0.5s 内恢复至 0dB，商店环境音在 0.3s 内淡出，探索环境音恢复至 -10dB
 - **AC-BGM-08**：GIVEN 渡劫战斗触发，WHEN 场景切换，THEN 渡劫BGM (`bgm_tribulation`) 在 0.3s 内淡入至 0dB，独立于普通战斗BGM
 - **AC-BGM-09**：GIVEN 同一首BGM正在播放，WHEN 再次请求播放相同 `bgm_id`，THEN 请求被忽略（不重新开始，不交叉淡入淡出到自己）
@@ -591,6 +592,20 @@ Tween 过渡:
 - **AC-ACCESS-01**：GIVEN 字幕设置为开启，WHEN 对话文本显示，THEN 字幕文本在对话文本出现后100ms内渲染在屏幕底部
 - **AC-ACCESS-02**：GIVEN 单声道开关设为开启，WHEN 任何音频播放，THEN 左右声道输出相同信号（通过 AudioEffect 验证或手动听觉测试）
 - **AC-ACCESS-03**：GIVEN 所有音量滑动条拖至0%，WHEN 游戏运行，THEN 所有总线输出 -80dB，无音频可听
+
+---
+
+### 边界澄清（2026-09-07，QL-STORY-READY）
+
+- **过渡矩阵真源**：本 GDD §9 AudioState 过渡矩阵（22 行）是音频行为**唯一真源**。SceneManager 的 `TRANSITION_AUDIO_PARAMS` 降级为「TransitionType→AudioState 映射 + 转场时长」的引用层——数值以矩阵为准，SceneManager 侧参数与单测在 audio epic 实现时同步对齐（含探索→战斗 0.5s 淡出、渡劫 0.3s 顺序式的修正）。
+- **总线索引不可靠**：总线存在子总线（SFX 3 条），整数索引随结构变化不稳定——**一切引用按总线名称**（`AudioServer.get_bus_index("BGM")`），不按硬编码索引。
+- **Boss/渡劫过渡例外**：统一为**顺序执行**——先淡出完成(0.3s)再淡入(0.3s)，制造冲击感（公式节与矩阵行一致）。
+- **F1 静音机制**：Master `volume_db = -80dB`（AC-MUTE-01 语义）；与滑条 0% 的区别仅在作用范围（Master 全局 vs 单总线）。
+- **UI 音效最低时长 80ms + 打断规则**（§7）：确定性逻辑，归 SFX 池实现（打断旧 UI 音效；每个 UI 音效最低播放 80ms 防快速导航卡顿）。
+- **F1 静音图标**：音频系统 emit `mute_state_changed` 信号，图标渲染归 HUD epic（表现层分工）。
+- **字幕渲染（AC-ACCESS-01）**：归对话系统 UI（其 epic 尚未建立）——本系统只保留字幕开关设置位，渲染行为 deferred 至对话系统 epic。
+- **BGM 存档恢复（边缘 #10/#11）**：存档记录 `bgm_id` + 播放位置(ms)，读档恢复；场景不匹配时优先当前场景默认 BGM——音频侧提供恢复 API，存档 schema 协调归 save-load 对接 story。
+- **R-06（Ogg 循环间隙）**：独立 spike（Sprint 13 开始前实测），产出格式裁决（WAV loop 点 vs Ogg 接受间隙）后关闭风险项。
 
 ---
 
