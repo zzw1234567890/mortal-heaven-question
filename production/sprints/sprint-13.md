@@ -22,12 +22,12 @@
 
 ## 任务
 
-### 必须完成（关键路径）—— 7 项（5.5d）
+### 必须完成（关键路径）—— 7 项（6.0d）
 
 | ID | 任务 | 文件/Spike | 类型 | 预估 | 依赖 | 验收标准 |
 |----|------|-----------|------|:--:|:--:|---------|
 | S13-1 | R-01 双焦点 spike | `production/spikes/r01-dual-focus-spike.md`（待产出） | Spike | 0.5d | — | 目标硬件实测 `_gui_input()`/`_unhandled_input()` 响应差异、`grab_focus()` 对鼠标 hover 的影响；结论写入 OQ-02 关闭；双视觉策略确认或修正 |
-| S13-2 | hud 001 CanvasLayer 挂载与可见性 | `production/epics/hud/story-001-hud-canvas-mount-and-visibility.md` | Integration | 1.0d | S13-1 | 探索/地图/商店/事件场景渲染；战斗场景隐藏；暂停菜单豁免；SceneManager 信号驱动 |
+| S13-2 | hud 001 CanvasLayer 挂载与可见性 | `production/epics/hud/story-001-hud-canvas-mount-and-visibility.md` | Integration | 1.5d | S13-1 | PersistentLayer+register_persistent 补齐；12 值可见性矩阵；PauseOverlay 豁免分支骨架；SceneManager 信号驱动（2026-09-08 GAP 裁决后） |
 | S13-3 | hud 002 境界+修为条 | `production/epics/hud/story-002-realm-cultivation-bar.md` | UI+Logic | 1.0d | S13-2 | 阈值颜色切换纯函数单测+平滑填充动画+80% 呼吸闪烁 |
 | S13-4 | hud 003 灵石+卡组计数 | `production/epics/hud/story-003-lingshi-deck-counter.md` | UI | 0.5d | S13-2 | 事件驱动更新+数值跳动动画+千分位格式化 |
 | S13-5 | hud 004 通知系统 | `production/epics/hud/story-004-notification-system.md` | Logic | 1.0d | S13-2 | 队列/优先级/时长纯函数单测+堆叠上限 3 条+FIFO 丢弃 |
@@ -51,7 +51,7 @@
 | S13-13 | hud 008 F1 静音图标 | `production/epics/hud/story-008-mute-icon.md` | UI | 0.5d | S13-5 | 图标状态切换+InputManager 联动 |
 | S13-14 | audio 001 总线+骨架 PersistentLayer | `production/epics/audio-manager/story-001-bus-layout-manager-skeleton.md` | Integration | 1.0d | — | AudioBusLayout 资产+总线按名称访问+AudioServer 包装层可注入（无 UI 依赖，可并行） |
 
-**总计**：14 项，预估 9.5d（必须 5.5d + 应该 2.5d + 可以 1.5d）——必须+应该 8.0d 恰在容量内；可以项按实际进度弹性填充。
+**总计**：14 项，预估 10.0d（必须 6.0d + 应该 2.5d + 可以 1.5d）——必须+应该 8.5d 恰在容量内（2026-09-08 调整：hud 001 扩 scope +0.5d——PersistentLayer/register_persistent 补齐，GAP-2 裁决；audio 001 同步受益）；可以项按实际进度弹性填充。
 
 ## 推迟到 Sprint 14（PR-SPRINT 裁决记录）
 

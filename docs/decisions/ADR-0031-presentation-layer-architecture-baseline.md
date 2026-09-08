@@ -46,17 +46,19 @@ Accepted（2026-09-07——经三轮对抗性审查后接受，4 BLOCKER + 7 HIG
 - **音频系统例外**：`AudioManager` 的 AudioStreamPlayer 节点池挂在 SceneManager 持久层（见下方 §1.2），由 ADR-0005 的 `pre_transition` 信号驱动音频过渡
 - Autoload 计数保持 25，不新增
 
-#### 1.1 暂停菜单——场景内 overlay，非场景切换
+#### 1.1 暂停菜单——HUD 拥有的全局 overlay 分支，非场景切换
 
-- 暂停菜单（`design/ux/pause-menu.md`）是当前场景内的 overlay Control，**不经 SceneManager 转场**（ADR-0005 只管场景间切换，暂停不切换场景）
-- 暂停时 `SceneTree.paused = true`；HUD 设 `process_mode = PROCESS_MODE_ALWAYS` 保持可见；音频节点池节点同样 `PROCESS_MODE_ALWAYS`，但由暂停菜单逻辑**显式暂停音频总线**（BGM 与 SFX 一并暂停，与 `design/ux/pause-menu.md` AC「音频暂停」一致）——音频恢复在暂停菜单关闭时执行
+> **2026-09-08 修订**（hud 001 story-readiness GAP-1 裁决）：暂停菜单归属从「各场景挂载」修订为「HUD 拥有的全局层分支」。理由：hud-system GDD 边界澄清（2026-09-07）与 combat-ui UX（战斗中 ESC 转发）均以 HUD 为暂停菜单单一渲染方；分散到 11 个场景会产生重复挂载逻辑。PauseOverlay 为 HUD CanvasLayer 内独立子分支（`process_mode = PROCESS_MODE_ALWAYS`），战斗隐藏规则只作用于内容分支、豁免暂停分支。
+
+- 暂停菜单（`design/ux/pause-menu.md`）是 HUD CanvasLayer 内的 overlay Control 分支（PauseOverlay），**不经 SceneManager 转场**（ADR-0005 只管场景间切换，暂停不切换场景）
+- 暂停时 `SceneTree.paused = true`；PauseOverlay 设 `process_mode = PROCESS_MODE_ALWAYS` 保持可见；音频节点池节点同样 `PROCESS_MODE_ALWAYS`，但由暂停菜单逻辑**显式暂停音频总线**（BGM 与 SFX 一并暂停，与 `design/ux/pause-menu.md` AC「音频暂停」一致）——音频恢复在暂停菜单关闭时执行
 - ESC 打开暂停菜单经 ADR-0004 路径 B（`_input()` 拦截），push `modal` 级锁，关闭时 pop——遵循锁栈配对规则
 
 #### 1.2 SceneManager 持久层——音频节点池的挂载结构
 
 - SceneManager 在启动时创建一个持久节点（`root` 直挂的 `Node`，命名 `PersistentLayer`），场景切换（`change_scene_to_file()`）不销毁它
 - AudioManager（RefCounted 控制类，非节点）在启动时创建并负责将 AudioStreamPlayer 节点池实例化挂入 `PersistentLayer`，生命周期与进程等长
-- SceneManager 暴露挂载 API `register_persistent(node: Node)`——任何需要跨场景存活的节点都通过它注册（未来若有类似需求不再发明新结构）
+- SceneManager 暴露挂载 API `register_persistent(node: Node)`——任何需要跨场景存活的节点都通过它注册（未来若有类似需求不再发明新结构）。HUD CanvasLayer 经此 API 挂载（2026-09-08 GAP-2 裁决——hud story-001 实现）
 - 池大小、双播放器交叉淡化等**内部细节**留给 audio epic；挂载结构本身在此定死，audio epic 不得改动此结构（如需改动须修订本 ADR）
 
 ### 2. 零状态所有权——UI 只读消费
