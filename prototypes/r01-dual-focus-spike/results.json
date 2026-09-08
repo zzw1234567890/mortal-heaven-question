@@ -1,0 +1,75 @@
+{
+  "engine": "4.6.3-stable (official)",
+  "results": [
+    {
+      "expected": true,
+      "id": "V1",
+      "label": "grab_focus() 后 hover 视觉保持",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "expected": true,
+      "id": "V1b",
+      "label": "grab_focus() 获得键盘焦点（has_focus）",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "expected": true,
+      "id": "V2",
+      "label": "焦点环与悬停边框可同时激活",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "expected": true,
+      "id": "V3",
+      "label": "_gui_input 收到鼠标点击（手动派发降级）",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "expected": true,
+      "id": "V4",
+      "label": "probe 持有键盘焦点时 _unhandled_input 触发",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "expected": true,
+      "id": "V4b",
+      "label": "无焦点时 _unhandled_input 触发（基线）",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "expected": false,
+      "id": "V5",
+      "label": "ANIMATION 锁（仅键鼠白名单含鼠标）下鼠标 UI_NAV",
+      "observed": false,
+      "status": "PASS"
+    },
+    {
+      "expected": true,
+      "id": "V5b",
+      "label": "ANIMATION 锁下键盘 UI_NAV",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "expected": false,
+      "id": "V5c",
+      "label": "ANIMATION 锁下键盘 GAMEPLAY",
+      "observed": false,
+      "status": "PASS"
+    },
+    {
+      "expected": true,
+      "id": "V6",
+      "label": "gui_input accept 后鼠标事件不落入 _unhandled_input",
+      "observed": true,
+      "status": "PASS"
+    }
+  ]
+}

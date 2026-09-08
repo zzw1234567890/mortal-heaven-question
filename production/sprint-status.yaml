@@ -14,18 +14,18 @@ goal: "关闭 R-01/R-06/R-02/R-03 技术风险 + HUD 系统 8 stories 全量交�
 start: "2026-09-08"
 end: "2026-09-19"
 generated: "2026-09-08"
-updated: "2026-09-08"
+updated: "2026-09-08"  # S13-1 done
 
 stories:
   - id: "13-1"
     name: "R-01 双焦点 spike（非 story）"
     file: "production/spikes/r01-dual-focus-spike.md"
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: done
+    owner: "ui-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-09-08"
 
   - id: "13-2"
     name: "hud 001 CanvasLayer 挂载与可见性"

@@ -3,37 +3,32 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13
-Task: qa-plan 完成（qa-plan-sprint-13-2026-09-08.md）——下一步 S13-1 R-01 双焦点 spike
+Task: S13-1 R-01 双焦点 spike 完成（10/10 PASS）——下一步 S13-2 hud 001 story-readiness
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
+<!-- SPIKE：2026-09-08 | S13-1 R-01 | Report：production/spikes/r01-dual-focus-spike.md | OQ-02 已关闭 | R-01 已关闭 -->
 
 ## 当前任务
 
-Sprint 13 已规划（2026-09-08，`/sprint-plan new`）：
+**S13-1 R-01 双焦点 spike 已完成**（2026-09-08，目标硬件 RTX 3050 / Godot 4.6.3 / Vulkan Forward+）：
 
-- **冲刺目标**：关闭 R-01/R-06/R-02/R-03 技术风险 + HUD 系统 8 stories 全量交付
-- **PR-SPRINT 裁决**：全量 22 项方案 UNREALISTIC（230% 容量）→ 按制作人修订案裁剪为 14 项 9.5d：
-  - 必须 7 项 5.5d：R-01 spike + hud 001-005 + QA 签收
-  - 应该 5 项 2.5d：R-06 spike + hud 006/007 + R-02 合批方案（combat-ui-layout 009a）+ R-03 D3D12 冒烟
-  - 可以 2 项 1.5d：hud 008 + audio 001
-- **推迟 Sprint 14**：main-menu 5 stories + audio 002-004 + Draw Call 满场实测（009b）——Sprint 14 负载预警 12d+，届时二次裁剪；里程碑预估修正为 3 个冲刺起
-- **文件**：production/sprints/sprint-13.md + production/sprint-status.yaml（14 stories 初始化）
-
-**前序完成**（本会话）：
-- `/create-stories deck-editing-ui`（1ec5406）：7 stories + 8 BLOCKING 裁决（B1 出售价×0.5 终裁/B2 直调分域/B4 Logic 内核单测/B5 超限仅事件入口/B6 稀有度筛选/B7 stub+上报/B8 009 缩窄）
-- 全部 38 epic 已有 story
+- harness：`prototypes/r01-dual-focus-spike/`（spike.gd SceneTree 脚本 + probe_control.gd 探针 + results.json）
+- **10/10 PASS**，三大结论：
+  1. **双视觉策略成立**——`grab_focus()` 不影响鼠标 hover（V1）；焦点环与悬停边框并存（V2）——UX 规范无需修正
+  2. **ADR-0004 路径注释修正**——焦点 Control 收到键盘 `_gui_input` 但不自动消耗，`_unhandled_input` 仍触发；须显式 `accept_event()`（V4/V6）——hud story 实现时遵循
+  3. InputManager 设备掩码与双焦点正交（V5）
+- 已更新：OQ-02 关闭（architecture.md）、R-01 关闭（risk register）、ADR-0004 引擎兼容性+风险节、sprint-status.yaml 13-1 done
+- harness 局限记录：SceneTree 脚本环境 `parse_input_event` 不触发 GUI 命中测试（V3 降级手动派发）——hud 001 集成测试以真实场景覆盖
 
 ## Git 状态
 
-- 1ec5406：deck-editing-ui 7 stories（已提交）
-- 工作树未提交：sprint-13.md（新建）+ sprint-status.yaml（重写）+ active.md
+- 工作树未提交：spike harness（prototypes/）+ spike 报告（production/spikes/）+ OQ-02/R-01/ADR-0004 更新 + sprint-status.yaml + active.md
 
 ## 下一步
 
-- 提交 QA 计划
-- **S13-1 R-01 双焦点 spike**（第 1 天、timebox 0.5d、结论当日写 OQ-02 关闭）——Sprint 13 全部 UI story 的硬前置
-- 之后 `/story-readiness production/epics/hud/story-001-hud-canvas-mount-and-visibility.md` → `/dev-story`
+- **S13-2 hud 001**：`/story-readiness production/epics/hud/story-001-hud-canvas-mount-and-visibility.md` → `/dev-story`
+- 可并行应该项：S13-8 R-06 Ogg spike / S13-11 R-02 合批 009a / S13-12 R-03 D3D12 冒烟
 - 依赖上报清单（story 实现时跟进——见 EPIC.md deck-editing-ui 依赖上报节）
 
 ## 全量测试基线（不变）

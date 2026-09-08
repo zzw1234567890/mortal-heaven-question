@@ -15,7 +15,7 @@ Accepted
 | **知识风险** | HIGH（Godot 4.6 LLM 知识截止 2025-05——双焦点系统、SDL3 手柄驱动均在截止之后） |
 | **查阅的参考** | `docs/engine-reference/godot/VERSION.md`、`docs/engine-reference/godot/modules/input.md`、`docs/engine-reference/godot/breaking-changes.md`、`docs/engine-reference/godot/deprecated-apis.md`、`docs/engine-reference/godot/current-best-practices.md` |
 | **使用的截止后 API** | 4.6 双焦点系统（mouse ≠ keyboard focus——`grab_focus()` 仅影响键盘/手柄焦点，不影响鼠标焦点）；4.5 SDL3 手柄驱动（API 不变——但底层行为变化可能影响设备检测和映射）；4.5 递归 Control 禁用（`process_mode` + `mouse_filter` 可禁用整个节点层级的交互） |
-| **需要验证** | 4.6 双焦点在自定义 Control 组件上的实际行为——`_gui_input()` 和 `_unhandled_input()` 在鼠标和键盘分别获得焦点时的响应差异（参见 architecture.md OQ-02） |
+| **需要验证** | ~~4.6 双焦点在自定义 Control 组件上的实际行为~~ **已验证（2026-09-08，R-01 spike——`production/spikes/r01-dual-focus-spike.md`）**：①双视觉策略成立——`grab_focus()` 不影响鼠标 hover，焦点环与悬停边框可并存；②**路径注释修正**——焦点 Control 收到键盘 `_gui_input()` 但不自动消耗事件，`_unhandled_input()` 仍触发，须显式 `accept_event()` 才阻断传播；③设备掩码白名单判定与双焦点正交，工作正常（10/10 PASS） |
 
 ## ADR 依赖关系
 
@@ -321,7 +321,9 @@ func _play_card_animation(card: CardInstance) -> void:
 ```gdscript
 ## ⚠️ 输入分发路径选择（Godot 4.6 事件派发顺序）：
 ##   _input(event) → GUI 处理 (_gui_input) → _unhandled_input(event)
-## Control 节点获得键盘焦点后会消耗 InputEventKey——_unhandled_input() 不会触发
+## ⚠ 2026-09-08 R-01 spike 实测修正：焦点 Control 收到键盘 _gui_input() 但不自动消耗事件
+##   ——_unhandled_input() 仍会触发。须显式 accept_event() 才阻断传播（V6 证实）。
+##   依赖「焦点消耗键盘事件」防止重复响应的代码须在 _gui_input 中显式 accept_event()。
 ## 因此采用双路径策略：
 ##   GAMEPLAY 键盘输入 → Input Map 动作轮询 (_process 中 is_action_just_pressed)
 ##   UI_NAV 快捷键 → _input()（在 GUI 派发前拦截）
@@ -431,7 +433,7 @@ T+2: SceneManager._ready() → 可调用 InputManager.push_lock()
 ### 风险
 - **`await` 异常路径锁泄漏**：战斗动画 `await _animate()` 被取消或异常 → `pop_lock()` 从未执行。缓解：在调用方中使用 try-finally 模式（GDScript 无 try-catch——但有 `_on_animation_finished` 信号 + 超时保底）。InputManager 在 `clear_locks()` 调用时重置所有锁（SceneManager 在场景卸载时调用）
 - **source 名称冲突**：两个不同系统使用相同的 source 名称 → push 检测误报警告。缓解：使用明确的 StringName 标识（按系统命名规范）——`&"dialogue_system"`、`&"combat_system"`、`&"scene_manager"`
-- **4.6 双焦点未充分测试**：在目标硬件上，鼠标 hover 和键盘焦点切换的实际行为未知（architecture.md OQ-02）。缓解：在编码前于目标硬件上测试 `_gui_input` / `_unhandled_input` 对双焦点事件的响应
+- **~~4.6 双焦点未充分测试~~（已验证——2026-09-08 R-01 spike 10/10 PASS，OQ-02 关闭）**：双视觉策略成立、`grab_focus()` 不影响鼠标 hover、焦点 Control 不自动消耗键盘事件（路径注释已修正）——见 `production/spikes/r01-dual-focus-spike.md`
 
 ## 解决的 GDD 需求
 

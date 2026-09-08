@@ -11,7 +11,7 @@
 
 | # | 风险 | 概率 | 影响 | 等级 | 状态 | 所有者 |
 |---|------|------|------|------|------|--------|
-| R-01 | Godot 4.6 双焦点系统在自定义 Control 组件上的实际行为未验证 | 高 | 高 | 🔴 高 | 开放 | ui-programmer |
+| R-01 | Godot 4.6 双焦点系统在自定义 Control 组件上的实际行为未验证 | 高 | 高 | 🔴 高 | 已关闭（2026-09-08 spike） | ui-programmer |
 | R-02 | Draw Call 超 200 预算（战斗 16 角色卡 + 手牌 + 节点图迷雾） | 中 | 高 | 🔴 高 | 开放 | ui-programmer |
 | R-03 | D3D12 默认渲染器兼容性（Windows 驱动差异） | 中 | 中 | 🟡 中 | 开放 | godot-specialist |
 | R-04 | AccessKit 屏幕阅读器支持的实际可用性（4.5+，未经项目验证） | 中 | 中 | 🟡 中 | 开放 | accessibility-specialist |
@@ -26,17 +26,19 @@
 
 ## 风险详情
 
-### R-01 双焦点系统未验证行为 🔴 高
+### R-01 双焦点系统未验证行为 🔴 高（已关闭）
+
+> **2026-09-08 关闭**：Sprint 13 S13-1 spike（`production/spikes/r01-dual-focus-spike.md`）——10/10 PASS。
+> 双视觉策略确认无需修正；ADR-0004 路径注释修正（焦点 Control 不自动消耗键盘事件，
+> `_unhandled_input` 仍触发——须显式 `accept_event()`）。OQ-02 已关闭。
 
 - **来源**：architecture.md OQ-02（High）、ADR-0004 §知识风险、architecture.md §PRESENTATION 层 HIGH RISK 标记
 - **描述**：Godot 4.6 将鼠标/触摸焦点与键盘/手柄焦点分离——`grab_focus()` 只影响键盘/手柄焦点，鼠标 hover 焦点独立存在。自定义 Control 组件上 `_gui_input()` / `_unhandled_input()` 在双焦点下的响应差异未在目标硬件上测试。LLM 知识截止 2025-05，双焦点系统在截止之后——所有相关 API 建议需交叉查阅 `docs/engine-reference/godot/`。
 - **影响范围**：全部 5 个 Control 类 UI 系统——焦点环（松石青 2px）vs 鼠标悬停（墨色边框加粗）的双视觉策略、Tab 导航、手柄虚拟光标、输入锁栈的设备类型判定
-- **现有缓解**：
-  1. ADR-0004 已定义 `check_device_allowed(device_type)` 独立判定——锁栈判定区分设备类型
-  2. combat-ui.md / exploration-ui.md 已定义双视觉策略（焦点环 vs 悬停，两者同时激活时优先显示悬停态）
-- **待办措施**：Sprint 13 首个 UI story 前置一个双焦点行为验证 spike（目标硬件实测 `_gui_input()` / `_unhandled_input()` 响应差异、`grab_focus()` 对鼠标 hover 的影响）
-- **触发条件**：Sprint 13 第一个 Control 组件实现时
-- **关闭条件**：spike 报告确认行为，OQ-02 关闭，双视觉策略按实测结果修正（或确认无需修正）
+- **spike 结论**（2026-09-08）：
+  1. `grab_focus()` 不影响鼠标 hover——双视觉并存成立，UX 规范无需修正
+  2. 焦点 Control 收到键盘 `_gui_input` 但不自动消耗——`_unhandled_input` 仍触发；显式 `accept_event()` 才阻断（ADR-0004 注释修正）
+  3. InputManager 设备掩码白名单判定与双焦点正交，工作正常
 
 ### R-02 Draw Call 超 200 预算 🔴 高
 
@@ -148,3 +150,4 @@
 | 日期 | 变更 | 操作者 |
 |------|------|--------|
 | 2026-09-07 | 创建登记册，10 项风险（2 已缓解） | ux-design 会话 |
+| 2026-09-08 | R-01 已关闭——S13-1 spike 10/10 PASS（双视觉确认+ADR-0004 注释修正） | Sprint 13 S13-1 spike |

@@ -398,7 +398,7 @@ pop_lock(source: StringName)
 | ID | 摘要 | 优先级 | 解决路径 |
 |----|------|--------|---------|
 | OQ-01 | 卡牌效果引擎中每个效果类型的具体读写契约（以 10 张代表性卡牌为例） | Medium | 在编码前于 `contracts.md` 中定义 |
-| OQ-02 | Godot 4.6 双焦点系统在自定义 Control 组件上的实际行为——需要在目标硬件上测试 | High | ADR-0004 (输入管理器) 中标记，实现时验证 |
+| OQ-02 | ~~Godot 4.6 双焦点系统在自定义 Control 组件上的实际行为——需要在目标硬件上测试~~ **已关闭（2026-09-08）**：S13-1 spike 确认双视觉策略成立、`grab_focus()` 不影响鼠标 hover、焦点 Control 不自动消耗键盘事件（须显式 `accept_event()`）——见 `production/spikes/r01-dual-focus-spike.md` | High | 已关闭 |
 | OQ-03 | `progression.dat` 和 Steam Cloud Save 之间的同步策略 | Low | 发布前处理——单人游戏，不阻塞开发 |
 | OQ-04 | 卡牌模板异步加载策略（222 个 Resource 文件，需防止启动卡顿）| Medium | ADR-0006 中建议使用 `ResourceLoader.load_threaded_request()` |
 | OQ-05 | 卡牌效果引擎与事件系统的 `Outcome` 类型是否应统一为共享词汇表 | Low | ADR-0003 + ADR-0009 中协调 |
