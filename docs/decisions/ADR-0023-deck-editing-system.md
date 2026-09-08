@@ -159,7 +159,7 @@ func get_sell_price(card_id: int) → int:
   var template: CardTemplate = CardSystem.get_template(inst.get("template_id", ""))
   if not template: return 0
   var base: int = ResourceSystem.dismantle_value(template.rarity, inst.get("level", 1))
-  return floori(base * 0.8)  # 坊市抽成20%
+  return floori(base * 0.5)  # 坊市收购价 50%（2026-09-08 终裁）
 
 func execute_sell(card_id: int) → bool:
   var price: int = get_sell_price(card_id)
@@ -300,7 +300,7 @@ DeckEditingSystem.add_cards_to_deck()
 | deck-editing-system.md | §核心规则 #8 卡组变更日志——持久化到存档 | `_append_change_log()` 内部方法——写入 GSM `player.deck.change_log` 数组，随 GSM `serialize()` 持久化 |
 | deck-editing-system.md | §公式 #1 卡组上限验证 `can_add_to_deck()` | `can_add_to_deck(count)` API——境界查询 + 天赋修正 + 当前张数比较 |
 | deck-editing-system.md | §公式 #2 坊市散功费用 `removal_cost()` | 委托 ResourceSystem `delete_card_cost(session_remove_count)`——DeckEditingSystem 管理 `session_remove_count` 状态 |
-| deck-editing-system.md | §公式 #3 坊市卡牌售价 `sell_price()` | 委托 ResourceSystem `dismantle_value(rarity, level)` × 0.8 |
+| deck-editing-system.md | §公式 #3 坊市卡牌售价 `sell_price()` | 委托 ResourceSystem `dismantle_value(rarity, level)` × 0.5（2026-09-08 终裁——此前 ×0.8 与「100% 拆解」两版均废弃） |
 | deck-editing-system.md | §公式 #4 卡组最低张数保护 `can_remove_from_deck()` | `can_remove_from_deck(count)` API——强制最低 5 张保护 |
 
 ## 性能影响

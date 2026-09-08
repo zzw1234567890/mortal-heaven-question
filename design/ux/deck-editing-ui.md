@@ -76,7 +76,7 @@
 | HUD 卡组图标 | 探索中点击卡组图标 | 卡组数据快照 |
 | 坊市内部 | 三标签页内「查看卡组」入口 | 当前坊市操作上下文（买卡决策参考） |
 | 战利品面板（combat-ui） | 三选一选择前点击「查看卡组」 | 候选卡牌上下文（判断「这张进不进构筑」） |
-| 事件结算（超限触发） | 事件获得卡牌后卡组 > 境界上限 → 先「你获得了以下卡牌」弹窗 → 强制进入超限弃牌 | 新获得的卡牌列表、超限张数 |
+| 事件结算（超限触发） | 事件获得卡牌后卡组 > 境界上限 → 先「你获得了以下卡牌」弹窗 → 强制进入超限弃牌 | **唯一超限触发路径**（2026-09-08 B5 裁决——战利品单次最多 +1 张且卡组满时卡牌灰显，不可能超限） |
 | 战斗中（卡组图标） | 战斗 HUD 点击卡组图标 | 完整卡组 + 牌库/已抽出标注 |
 
 ### 退出点
@@ -387,31 +387,31 @@
 
 ## Events Fired
 
-**信号归属原则**（沿用 exploration-ui B6 裁决先例 + ADR-0007）：UI 信号为**意图/通知**；所有持久变更（灵石扣除、卡组增删、日志写入）由卡组编辑系统/资源系统在系统侧执行。UI 绝不直接操作灵石或卡组数据。
+**信号归属原则**（2026-09-08 修订——直调+通知信号模式，B2/B3a 裁决）：UI **直调** DeckEditingSystem/ExplorationSystem API（ADR-0023 渠道 2 契约）；下表信号为**通知性 Cat 2b 信号**——操作完成后由执行方发射，供 HUD 刷新与分析使用，**不是**意图信号。所有持久变更（灵石扣除、卡组增删、日志写入）由系统侧执行。UI 绝不直接操作灵石或卡组数据。
 
-| 玩家动作 | 触发的事件 | 载荷 / 数据 |
-|---|---|---|
-| 购买确认 | `shop_purchase_confirmed`（意图） | `{card_id, price}` — 系统验证扣费+加卡+记日志 |
-| 散功确认（二次确认后） | `deck_remove_confirmed`（意图） | `{card_id, cost}` — 系统扣费+移除+记日志 |
-| 出售确认（二次确认后） | `deck_sell_confirmed`（意图） | `{card_ids: [...], total_price}` — 系统移除+入账+记日志 |
-| 刷新商店 | `shop_refresh_requested`（意图） | `{cost}` — 系统扣费+重生成商品 |
-| 离开商店 | `shop_exited`（通知） | `{purchases_count}` |
-| 标签页切换 | `shop_tab_changed`（分析，可选） | `{tab: buy/remove/sell}` |
-| 卡组浏览打开/关闭 | `deck_view_opened` / `deck_view_closed`（分析，可选） | `{source: exploration/shop/loot/combat}` |
-| 筛选/排序变更 | `deck_filter_changed`（分析，可选） | `{filter, sort}` — 瞬态交互状态，UI 本地 |
-| 卡牌详情查看 | `card_detail_viewed`（分析，可选） | `{card_id}` |
-| 超限弃牌确认 | `overlimit_discard_confirmed`（意图） | `{card_ids: [...], compensation}` — 系统移除+补偿入账+记日志 |
-| 商品悬停预览 | 无事件 | 纯视图操作 |
+| 玩家动作 | UI 直调的系统 API | 通知信号（完成后发射） | 载荷 / 数据 |
+|---|---|---|---|
+| 购买确认 | `DeckEditingSystem.execute_purchase(card_id)`（依赖上报——库存归 ExplorationSystem，扣费+加卡+标记已售编排归 DeckEditingSystem） | `shop_purchase_confirmed` | `{card_id, price}` |
+| 散功确认（二次确认后） | `DeckEditingSystem.execute_delete(card_id)` | `deck_remove_confirmed` | `{card_id, cost}` |
+| 出售确认（二次确认后） | `DeckEditingSystem.execute_sell_batch(card_ids)`（依赖上报——原子批量，防半完成） | `deck_sell_confirmed` | `{card_ids: [...], total_price}` |
+| 刷新商店 | `ExplorationSystem.refresh_shop_inventory()`（依赖上报——库存重生成归探索系统） | `shop_refresh_completed` | `{cost, new_items}` |
+| 离开商店 | —（纯 UI） | `shop_exited`（分析，可选） | `{purchases_count}` |
+| 标签页切换 | —（瞬态） | `shop_tab_changed`（分析，可选） | `{tab: buy/remove/sell}` |
+| 卡组浏览打开/关闭 | —（纯 UI） | `deck_view_opened` / `deck_view_closed`（分析，可选） | `{source: exploration/shop/combat}` |
+| 筛选/排序变更 | —（瞬态交互状态，UI 本地） | `deck_filter_changed`（分析，可选） | `{filter_type, filter_rarity, sort}` |
+| 卡牌详情查看 | —（纯 UI） | `card_detail_viewed`（分析，可选） | `{card_id}` |
+| 超限弃牌确认 | `DeckEditingSystem.confirm_overflow_discard(card_ids)`（依赖上报——handle_overflow 编排的系统侧入口） | `overlimit_discard_confirmed` | `{card_ids: [...], compensation}` |
+| 商品悬停预览 | —（纯视图操作） | 无事件 | — |
 
-**标记持久游戏状态的动作**（架构团队特别关注——全部由系统侧执行）：
-- `shop_purchase_confirmed` / `deck_remove_confirmed` / `deck_sell_confirmed` — 灵石+卡组变更
-- `shop_refresh_requested` — 灵石扣除
-- `overlimit_discard_confirmed` — 卡组变更+补偿灵石
+**标记持久游戏状态的动作**（架构团队特别关注——全部由系统侧 API 执行，UI 仅发起调用）：
+- `execute_purchase` / `execute_delete` / `execute_sell_batch` — 灵石+卡组变更+库存标记
+- `refresh_shop_inventory` — 灵石扣除+库存重生成
+- `confirm_overflow_discard` — 卡组变更+补偿灵石
 - 每次卡组变更同时写入 DeckChangeLog（持久化——卡组浏览「历史」标签数据源，GDD §8）
 
 **无事件动作**：商品悬停、卡牌悬停预览、弹窗内导航。
 
-**来源**：GDD 与其他系统的交互表 + B6 裁决先例 + 用户批准。
+**来源**：GDD 与其他系统的交互表 + ADR-0023 渠道 2 直调契约 + 2026-09-08 B2/B3a 裁决。
 
 ---
 
@@ -449,17 +449,17 @@
 
 ## Data Requirements
 
-**零状态所有权**（ADR-0031）：全部数据从系统读取；写操作仅通过意图信号（见 Events Fired）。UI 零数值计算——散功费用、出售价、补偿金额全部由系统返回后显示。
+**零状态所有权**（ADR-0031）：全部数据从系统读取；写操作仅通过直调系统 API（见 Events Fired——2026-09-08 B3a 裁决直调+通知信号模式）。UI 零数值计算——散功费用、出售价、总价求和、补偿金额全部由系统返回后显示。
 
 | 数据 | 源系统 | 读 / 写 | 备注 |
 |---|---|---|---|
-| 商品列表（含价格/已售状态） | 卡组编辑系统（坊市库存——地图生成时确定，ADR-0014） | 读 | 刷新后重新拉取 |
+| 商品列表（含价格/已售状态） | ExplorationSystem（坊市库存 `_shop_inventories`——地图生成时确定，ADR-0014；2026-09-08 B2 裁决库存归探索系统） | 读 | 刷新后重新拉取 |
 | 当前卡组快照（全部卡牌+实例 ID） | 卡组编辑系统 | 读 | 卡组浏览/散功/售卡网格数据源 |
 | 灵石余额 | 资源系统（GSM player 域） | 读 | 顶部状态条+余额校验显示（判定归系统） |
 | 境界卡组上限（20~40） | 境界系统（realm_deck_limit+天赋修正） | 读 | 「28/30」分母+卡组满灰态判定 |
 | 暗金卡计数（1/2） | 卡组编辑系统 | 读 | 统计条 |
 | 散功当前费用+已删次数 | 卡组编辑系统（公式 2：50+25×次数） | 读 | UI 不计算递增——系统返回当前值 |
-| 每卡出售价（拆解价×0.8） | 卡组编辑系统 | 读 | 售卡网格标注+总价累计（系统返回逐卡价，UI 仅求和显示——**若求和也归系统**则为纯展示，实现时以卡组编辑系统 API 为准） |
+| 每卡出售价（拆解基准价×0.5） | 卡组编辑系统 | 读 | 售卡网格标注+总价累计（`get_sell_total(card_ids)` API——2026-09-08 OQ#2 裁决：求和归系统侧，UI 纯显示） |
 | 超限弃牌数+补偿金额 | 卡组编辑系统（公式 5） | 读 | 进度指示+确认按钮文案 |
 | 卡牌模板详情（名称/费用/效果/稀有度/标签/本命） | 卡牌系统 | 读 | 卡牌详情浮窗+商品卡正面 |
 | 获得来源（第X章·XX事件） | 卡牌系统（出处追踪）+ DeckChangeLog | 读 | 详情浮窗+历史标签 |
@@ -524,8 +524,8 @@
 - [ ] 购买确认后：灵石扣减数字滚动 + 卡牌飞向卡组图标（0.3s）+ 商品标记已售 + 卡组计数 +1
 - [ ] 散功费用显示当前值：「散功费用：50灵石（第1次）」→ 删 1 次后显示「75灵石（第2次）」——数值与系统返回一致（UI 未计算）
 - [ ] 散功/售卡时卡组仅剩 5 张：确认按钮禁用 + 「卡组至少保留5张」提示
-- [ ] 出售多选：已选 N 张总价实时累计（34灵石）；二次确认含「出售后不可恢复」
-- [ ] 卡组浏览筛选结果为 0 显示「没有符合条件的卡牌」空态；类型分组+排序正确
+- [ ] 出售多选：已选 N 张总价实时累计（`get_sell_total` 系统返回，UI 不求和）；二次确认含「出售后不可恢复」+总金额（拆解基准价×0.5——2026-09-08 B1 终裁）
+- [ ] 卡组浏览筛选（类型 7 标签 × 稀有度 6 档双维度——2026-09-08 B6 裁决）结果为 0 显示「没有符合条件的卡牌」空态；类型分组+排序正确
 - [ ] 「历史」标签展示变更日志（回合/来源渠道/卡名/操作），读档后完整恢复（持久化验证）
 - [ ] 超限弃牌：先「你获得了以下卡牌」弹窗（不可跳过）→ 弃牌界面；选满 N 张后确认按钮才激活；确认是唯一出口（无取消路径）；补偿金额（N×5灵石）实时显示
 - [ ] 纯键盘可完成完整坊市流程（浏览→购买→散功→出售→离开）与超限弃牌——焦点环全程可见
@@ -546,7 +546,7 @@
 
 1. **玩家旅程地图尚未创建**（`design/player-journey.md` 不存在）。设计假设基于 GDD 玩家幻想段落推断。运行 `/ux-design` 阶段 2b 或手动创建它以建立此屏幕的玩家上下文。
 
-2. **售卡总价求和归属**：逐卡出售价由卡组编辑系统返回，但「已选 N 张 = X 灵石」的求和若在 UI 侧做是否违反零数值计算原则？倾向：卡组编辑系统提供 `get_sell_total(card_ids)` API，UI 纯显示——待 /create-stories 时与架构确认。
+2. ~~**售卡总价求和归属**~~：已裁决（2026-09-08）——卡组编辑系统提供 `get_sell_total(card_ids)` API，UI 纯显示。列入 story 依赖上报项（系统侧未实现时 stub+接线缺口上报+真实接线后复验）。
 
 3. **战斗中卡组查看的牌库标注**：deck-editing-system §5 要求战斗中显示「已抽出/仍在牌库」状态——这属于战斗 HUD 范畴还是卡组浏览复用界面？倾向：复用卡组浏览界面+状态标注参数（combat-ui epic 的牌库/弃牌面板 story 008 有数据通路）——待 combat-ui 实现时确认。
 
@@ -556,4 +556,4 @@
 
 6. **角色替换弹窗归属**（deck-editing-system §6）：角色位满后获得新角色的替换弹窗（含叙事确认「确定要与[角色名]告别吗？」）——2026-09-08 裁决**归事件/叙事流程**（EventSystem 事件面板的后续弹窗），不属于卡组编辑 UI 范围。事件系统 UI 实现时认领。
 
-**已裁决（记录）**：GDD 待解决问题 #1（悬停预览——采纳）、#2（超限弃牌出售替代——不提供）、#3（跳过按钮——归 combat-ui 范围）。
+**已裁决（记录）**：GDD 待解决问题 #1（悬停预览——采纳）、#2（超限弃牌出售替代——不提供）、#3（跳过按钮——归 combat-ui 范围）；B1（出售价=拆解基准价×0.5）、B2/B3a（直调+分域 API+通知信号）、B5（超限仅事件入口）、B6（卡组浏览补稀有度筛选）、B7（系统 API stub+上报）、B8（exploration-ui 009 缩窄为入口，界面本体归本 epic story 005）——2026-09-08 create-stories QL-STORY-READY 裁决。
