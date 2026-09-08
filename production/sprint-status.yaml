@@ -9,184 +9,150 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 
-sprint: 5
-goal: "Feature 层探索经济线 4 Epic（17 story）——形成可运行的探索循环"
-start: "2026-08-29"
-end: "2026-09-05"
-generated: "2026-08-29"
-updated: "2026-08-29"
+sprint: 13
+goal: "关闭 R-01/R-06/R-02/R-03 技术风险 + HUD 系统 8 stories 全量交付——Sprint 14 combat-ui/main-menu/audio 铺路"
+start: "2026-09-08"
+end: "2026-09-19"
+generated: "2026-09-08"
+updated: "2026-09-08"
 
 stories:
-  # === exploration-system（探索系统，DAG 程序化生成）===
-  - id: "5-1"
-    name: "程序化 DAG 地图生成（generate_map）"
-    file: "production/epics/exploration-system/story-001-procedural-dag.md"
+  - id: "13-1"
+    name: "R-01 双焦点 spike（非 story）"
+    file: "production/spikes/r01-dual-focus-spike.md"
     priority: must-have
     status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: ""
+    completed: ""
+
+  - id: "13-2"
+    name: "hud 001 CanvasLayer 挂载与可见性"
+    file: "production/epics/hud/story-001-hud-canvas-mount-and-visibility.md"
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: "13-1"
+    completed: ""
+
+  - id: "13-3"
+    name: "hud 002 境界+修为条组件"
+    file: "production/epics/hud/story-002-realm-cultivation-bar.md"
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: "13-2"
+    completed: ""
+
+  - id: "13-4"
+    name: "hud 003 灵石+卡组计数组件"
+    file: "production/epics/hud/story-003-lingshi-deck-counter.md"
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "13-2"
+    completed: ""
+
+  - id: "13-5"
+    name: "hud 004 通知/提示系统"
+    file: "production/epics/hud/story-004-notification-system.md"
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: "13-2"
+    completed: ""
+
+  - id: "13-6"
+    name: "hud 005 暂停菜单（全局覆盖层）"
+    file: "production/epics/hud/story-005-pause-menu.md"
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: "13-2"
+    completed: ""
+
+  - id: "13-7"
+    name: "Sprint 13 QA 签收"
+    file: "production/epics/qa/story-001-sprint-13-qa.md"
+    priority: must-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "13-1,13-2,13-3,13-4,13-5,13-6"
+    completed: ""
+
+  - id: "13-8"
+    name: "R-06 Ogg 循环间隙 spike（非 story）"
+    file: "production/spikes/r06-ogg-loop-spike.md"
+    priority: should-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: ""
+    completed: ""
+
+  - id: "13-9"
+    name: "hud 006 探索 HUD 右下信息组"
+    file: "production/epics/hud/story-006-exploration-hud-info.md"
+    priority: should-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "13-3"
+    completed: ""
+
+  - id: "13-10"
+    name: "hud 007 场景切换过渡提示"
+    file: "production/epics/hud/story-007-scene-transition-hints.md"
+    priority: should-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "13-2"
+    completed: ""
+
+  - id: "13-11"
+    name: "R-02 合批方案定型（combat-ui-layout 009a）"
+    file: "production/epics/combat-ui-layout/story-009a-batching-scheme.md"
+    priority: should-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: ""
+    completed: ""
+
+  - id: "13-12"
+    name: "R-03 D3D12 冒烟 spike（非 story）"
+    file: "production/spikes/r03-d3d12-smoke-spike.md"
+    priority: should-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: ""
+    completed: ""
+
+  - id: "13-13"
+    name: "hud 008 F1 静音状态图标"
+    file: "production/epics/hud/story-008-mute-icon.md"
+    priority: nice-to-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "13-5"
+    completed: ""
+
+  - id: "13-14"
+    name: "audio 001 总线+AudioManager 骨架"
+    file: "production/epics/audio-manager/story-001-bus-layout-manager-skeleton.md"
+    priority: nice-to-have
+    status: backlog
     owner: ""
     estimate_days: 1.0
     blocker: ""
-    completed: ""
-
-  - id: "5-2"
-    name: "导航状态 GSM exploration.* 主存储"
-    file: "production/epics/exploration-system/story-002-navigation-gsm.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-1"
-    completed: ""
-
-  - id: "5-3"
-    name: "move_to_node / resolve_node 节点推进"
-    file: "production/epics/exploration-system/story-003-move-resolve-node.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-1"
-    completed: ""
-
-  - id: "5-4"
-    name: "DAG 缓存重建 + _dag_ready 就绪标志"
-    file: "production/epics/exploration-system/story-004-dag-cache-rebuild.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-2"
-    completed: ""
-
-  - id: "5-5"
-    name: "事件节点分配 + 经济计算"
-    file: "production/epics/exploration-system/story-005-event-allocation-economy.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-3"
-    completed: ""
-
-  # === cultivation-system（修为养成）===
-  - id: "5-6"
-    name: "gain_cultivation 统一获取入口 + 溢出判定"
-    file: "production/epics/cultivation-system/story-001-gain-cultivation.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: ""
-    completed: ""
-
-  - id: "5-7"
-    name: "GSM player.* 数据存储 + batch_updated 传播"
-    file: "production/epics/cultivation-system/story-002-gsm-storage.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-6"
-    completed: ""
-
-  - id: "5-8"
-    name: "settle_overflow + 突破后溢出结算"
-    file: "production/epics/cultivation-system/story-003-settle-overflow.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-6"
-    completed: ""
-
-  - id: "5-9"
-    name: "realm_upgraded 信号订阅 + check_breakthrough"
-    file: "production/epics/cultivation-system/story-004-realm-upgraded-check-breakthrough.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-6"
-    completed: ""
-
-  # === tribulation-system（渡劫突破）===
-  - id: "5-10"
-    name: "渡劫流程编排 + TribulationState 状态机"
-    file: "production/epics/tribulation-system/story-001-tribulation-state-machine.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 1.0
-    blocker: "5-9"
-    completed: ""
-
-  - id: "5-11"
-    name: "渡劫战斗委托 CombatSystem + 天雷 debuff"
-    file: "production/epics/tribulation-system/story-002-combat-delegate-thunder.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-10"
-    completed: ""
-
-  - id: "5-12"
-    name: "渡劫丹辅助 + 成功/失败分支处理"
-    file: "production/epics/tribulation-system/story-003-pill-branch.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-10"
-    completed: ""
-
-  - id: "5-13"
-    name: "渡劫结果 GSM 同步 + 场景恢复"
-    file: "production/epics/tribulation-system/story-004-gsm-sync-scene-restore.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-11"
-    completed: ""
-
-  # === deck-editing-system（卡组编辑）===
-  - id: "5-14"
-    name: "卡组验证器（卡组上限/添加/移除校验）"
-    file: "production/epics/deck-editing-system/story-001-deck-validator.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: ""
-    completed: ""
-
-  - id: "5-15"
-    name: "卡组编辑 API + GSM deck.* 存储"
-    file: "production/epics/deck-editing-system/story-002-edit-api-gsm.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-14"
-    completed: ""
-
-  - id: "5-16"
-    name: "卡组保存/加载 + 默认卡组"
-    file: "production/epics/deck-editing-system/story-003-save-load-default.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-15"
-    completed: ""
-
-  - id: "5-17"
-    name: "卡组验证 UI 数据源接口"
-    file: "production/epics/deck-editing-system/story-004-ui-data-source.md"
-    priority: must-have
-    status: ready-for-dev
-    owner: ""
-    estimate_days: 0.5
-    blocker: "5-16"
     completed: ""
