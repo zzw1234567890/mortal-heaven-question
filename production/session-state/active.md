@@ -3,8 +3,10 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13
-Task: sprint-plan 完成（14 项，PR-SPRINT 裁决后裁剪）——下一步 /qa-plan sprint
+Task: qa-plan 完成（qa-plan-sprint-13-2026-09-08.md）——下一步 S13-1 R-01 双焦点 spike
 <!-- /STATUS -->
+
+<!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
 
 ## 当前任务
 
@@ -29,9 +31,9 @@ Sprint 13 已规划（2026-09-08，`/sprint-plan new`）：
 
 ## 下一步
 
-- 提交 sprint-13 计划
-- **`/qa-plan sprint`（实现开始前必需）**——Sprint 13 无 QA 计划，Production→Polish 关口需要 QA 签收
-- `/story-readiness production/spikes/` 或直接开始 S13-1 R-01 双焦点 spike（第 1 天、timebox 0.5d、结论当日写 OQ-02）
+- 提交 QA 计划
+- **S13-1 R-01 双焦点 spike**（第 1 天、timebox 0.5d、结论当日写 OQ-02 关闭）——Sprint 13 全部 UI story 的硬前置
+- 之后 `/story-readiness production/epics/hud/story-001-hud-canvas-mount-and-visibility.md` → `/dev-story`
 - 依赖上报清单（story 实现时跟进——见 EPIC.md deck-editing-ui 依赖上报节）
 
 ## 全量测试基线（不变）
