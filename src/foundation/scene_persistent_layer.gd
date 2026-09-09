@@ -1,13 +1,15 @@
+class_name ScenePersistentLayer
 extends RefCounted
 ## ScenePersistentLayer —— SceneManager 持久层子模块（hud Story 001，GAP-2 裁决）。
 ##
 ## 管理 PersistentLayer 节点的创建与跨场景持久节点的注册
 ## （ADR-0031 §1.2 契约）。[br]
-## [br][b]挂载位置说明[/b]：ADR-0031 §1.2 表述为「root 直挂的 Node」。
-## 本实现将 PersistentLayer 挂为 SceneManager（Autoload）的子节点——
-## [code]change_scene_to_file()[/code] 仅释放 [code]current_scene[/code]
-## （root 的子节点），Autoload 及其子节点不被销毁，持久性等价；
-## 且避免 [method _ready] 阶段对 [code]get_tree().root[/code] 的时序依赖。
+## [br][b]挂载位置说明[/b]（2026-09-09 code-review 修订，与 ADR-0031 §1.2 同步）：
+## PersistentLayer 挂为 SceneManager（Autoload）的子节点。
+## [code]change_scene_to_file()[/code] 只释放 [code]current_scene[/code]
+## （root 下由场景切换管线赋值的子节点），Autoload 及其子树永不被赋值为
+## [code]current_scene[/code]，持久性等价。绘制顺序差异（树序位置改变）
+## 由 HUD CanvasLayer 显式 [code]layer = 90[/code] 编号补偿（见 hud.gd）。
 ##
 ## [br]来源: ADR-0031 §1.2（表现层架构基线——持久层挂载结构）。
 

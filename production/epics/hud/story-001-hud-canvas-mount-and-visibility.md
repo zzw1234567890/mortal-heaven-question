@@ -136,6 +136,18 @@
 > 注：文件名从 QA 规格中的 `hud_scene_visibility_test.gd` 调整为 `test_hud_scene_visibility.gd`——
 > GUT 以 `test_` 前缀发现测试脚本（.gutconfig.json prefix），原命名不被发现（实现期发现，非规格变更）。
 
+**Code review 修复（2026-09-09，CHANGES REQUIRED → 复审）**——测试从 20 个扩至 27 个，全部通过（全量 2481/2482，1 为预先存在的 realm flake）：
+- BLOCKING：补 `test_persistent_layer_survives_real_change_scene_to_file`（关闭 `_test_mode`，真实 `change_scene_to_file` + await，验证 ADR-0031 §1.2 等价性依赖的引擎行为）
+- HIGH：补 `test_hud_initial_visibility_matches_boot_scene`（setup 后 MAIN_MENU 不可见）、`test_hud_visibility_matrix_keys_match_registered_scene_ids`（矩阵键集守卫）、`test_hud_unknown_scene_id_keeps_previous_state_and_warns`（未注册 ID 警告）
+- GAP：PauseOverlay 豁免断言强化（先手动置 visible=true 再 emit COMBAT——可证伪形态）、`test_register_persistent_node_with_other_parent_pushes_error`、`test_register_persistent_same_name_different_node_warns_and_adds`、`test_hud_setup_called_twice_does_not_duplicate_connection`、`test_register_persistent_null_pushes_error` 改 push_error 计数断言
+- Mock 迁移：GSM/IM/SL mock 提取至 `tests/integration/scene_manager/mocks/`（preload 静态编译共享 fixture，消除与 test_loading_screen.gd 的双份拷贝漂移）
+
+**实现修复（对应项）**：
+- HUD.tscn CanvasLayer 显式 `layer = 90`（绘制顺序预算——PauseOverlay 置顶保证）
+- hud.gd `setup()` 末尾按 `get_current_scene_id()` 一次性同步初始可见性；`is_connected` 防重复连接；未注册 SceneID `push_warning`
+- hud.gd/scene_persistent_layer.gd 补 `class_name`（Hud/ScenePersistentLayer——类型链收紧，scene_manager.gd 持久层引用随之强类型）
+- ADR-0031 §1.2 修订（挂载位置 Autoload 子节点+layer 补偿）；scene_persistent_layer.gd 头注释错误论证（root 时序理由）修正
+
 ---
 
 ## Dependencies

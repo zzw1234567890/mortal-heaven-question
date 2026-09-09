@@ -56,7 +56,7 @@ Accepted（2026-09-07——经三轮对抗性审查后接受，4 BLOCKER + 7 HIG
 
 #### 1.2 SceneManager 持久层——音频节点池的挂载结构
 
-- SceneManager 在启动时创建一个持久节点（`root` 直挂的 `Node`，命名 `PersistentLayer`），场景切换（`change_scene_to_file()`）不销毁它
+- SceneManager 在启动时创建一个持久节点（命名 `PersistentLayer`）。**挂载位置（2026-09-09 code-review 修订）**：`PersistentLayer` 挂为 SceneManager（Autoload）的子节点，而非 root 直挂——`change_scene_to_file()` 只释放 `current_scene`（root 下由场景切换管线赋值的子节点），Autoload 及其子树永不被赋值为 `current_scene`，转场存活等价。**绘制顺序差异由显式 `layer` 编号补偿**：挂载点改变会改变 CanvasLayer 相对场景 UI 的树序位置（Autoload 先于 current_scene 入树），因此 HUD CanvasLayer 必须显式设 `layer`（HUD = 90；场景 UI 用默认 1；加载画面隐式 0）——PauseOverlay 的全屏置顶由此保证，不可依赖同值 tie-break
 - AudioManager（RefCounted 控制类，非节点）在启动时创建并负责将 AudioStreamPlayer 节点池实例化挂入 `PersistentLayer`，生命周期与进程等长
 - SceneManager 暴露挂载 API `register_persistent(node: Node)`——任何需要跨场景存活的节点都通过它注册（未来若有类似需求不再发明新结构）。HUD CanvasLayer 经此 API 挂载（2026-09-08 GAP-2 裁决——hud story-001 实现）
 - 池大小、双播放器交叉淡化等**内部细节**留给 audio epic；挂载结构本身在此定死，audio epic 不得改动此结构（如需改动须修订本 ADR）

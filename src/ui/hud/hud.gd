@@ -1,9 +1,14 @@
+class_name Hud
 extends CanvasLayer
 ## HUD —— 全局抬头显示骨架（hud Epic Story 001）。
 ##
 ## [b]节点形态[/b]：场景内 CanvasLayer（ADR-0031 §1——零新增 Autoload），
 ## 由调用方（游戏启动流程）通过 [code]SceneManager.register_persistent()[/code]
 ## 挂载到 PersistentLayer，场景切换不销毁。[br]
+## [br][b]layer = 90[/b]（绘制顺序预算——code-review HIGH-1 修复）：CanvasLayer 按
+## [code]layer[/code] 整数排序，显式编号使 PauseOverlay 在任何场景 UI 之上
+## （暂停菜单必须全屏置顶）。中间区间留给场景 UI（combat-ui/exploration-ui
+## 用默认 1，加载画面隐式 0——HUD 恒在其上）。[br]
 ## [br][b]结构[/b]（两个一级分支，骨架仅挂载点）：[br]
 ##   - [code]ContentLayer[/code]（Control）——内容分支，受可见性矩阵控制；
 ##     下分四个区域容器（RealmBarArea 左上 / LingshiDeckArea 右上 /
@@ -39,6 +44,10 @@ const SCENE_VISIBILITY: Dictionary = {
 	10: true,   # CULTIVATION     —— GDD 边界澄清（2026-09-05）
 }
 
+## LOADING 的 SceneID（99）——不入矩阵，保持前一状态（确定性规则）。
+## 单列常量避免在处理器中硬编码魔数。
+const _LOADING_SCENE_ID: int = 99
+
 ## === 内部状态 ==================================================================
 
 ## 注入的 SceneManager 引用（依赖注入——测试可用 mock 替代 Autoload）。
@@ -53,7 +62,13 @@ var _scene_manager: Node = null
 
 ## 注入 SceneManager 并订阅转场信号（调用方挂载后调用一次）。[br]
 ## 依赖注入而非直引 Autoload——测试可传入轻量 mock（先例：
-## [code]tests/integration/scene_manager/test_loading_screen.gd[/code]）。
+## [code]tests/integration/scene_manager/test_loading_screen.gd[/code]）。[br]
+## [br][b]初始可见性同步[/b]（code-review H-1/HIGH-2 修复）：挂载后首信号前，
+## 按 SceneManager 当前场景 ID 一次性同步内容分支——启动流程停留 MAIN_MENU
+## 时不经转场，若无此同步 HUD 将以 Control 默认值（visible = true）叠加在
+## 主菜单上。[code]get_current_scene_id()[/code] 为一次性方法调用而非轮询，
+## 不违反 AC-4。[br]
+## [b]重复调用防护[/b]：同一 SceneManager 重复 setup 时跳过重复连接。
 func setup(scene_manager: Node) -> void:
 	_scene_manager = scene_manager
 	if _scene_manager == null:
@@ -63,16 +78,24 @@ func setup(scene_manager: Node) -> void:
 		push_error("HUD.setup: scene_manager 缺少 post_transition 信号")
 		_scene_manager = null
 		return
-	_scene_manager.post_transition.connect(_on_post_transition)
+	if not _scene_manager.post_transition.is_connected(_on_post_transition):
+		_scene_manager.post_transition.connect(_on_post_transition)
+	# 初始可见性同步——按当前场景 ID 落定（未注册 ID 时保持隐藏）
+	if _scene_manager.has_method(&"get_current_scene_id"):
+		var current_id: int = _scene_manager.get_current_scene_id()
+		content_layer.visible = SCENE_VISIBILITY.get(current_id, false)
 
 ## === 信号处理器 ================================================================
 
 ## 转场完成 → 按可见性矩阵设置内容分支。[br]
 ## [b]PauseOverlay 豁免[/b]（GAP-1 裁决）：矩阵只写 [member content_layer.visible]，
 ## 暂停分支由暂停逻辑独立管理（Story 005）。[br]
-## [param to] 为 LOADING 时不入矩阵（保持前一状态——确定性规则）。
+## [param to] 为 LOADING 或未注册 ID 时不入矩阵——LOADING 保持前一状态
+## （确定性规则）；未注册 ID 同样保持但 [code]push_warning[/code]
+## （code-review H-2 修复——新增场景漏配矩阵时显式报警而非静默失效）。
 func _on_post_transition(_from: int, to: int) -> void:
 	if not SCENE_VISIBILITY.has(to):
-		# LOADING（99）及未来未注册 ID——保持前一状态
+		if to != _LOADING_SCENE_ID:
+			push_warning("HUD 可见性矩阵缺少 SceneID %d——保持前一状态" % to)
 		return
 	content_layer.visible = SCENE_VISIBILITY[to]

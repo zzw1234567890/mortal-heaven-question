@@ -138,7 +138,7 @@ var _phase3_in_progress: bool = false
 var _transition: RefCounted = null
 
 ## 持久层子模块（惰性初始化，hud Story 001 / GAP-2 裁决）。
-var _persistent_layer: RefCounted = null
+var _persistent_layer: ScenePersistentLayer = null
 
 ## === 依赖注入 ==================================================================
 
@@ -160,7 +160,7 @@ func _ready() -> void:
 	_transitioning = false
 	_transition_type = TransitionType.NONE
 	# _current_scene_id 默认 MAIN_MENU——首个启动场景
-	# PersistentLayer 创建（ADR-0031 §1.2——root 直挂 Node 的等价实现，
+	# PersistentLayer 创建（ADR-0031 §1.2——挂为 SceneManager 子节点，
 	# 见 scene_persistent_layer.gd 头注释的等价性说明）
 	_get_persistent_layer().ensure_layer()
 
@@ -202,9 +202,9 @@ func _get_transition() -> RefCounted:
 
 
 ## 惰性获取持久层子模块（hud Story 001 / GAP-2 裁决）。
-func _get_persistent_layer() -> RefCounted:
+func _get_persistent_layer() -> ScenePersistentLayer:
 	if _persistent_layer == null:
-		_persistent_layer = load("res://src/foundation/scene_persistent_layer.gd").new(self)
+		_persistent_layer = ScenePersistentLayer.new(self)
 	return _persistent_layer
 
 ## === 公共 API ==================================================================

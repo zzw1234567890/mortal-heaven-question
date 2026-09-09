@@ -8,6 +8,7 @@ extends GutTest
 ## Story 类型为 Integration——此测试文件为阻塞项。
 
 const SM := preload("res://src/foundation/scene_manager.gd")
+const MockFactory := preload("res://tests/integration/scene_manager/mocks/mock_factory.gd")
 
 var sm: Node = null
 var _mock_gsm: Node = null
@@ -19,9 +20,9 @@ func before_each() -> void:
 	sm = SM.new()
 	sm._ready()
 	sm._test_mode = true
-	_mock_gsm = _build_mock_gsm()
-	_mock_im = _build_mock_im()
-	_mock_sl = _build_mock_sl()
+	_mock_gsm = MockFactory.build_gsm()
+	_mock_im = MockFactory.build_im()
+	_mock_sl = MockFactory.build_sl()
 	sm.set_dependencies(_mock_gsm, _mock_im, _mock_sl)
 
 
@@ -40,64 +41,7 @@ func after_each() -> void:
 		_mock_sl = null
 
 
-# ── Mock 构造 ─────────────────────────────────────────────────────────────────
-
-func _build_mock_gsm() -> Node:
-	var n := Node.new()
-	var s := GDScript.new()
-	s.source_code = """extends Node
-var session: Dictionary = {"current_scene": "", "scene_id": 0}
-func set_session_scene(id: int, path: String) -> void:
-	session.scene_id = id
-	session.current_scene = path
-"""
-	var err := s.reload()
-	if err != OK:
-		push_error("Mock GSM 编译失败: %d" % err)
-	n.set_script(s)
-	return n
-
-
-func _build_mock_im() -> Node:
-	var n := Node.new()
-	var s := GDScript.new()
-	s.source_code = """extends Node
-var push_calls: int = 0
-var pop_calls: int = 0
-var _call_log: Array = []
-func push_lock(_type: int, _source: StringName) -> void:
-	push_calls += 1
-	_call_log.append({"op": "push", "type": _type, "source": _source})
-func pop_lock(_source: StringName) -> void:
-	pop_calls += 1
-	_call_log.append({"op": "pop", "source": _source})
-func reset_counts() -> void:
-	push_calls = 0
-	pop_calls = 0
-	_call_log.clear()
-"""
-	var err := s.reload()
-	if err != OK:
-		push_error("Mock IM 编译失败: %d" % err)
-	n.set_script(s)
-	return n
-
-
-func _build_mock_sl() -> Node:
-	var n := Node.new()
-	var s := GDScript.new()
-	s.source_code = """extends Node
-var auto_save_called: bool = false
-var auto_save_call_count: int = 0
-func auto_save() -> void:
-	auto_save_called = true
-	auto_save_call_count += 1
-"""
-	var err := s.reload()
-	if err != OK:
-		push_error("Mock SL 编译失败: %d" % err)
-	n.set_script(s)
-	return n
+# ── Mock 构造（GSM/IM/SL 已提取至 mocks/ 共享 fixture——hud 001 code-review 修复）──
 
 
 func _make_loading_screen_mock() -> Node:
