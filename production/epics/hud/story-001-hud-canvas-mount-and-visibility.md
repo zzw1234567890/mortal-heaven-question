@@ -1,12 +1,12 @@
 # Story 001: HUD CanvasLayer 挂载与场景可见性切换
 
 > **Epic**: HUD 系统
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: Integration
 > **Estimate**: 1.5d（原 1.0d + 0.5d——GAP-2 裁决扩 scope：含 SceneManager PersistentLayer/register_persistent 补齐）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-08（/dev-story 开始实现）
+> **Last Updated**: 2026-09-09（/story-done 关闭）
 
 ## Context
 
@@ -31,12 +31,12 @@
 
 *From GDD `design/gdd/hud-system.md`，scoped to this story（含 2026-09-08 QL-STORY-READY 裁决）:*
 
-- [ ] SceneManager 启动时创建 PersistentLayer（root 直挂 Node）并暴露 `register_persistent(node: Node)` API（ADR-0031 §1.2 契约——GAP-2 裁决纳入本 story）
-- [ ] HUD 以 CanvasLayer 场景经 `register_persistent()` 挂载，在探索/商店/事件场景中渲染（AC-hud-001 / AC-hud-004 可见性前提；地图选择为探索内部状态、随 EXPLORATION 显示）
-- [ ] 进入战斗/渡劫场景时 HUD 内容分支整体不渲染（含所有内容子元素；PauseOverlay 分支豁免——GAP-1 裁决：HUD 拥有暂停菜单，ADR-0031 §1.1 已修订）
-- [ ] 战斗中暂停菜单仍可由 HUD PauseOverlay 分支渲染（PROCESS_MODE_ALWAYS 独立分支——本 story 仅搭骨架：挂载点节点存在且 process_mode 正确，菜单本体归 Story 005）
-- [ ] 场景切换由 SceneManager 信号驱动（`pre_transition` / `post_transition`），非轮询
-- [ ] HUD 不持有任何游戏状态副本——显示时从 GSM/源系统直接读取
+- [x] SceneManager 启动时创建 PersistentLayer（**2026-09-09 修订：挂为 SceneManager 子节点**——ADR-0031 §1.2 code-review 修订后契约，非 root 直挂）并暴露 `register_persistent(node: Node)` API（ADR-0031 §1.2 契约——GAP-2 裁决纳入本 story）
+- [x] HUD 以 CanvasLayer 场景经 `register_persistent()` 挂载，在探索/商店/事件场景中渲染（AC-hud-001 / AC-hud-004 可见性前提；地图选择为探索内部状态、随 EXPLORATION 显示）
+- [x] 进入战斗/渡劫场景时 HUD 内容分支整体不渲染（含所有内容子元素；PauseOverlay 分支豁免——GAP-1 裁决：HUD 拥有暂停菜单，ADR-0031 §1.1 已修订）
+- [x] 战斗中暂停菜单仍可由 HUD PauseOverlay 分支渲染（PROCESS_MODE_ALWAYS 独立分支——本 story 仅搭骨架：挂载点节点存在且 process_mode 正确，菜单本体归 Story 005）
+- [x] 场景切换由 SceneManager 信号驱动（`pre_transition` / `post_transition`），非轮询
+- [x] HUD 不持有任何游戏状态副本——显示时从 GSM/源系统直接读取
 
 ### SceneID → HUD 可见性矩阵（GAP-3 裁决——按 GDD 收紧，2026-09-08）
 
@@ -63,7 +63,7 @@
 
 *Derived from ADR-0031 Implementation Guidelines（含 2026-09-08 裁决）:*
 
-- **PersistentLayer 补齐**（GAP-2 裁决）：SceneManager `_ready()` 创建 `PersistentLayer`（root 直挂 Node，`process_mode` 默认），实现 `register_persistent(node: Node) -> void`（add_child 到 PersistentLayer）。HUD 在首次游戏场景启动时经此 API 挂载。此 API 同时是 audio 001（S13-14）的前置——audio story 测试将依赖它。
+- **PersistentLayer 补齐**（GAP-2 裁决）：SceneManager `_ready()` 创建 `PersistentLayer`（**2026-09-09 修订：挂为 SceneManager 子节点**——ADR-0031 §1.2 修订后契约；`change_scene_to_file()` 只释放 `current_scene`，存活等价，绘制顺序由 HUD 显式 `layer = 90` 补偿），实现 `register_persistent(node: Node) -> void`（add_child 到 PersistentLayer）。HUD 在首次游戏场景启动时经此 API 挂载。此 API 同时是 audio 001（S13-14）的前置——audio story 测试将依赖它。
 - HUD 场景结构：`HUD.tscn` 根节点 CanvasLayer，两个一级分支：`ContentLayer`（Control——按区域分容器：左上/右上/右下/顶部通知，由后续 story 填充）与 `PauseOverlay`（Control，`process_mode = PROCESS_MODE_ALWAYS`——Story 005 填充）。可见性切换只作用于 `ContentLayer.visible`，PauseOverlay 不受战斗隐藏影响（GAP-1 裁决）。
 - 可见性切换：订阅 SceneManager `post_transition(from, to)`，按上方 SceneID→可见性矩阵设置 `ContentLayer.visible`。`pre_transition` 期间保持当前状态（LOADING 行为——确定性规则）。
 - 信号到达时从源系统读取，不在 UI 内缓存游戏状态（瞬态交互状态除外，须命名 `_cache`/`_last` 前缀并注释）。
@@ -154,3 +154,23 @@
 
 - Depends on: None（SceneManager/GSM Foundation 层已 Complete；PersistentLayer/register_persistent 由本 story 补齐——GAP-2 裁决）
 - Unlocks: Story 002、003、005、006（挂载点与可见性骨架）、audio 001（register_persistent API）
+
+---
+
+## Completion Notes
+
+**Completed**：2026-09-09
+**Verdict**：COMPLETE WITH NOTES（两关卡通过：QL-TEST-COVERAGE **ADEQUATE** / LP-CODE-REVIEW **APPROVED**）
+**Criteria**：6/6 通过（自动化验证——27 个集成测试全数通过，全量 2481/2482，1 pending 为预存 realm flake）
+**Deviations**（均建议性）：
+- ADR-0031 §1.2 挂载位置实现偏离（root 直挂 → SceneManager 子节点）——**已按 ADR 修订流程回写**（2026-09-09 code-review 修订，layer=90 补偿绘制顺序），story AC/Implementation Notes 措辞已同步
+- 测试文件名 `test_hud_scene_visibility.gd`（规格为 `hud_scene_visibility_test.gd`）——GUT `test_` 前缀发现约定
+- 可见性矩阵为 hud.gd 内 const Dictionary（非外部配置）——骨架阶段便于审阅+键集守卫测试钉死；若后续平衡调整频繁可迁外部数据
+**Test Evidence**：`tests/integration/hud/test_hud_scene_visibility.gd`（27 测试，BLOCKING 证据通过）
+**Code Review**：已完成（三专家并行首轮 CHANGES REQUIRED → 全项修复 → 独立复审 APPROVED → LP-CODE-REVIEW 关卡 APPROVED）
+**Tech Debt**（记入 docs/tech-debt-register.md）：
+- INFO-2：真实转场存活测试以 LOADING 为目标（两段式退化路径）——场景资产齐备后补非退化真实转场测试
+- INFO-3：hud.gd `has_method` 守卫静默跳过初始同步（无日志）——可选补 push_warning
+- N-1（QL 关卡）：转场中途保持仅单向覆盖——Story 007 补反向对照
+- N-2（QL 关卡）：初始可见性同步仅测 MAIN_MENU 启动分支——Story 002 接入真实启动流时补
+- 遗留（非本 story）：`scene_manager.gd:277/286` 直引全局 GameStateManager（Sprint 10 技债，使信号发射无法纯 mock 隔离）
