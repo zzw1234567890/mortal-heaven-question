@@ -96,6 +96,7 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"cultivation": 0,
 				"max_cultivation": _gsm.BASE_MAX,
 				"cultivation_full": false,
+				"is_fallen": false,
 				"overflow_pool": 0,
 				"resources": {"ling_shi": 0, "ling_cai": {"low": 0, "medium": 0, "high": 0, "top": 0}, "dan_yao_sui_pian": 0},
 				"identity_id": "",

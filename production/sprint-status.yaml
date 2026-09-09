@@ -41,8 +41,8 @@ stories:
     name: "hud 002 境界+修为条组件"
     file: "production/epics/hud/story-002-realm-cultivation-bar.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: in-progress
+    owner: "ui-programmer"
     estimate_days: 1.0
     blocker: "13-2"
     completed: ""

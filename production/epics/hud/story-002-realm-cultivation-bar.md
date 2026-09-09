@@ -6,7 +6,7 @@
 > **Type**: UI
 > **Estimate**: 1.0d（sprint-13 S13-3）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-09（QL-STORY-READY GAPS 裁决修订——8 项缺口落地）
+> **Last Updated**: 2026-09-09（/dev-story 开始实现）
 
 ## Context
 

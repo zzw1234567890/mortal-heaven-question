@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13
-Task: S13-2 hud 001 实现完成（20/20 测试通过）——下一步 /code-review + /story-done
+Task: S13-3 hud 002 实现完成（25/25 单测+全量回归通过）——下一步 /code-review + /story-done
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -11,28 +11,31 @@ Task: S13-2 hud 001 实现完成（20/20 测试通过）——下一步 /code-re
 
 ## 当前任务
 
-**S13-2 hud 001 story-readiness 完成**（2026-09-08，QL-STORY-READY 首轮 GAPS → 3 项用户裁决落地）：
+**S13-3 hud 002 实现完成**（2026-09-09 /dev-story）：
 
-- **GAP-1 暂停归属**：HUD 拥有——HUD CanvasLayer 内独立 PauseOverlay 分支（PROCESS_MODE_ALWAYS），战斗隐藏只作用于 ContentLayer。ADR-0031 §1.1 已修订（原「各场景挂载」→「HUD 拥有的全局层分支」）
-- **GAP-2 挂载机制**：本 story 扩 scope +0.5d——补齐 SceneManager PersistentLayer + register_persistent()（ADR-0031 §1.2 契约，audio 001 同步受益）
-- **GAP-3 可见性矩阵**：按 GDD 收紧——12 值 SceneID 全矩阵（显示：EXPLORATION/SHOP/EVENT_PANEL/DECK_EDITING/CULTIVATION；隐藏：COMBAT/TRIBULATION/RESULT_SCREEN/DEFEAT_SCREEN/MAIN_MENU/IDENTITY_SELECT；LOADING 保持前一状态）；地图选择=探索内部状态
-- story 文件已重写（AC 6 条+矩阵+QA 规格 6 条对齐裁决）；sprint-13.md/sprint-status.yaml 预估更新 1.0d→1.5d（总计 10.0d，必须+应该 8.5d 仍在容量内）
-- **ADVISORY 一并解决**：AC-3 PauseOverlay 骨架测试规格、AC-1 信号驱动挂载验证（test_loading_screen.gd 先例）、AC-4/6 grep 正则明确、风险 HIGH→MEDIUM
+- 主代理 ui-programmer（3 轮唤醒：首轮空转→补实现→修嵌入路径）；我方直接验证关键产出
+- Logic 内核：`src/ui/hud/cultivation_bar_state.gd`（CultivationBarState 纯函数静态类，THRESHOLDS 数据驱动，G1-G7 裁决语义全落地）
+- UI 组件：`src/ui/hud/realm_bar.gd` + `RealmBar.tscn`（Label+进度条+可突破提示+tooltip；0.3s 填充/1.0s 脉动/0.8s 落难占位闪烁；依赖注入 setup(gsm, realm_table)；幂等 _refresh；_last_* 瞬态交互状态注释齐备）
+- GSM：`gsm_serializer.gd` player 域 +`"is_fallen": false`（G1 裁决——写入端归 realm-system 后续 story）
+- HUD.tscn：RealmBarArea 下嵌 RealmBar 实例（ContentLayer/RealmBarArea）
+- 测试：`tests/unit/hud/test_cultivation_bar_state.gd` 25 测试全通过；hud 集成 27/27 无回归；全量 2506/2507（1 pending 预存）
+- 已暂存待提交（src/ tests/）
 
 ## Git 状态
 
-- 95e9973：S13-1 spike（已提交）
-- 工作树未提交：story-001 重写 + ADR-0031 §1.1/§1.2 修订 + sprint-13.md + sprint-status.yaml + active.md
+- 2d8a1b6：hud 002 就绪度修订（最新提交）
+- 暂存未提交：hud 002 实现（cultivation_bar_state/realm_bar/RealmBar.tscn/gsm_serializer/HUD.tscn/test 25 个）
+- 未暂存：story-002 文件（in-progress 标记）+ sprint-status.yaml + active.md
 
-## 会话摘录——/dev-story 2026-09-08
-- 故事：production/epics/hud/story-001-hud-canvas-mount-and-visibility.md——HUD CanvasLayer 挂载与可见性切换
-- 更改的文件：src/foundation/scene_manager.gd（+register_persistent API）、src/foundation/scene_persistent_layer.gd（新建 76 行）、src/ui/hud/hud.gd+HUD.tscn（新建）、tests/integration/hud/test_hud_scene_visibility.gd（新建 20 测试）
-- 编写的测试：tests/integration/hud/test_hud_scene_visibility.gd——20/20 通过
-- 阻塞项：无
-- 偏差：测试文件名 test_hud_scene_visibility.gd（非规格的 hud_scene_visibility_test.gd——GUT test_ 前缀约定）
-- 已知事项：test_ac010_realm_up_triggers_gsm_realm_changed 在全量套件中偶发失败——**预先存在**（已验证 master 基线无 hud 改动时同样失败，测试顺序相关 flake，非本 story 引入；hud 改动移除后仍失败）。需单独 story/修复跟进，不阻塞 hud 001。
-- 下一步：/code-review src/foundation/scene_manager.gd src/foundation/scene_persistent_layer.gd src/ui/hud/hud.gd 然后 /story-done
+## 会话摘录——/dev-story 2026-09-09（hud 002）
+- 故事：production/epics/hud/story-002-realm-cultivation-bar.md——境界+修为条组件（左上）
+- 更改的文件：src/ui/hud/cultivation_bar_state.gd（新建）、src/ui/hud/realm_bar.gd+RealmBar.tscn（新建）、src/ui/hud/HUD.tscn（嵌实例）、src/foundation/gsm/gsm_serializer.gd（+is_fallen）、tests/unit/hud/test_cultivation_bar_state.gd（新建 25 测试）
+- 编写的测试：25/25 通过
+- 阻塞项：无（ui-programmer 偶发 realm flake 已确认为预存技债 test_ac010——非本 story）
+- 偏差：落难破碎光效为 modulate 闪烁占位（真实特效归打磨 story，代码已注明）；「炼气·落难」「可飞升」「可突破！」为 const 常量+GDD 来源注释（项目无本地化系统）
+- 下一步：提交实现 → /code-review src/ui/hud/cultivation_bar_state.gd src/ui/hud/realm_bar.gd → /story-done
 
-## 全量测试基线（不变）
+## 全量测试基线（2026-09-09 更新）
 
-- Scripts: 143 / Tests: 2455 / Passing: 2454 / Pending: 1 / Failing: 0 / Asserts: 9195
+- Scripts: 145 / Tests: 2507 / Passing: 2506 / Pending: 1 / Failing: 0 / Asserts: 9124+
+- hud 单元：25/25；hud 集成：27/27；scene_manager：47/47

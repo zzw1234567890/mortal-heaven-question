@@ -1,0 +1,61 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/hud/realm_bar.gd" id="1_script"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_realm"]
+font_size = 22
+font_color = Color(0.10196078514957428, 0.10196078514957428, 0.10196078514957428, 1)
+
+[node name="RealmBar" type="Control"]
+custom_minimum_size = Vector2(240, 56)
+layout_mode = 3
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 240.0
+offset_bottom = 56.0
+mouse_filter = 1
+script = ExtResource("1_script")
+
+[node name="RealmNameLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 240.0
+offset_bottom = 28.0
+mouse_filter = 2
+text = "炼气期"
+label_settings = SubResource("LabelSettings_realm")
+
+[node name="BarBackground" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 32.0
+offset_right = 240.0
+offset_bottom = 44.0
+mouse_filter = 2
+color = Color(0.10196078514957428, 0.10196078514957428, 0.10196078514957428, 0.18039216103553772)
+
+[node name="BarFill" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 32.0
+offset_right = 0.0
+offset_bottom = 44.0
+mouse_filter = 2
+color = Color(0.290196090936661, 0.5803921818733221, 0.5803921818733221, 1)
+
+[node name="BreakthroughHint" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 44.0
+offset_right = 240.0
+offset_bottom = 60.0
+mouse_filter = 2
+text = "可突破！"
+label_settings = SubResource("LabelSettings_realm")
