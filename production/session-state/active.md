@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13
-Task: S13-2 hud 001 story-readiness 完成（3 GAP 裁决落地）——下一步 /dev-story
+Task: S13-2 hud 001 实现完成（20/20 测试通过）——下一步 /code-review + /story-done
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -24,10 +24,14 @@ Task: S13-2 hud 001 story-readiness 完成（3 GAP 裁决落地）——下一�
 - 95e9973：S13-1 spike（已提交）
 - 工作树未提交：story-001 重写 + ADR-0031 §1.1/§1.2 修订 + sprint-13.md + sprint-status.yaml + active.md
 
-## 下一步
-
-- **`/dev-story production/epics/hud/story-001-hud-canvas-mount-and-visibility.md`**（story 现为 READY）
-- 可并行应该项：S13-8 R-06 Ogg spike / S13-11 R-02 合批 009a / S13-12 R-03 D3D12 冒烟
+## 会话摘录——/dev-story 2026-09-08
+- 故事：production/epics/hud/story-001-hud-canvas-mount-and-visibility.md——HUD CanvasLayer 挂载与可见性切换
+- 更改的文件：src/foundation/scene_manager.gd（+register_persistent API）、src/foundation/scene_persistent_layer.gd（新建 76 行）、src/ui/hud/hud.gd+HUD.tscn（新建）、tests/integration/hud/test_hud_scene_visibility.gd（新建 20 测试）
+- 编写的测试：tests/integration/hud/test_hud_scene_visibility.gd——20/20 通过
+- 阻塞项：无
+- 偏差：测试文件名 test_hud_scene_visibility.gd（非规格的 hud_scene_visibility_test.gd——GUT test_ 前缀约定）
+- 已知事项：test_ac010_realm_up_triggers_gsm_realm_changed 在全量套件中偶发失败——**预先存在**（已验证 master 基线无 hud 改动时同样失败，测试顺序相关 flake，非本 story 引入；hud 改动移除后仍失败）。需单独 story/修复跟进，不阻塞 hud 001。
+- 下一步：/code-review src/foundation/scene_manager.gd src/foundation/scene_persistent_layer.gd src/ui/hud/hud.gd 然后 /story-done
 
 ## 全量测试基线（不变）
 

@@ -6,7 +6,7 @@
 > **Type**: Integration
 > **Estimate**: 1.5d（原 1.0d + 0.5d——GAP-2 裁决扩 scope：含 SceneManager PersistentLayer/register_persistent 补齐）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-08（QL-STORY-READY GAP-1/2/3 裁决落地）
+> **Last Updated**: 2026-09-08（/dev-story 开始实现）
 
 ## Context
 
@@ -129,9 +129,12 @@
 
 **Story Type**: Integration
 **Required evidence**:
-- Integration: `tests/integration/hud/hud_scene_visibility_test.gd` — must exist and pass
+- Integration: `tests/integration/hud/test_hud_scene_visibility.gd` — must exist and pass
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created 2026-09-08——20 个测试函数全部通过（GUT 全量套件中 20/20）
+
+> 注：文件名从 QA 规格中的 `hud_scene_visibility_test.gd` 调整为 `test_hud_scene_visibility.gd`——
+> GUT 以 `test_` 前缀发现测试脚本（.gutconfig.json prefix），原命名不被发现（实现期发现，非规格变更）。
 
 ---
 

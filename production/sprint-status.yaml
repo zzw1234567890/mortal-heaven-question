@@ -31,8 +31,8 @@ stories:
     name: "hud 001 CanvasLayer 挂载与可见性"
     file: "production/epics/hud/story-001-hud-canvas-mount-and-visibility.md"
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: in-progress
+    owner: "ui-programmer"
     estimate_days: 1.5
     blocker: "13-1"
     completed: ""

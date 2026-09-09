@@ -1,0 +1,45 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/hud/hud.gd" id="1_script"]
+
+[node name="HUD" type="CanvasLayer"]
+script = ExtResource("1_script")
+
+[node name="ContentLayer" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="RealmBarArea" type="Control" parent="ContentLayer"]
+layout_mode = 1
+anchors_preset = 0
+mouse_filter = 2
+
+[node name="LingshiDeckArea" type="Control" parent="ContentLayer"]
+layout_mode = 1
+anchors_preset = 1
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="ExplorationInfoArea" type="Control" parent="ContentLayer"]
+layout_mode = 1
+anchors_preset = 3
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="NotificationArea" type="Control" parent="ContentLayer"]
+layout_mode = 1
+anchors_preset = 5
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="PauseOverlay" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+process_mode = 3

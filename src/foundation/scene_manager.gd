@@ -137,6 +137,9 @@ var _phase3_in_progress: bool = false
 ## 转换管线子模块（惰性初始化，Sprint 10 Story 7 拆分）。
 var _transition: RefCounted = null
 
+## 持久层子模块（惰性初始化，hud Story 001 / GAP-2 裁决）。
+var _persistent_layer: RefCounted = null
+
 ## === 依赖注入 ==================================================================
 
 ## 注入的 GSM 引用。null 时使用 GameStateManager Autoload。
@@ -157,6 +160,9 @@ func _ready() -> void:
 	_transitioning = false
 	_transition_type = TransitionType.NONE
 	# _current_scene_id 默认 MAIN_MENU——首个启动场景
+	# PersistentLayer 创建（ADR-0031 §1.2——root 直挂 Node 的等价实现，
+	# 见 scene_persistent_layer.gd 头注释的等价性说明）
+	_get_persistent_layer().ensure_layer()
 
 ## === 依赖注入方法 ==============================================================
 
@@ -194,7 +200,21 @@ func _get_transition() -> RefCounted:
 		_transition = load("res://src/foundation/scene_transition.gd").new(self)
 	return _transition
 
+
+## 惰性获取持久层子模块（hud Story 001 / GAP-2 裁决）。
+func _get_persistent_layer() -> RefCounted:
+	if _persistent_layer == null:
+		_persistent_layer = load("res://src/foundation/scene_persistent_layer.gd").new(self)
+	return _persistent_layer
+
 ## === 公共 API ==================================================================
+
+## 注册跨场景持久节点——挂入 PersistentLayer（ADR-0031 §1.2 契约）。[br]
+## HUD CanvasLayer、audio 节点池等需要跨场景存活的节点均经此 API 挂载。[br]
+## [br][b]防呆规则[/b]：重复注册（节点已在 PersistentLayer 下）push_warning 并忽略；
+## null 节点或已有其他父节点的节点 push_error 并忽略。
+func register_persistent(node: Node) -> void:
+	_get_persistent_layer().register(node)
 
 ## 请求场景转换——SceneManager 唯一入口点。
 ## 返回 [code]false[/code] 的条件：[br]
