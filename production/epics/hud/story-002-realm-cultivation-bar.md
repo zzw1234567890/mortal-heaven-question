@@ -1,12 +1,12 @@
 # Story 002: 境界+修为条组件（左上）
 
 > **Epic**: HUD 系统
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI
 > **Estimate**: 1.0d（sprint-13 S13-3）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-09（/dev-story 开始实现）
+> **Last Updated**: 2026-09-10（/story-done 关闭）
 
 ## Context
 
@@ -31,14 +31,14 @@
 
 *From GDD `design/gdd/hud-system.md`，scoped to this story（含 2026-09-09 QL-STORY-READY 裁决修订）:*
 
-- [ ] 所有 HUD 可见场景显示当前境界名称 + 修为进度条（AC-hud-001）
-- [ ] 修为≥90% 时进度条金色脉动动画（AC-hud-002——脉动呼吸周期 1.0s，design/ux/hud.md L186）
-- [ ] 修为满（current == max_val）时显示「可突破！」文字提示（GDD L66——G3 裁决补入 scope；与 ≥90% 脉动为两个不同触发点：90% 起脉动、100% 满加文字）
-- [ ] 炼气·落难状态境界名称显示「炼气·落难」+ 破碎光效（AC-hud-003；破碎光效**替代**脉动——design/ux/hud.md L189，落难时 pulsing=false）
-- [ ] 进度条颜色：<50% 蓝色、50~90% 紫色、≥90% 金色
-- [ ] 鼠标悬停显示具体数值（如 1800/2250）
-- [ ] 化神期满修为显示「可飞升」替代进度条
-- [ ] 修为条平滑填充动画 0.3s（G5 裁决：以 GDD hud-system.md L254 为准——与 design/ux/hud.md L195 的 0.4s 冲突已裁决为 0.3s，UX 文档待同步修订）
+- [x] 所有 HUD 可见场景显示当前境界名称 + 修为进度条（AC-hud-001）
+- [x] 修为≥90% 时进度条金色脉动动画（AC-hud-002——脉动呼吸周期 1.0s，design/ux/hud.md L186）
+- [x] 修为满（current == max_val）时显示「可突破！」文字提示（GDD L66——G3 裁决补入 scope；与 ≥90% 脉动为两个不同触发点：90% 起脉动、100% 满加文字）
+- [x] 炼气·落难状态境界名称显示「炼气·落难」+ 破碎光效（AC-hud-003；破碎光效**替代**脉动——design/ux/hud.md L189，落难时 pulsing=false；破碎为 modulate 闪烁占位，真实特效归打磨 story）
+- [x] 进度条颜色：<50% 蓝色、50~90% 紫色、≥90% 金色
+- [x] 鼠标悬停显示具体数值（如 1800/2250）——tooltip_delay_sec=0.1（code-review E-H1 修复）
+- [x] 化神期满修为显示「可飞升」替代进度条
+- [x] 修为条平滑填充动画 0.3s（G5 裁决：以 GDD hud-system.md L254 为准——与 design/ux/hud.md L195 的 0.4s 冲突已裁决为 0.3s，UX 文档待同步修订）
 
 ---
 
@@ -136,7 +136,8 @@
 - Logic 内核: `tests/unit/hud/test_cultivation_bar_state.gd` — must exist and pass（BLOCKING）
 - Visual/Feel: `production/qa/evidence/cultivation-bar-evidence.md` + sign-off（动画/光效/tooltip 手动验证）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Logic 内核 27 测试全通过（BLOCKING 达成）
+**Status**: [ ] Visual/Feel 手动证据未建（ADVISORY——见 Completion Notes，技债 TD-006）
 
 ---
 
@@ -145,3 +146,20 @@
 - Depends on: Story 001（挂载点——Complete 2026-09-09）
 - Unlocks: None（独立组件）
 - **扩 scope 注记（G1 裁决）**：含 GSM player 域 `is_fallen` 字段新增（gsm_serializer 默认值+读取接线）——落难写入端归 realm-system 后续 story
+
+---
+
+## Completion Notes
+
+**Completed**：2026-09-10
+**Criteria**：8/8 通过（AC-5/6/7 视觉三例经代码路径实现+Logic 内核交叉锁定，正式手动截图验证延迟——TD-006）
+**实现提交**：667a5a9（实现）+ 7eac57c（code-review 修复）+ bfa1e08（模式库尺寸同步）
+**Deviations**：
+- ADVISORY：落难破碎光效为 modulate 闪烁占位（真实 shader/粒子特效归打磨 story，代码已注明）——用户接受
+- ADVISORY：固定词条（「炼气·落难」「可飞升」「可突破！」）为 const 常量+GDD 来源注释（项目无本地化系统，本地化入库后替换为键）——用户接受
+- ADVISORY：G-H3 batch 过滤补 `player.realm` 路径——story G6 裁决规格自身缺口，实现顺带补齐（注释注明依据 gsm_signal_router 多变更路由行为）
+**Code Review**：已完成——三专家首轮 CHANGES REQUIRED（5 HIGH：脉动 show_bar 耦合 G-H1 / 溢出满值 G-H2 / batch 过滤缺 realm G-H3 / tooltip 延迟 E-H1 / 尺寸契约 56↔60 E-H2）→ 全部修复（7eac57c）→ 双专家复审 APPROVED + LP-CODE-REVIEW 关卡 APPROVED
+**测试结果**：hud 单元 26/26（修复后 27 函数）；hud 集成 27/27；全量 2507/2508 零失败（1 pending 预存 realm flake 技债）
+**QA 关卡**：QL-TEST-COVERAGE 判 GAPS（两项 ADVISORY：手动验证路径未建 TD-006 / realm_bar 接线逻辑零自动化 TD-007）——Logic 内核 BLOCKING 证据 ADEQUATE，无 BLOCKING 缺口
+**尺寸契约修订**：UX 规格与组件统一为 240×60px（hud.md L110/L180 + interaction-patterns.md L322 + RealmBar.tscn——code-review E-H2 用户裁决）
+**技债登记**：TD-006~TD-010（docs/tech-debt-register.md）
