@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13
-Task: S13-3 hud 002 已关闭（COMPLETE WITH NOTES）——下一步 /story-readiness hud 003
+Task: S13-4 hud 003 实现完成（46/46 单测+35/35 集成+全量 2535/2536）——下一步 /code-review + /story-done
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -11,31 +11,24 @@ Task: S13-3 hud 002 已关闭（COMPLETE WITH NOTES）——下一步 /story-rea
 
 ## 当前任务
 
-**S13-3 hud 002 已关闭**（2026-09-10 /story-done——COMPLETE WITH NOTES）：
+**S13-4 hud 003 实现完成**（2026-09-10 /dev-story）：
 
-- 实现提交 667a5a9 + code-review 修复 7eac57c + 模式库尺寸同步 bfa1e08
-- Code review：三专家首轮 CHANGES REQUIRED（5 HIGH：G-H1 脉动 show_bar 耦合 / G-H2 溢出满值 / G-H3 batch 过滤缺 realm / E-H1 tooltip 延迟 / E-H2 尺寸契约）→ 全修 → 双复审 APPROVED + LP-CODE-REVIEW APPROVED
-- QA 关卡：QL-TEST-COVERAGE GAPS（2 ADVISORY：手动验证路径 TD-006 / 接线测试 TD-007）——Logic 内核 BLOCKING 证据 ADEQUATE
-- 技债登记 TD-006~TD-010（docs/tech-debt-register.md）
-- 尺寸契约统一 240×60（hud.md/interaction-patterns.md/RealmBar.tscn）
+- ui-programmer 3 轮唤醒（首轮中断→补齐→修 2 失败测试）；我方自跑验证
+- Logic 内核：`src/ui/hud/lingshi_formatter.gd`（format_lingshi 整数截断 k 格式+get_deck_count_state 三态+G3 cap<=0 防御）
+- UI 组件：`src/ui/hud/lingshi_deck_bar.gd` + `LingshiDeckBar.tscn`（G1 双订阅 resource_changed+batch_updated 过滤两路径；animate 注入开关——兼 TD-008 reduce-motion 预留接线点）
+- HUD.tscn：LingshiDeckArea 下嵌实例（L39）
+- 测试：单元 46/46（新增 20）+ 集成 35/35（新增 8）+ 全量 2535/2536（+28 净增，1 pending 预存）
+- 已暂存待提交（src/ tests/）
 
-## 下一步
-
-- /story-readiness production/epics/hud/story-003-lingshi-deck-counter.md（S13-4，0.5d）
-- 冲刺剩余：S13-4 hud 003 / S13-5 hud 004 通知 / S13-6 hud 005 暂停菜单 / S13-7 QA 签收 + should-have（R-06/R-02/R-03/hud 006/007）
-
-## Git 状态
-
-- bfa1e08：模式库尺寸同步（最新提交）
-- 未暂存：story-002 关闭（Complete+Completion Notes）+ sprint-status.yaml（13-3 done）+ tech-debt-register.md + active.md——待一并提交
-
-## 会话摘录——/story-done 2026-09-10（hud 002）
-- Verdict：COMPLETE WITH NOTES
-- Story：production/epics/hud/story-002-realm-cultivation-bar.md — 境界+修为条组件（左上）
-- Tech debt logged：5 项（TD-006 手动验证路径 / TD-007 接线测试 / TD-008 reduce-motion / TD-009 2px 线框 / TD-010 tween 幂等+冗余赋值）
-- Next recommended：hud 003 灵石+卡组计数（production/epics/hud/story-003-lingshi-deck-counter.md）
+## 会话摘录——/dev-story 2026-09-10（hud 003）
+- 故事：production/epics/hud/story-003-lingshi-deck-counter.md——灵石+卡组计数组件（右上）
+- 更改的文件：src/ui/hud/lingshi_formatter.gd（新建）、src/ui/hud/lingshi_deck_bar.gd+LingshiDeckBar.tscn（新建）、src/ui/hud/HUD.tscn（嵌实例）、tests/unit/hud/test_lingshi_formatter.gd（11 测试）+ test_deck_count_state.gd（9 测试）、tests/integration/hud/test_gsm_signal_binding.gd（8 测试）
+- 编写的测试：28/28 通过
+- 阻塞项：无
+- 偏差：截断语义显式化（1255→1.2k——与规格 9999→9.9k 一致）；animate 开关为新增测试注入点（规格未指定实现方式）
+- 下一步：提交实现 → /code-review src/ui/hud/lingshi_formatter.gd src/ui/hud/lingshi_deck_bar.gd → /story-done
 
 ## 全量测试基线（2026-09-10 更新）
 
-- Scripts: 145 / Tests: 2508 / Passing: 2507 / Pending: 1 / Failing: 0 / Asserts: 9365
-- hud 单元：26/26（27 函数）；hud 集成：27/27；scene_manager：47/47
+- Scripts: 148 / Tests: 2536 / Passing: 2535 / Pending: 1 / Failing: 0 / Asserts: 9421
+- hud 单元：46/46；hud 集成：35/35

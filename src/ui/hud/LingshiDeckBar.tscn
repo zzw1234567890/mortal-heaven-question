@@ -1,0 +1,70 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/hud/lingshi_deck_bar.gd" id="1_script"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_counter"]
+font_size = 20
+font_color = Color(0.10196078514957428, 0.10196078514957428, 0.10196078514957428, 1)
+
+[node name="LingshiDeckBar" type="Control"]
+custom_minimum_size = Vector2(200, 56)
+layout_mode = 3
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 200.0
+offset_bottom = 56.0
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="LingshiLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 200.0
+offset_bottom = 26.0
+mouse_filter = 2
+text = "🪙 0"
+horizontal_alignment = 2
+label_settings = SubResource("LabelSettings_counter")
+
+[node name="LingshiDeltaLabel" type="Label" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 200.0
+offset_bottom = 26.0
+mouse_filter = 2
+text = "+25"
+horizontal_alignment = 0
+label_settings = SubResource("LabelSettings_counter")
+
+[node name="DeckLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 30.0
+offset_right = 200.0
+offset_bottom = 56.0
+mouse_filter = 2
+text = "📜 0/20"
+horizontal_alignment = 2
+label_settings = SubResource("LabelSettings_counter")
+
+[node name="OverlimitLabel" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 30.0
+offset_right = 200.0
+offset_bottom = 56.0
+mouse_filter = 2
+text = "超限！"
+horizontal_alignment = 0
+font_color = Color(0.701960802078247, 0.2588235437870026, 0.290196090936661, 1)
+label_settings = SubResource("LabelSettings_counter")

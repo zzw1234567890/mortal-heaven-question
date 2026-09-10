@@ -6,7 +6,7 @@
 > **Type**: UI
 > **Estimate**: 0.5d（sprint-13 S13-4）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-10（/story-readiness QL-STORY-READY G1-G4 裁决落地）
+> **Last Updated**: 2026-09-10（/dev-story 开始实现）
 
 ## Context
 
