@@ -66,5 +66,4 @@ offset_bottom = 56.0
 mouse_filter = 2
 text = "超限！"
 horizontal_alignment = 0
-font_color = Color(0.701960802078247, 0.2588235437870026, 0.290196090936661, 1)
 label_settings = SubResource("LabelSettings_counter")

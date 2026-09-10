@@ -120,3 +120,17 @@ func test_hud_deck_count_cap_zero_with_cards_returns_normal() -> void:
 	assert_false(state[&"flashing"], "3/0 不应闪烁")
 	assert_false(state[&"overlimit"], "3/0 不应超限标记")
 	assert_eq(state[&"label"], "3/0", "3/0 label 应为 \"3/0\"")
+
+
+func test_hud_deck_count_negative_count_returns_normal() -> void:
+	## AC-2 edge（G4/SUGGESTION-2 补充 2026-09-10）: count<0 → 走 cap>0 主判定
+	## 路径返回 normal（-5 恒小于正 cap），label 负数直显 "-5/30"——与
+	## format_lingshi 负数直显同策略（lingshi_formatter.gd L77-78 文档声明：
+	## 防御性直显，不钳零不崩溃）。
+	# Arrange + Act
+	var state: Dictionary = F.get_deck_count_state(-5, 30)
+	# Assert
+	assert_eq(state[&"color"], "normal", "-5/30 应为 normal")
+	assert_false(state[&"flashing"], "-5/30 不应闪烁")
+	assert_false(state[&"overlimit"], "-5/30 不应超限标记")
+	assert_eq(state[&"label"], "-5/30", "-5/30 label 应为 \"-5/30\"（负数直显）")

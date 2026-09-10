@@ -50,6 +50,7 @@
 - 灵石跳动动画：Tween 0.3s 数字滚动 + (+xx/-xx) 浮动文本，属 Visual/Feel 手动验证。
 - 卡组 0/20（未获得卡牌）正常显示「0/20」，不触发异常（GDD 边界情况）。
 - **cap<=0 防御分支（G3 裁决）**：`get_deck_count_state` 对 cap<=0 返回 normal（系统 `get_deck_limit()` 最低返回 20，此分支不可达，单测仅防御性锁定行为——count==cap==0 不得落入 yellow）。
+- **卡组布局纵向堆叠（2026-09-10 用户裁决）**：GDD hud-system.md §3 与 design/ux/hud.md 元素 3「灵石右侧 16px」横向排列矛盾——裁决保留实现（灵石行在上、卡组行在下，间距 4px），回写 ux spec 收敛两文档（ux.md 已改纵向堆叠描述）。
 
 ---
 

@@ -19,6 +19,8 @@ const BAR_SCENE: PackedScene = preload("res://src/ui/hud/LingshiDeckBar.tscn")
 var gsm: Node = null
 var bar: Control = null
 var _saved_lingshi: int = 0
+var _saved_ling_cai_low: int = 0
+var _saved_deck: Array = []
 
 
 func before_each() -> void:
@@ -26,12 +28,19 @@ func before_each() -> void:
 	if gsm == null:
 		fail_test("GSM Autoload 未注册")
 		return
-	# 保存原值——after_each 复原（测试自行清理，G4 裁决）
+	# 保存原值——after_each 复原（测试自行清理，G4 裁决）。
+	# H-3 修复：卡组与灵材一并保存复原（duplicate 防引用共享——
+	# 直写 current_deck 替换数组后原引用丢失）。
 	_saved_lingshi = int(gsm.player.resources.ling_shi)
+	_saved_ling_cai_low = int(gsm.player.resources.ling_cai.low)
+	_saved_deck = gsm.deck.current_deck.duplicate()
 	# 独立基线值——避免与用例间残留耦合
 	gsm.player.resources.ling_shi = 100
-	gsm.set("_signal_chain_depth", 0)
-	gsm.get("_signal_router").set("_pending_changes", [])
+	# 注：不再手写 _signal_chain_depth——对 static var 的 set() 语义不可靠，
+	# 且 GSM 每帧 _reset_signal_chain_depth 自动复位（H-3 修复）。
+	# 复审修正：_pending_changes 声明在 GSM 本体（router 无此成员——
+	# 对 router 的 set() 是静默 no-op），改清 GSM 自身成员。
+	gsm.set("_pending_changes", {})
 	bar = BAR_SCENE.instantiate()
 	# AC-3 规格「自动化断言显示文本，不含动画」——关闭滚动 Tween，
 	# 信号处理后显示文本直接落位终值（组件 animate 注入点，测试/共享）。
@@ -50,10 +59,12 @@ func after_each() -> void:
 		bar.free()
 	bar = null
 	if gsm != null and is_instance_valid(gsm):
-		# 复原灵石原值（测试自行清理——G4 裁决；直写绕过缓冲不触发信号）
-		gsm.set("_signal_chain_depth", 0)
-		gsm.get("_signal_router").set("_pending_changes", [])
+		# 复原灵石/灵材/卡组原值（测试自行清理——G4 裁决；直写绕过缓冲不触发
+		# 信号）。
+		gsm.set("_pending_changes", {})
 		gsm.player.resources.ling_shi = _saved_lingshi
+		gsm.player.resources.ling_cai.low = _saved_ling_cai_low
+		gsm.deck.current_deck = _saved_deck
 	gsm = null
 
 
@@ -145,13 +156,23 @@ func test_ac003_hidden_then_restored_shows_latest_value() -> void:
 func test_ac003_resource_changed_other_type_ignored() -> void:
 	## AC-3 补充（G1 裁决过滤）: resource_changed 非灵石类型（灵材 low）——
 	## 不触发灵石行刷新（基线文本保持）
-	# Arrange —— 基线 100（before_each）
-	var text_before: String = _lingshi_text()
+	# Arrange —— 制造缓存差（复审修正：若不直写新值，GSM 灵石仍为 100，
+	## 过滤失效时 _refresh 读入 100 与缓存相等，幂等守卫吞掉一切——断言恒真。
+	## 直写 200 绕过缓冲不发信号，组件缓存保持 100；过滤失效时 _refresh
+	## 读到 200 → _last_lingshi 变 200 → 断言失败，区分性成立）
+	gsm.player.resources.ling_shi = 200
 	# Act —— 直写 + 手动发非灵石资源信号（模拟灵材变更）
 	gsm.player.resources.ling_cai.low = 5
 	gsm.resource_changed.emit(&"ling_cai.low", 5, 5)
-	# Assert —— 文本未变（无多余刷新路径误触发）
-	assert_eq(_lingshi_text(), text_before, "非灵石资源信号不应改变灵石显示")
+	# Assert —— 区分性断言（G2 修复：原文本对比断言在幂等守卫提前 return 下
+	# 恒真）：(a) 灵石内部值仍为缓存基线 100（过滤失效时会读入直写的 200）；
+	# (b) delta 浮动标签不可见（过滤失效且守卫失效的复合场景下，
+	# _show_delta 会漏显「+5」——此断言可捕获）。
+	assert_eq(bar._last_lingshi, 100,
+			"非灵石资源信号不应触发灵石行刷新（_last_lingshi 应保持基线 100）")
+	var delta_label: Label = bar.get_node(^"LingshiDeltaLabel")
+	assert_false(delta_label.visible,
+			"非灵石资源信号后 delta 浮动标签不应可见")
 
 
 func test_ac003_batch_updated_deck_path_refreshes_deck_row() -> void:
