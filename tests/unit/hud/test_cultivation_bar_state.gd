@@ -106,6 +106,19 @@ func test_hud_cultivation_overflow_current_clamps_to_gold() -> void:
 	# Assert
 	assert_eq(state[&"color"], "gold", "溢出按 100% 应为 gold")
 	assert_true(state[&"pulsing"], "溢出按 100% 应脉动")
+	assert_true(state[&"breakthrough_hint"], "溢出即满——非化神应提示可突破（HIGH-2）")
+
+
+func test_hud_cultivation_spirit_overflow_shows_ascendable() -> void:
+	## AC-4 补充（code-review HIGH-2）: 化神期溢出 → 同满值显示「可飞升」
+	## （溢出边界与满值类判定自洽——deserialize 整域替换可产生溢出存档值）
+	# Arrange + Act
+	var state: Dictionary = S.get_cultivation_bar_state(
+			SPIRIT_TRANSFORMATION, NAME_SPIRIT, false, 1200, 1000)
+	# Assert
+	assert_false(state[&"show_bar"], "化神溢出应隐藏进度条（溢出即满）")
+	assert_eq(state[&"label"], "可飞升", "化神溢出 label 应为「可飞升」")
+	assert_false(state[&"breakthrough_hint"], "化神溢出不应提示可突破（可飞升接管）")
 
 
 func test_hud_cultivation_invalid_realm_id_returns_safe_default_and_warns() -> void:

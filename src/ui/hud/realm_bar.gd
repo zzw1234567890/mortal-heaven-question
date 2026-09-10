@@ -61,9 +61,12 @@ var _realm_names: Dictionary = {}
 ## 上次应用的修为比例——跳过重复信号触发的 Tween 重启（_refresh 幂等性：
 ## cultivation_changed 与 batch_updated 对同一变更双发射时无操作）。
 var _last_ratio: float = -1.0
-## 上次脉动状态——仅状态翻转时启停 Tween，避免每信号重建循环动画。
+## 上次脉动激活状态（pulsing and show_bar 合成）——仅翻转时启停 Tween，
+## 避免每信号重建循环动画。取合成值而非纯 pulsing：化神期满隐藏（pulsing=true
+## 但 show_bar=false）→ 修为回落重显进度条时，纯 pulsing 不翻转会导致永无脉动
+## （code-review HIGH-1 修复）。
 var _last_pulsing: bool = false
-## 上次落难状态——仅状态翻转时启停占位闪烁。
+## 上次落难闪烁激活状态（is_fallen and show_bar 合成）——语义同上（HIGH-1 对称修复）。
 var _last_fallen: bool = false
 ## 平滑填充 Tween 句柄（新值到来时 kill 重建）。
 var _fill_tween: Tween = null
@@ -115,8 +118,10 @@ func _on_cultivation_changed(_delta: int, _current: int, _max_val: int) -> void:
 
 func _on_batch_updated(changes: Dictionary) -> void:
 	# 过滤 story 规定的两条路径 + is_fallen 前置接线（G1 写入端归后续 story，
-	# 届时落难写入将经 batch_updated 广播——此处直接命中）。
-	for path: String in ["player.cultivation", "player.max_cultivation", "player.is_fallen"]:
+	# 届时落难写入将经 batch_updated 广播——此处直接命中）+ player.realm
+	# （code-review HIGH-3 补充：GSM 路由对同帧多变更只发 batch_updated 不发
+	# realm_changed——realm 与其他路径同帧变更时唯一刷新入口是此过滤，须包含）。
+	for path: String in ["player.realm", "player.cultivation", "player.max_cultivation", "player.is_fallen"]:
 		if changes.has(path):
 			_refresh()
 			return
@@ -158,16 +163,18 @@ func _apply_state(state: Dictionary, current: int, max_val: int, is_fallen: bool
 	if max_val > 0:
 		ratio = clampf(float(current) / float(max_val), 0.0, 1.0)
 	_tween_fill(ratio, show_bar)
-
-	if state[&"pulsing"] != _last_pulsing:
-		_last_pulsing = state[&"pulsing"]
+	# 翻转检测用 pulsing/fallen 与 show_bar 的合成值（成员注释——HIGH-1 修复）。
+	var pulse_active: bool = state[&"pulsing"] and show_bar
+	if pulse_active != _last_pulsing:
+		_last_pulsing = pulse_active
 		_stop_pulse()
-		if state[&"pulsing"] and show_bar:
+		if pulse_active:
 			_start_pulse()
-	if is_fallen != _last_fallen:
-		_last_fallen = is_fallen
+	var fallen_active: bool = is_fallen and show_bar
+	if fallen_active != _last_fallen:
+		_last_fallen = fallen_active
 		_stop_fallen_flicker()
-		if is_fallen and show_bar:
+		if fallen_active:
 			_start_fallen_flicker()
 
 ## === 动画（Tween——输入驱动的纯视觉变换，零轮询豁免）===========================
@@ -179,11 +186,11 @@ func _tween_fill(ratio: float, show_bar: bool) -> void:
 		return  # 幂等：双发射重复触发时无操作
 	var is_first: bool = _last_ratio < 0.0
 	_last_ratio = ratio
+	if _fill_tween != null and _fill_tween.is_valid():
+		_fill_tween.kill()  # 先 kill 再判 show_bar——隐藏切换时残留 tween 一并清理
 	if not show_bar:
 		return  # 化神期满：进度条隐藏，无需动画
 	var target_w: float = bar_background.size.x * ratio
-	if _fill_tween != null and _fill_tween.is_valid():
-		_fill_tween.kill()
 	if is_first or not is_inside_tree():
 		bar_fill.size.x = target_w
 		return

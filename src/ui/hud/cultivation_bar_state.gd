@@ -56,16 +56,20 @@ const COLOR_GOLD: String = "gold"
 ##   - 非法 realm_id（<1 或 >5）→ 安全默认（blue/不脉动/正常 label）+ push_warning[br]
 ##   - max_val <= 0 → 防除零（按 0% 处理：blue/不脉动）[br]
 ##   - current < 0 → 按负数安全处理（钳为 0%：blue）[br]
-##   - current > max_val → 溢出按 100% 处理（gold）
+##   - current > max_val → 溢出按 100% 处理（gold；满值类判定——化神「可飞升」
+##     与非化神「可突破」——同样按溢出即满生效，保持边界自洽）
 static func get_cultivation_bar_state(realm_id: int, realm_name: String,
 		is_fallen: bool, current: int, max_val: int) -> Dictionary:
-	if realm_id < 1 or realm_id > 5:
+	if realm_id < 1 or realm_id > SPIRIT_TRANSFORMATION_LEVEL:
 		push_warning("CultivationBarState: 非法 realm_id %d（有效范围 1-5）——返回安全默认" % realm_id)
 		return _safe_default(realm_name)
 
 	var ratio: float = _clamp_ratio(current, max_val)
-	var is_spirit_full: bool = realm_id == SPIRIT_TRANSFORMATION_LEVEL \
-			and current == max_val and max_val > 0
+	# 满值判定用 >=（溢出即满）：与头部声明的「current > max_val 按 100% 处理」
+	# 边界自洽——化神期溢出同样显示「可飞升」，非化神溢出同样提示可突破
+	# （code-review HIGH-2 修复；存档 deserialize 整域替换可产生溢出值）。
+	var is_full: bool = max_val > 0 and current >= max_val
+	var is_spirit_full: bool = realm_id == SPIRIT_TRANSFORMATION_LEVEL and is_full
 
 	var color: String = _color_for_ratio(ratio)
 	# 脉动：≥90% 且非落难（落难时破碎光效替代脉动——G7 裁决）
@@ -78,8 +82,8 @@ static func get_cultivation_bar_state(realm_id: int, realm_name: String,
 		label = LABEL_ASCENDABLE
 	# show_bar：化神期满隐藏进度条（「可飞升」替代）
 	var show_bar: bool = not is_spirit_full
-	# 可突破提示：修为满且非化神期满且非落难（化神期满由 show_bar=false 接管——G3 裁决）
-	var breakthrough_hint: bool = current == max_val and max_val > 0 \
+	# 可突破提示：满值且非化神期满且非落难（化神期满由 show_bar=false 接管——G3 裁决）
+	var breakthrough_hint: bool = is_full \
 			and not is_spirit_full and not is_fallen
 
 	return {

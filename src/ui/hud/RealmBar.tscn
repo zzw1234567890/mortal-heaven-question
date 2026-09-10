@@ -7,13 +7,13 @@ font_size = 22
 font_color = Color(0.10196078514957428, 0.10196078514957428, 0.10196078514957428, 1)
 
 [node name="RealmBar" type="Control"]
-custom_minimum_size = Vector2(240, 56)
+custom_minimum_size = Vector2(240, 60)
 layout_mode = 3
 anchors_preset = 0
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 240.0
-offset_bottom = 56.0
+offset_bottom = 60.0
 mouse_filter = 1
 script = ExtResource("1_script")
 
