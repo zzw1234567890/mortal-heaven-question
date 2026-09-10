@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/ui/hud/hud.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/RealmBar.tscn" id="2_realm_bar"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/LingshiDeckBar.tscn" id="3_lingshi_deck_bar"]
+[ext_resource type="PackedScene" path="res://src/ui/hud/NotificationToastArea.tscn" id="4_notification_toast_area"]
 
 [node name="HUD" type="CanvasLayer"]
 layer = 90
@@ -50,6 +51,8 @@ layout_mode = 1
 anchors_preset = 5
 grow_horizontal = 2
 mouse_filter = 2
+
+[node name="NotificationToastArea" parent="ContentLayer/NotificationArea" instance=ExtResource("4_notification_toast_area")]
 
 [node name="PauseOverlay" type="Control" parent="."]
 layout_mode = 3
