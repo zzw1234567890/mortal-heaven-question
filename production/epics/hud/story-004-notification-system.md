@@ -1,12 +1,12 @@
 # Story 004: 通知/提示系统
 
 > **Epic**: HUD 系统
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: Logic
 > **Estimate**: [待 sprint 排期填写]
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-10（QL-STORY-READY G1-G8 裁决落地——时间注入/容量锁定/类型映射全值表/战斗事件拆分/请求接口归本 story）
+> **Last Updated**: 2026-09-11（story-done 关闭——两关卡 ADEQUATE）
 
 ## Context
 
@@ -31,11 +31,11 @@
 
 *From GDD `design/gdd/hud-system.md`，scoped to this story:*
 
-- [ ] 获得道具等通知从顶部滑入，按类型时长后消失（普通 2~3s、重要 5s）（AC-hud-008）
-- [ ] 同时多个通知最多 3 条堆叠显示，超出时丢弃最早的非重要通知（AC-hud-009）
-- [ ] 重要通知（系统提示/错误提示）优先级高，不被普通通知挤掉
-- [ ] 通知可点击关闭；不阻塞玩家操作（非弹窗）
-- [ ] 通知类型→时长/颜色映射：「重要」判定 = 类型属于系统提示或错误提示（边界澄清 2026-09-07）
+- [x] 获得道具等通知从顶部滑入，按类型时长后消失（普通 2~3s、重要 5s）（AC-hud-008）
+- [x] 同时多个通知最多 3 条堆叠显示，超出时丢弃最早的非重要通知（AC-hud-009）
+- [x] 重要通知（系统提示/错误提示）优先级高，不被普通通知挤掉
+- [x] 通知可点击关闭；不阻塞玩家操作（非弹窗）
+- [x] 通知类型→时长/颜色映射：「重要」判定 = 类型属于系统提示或错误提示（边界澄清 2026-09-07）
 
 ---
 
@@ -122,11 +122,11 @@
 
 **Story Type**: Logic（含通知请求接口最小集成）
 **Required evidence**:
-- Logic: `tests/unit/hud/notification_stack_test.gd` — must exist and pass（BLOCKING）
-- Integration: 请求接口测试（AC-7——路径实现时定，`tests/integration/hud/` 下）
+- Logic: `tests/unit/hud/test_notification_stack.gd` — must exist and pass（BLOCKING）
+- Integration: 请求接口测试（AC-7）: `tests/integration/hud/test_notification_request_interface.gd`
 - 视觉部分（滑入滑出/堆叠动画）: `production/qa/evidence/notification-stack-evidence.md` + sign-off（ADVISORY，随证据文档记录）
 
-**Status**: [ ] Not yet created
+**Status**: [x] 已创建并全部通过（单元 30 测试 + 集成 8 测试；视觉证据 2026-09-11 签收）
 
 ---
 
@@ -134,3 +134,17 @@
 
 - Depends on: Story 001（HUD 挂载——通知区域为 HUD 子容器）
 - Unlocks: None
+
+---
+
+## Completion Notes
+**Completed**：2026-09-11
+**Criteria**：5/5 通过（AC-5 视觉项已手动验证——`production/qa/evidence/notification-stack-evidence.md` 签收）
+**Deviations**（均为已裁决记录）：
+- combat_event 类型与 HUD 战斗隐藏矩阵矛盾（code-review H-2）——展示宿主推迟至 combat-ui epic 裁决，GDD 待解决问题 #4 登记
+- error 类型通知因 blink 同帧启动无滑入位移动画（N-2，已声明取舍）
+- 0.1s 对账视觉窗口（挤出 Toast 最多延迟 0.1s 滑出——Timer 驱动对账换取内核接口纯净）
+- TYPE_META 外层 String / 内层 StringName 键风格混用（N-4，运行正确）
+- 测试文件路径由故事原稿 `notification_stack_test.gd` 修正为实际 `test_notification_stack.gd`（GUT 约定）
+**Test Evidence**：Logic：`tests/unit/hud/test_notification_stack.gd`（30 测试）+ 集成：`tests/integration/hud/test_notification_request_interface.gd`（8 测试）；视觉：`production/qa/evidence/notification-stack-evidence.md`
+**Code Review**：已完成（三专家初判 CHANGES REQUIRED → 修复提交 e8fec98 → 双专家复审 APPROVED/APPROVED WITH SUGGESTIONS；QL-TEST-COVERAGE ADEQUATE + LP-CODE-REVIEW ADEQUATE）

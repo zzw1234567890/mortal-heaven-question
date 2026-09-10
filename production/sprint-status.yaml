@@ -14,7 +14,7 @@ goal: "关闭 R-01/R-06/R-02/R-03 技术风险 + HUD 系统 8 stories 全量交�
 start: "2026-09-08"
 end: "2026-09-19"
 generated: "2026-09-08"
-updated: "2026-09-10"  # S13-4 done
+updated: "2026-09-11"  # S13-5 done
 
 stories:
   - id: "13-1"
@@ -61,11 +61,11 @@ stories:
     name: "hud 004 通知/提示系统"
     file: "production/epics/hud/story-004-notification-system.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "ui-programmer"
     estimate_days: 1.0
     blocker: "13-2"
-    completed: ""
+    completed: "2026-09-11"
 
   - id: "13-6"
     name: "hud 005 暂停菜单（全局覆盖层）"
