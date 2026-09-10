@@ -1,12 +1,12 @@
 # Story 003: 灵石+卡组计数组件（右上）
 
 > **Epic**: HUD 系统
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI
 > **Estimate**: 0.5d（sprint-13 S13-4）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-10（/dev-story 开始实现）
+> **Last Updated**: 2026-09-10（/story-done 关闭——COMPLETE WITH NOTES）
 
 ## Context
 
@@ -31,10 +31,10 @@
 
 *From GDD `design/gdd/hud-system.md`，scoped to this story:*
 
-- [ ] 所有场景显示灵石数量；数字超过 999 显示「1.2k」格式（AC-hud-004）
-- [ ] 探索/商店场景显示卡组数量（战斗中 HUD 不渲染，见 Story 001）（AC-hud-005）
-- [ ] 卡组达到上限数字变黄；超过上限变红+闪烁+「超限！」标记（AC-hud-006）
-- [ ] 灵石变更时数字短暂跳动动画（+xx/-xx）（AC-hud-007）
+- [x] 所有场景显示灵石数量；数字超过 999 显示「1.2k」格式（AC-hud-004）——test_lingshi_formatter.gd 11 测试（含 G2 裁决 10000+ 延续 k 格式与截断语义锁定）
+- [x] 探索/商店场景显示卡组数量（战斗中 HUD 不渲染，见 Story 001）（AC-hud-005）——test_deck_count_state.gd 10 测试 + deck 路径 batch 集成；可见性归 Story 001 矩阵（已裁决边界）
+- [x] 卡组达到上限数字变黄；超过上限变红+闪烁+「超限！」标记（AC-hud-006）——三态判定单测全覆盖；B-1 修复后颜色接线可用（视觉确认归 AC-5 手动验证，TD-013）
+- [x] 灵石变更时数字短暂跳动动画（+xx/-xx）（AC-hud-007）——B-2/B-3 修复后 delta 编排可用（视觉确认归 AC-4 手动验证，TD-013）
 
 ---
 
@@ -113,7 +113,7 @@
 
 **Integration 测试前提（G4 裁决 2026-09-10）**：共享 `tests/integration/scene_manager/mocks/mock_gsm.gd` 仅 session 域、无 resource_changed 信号——AC-3 集成测试可复用 `tests/unit/cultivation_system/` 直连真实 GSM 实例的测试模式（写 `player.resources.ling_shi` + 断言信号/显示文本），免建 hud 专用 mock。
 
-**Status**: [ ] Not yet created
+**Status**: [x] 已创建并通过——单元 test_lingshi_formatter.gd（11）+ test_deck_count_state.gd（10）、集成 test_gsm_signal_binding.gd（8）；2026-09-10 实测 47/47 单元 + 35/35 集成全绿
 
 ---
 
@@ -121,3 +121,19 @@
 
 - Depends on: Story 001（挂载点）
 - Unlocks: None（超限弃牌界面归 deck-editing-ui epic，非本 epic）
+
+---
+
+## Completion Notes
+**Completed**：2026-09-10
+**Criteria**：4/4 通过（AC-1/2/3 自动化覆盖——单元 21 + 集成 8；AC-4/5 视觉项经 code-review 修复后代码路径可用，最终视觉确认归手动验证 TD-013）
+**Deviations**（均经用户裁决 2026-09-10）：
+- 截断语义显式化：1255→"1.2k"（与规格 9999→"9.9k" 一致的向下截断）
+- 10000+ 延续 k 格式（关闭 GDD L237 待澄清项）
+- 卡组布局纵向堆叠（GDD §3 vs ux spec「灵石右侧 16px」矛盾——保留实现、回写 ux spec）
+- delta 浮动改向下浮（顶行上浮 18px 顶出 HUD 顶边距 12px）+ 负号前缀区分方向
+- `animate` 开关为新增测试注入点（规格未指定实现方式，兼 TD-008 reduce-motion 接线）
+**Test Evidence**：tests/unit/hud/test_lingshi_formatter.gd（11）+ test_deck_count_state.gd（10）+ tests/integration/hud/test_gsm_signal_binding.gd（8）——47/47 单元 + 35/35 集成（2026-09-10 实测）
+**Code Review**：已完成——三专家 CHANGES REQUIRED（3 BLOCKING+3 HIGH+恒真断言）→ 全部修复（提交 62669da）→ GDScript 复审 APPROVED WITH SUGGESTIONS（三项建议已修：G2 区分性断言、_pending_changes 改 gsm.set、S-1 起滚帧顺序）→ LP-CODE-REVIEW APPROVED / QL-TEST-COVERAGE BLOCKING 证据 ADEQUATE（3 ADVISORY）
+**Tech debt logged**：TD-012（_apply_deck 视觉接线零集成断言——B-1/H-1 修复无回归测试）、TD-013（AC-4/5 手动验证证据文档）；另 TD-008 追加（三类动画 reduce-motion）、TD-011（emoji 占位）
+**Code Review 遗留 LOW**：lingshi_deck_bar.gd SIGN_PLUS 死常量——下次触碰该文件时顺带删除
