@@ -2,8 +2,10 @@ class_name NotificationToastArea
 extends Control
 ## NotificationToastArea —— 中央顶部通知区域组件（hud Story 004）。
 ##
-## [b]结构[/b]：VBoxContainer 动态堆叠容器——push 时实例化 Toast 子场景
-## （滑入 0.2s），到期/关闭时播滑出动画后释放。[br]
+## [b]结构[/b]：VBoxContainer 动态堆叠容器——push 时生成 Toast（双层：外层
+## holder 占容器布局槽位 + 内层 SlidePanel 为动画目标，滑入 0.2s），
+## 到期/关闭/被挤出时播滑出动画后释放（挤出经 UI 对账同步——见
+## [method _reconcile_toast_nodes]）。[br]
 ## [br][b]Logic 内核[/b]：全部时长/容量/重要判定走 [NotificationStack]
 ## （时间注入模式 G1 裁决——本组件 Timer 每 tick 调用同一 [code]advance(delta)[/code]
 ## 入口，被移除条目播滑出动画）。[br]
@@ -19,7 +21,7 @@ extends Control
 ## 内核 [code]advance[/code] 的注入源（到期判定属 Logic 而非游戏状态读取）；
 ## Tween 动画属输入驱动的纯视觉变换豁免（ADR-0031 §3）。[br]
 ## [br][b]mouse_filter[/b]（story Engine Notes）：通知可点击关闭——本区域根
-## IGNORE 透传（无通知时不拦截下层点击），Toast 子场景 STOP 使 gui_input 可达。
+## IGNORE 透传（无通知时不拦截下层点击），内层 SlidePanel STOP 使 gui_input 可达。
 ##
 ## [br]来源: ADR-0031、design/gdd/hud-system.md §4、design/ux/hud.md「元素 12」、
 ## design/ux/interaction-patterns.md「通知堆叠」、hud Story 004（2026-09-10
@@ -69,9 +71,12 @@ var _stack: NotificationStack = null
 ## 入库后由此开关接入跳过/弱化；先例 lingshi_deck_bar.animate）。
 var animate: bool = true
 
-## id → Toast 面板节点映射（渲染同步用——advance 移除/点击关闭时定位节点）。
+## id → Toast holder 节点映射（渲染同步用——advance 移除/点击关闭/对账挤出时
+## 定位节点）。
 var _toast_nodes: Dictionary = {}
-## 滑出中待释放节点列表（Tween 完成回调延迟释放，_exit_tree 时一并清理）。
+## id → 活跃 Tween（滑入/blink/滑出——一个 id 同时至多一个：后来者经
+## [method _stop_blink] kill 并 erase 前任；各类 Tween 均在 [code]finished[/code]
+## 回调 erase，键空间随 Toast 生命周期回收不泄漏——S-1 语义梳理）。
 var _toast_tweens: Dictionary = {}
 ## 时间推进 Timer（本组件生命周期内创建/销毁）。
 var _tick_timer: Timer = null
@@ -84,7 +89,7 @@ var _tick_timer: Timer = null
 
 func _ready() -> void:
 	# 纯展示区域根节点 IGNORE 透传（G8 裁决透传先例）——无通知时不拦截下层点击；
-	# Toast 子场景自身 STOP 使点击关闭可达。
+	# 内层 SlidePanel STOP 使点击关闭可达。
 	mouse_filter = MOUSE_FILTER_IGNORE
 	if _stack == null:
 		_stack = NotificationStack.new()
@@ -131,37 +136,77 @@ func _on_tick() -> void:
 	var removed: Array = _stack.advance(TICK_INTERVAL)
 	for entry: Dictionary in removed:
 		_play_slide_out(int(entry[&"id"]))
+	# B-1 修复：UI 侧对账——内核 push 容量挤出对 advance 返回值不可见（挤出条目
+	# 不经到期移除路径），UI 有节点但内核无条目的差集即被挤出 Toast，逐个滑出
+	# 释放（HUD persistent 跨场景常驻——不对账则泄漏累积，AC-hud-009）。
+	_reconcile_toast_nodes()
+
+## 对账：比对 [member _toast_nodes] 键集与内核 [code]get_active()[/code] 的 id 集，
+## 对差集（UI 有节点但内核无条目）逐个播滑出（挤出同步——[method _play_slide_out]
+## 内部 erase [member _toast_nodes]，故遍历前复制键集避免遍历中修改）。
+func _reconcile_toast_nodes() -> void:
+	var active_ids: Array = []
+	for entry: Dictionary in _stack.get_active():
+		active_ids.append(int(entry[&"id"]))
+	var stale_ids: Array = []
+	for id: int in _toast_nodes.keys():
+		if not active_ids.has(id):
+			stale_ids.append(id)
+	for id: int in stale_ids:
+		_play_slide_out(id)
 
 ## === Toast 渲染 ===============================================================
 
-## 为新通知生成 Toast 面板节点（纯代码构建——先例：HUD.tscn 区域容器模式，
-## Toast 为短生命周期动态节点，不建独立 tscn 子场景减少文件数）。
+## 为新通知生成 Toast 节点（纯代码构建——先例：HUD.tscn 区域容器模式，
+## Toast 为短生命周期动态节点，不建独立 tscn 子场景减少文件数）。[br]
+## [b]双层结构[/b]（B-2 修复）：外层 holder（Control，命名 "Toast%d"）进
+## StackContainer 接受容器布局（VBox 只管理直接子节点——holder 的槽位/拉伸；
+## holder 为普通 Control 而非容器，确保内层 position 不被容器布局覆写），
+## 高度由 [member custom_minimum_size] 保持堆叠高度；内层 SlidePanel（Panel，
+## FULL_RECT 锚跟随 holder 尺寸）为动画目标——滑入/滑出对其做
+## [code]position.y + modulate.a[/code]，彻底消除对容器布局槽位读数的依赖
+## （add_child 同帧读布局结果是 OVERLAP 缺陷根因）。点击关闭绑在内层
+## STOP 节点上（gui_input 可达）。
 func _spawn_toast(id: int) -> void:
 	var entry: Dictionary = _find_entry(id)
 	if entry.is_empty():
 		return
-	var toast: PanelContainer = PanelContainer.new()
-	toast.name = "Toast%d" % id
-	toast.mouse_filter = MOUSE_FILTER_STOP
-	toast.custom_minimum_size = Vector2(360, 32)
+	var holder: Control = Control.new()
+	holder.name = "Toast%d" % id
+	holder.mouse_filter = MOUSE_FILTER_IGNORE
+	holder.custom_minimum_size = Vector2(360, 32)
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var panel: Panel = _build_toast_panel(entry)
+	holder.add_child(panel)
+	_stack_container.add_child(holder)
+	_toast_nodes[id] = holder
+	_play_slide_in(id, panel)
+	if bool(entry[&"blink"]):
+		_start_blink(id, panel)
+
+## 构建内层 Toast 面板（文本 + 颜色映射 + 点击关闭绑定——B-2 双层结构拆出，
+## 保持 _spawn_toast 紧凑）。Panel 与 Label 均 FULL_RECT 锚——跟随 holder
+## 尺寸（holder 为普通 Control，无容器布局覆写内层 position）。
+func _build_toast_panel(entry: Dictionary) -> Panel:
+	var panel: Panel = Panel.new()
+	panel.name = "SlidePanel"
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.mouse_filter = MOUSE_FILTER_STOP
 	var label: Label = Label.new()
 	label.text = str(entry[&"text"])
 	label.mouse_filter = MOUSE_FILTER_IGNORE
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	if label.label_settings == null:
 		label.label_settings = LabelSettings.new()
 		label.label_settings.font_size = 13
 	# 颜色 String→Color 映射在 UI 层（G3 裁决——内核不返回 Color）。
 	label.label_settings.font_color = TEXT_COLORS.get(
 			str(entry[&"color"]), TEXT_COLORS["white"])
-	toast.add_child(label)
-	toast.gui_input.connect(_on_toast_gui_input.bind(id))
-	_stack_container.add_child(toast)
-	_toast_nodes[id] = toast
-	_play_slide_in(toast)
-	if bool(entry[&"blink"]):
-		_start_blink(id, toast)
+	panel.add_child(label)
+	panel.gui_input.connect(_on_toast_gui_input.bind(int(entry[&"id"])))
+	return panel
 
 ## 从内核队列查找条目（get_active 只读快照遍历）。
 func _find_entry(id: int) -> Dictionary:
@@ -170,8 +215,9 @@ func _find_entry(id: int) -> Dictionary:
 			return entry
 	return {}
 
-## 点击关闭（AC-4）——mouse_filter STOP + gui_input（story Engine Notes：
-## Control 内建输入处理，无焦点导航需求）。
+## 点击关闭（AC-4）——内层 SlidePanel mouse_filter STOP + gui_input（story Engine
+## Notes：Control 内建输入处理，无焦点导航需求）。dismiss 返回 false（条目已被
+## 内核挤出/移除）时点击不播动画——挤出节点由对账路径在下一 tick 统一滑出。
 func _on_toast_gui_input(event: InputEvent, id: int) -> void:
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
@@ -180,57 +226,73 @@ func _on_toast_gui_input(event: InputEvent, id: int) -> void:
 
 ## === 动画（Tween——输入驱动的纯视觉变换，零轮询豁免）===========================
 
-## 滑入：从上方 -32px 落位 + 淡入，0.2s（GDD 视觉表「通知弹出 0.2s」——AC-5
-## 手动验证项，代码路径实现）。
-func _play_slide_in(toast: PanelContainer) -> void:
+## 滑入：内层 SlidePanel 从上方 -32px 落位 + 淡入，0.2s（GDD 视觉表「通知弹出
+## 0.2s」——AC-5）。动画目标为内层 Panel（holder 为普通 Control——position 不受
+## 容器布局管理，B-2 修复：不再读 add_child 同帧布局槽位，消除滑入目标过期导致的
+## 堆叠重叠）。[code]from(-32)[/code] 显式起点。Tween 入 [member _toast_tweens][id]
+## ——滑出/blink 接管键位时经 [method _stop_blink] kill（避免同写 position:y 冲突）。
+func _play_slide_in(id: int, panel: Panel) -> void:
 	if not animate or not is_inside_tree():
 		return
-	var target_y: float = toast.position.y
-	toast.position.y = target_y - 32.0
-	toast.modulate.a = 0.0
+	panel.modulate.a = 0.0
 	var tween: Tween = create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(toast, "position:y", target_y,
+	tween.tween_property(panel, "position:y", 0.0,
+			SLIDE_DURATION).from(-32.0) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(panel, "modulate:a", 1.0,
 			SLIDE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(toast, "modulate:a", 1.0,
-			SLIDE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(func() -> void: _toast_tweens.erase(id))
+	_toast_tweens[id] = tween
 
-## 滑出：向上滑出 + 淡出 0.2s，完成后释放节点（GDD 视觉表「通知消失 0.2s」+
-## story Guardrail）。VBoxContainer 堆叠重排由引擎布局自动完成（后续 Toast
-## 上移填补空位——AC-5 堆叠重排无重叠）。
+## 滑出：内层 SlidePanel 向上滑出 + 淡出 0.2s，完成后释放 holder 节点（GDD 视觉表
+## 「通知消失 0.2s」+ story Guardrail）。VBoxContainer 堆叠重排由引擎布局自动完成
+## （后续 Toast 上移填补空位——AC-5 堆叠重排无重叠）。[br]
+## [b]Tween 生命周期[/b]（S-1 修复）：滑出 Tween 存入 [member _toast_tweens][id]，
+## [code]finished[/code] 回调 erase——字典不随通知量增长持有已失效 Tween 引用；
+## 一个 id 同时至多一个活跃 Tween（滑入/blink 由 [method _stop_blink] kill 腾位）。
 func _play_slide_out(id: int) -> void:
-	var toast: PanelContainer = _toast_nodes.get(id, null)
-	if toast == null or not is_instance_valid(toast):
+	var holder: Control = _toast_nodes.get(id, null)
+	if holder == null or not is_instance_valid(holder):
 		return
 	_toast_nodes.erase(id)
 	_stop_blink(id)
 	if not animate or not is_inside_tree():
-		toast.queue_free()
+		holder.queue_free()
+		return
+	var panel: Panel = holder.get_node_or_null("SlidePanel") as Panel
+	if panel == null:
+		holder.queue_free()
 		return
 	var tween: Tween = create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(toast, "position:y",
-			toast.position.y - 32.0,
+	tween.tween_property(panel, "position:y", -32.0,
 			SLIDE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(toast, "modulate:a", 0.0,
+	tween.tween_property(panel, "modulate:a", 0.0,
 			SLIDE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(toast.queue_free)
+	tween.chain().tween_callback(holder.queue_free)
+	# S-1：完成时 erase——滑出是该 id 最后一个 Tween，键空间被回收不泄漏。
+	tween.finished.connect(func() -> void: _toast_tweens.erase(id))
 	_toast_tweens[id] = tween
 
 ## error 类型 blink 闪烁：0.8s 周期循环（透明度闪烁——GDD §4「红色闪烁」）。
 ## [b]reduce-motion 技债注记[/b]（TD-008 同源）：animate=false 时不建循环
 ## Tween，静态呈现。
-func _start_blink(id: int, toast: PanelContainer) -> void:
+func _start_blink(id: int, panel: Panel) -> void:
 	if not animate or not is_inside_tree():
 		return
+	# 滑入 Tween 仍在播时 kill——blink 与滑入同写 modulate.a 会冲突；blink 自身
+	# 循环（0→0.35→1.0）覆盖淡入语义，视觉无损。
+	_stop_blink(id)
 	var tween: Tween = create_tween().set_loops()
-	tween.tween_property(toast, "modulate:a", 0.35,
+	tween.tween_property(panel, "modulate:a", 0.35,
 			BLINK_PERIOD * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(toast, "modulate:a", 1.0,
+	tween.tween_property(panel, "modulate:a", 1.0,
 			BLINK_PERIOD * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_toast_tweens[id] = tween
 
-## 停止指定 Toast 的循环动画（blink——滑出前调用避免 Tween 泄漏到已隐藏节点）。
+## 停止指定 Toast 的当前 Tween（滑入/blink——滑出前调用避免 Tween 泄漏到已隐藏
+## 节点，同时腾出 [member _toast_tweens] 键位给滑出 Tween——一个 id 同时至多一个）。
 func _stop_blink(id: int) -> void:
 	var tween: Tween = _toast_tweens.get(id, null)
 	if tween != null and tween.is_valid():

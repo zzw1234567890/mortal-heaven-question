@@ -57,6 +57,8 @@ var _scene_manager: Node = null
 
 @onready var content_layer: Control = $ContentLayer
 @onready var pause_overlay: Control = $PauseOverlay
+## 通知区域组件（H-1 修复——request_notification 转发目标，G7 裁决）。
+@onready var _notification_toast_area: NotificationToastArea = $ContentLayer/NotificationArea/NotificationToastArea
 
 ## === 生命周期 ==================================================================
 
@@ -86,6 +88,17 @@ func setup(scene_manager: Node) -> void:
 		content_layer.visible = SCENE_VISIBILITY.get(current_id, false)
 
 ## === 信号处理器 ================================================================
+
+## 通知显示请求（H-1 修复——G7 裁决 HUD 侧转发接线）：转发到通知区域组件
+## [code]NotificationToastArea.request_notification[/code]。[br]
+## 各系统经 HUD 公共接口请求显示通知——HUD 不主动轮询（ADR-0007 Cat 2b 动作
+## 通知；组件侧另发 [signal NotificationToastArea.notification_requested] 信号
+## 供未来系统连接）。[br]
+## [br][param type]: 通知类型（GDD §4 类型表键；未知类型内核安全默认）。[br]
+## [param text]: 通知文本。[br]
+## [b]返回[/b]：通知 id（0 表示被容量规则拒绝——UI 层不渲染）。
+func request_notification(type: String, text: String) -> int:
+	return _notification_toast_area.request_notification(type, text)
 
 ## 转场完成 → 按可见性矩阵设置内容分支。[br]
 ## [b]PauseOverlay 豁免[/b]（GAP-1 裁决）：矩阵只写 [member content_layer.visible]，

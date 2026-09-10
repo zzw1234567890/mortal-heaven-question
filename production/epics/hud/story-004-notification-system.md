@@ -18,7 +18,7 @@
 **ADR Decision Summary**: 通知堆叠/优先级/时长管理是确定性逻辑（Logic 主体），滑入滑出动画为视觉部分（ADVISORY）。通知队列数据结构可存于 HUD 组件本地（瞬态交互状态），不写回 GSM。
 
 **Engine**: Godot 4.6 | **Risk**: HIGH（双焦点变更在 LLM 知识截止后）
-**Engine Notes**: 通知点击关闭用 Control 内建 mouse_filter + gui_input，无焦点导航需求。计时器用 SceneTreeTimer 或 Timer 节点。
+**Engine Notes**: 通知点击关闭用 Control 内建 mouse_filter + gui_input，无焦点导航需求。计时器用 SceneTreeTimer 或 Timer 节点。[b]战斗通知边界（code-review H-2 裁决 2026-09-10）[/b]：combat_event_offensive/defensive 类型已在映射表实现（供 combat-ui epic 使用），但 HUD 战斗可见性矩阵在 COMBAT 下隐藏 ContentLayer——战斗期间通知在不可见层静默到期消失。展示宿主归属（战斗专用通知区 vs 调整隐藏矩阵）推迟至 combat-ui epic 裁决，GDD 待解决问题 #4 已登记。
 
 **Control Manifest Rules (this layer)**:
 - Required: 通知类型/时长/优先级判定提取为纯函数或独立可测类

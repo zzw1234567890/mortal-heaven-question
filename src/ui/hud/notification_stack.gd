@@ -124,7 +124,11 @@ func advance(delta_seconds: float) -> Array:
 
 ## 活动通知只读快照。[br]
 ## [br][b]返回[/b]：条目字典的 duplicate 数组（入队序）——调用方修改快照不影响
-## 内部队列。每条字段见 [member _entries] 头注释。
+## 内部队列。每条字段见 [member _entries] 头注释。[br]
+## [b]浅拷贝即完整隔离[/b]（S-4 注记 2026-09-10）：条目值全为标量
+## （int/String/float/bool）——[method Dictionary.duplicate] 的浅拷贝已切断全部
+## 引用共享；若未来条目字段引入引用类型（数组/嵌套字典/对象），需改
+## [code]duplicate(true)[/code] 深拷贝。
 func get_active() -> Array:
 	var snapshot: Array = []
 	for entry: Dictionary in _entries:

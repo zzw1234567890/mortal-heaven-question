@@ -238,6 +238,47 @@ func test_ac002_first_push_returns_id_one() -> void:
 	assert_eq(stack.push("item", "c"), 3, "第三次 push 应返回 id=3")
 
 
+func test_ac002_rejected_push_does_not_consume_id() -> void:
+	## QA G-1/G-4: 被拒 push 不消耗 id——3 重要 + 第 4 普通被拒（返回 0）后，
+	## 下一次成功 push 返回 id=4（_next_id 未因拒绝路径递增，id 序号连续）
+	# Arrange
+	var stack: RefCounted = S.new()
+	stack.push("system", "重要1")
+	stack.push("system", "重要2")
+	stack.push("system", "重要3")
+	# Act —— 第 4 条普通被拒（全重要队列无可挤出项）
+	var rejected_id: int = stack.push("item", "普通4")
+	# Assert（G-4 内核侧——拒绝路径 _next_id 不递增的间接断言）
+	assert_eq(rejected_id, 0, "全重要队列 + 普通 push 应被拒绝（返回 0）")
+	# Act —— 下一次成功 push（再入一条重要）
+	var next_id: int = stack.push("error", "重要4")
+	# Assert（G-1——id 连续：被拒 push 未消耗 id=4）
+	assert_eq(next_id, 4, "被拒 push 不消耗 id——下一个成功 push 应返回 id=4（连续）")
+
+
+func test_ac002_important_overflow_falls_back_on_expiry() -> void:
+	## QA G-2: 超时回落序列——3 普通 + 2 重要在队（临时 5 条），推进到 2 条普通
+	## 到期 → 队列回落到 3 条内；继续推进到重要到期 → 逐条移除
+	# Arrange
+	var stack: RefCounted = S.new()
+	stack.push("lingshi", "普通1")     # 2s
+	stack.push("lingshi", "普通2")     # 2s
+	stack.push("lingshi", "普通3")     # 2s
+	stack.push("system", "重要1")      # 5s
+	stack.push("system", "重要2")      # 5s
+	assert_eq(stack.get_active().size(), 5, "前置：3 普通 + 2 重要 = 临时 5 条")
+	# Act —— 推进 2s：3 条普通到期（回落，重要仍在）
+	var removed: Array = stack.advance(2.0)
+	# Assert
+	assert_eq(removed.size(), 3, "2s 时 3 条普通应全部到期")
+	assert_eq(stack.get_active().size(), 2, "普通到期后队列回落到 2 条（重要仍在）")
+	# Act —— 继续推进到 5s：2 条重要到期（逐条移除）
+	removed = stack.advance(3.0)
+	# Assert
+	assert_eq(removed.size(), 2, "5s 时 2 条重要应全部到期")
+	assert_eq(stack.get_active().size(), 0, "全部到期后队列应为空")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # AC-3：重要通知优先级
 # ═══════════════════════════════════════════════════════════════════════════════

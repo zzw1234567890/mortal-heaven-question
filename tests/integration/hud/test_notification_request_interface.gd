@@ -17,7 +17,7 @@ const HUD_SCENE: PackedScene = preload("res://src/ui/hud/HUD.tscn")
 const STACK_SCRIPT: Script = preload("res://src/ui/hud/notification_stack.gd")
 
 var hud: CanvasLayer = null
-var area: Control = null
+var area: NotificationToastArea = null
 var stack: RefCounted = null
 
 
@@ -138,3 +138,40 @@ func test_ac007_capacity_rule_via_request_interface() -> void:
 	for entry: Dictionary in _active_entries():
 		texts.append(str(entry[&"text"]))
 	assert_eq(texts, ["第2条", "第3条", "第4条"], "最早一条应被挤出（FIFO）")
+
+
+func test_ac007_evicted_toast_removed_from_container() -> void:
+	## B-1 修复验证: 容量挤出的 Toast 应从堆叠容器移除（挤出对 UI 层经对账
+	## 可见——4 条普通请求后 StackContainer 保持 3 子节点，被挤出的 Toast1
+	## 不残留）。queue_free 帧末生效——先断言 id 不在 _toast_nodes（对账已
+	## erase，确定性强），再等一帧断言容器子节点数。
+	# Arrange —— before_each 已挂载（animate=false——滑出走 queue_free 路径）
+	# Act
+	area.request_notification("item", "第1条")
+	area.request_notification("item", "第2条")
+	area.request_notification("item", "第3条")
+	area.request_notification("item", "第4条")
+	# 挤出对账在 _on_tick（Timer 0.1s）执行——手动触发一次对账（等价 tick 路径）
+	area._on_tick()
+	# Assert —— 先断言映射键已 erase（不依赖 queue_free 帧时序）
+	assert_false(area._toast_nodes.has(1),
+			"被挤出的 Toast1 应已从 _toast_nodes 移除（对账生效）")
+	# 等一帧让 queue_free 生效后断言容器子节点数
+	await get_tree().process_frame
+	assert_eq(area.get_node("StackContainer").get_child_count(), 3,
+			"被挤出 Toast 释放后堆叠容器应保持 3 个子节点（无幽灵 Toast 残留）")
+
+
+func test_ac007_hud_forwards_notification_request() -> void:
+	## H-1 修复验证: HUD 侧转发链路——hud.request_notification 贯通到组件内核
+	## （返回非 0 id 且注入 stack 的 get_active() 出现对应条目）
+	# Arrange —— before_each 已挂载并注入独立 stack
+	# Act
+	var id: int = hud.request_notification("item", "HUD 转发测试")
+	# Assert
+	assert_ne(id, 0, "HUD 转发的请求应成功入队（返回非 0 id）")
+	var found: bool = false
+	for entry: Dictionary in _active_entries():
+		if int(entry[&"id"]) == id:
+			found = str(entry[&"text"]) == "HUD 转发测试"
+	assert_true(found, "注入 stack 的 get_active() 应出现 HUD 转发的条目（id/文本匹配）")
