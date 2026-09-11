@@ -6,7 +6,7 @@
 > **Type**: UI
 > **Estimate**: [待 sprint 排期填写]
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-11（QL-STORY-READY INAD-1+GAP-1~5 裁决落地——音频 Adapter 桩/ESC 信号+统一入口/进度行降级/退出语义/模糊方案）
+> **Last Updated**: 2026-09-11（/dev-story 实现开始）
 
 ## Context
 

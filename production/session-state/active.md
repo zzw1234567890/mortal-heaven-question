@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13
-Task: S13-5 hud 004 已关闭（Complete）——下一步 S13-6 hud 005 暂停菜单
+Task: S13-6 hud 005 就绪度裁决落地（提交 3274238）——下一步 /dev-story
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -44,3 +44,10 @@ Task: S13-5 hud 004 已关闭（Complete）——下一步 S13-6 hud 005 暂停�
 - Story：production/epics/hud/story-004-notification-system.md — hud 004 通知/提示系统
 - Tech debt logged：None（4 项 ADVISORY 均记入故事 Completion Notes 已裁决记录）
 - Next recommended：hud 005 暂停菜单（production/epics/hud/story-005-pause-menu.md）——Sprint 13 最后一个 must-have 实现 story
+
+## 会话摘录——/story-readiness 2026-09-11（hud 005）
+- 故事：production/epics/hud/story-005-pause-menu.md——暂停菜单（全局覆盖层）
+- 判定：主审 READY → QL-STORY-READY GAPS+INADEQUATE（1 INAD + 5 GAP）→ 用户四项裁决全推荐项 → 修订落地（提交 3274238）
+- 裁决要点：INAD-1 音频 PauseAudioAdapter 接口+no-op 桩（回归项已登记 audio-manager story 005）；GAP-1/3 InputManager pause_requested 信号 + hud.request_pause(source) 统一入口；GAP-2 进度行降级「层 3」；GAP-5 保存并退出=存档后返主菜单/返回主菜单=直接转场；GAP-4 ColorRect+blur shader
+- 附带发现：exploration_system.gd L363-367 map_states 快照缺 layers 键致读档重建恒空（S3 既有缺陷，归 exploration-ui epic 报 lead-programmer 跟进）
+- 下一步：/dev-story production/epics/hud/story-005-pause-menu.md
