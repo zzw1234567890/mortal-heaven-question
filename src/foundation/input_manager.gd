@@ -45,6 +45,11 @@ enum DeviceType {
 	GAMEPAD = 4,    ## 手柄 (SDL3, 4.5+)
 }
 
+## 暂停菜单打开请求信号（hud Story 005——GAP-1 裁决）。[br]
+## 在 [method _input] 的 ESC 拦截点（锁判定通过后）发射——Cat 2b 动作通知
+## （ADR-0007），由 HUD 暂停覆盖层监听。鼠标路径（暂停按钮）不经过本信号。
+signal pause_requested()
+
 ## === 常量 ====================================================================
 
 ## [method get_current_lock] 在空栈时的返回值——表示没有任何输入锁。
@@ -343,4 +348,5 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
 		if is_input_allowed(ActionType.UI_NAV, DeviceType.KEYBOARD):
 			print("InputManager: ESC 通过锁判定——已拦截")
+			pause_requested.emit()
 			get_viewport().set_input_as_handled()

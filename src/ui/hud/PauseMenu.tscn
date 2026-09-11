@@ -1,0 +1,116 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/ui/hud/pause_menu.gd" id="1_script"]
+[ext_resource type="Shader" path="res://src/ui/hud/pause_blur.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="shader_mat_1"]
+shader = ExtResource("2_shader")
+shader_parameter/blur_amount = 0.0
+shader_parameter/blur_radius = 4
+shader_parameter/dim_color = Color(0, 0, 0, 0.6)
+
+[node name="PauseMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+process_mode = 3
+script = ExtResource("1_script")
+
+[node name="MaskLayer" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="BackBufferCopy" type="BackBufferCopy" parent="MaskLayer"]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BlurRect" type="ColorRect" parent="MaskLayer"]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0)
+material = SubResource("shader_mat_1")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+grow_horizontal = 2
+grow_vertical = 2
+offset_left = 800.0
+offset_top = 350.0
+offset_right = 1120.0
+offset_bottom = 730.0
+custom_minimum_size = Vector2(320, 380)
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "⏸ 暂停"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+
+[node name="ContinueButton" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 44)
+text = "▶ 继续游戏"
+theme_override_font_sizes/font_size = 16
+
+[node name="DeckViewButton" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 44)
+text = "📜 查看卡组"
+theme_override_font_sizes/font_size = 16
+
+[node name="SettingsButton" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 44)
+text = "⚙ 系统设置"
+theme_override_font_sizes/font_size = 16
+
+[node name="HSeparator" type="HSeparator" parent="Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 1)
+
+[node name="SaveExitButton" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 44)
+text = "💾 保存并退出"
+theme_override_font_sizes/font_size = 16
+
+[node name="ReturnButton" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 44)
+text = "⚠ 返回主菜单"
+theme_override_font_sizes/font_size = 16
+
+[node name="ProgressLabel" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "探索进度：层 1"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 13
+
+[connection signal="pressed" from="Panel/VBox/ContinueButton" to="." method="_on_continue_pressed"]
+[connection signal="pressed" from="Panel/VBox/DeckViewButton" to="." method="_on_deck_view_pressed"]
+[connection signal="pressed" from="Panel/VBox/SettingsButton" to="." method="_on_settings_pressed"]
+[connection signal="pressed" from="Panel/VBox/SaveExitButton" to="." method="_on_save_exit_pressed"]
+[connection signal="pressed" from="Panel/VBox/ReturnButton" to="." method="_on_return_main_menu_pressed"]
+[connection signal="gui_input" from="MaskLayer" to="." method="_on_mask_gui_input"]

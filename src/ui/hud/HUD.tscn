@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/ui/hud/hud.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/RealmBar.tscn" id="2_realm_bar"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/LingshiDeckBar.tscn" id="3_lingshi_deck_bar"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/NotificationToastArea.tscn" id="4_notification_toast_area"]
+[ext_resource type="PackedScene" path="res://src/ui/hud/PauseMenu.tscn" id="5_pause_menu"]
 
 [node name="HUD" type="CanvasLayer"]
 layer = 90
@@ -61,3 +62,5 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 process_mode = 3
+
+[node name="PauseMenu" parent="PauseOverlay" instance=ExtResource("5_pause_menu")]

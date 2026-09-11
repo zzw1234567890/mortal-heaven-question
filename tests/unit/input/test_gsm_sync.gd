@@ -96,12 +96,17 @@ func test_ac005_default_device_mask_is_all() -> void:
 
 func test_ac006_no_own_signals_declared() -> void:
 	## AC-006: InputManager 自身不声明任何信号——通过 GSM batch_updated 传播
+	## [br]例外（hud Story 005 GAP-1 裁决 2026-09-11）：pause_requested 动作
+	## 通知信号（Cat 2b——ESC 拦截点发射，非锁状态）不在本 AC 范围——
+	## AC-006 语义为「锁状态经 GSM batch_updated 传播」，动作通知信号不属
+	## 锁状态同步（ADR-0007 Cat 2b 先例：battle_started 等）。
 	# Godot 4.6 所有 Node 子类都继承以下内置信号
 	var builtins := PackedStringArray([
 		"script_changed", "tree_entered", "tree_exited", "tree_exiting",
 		"ready", "renamed", "child_entered_tree", "child_exiting_tree",
 		"child_order_changed", "replacing_by",
 		"editor_description_changed", "editor_state_changed", "property_list_changed",
+		"pause_requested",  # hud Story 005 GAP-1 裁决例外（动作通知，非锁状态）
 	])
 	var user_signals: Array[Dictionary] = []
 	for sig in IM_SCRIPT.new().get_signal_list():

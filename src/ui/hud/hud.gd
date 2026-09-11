@@ -59,8 +59,17 @@ var _scene_manager: Node = null
 @onready var pause_overlay: Control = $PauseOverlay
 ## 通知区域组件（H-1 修复——request_notification 转发目标，G7 裁决）。
 @onready var _notification_toast_area: NotificationToastArea = $ContentLayer/NotificationArea/NotificationToastArea
+## 暂停菜单组件（Story 005——PauseOverlay 挂载点下的菜单本体）。
+@onready var _pause_menu: PauseMenu = $PauseOverlay/PauseMenu
 
 ## === 生命周期 ==================================================================
+
+func _ready() -> void:
+	# ESC 信号接线放 _ready（非 setup）——挂载即响应 ESC。
+	# setup() 只做 SceneManager 注入与可见性同步（测试 add_child 后即接线，
+	# 无须依赖调用方调 setup——GAP-1 裁决接线点修正）。
+	if not InputManager.pause_requested.is_connected(_on_pause_requested):
+		InputManager.pause_requested.connect(_on_pause_requested)
 
 ## 注入 SceneManager 并订阅转场信号（调用方挂载后调用一次）。[br]
 ## 依赖注入而非直引 Autoload——测试可传入轻量 mock（先例：
@@ -86,6 +95,28 @@ func setup(scene_manager: Node) -> void:
 	if _scene_manager.has_method(&"get_current_scene_id"):
 		var current_id: int = _scene_manager.get_current_scene_id()
 		content_layer.visible = SCENE_VISIBILITY.get(current_id, false)
+	# 暂停菜单依赖注入 + InputManager.pause_requested 信号接线（Story 005）。
+	_setup_pause_menu()
+
+## 暂停菜单组件初始化（Story 005——GAP-3 裁决统一入口接线）。[br]
+## 注入 SceneManager/SaveLoadSystem 引用；连接 InputManager.pause_requested 信号
+## 到 [method request_pause]（ESC 路径 B 拦截后发射——GAP-1 裁决）。
+func _setup_pause_menu() -> void:
+	_pause_menu.scene_manager = _scene_manager
+	_pause_menu.save_load = SaveLoadSystem
+	_pause_menu.audio_adapter = PauseAudioAdapter.new()
+
+## InputManager.pause_requested 信号回调——ESC 路径入口（GAP-1 裁决）。[br]
+## source 标识为 [code]&"esc"[/code]——统一汇入 [method request_pause]。
+func _on_pause_requested() -> void:
+	request_pause(&"esc")
+
+## 暂停菜单统一入口（GAP-3 裁决——三路汇入）。[br]
+## [br][param source] 来源标识：[code]&"esc"[/code]（ESC 信号路径）、
+## [code]&"button"[/code]（HUD 暂停按钮 pressed）、[code]&"combat_ui"[/code]
+## （战斗 UI 转发——combat-ui epic）。[br]已打开时幂等——不重复执行打开流程。
+func request_pause(source: StringName) -> void:
+	_pause_menu.request_open(source)
 
 ## === 信号处理器 ================================================================
 
