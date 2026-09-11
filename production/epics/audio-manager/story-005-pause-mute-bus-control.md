@@ -47,7 +47,7 @@
 
 **Logic 内核（BLOCKING 单测目标）**：`MuteController` 类——debounce 窗口判定（时间注入）、静音前值记忆、`mute_state_changed` 信号发射。
 
-- 暂停：`pause_all()` = 全部 AudioStreamPlayer `stream_paused = true`（位置保持）；`resume_all()` 逆序恢复。与 hud story 005（暂停菜单）对接——菜单调用这两个 API（hud 侧已声明）。
+- 暂停：`pause_all()` = 全部 AudioStreamPlayer `stream_paused = true`（位置保持）；`resume_all()` 逆序恢复。与 hud story 005（暂停菜单）对接——hud 侧定义 `PauseAudioAdapter` 接口（suspend/resume）并以 no-op 桩实现（QL-STORY-READY INAD-1 裁决 2026-09-11，audio-manager epic 未完成前 hud 走桩）。本 story 落地时接管 adapter 真实实现（suspend→pause_all / resume→resume_all），并须补回归项：暂停菜单打开时音频同步暂停、恢复时同步恢复（hud 侧桩阶段只能断言 adapter 方法被调用，总线/播放器状态断言归本 story）。
 - F1 捕获：InputManager `is_input_allowed()` 判定后转发 AudioManager.toggle_mute()——具体放行策略（暂停中/弹窗中是否允许 F1）按 InputManager 既有规则。
 - 静音前值记忆：静音时保存 Master 当前 dB（用户设置值），取消时恢复——非硬编码 0dB。
 - 图标渲染：hud epic story 008 消费 `mute_state_changed` 信号——本 story 只发信号。
