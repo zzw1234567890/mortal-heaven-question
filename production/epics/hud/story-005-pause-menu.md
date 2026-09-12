@@ -135,7 +135,7 @@
 ## Completion Notes
 
 **Completed**：2026-09-11
-**Criteria**：6/6 通过（AC-1~AC-3/AC-6 自动化测试覆盖；AC-4/AC-5 手动证据模板创建待签收——ADVISORY）
+**Criteria**：6/6 通过（AC-1~AC-3/AC-6 自动化测试覆盖；AC-4/AC-5 手动证据已验证签收——15/15 项通过，2026-09-11）
 
 **Deviations**：
 1. **AC-2 递延**：规格要求「所有角色 HP、当前费用、牌库/弃牌堆计数不变」，当前战斗数据模型尚未完整建模这些字段。已覆盖回合数 + GSM battle 域（is_active/phase/turn）断言；HP/费用/牌库计数递延至战斗数据模型完整建模后补齐（用户裁决 2026-09-11）。
@@ -146,7 +146,7 @@
 
 **Test Evidence**：
 - Integration: `tests/integration/hud/test_pause_menu.gd`（19 测试）+ `tests/integration/hud/test_pause_combat_state_preserved.gd`（4 测试）——全部通过
-- UI: `production/qa/evidence/pause-menu-evidence.md`——模板创建，手动验证后补齐签收（ADVISORY）
+- UI: `production/qa/evidence/pause-menu-evidence.md`——15/15 项通过，已签收（2026-09-11）
 - 全量回归：2596 tests / 2594 passing / 1 pending / 1 failing（test_ac010 预存 flaky，非本 story 引入）
 
 **Code Review**：已完成（双专家初审 CHANGES REQUIRED → 全部修复 → 复审 APPROVED WITH SUGGESTIONS → 3 LOW 直修 2 项 + 补 2 回归测试）
@@ -168,8 +168,8 @@
 | AC-3: suspend 调用 | test_ac003_suspend_called_on_open | COVERED |
 | AC-3: resume 调用 | test_ac003_resume_called_on_close | COVERED |
 | AC-3: 多轮配对 | test_ac003_suspend_resume_call_counts | COVERED |
-| AC-4: 菜单项完整性 | 手动证据 | ADVISORY（模板创建） |
-| AC-5: 背景模糊+计时 | 手动证据 | ADVISORY（模板创建） |
+| AC-4: 菜单项完整性 | 手动证据 | COVERED（15/15 项通过，2026-09-11 签收） |
+| AC-5: 背景模糊+计时 | 手动证据 | COVERED（同上） |
 | AC-6: combat_ui 路径 | test_ac006_request_pause_combat_ui_opens_menu | COVERED |
 | AC-6: button 路径 | test_ac006_request_pause_button_path_opens_menu | COVERED |
 | AC-6: 幂等 | test_ac006_request_pause_idempotent_while_paused | COVERED |
