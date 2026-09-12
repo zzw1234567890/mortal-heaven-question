@@ -2,8 +2,9 @@ shader_type canvas_item;
 // 暂停菜单背景模糊遮罩 shader（GAP-4 裁决——设计来源 design/ux/pause-menu.md
 // 「半透明黑色遮罩 + 背景模糊」+ interaction-patterns.md「遮罩层」）。
 // 采样自 BACKBUFFER（BackBufferCopy 提供——先例 L199），Downsample + Box blur。
-// uniform 纹理类型用 Texture 基类型（4.4+ 变更——见 control-manifest 禁止模式）。
-uniform sampler2D screen_tex : source_color, filter_linear_mipmap;
+// screen_tex 用 hint_screen_texture 声明屏幕纹理（运行时由引擎注入），线性过滤
+// 采样（Downsample 无需 mipmap——固定半径环形采样不受益于分级链）。
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 uniform float blur_amount : hint_range(0.0, 1.0) = 0.0;
 uniform int blur_radius : hint_range(1, 8) = 4;
 uniform vec4 dim_color : source_color = vec4(0.0, 0.0, 0.0, 0.6);

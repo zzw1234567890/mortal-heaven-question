@@ -98,9 +98,10 @@ func setup(scene_manager: Node) -> void:
 	# 暂停菜单依赖注入 + InputManager.pause_requested 信号接线（Story 005）。
 	_setup_pause_menu()
 
-## 暂停菜单组件初始化（Story 005——GAP-3 裁决统一入口接线）。[br]
-## 注入 SceneManager/SaveLoadSystem 引用；连接 InputManager.pause_requested 信号
-## 到 [method request_pause]（ESC 路径 B 拦截后发射——GAP-1 裁决）。
+## 暂停菜单组件初始化（Story 005——依赖注入职责）。[br]
+## 注入 SceneManager/SaveLoadSystem/音频 adapter 引用（依赖注入而非直引——
+## 测试可替换）。[code]InputManager.pause_requested[/code] 信号接线在
+## [method _ready]（GAP-1 裁决——挂载即响应 ESC），不在本方法。
 func _setup_pause_menu() -> void:
 	_pause_menu.scene_manager = _scene_manager
 	_pause_menu.save_load = SaveLoadSystem

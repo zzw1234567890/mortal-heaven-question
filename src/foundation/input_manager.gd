@@ -342,10 +342,12 @@ func _process(_delta: float) -> void:
 
 ## 路径 B：UI_NAV 快捷键——在 GUI 派发前拦截。[br]
 ## [br]
-## [param event] 输入事件。仅处理 ESC 按键按下事件。[br]
+## [param event] 输入事件。仅处理 ESC 按键按下事件（[code]echo[/code] 重复
+## 事件不处理——按住 ESC 不应重复触发，code-review G-7）。[br]
 ## 通过 [method is_input_allowed] 判定后调用 [method Node.accept_event] 阻止进一步传播。
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
+	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed \
+			and not event.echo:
 		if is_input_allowed(ActionType.UI_NAV, DeviceType.KEYBOARD):
 			print("InputManager: ESC 通过锁判定——已拦截")
 			pause_requested.emit()
