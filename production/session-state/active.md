@@ -51,3 +51,21 @@ Task: S13-6 hud 005 就绪度裁决落地（提交 3274238）——下一步 /de
 - 裁决要点：INAD-1 音频 PauseAudioAdapter 接口+no-op 桩（回归项已登记 audio-manager story 005）；GAP-1/3 InputManager pause_requested 信号 + hud.request_pause(source) 统一入口；GAP-2 进度行降级「层 3」；GAP-5 保存并退出=存档后返主菜单/返回主菜单=直接转场；GAP-4 ColorRect+blur shader
 - 附带发现：exploration_system.gd L363-367 map_states 快照缺 layers 键致读档重建恒空（S3 既有缺陷，归 exploration-ui epic 报 lead-programmer 跟进）
 - 下一步：/dev-story production/epics/hud/story-005-pause-menu.md
+
+## 会话摘录——/dev-story 2026-09-11（hud 005 实现完成）
+- 故事：production/epics/hud/story-005-pause-menu.md——暂停菜单（全局覆盖层）
+- 更改的文件：src/ui/hud/pause_menu.gd（新建）、PauseMenu.tscn（新建）、pause_audio_adapter.gd（新建）、pause_blur.gdshader（新建）、HUD.tscn/hud.gd（修改）、input_manager.gd（修改，GAP-1 信号）、test_gsm_sync.gd（修改，AC-006 例外裁决）
+- 编写的测试：tests/integration/hud/test_pause_menu.gd（12 测试）+ test_pause_combat_state_preserved.gd（4 测试）
+- 实现代理三次中断后交付；ESC 接线移 _ready() 直修（test_ac006 信号路由失败）；input AC-006 例外裁决修正
+- 全量：2591 tests / 2589 passing / 1 pending / 1 failing（test_ac010 预存 flaky，非本次引入）——零回归
+- 阻塞项：无
+- 下一步：/code-review src/ui/hud/pause_menu.gd src/ui/hud/pause_audio_adapter.gd src/ui/hud/hud.gd src/foundation/input_manager.gd → /story-done
+
+## Session Extract — /story-done 2026-09-11
+- Verdict：COMPLETE WITH NOTES
+- Story：production/epics/hud/story-005-pause-menu.md — hud 005 暂停菜单
+- Tech debt logged：None（5 项 ADVISORY 均记入 Completion Notes）
+- AC-2 HP/费用/牌库断言递延（战斗数据模型未建模——用户裁决）
+- AC-4/AC-5 手动证据模板创建（pause-menu-evidence.md）——ADVISORY 待签收
+- Code Review：双专家初审 CHANGES REQUIRED → 全修复 → 复审 APPROVED WITH SUGGESTIONS → 3 LOW 直修 2+补 2 回归测试
+- Next recommended：Sprint 13 QA 签收（S13-7）——须先补 TD-006/013 + 本 story + hud 004 视觉证据
