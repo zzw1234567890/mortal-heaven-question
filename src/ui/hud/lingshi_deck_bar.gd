@@ -40,6 +40,10 @@ const COUNT_COLORS: Dictionary = {
 ## 「超限！」标记色——朱砂红 #B3424A（与 COUNT_COLORS.red 同源，
 ## OverlimitLabel 的 LabelSettings 直写专用——B-1 修复）。
 const COLOR_OVERLIMIT: Color = Color("#B3424A")
+## 灵石负值 delta 文本色——朱砂红 #B3424A（支出警示，与 COUNT_COLORS.red
+## 同源；正值保持计数器墨色——2026-09-12 TD-013 验证裁决：仅 ± 前缀区分
+## 辨识度不足，负值复用警报色增强方向感知）。
+const COLOR_DELTA_NEGATIVE: Color = Color("#B3424A")
 
 ## 灵石数字滚动时长——0.3s（GDD hud-system.md §调优参数表「灵石数字跳动 0.3s」）。
 const LINGSHI_ROLL_DURATION: float = 0.3
@@ -98,6 +102,10 @@ var _roll_display: int = 0
 ## delta 浮动标签归位基准 Y——_ready 缓存的初始位置（B-3 修复：每次浮动
 ## 从归位基准起算向下浮，动画结束复位，杜绝 18px 漂移累积）。
 var _delta_home_y: float = 0.0
+
+## delta 标签 LabelSettings 是否已 duplicate 为独立实例（B-1 同源——
+## 首次直写前 duplicate，防跨场景实例共享污染）。
+var _delta_settings_owned: bool = false
 
 ## === 节点引用 ==================================================================
 
@@ -259,6 +267,20 @@ func _show_delta(delta: int) -> void:
 	# modulate.a，浮动标签永不显示）。
 	lingshi_delta_label.visible = true
 	lingshi_delta_label.text = ("%+d" % delta) if delta > 0 else str(delta)
+	# 负值红色——支出警示（COLOR_DELTA_NEGATIVE；正值复位墨色——
+	# 共享 LabelSettings 上一轮负值直写残留）。B-1 同源：LingshiDeltaLabel
+	# 与计数器共享 tscn SubResource，须 duplicate 独立实例后直写（首次），
+	# 后续轮次已是独立实例直写即可。
+	if lingshi_delta_label.label_settings != null:
+		if not _delta_settings_owned:
+			lingshi_delta_label.label_settings = \
+					lingshi_delta_label.label_settings.duplicate()
+			_delta_settings_owned = true
+		lingshi_delta_label.label_settings.font_color = \
+				COLOR_DELTA_NEGATIVE if delta < 0 else Color("#1A1A1A")
+	else:
+		lingshi_delta_label.add_theme_color_override("font_color",
+				COLOR_DELTA_NEGATIVE if delta < 0 else Color("#1A1A1A"))
 	lingshi_delta_label.modulate.a = 1.0
 	# B-3 修复：先复位到归位基准再起浮——连续变更时上一浮动可能尚未播完，
 	# 从漂移位置起算会累积偏移。

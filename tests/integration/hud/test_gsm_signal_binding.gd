@@ -190,3 +190,26 @@ func test_ac003_batch_updated_deck_path_refreshes_deck_row() -> void:
 	var expected_total: int = 8
 	assert_true(str(deck_label.text).begins_with("📜 %d/" % expected_total),
 			"deck 路径 batch 后卡组行应显示 total=%d（实际 %s）" % [expected_total, deck_label.text])
+
+
+func test_ac004_negative_delta_shows_red_color() -> void:
+	## AC-4 补充（TD-013 验证裁决 2026-09-12）: 负值 delta 浮动标签显示
+	## 朱砂红（COLOR_DELTA_NEGATIVE #B3424A）；正值复位墨色。
+	## 注意：animate=false 时 _show_delta 跳过（H-2）——颜色断言在
+	## _show_delta 直调下验证（视觉编排路径回归保护）。
+	# Arrange —— 覆盖 before_each 的 animate=false（_show_delta 的 not animate
+	## 分支提前 return，颜色逻辑不可达）——本测试验证视觉编排路径本身。
+	bar.animate = true
+	var delta_label: Label = bar.get_node(^"LingshiDeltaLabel")
+	# Act —— 负值 delta
+	bar._show_delta(-50)
+	# Assert —— 负值朱砂红
+	var expected_red: Color = Color("#B3424A")
+	var font_color: Color = delta_label.label_settings.font_color
+	assert_eq(font_color, expected_red, "负值 delta 文本应为朱砂红 #B3424A")
+	# Act —— 正值 delta（复位路径——上一轮负值直写残留应被覆盖回墨色）
+	bar._show_delta(25)
+	# Assert —— 正值复位墨色
+	var expected_normal: Color = Color("#1A1A1A")
+	assert_eq(delta_label.label_settings.font_color, expected_normal,
+			"正值 delta 文本应复位墨色 #1A1A1A")
