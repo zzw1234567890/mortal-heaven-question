@@ -16,7 +16,7 @@
 | R-03 | D3D12 默认渲染器兼容性（Windows 驱动差异） | 中 | 中 | 🟡 中 | 已关闭（2026-09-12 spike） | godot-specialist |
 | R-04 | AccessKit 屏幕阅读器支持的实际可用性（4.5+，未经项目验证） | 中 | 中 | 🟡 中 | 开放 | accessibility-specialist |
 | R-05 | 节点图最坏情况节点数的缩放/平移帧率 | 中 | 高 | 🔴 高 | 开放 | ui-programmer |
-| R-06 | Ogg Vorbis 循环间隙（BGM 无缝循环） | 高 | 中 | 🟡 中 | 开放 | audio-director |
+| R-06 | Ogg Vorbis 循环间隙（BGM 无缝循环） | 高 | 中 | 🟡 中 | 已关闭（2026-09-13 spike） | audio-director |
 | R-07 | Glow 在 tonemapping 之前处理（4.6 变更）——焦点环/高亮视觉效果回归 | 中 | 低 | 🟢 低 | 开放 | godot-shader-specialist |
 | R-08 | 25 个 Autoload 超软上限——表现层不得新增 Autoload | 低 | 中 | 🟢 低 | 已缓解 | lead-programmer |
 | R-09 | 手柄部分支持范围蔓延（虚拟光标磁性吸附实现复杂度） | 中 | 中 | 🟡 中 | 开放 | ui-programmer |
@@ -103,6 +103,7 @@
 - **待办措施**：架构阶段在目标硬件实测 Ogg 间隙时长；若可听见，BGM 改用 WAV（接受内存增大）或双 AudioStreamPlayer 交叉淡化（GDD 已含此架构）
 - **触发条件**：音频系统实现时
 - **关闭条件**：实测结论 + 选定方案记录到音频系统实现说明
+- **关闭记录（2026-09-13）**：spike 完成——**实测无间隙**（报告 `production/spikes/r06-ogg-loop-spike.md`）。AudioStreamOggVorbis `loop = true` 在 WASAPI 真实驱动下 PCM 级测量零静音段零跳变（复跑稳定），GDD「5-30ms 间隙」假设在 4.6.3 上不成立。BGM 维持 WAV MVP 规格（GDD 不变，Ogg 备选风险归零）；audio-system.md L135 与待解决问题 #5 随 audio 001 实现时修订。audio 002 解锁。
 
 ### R-07 Glow 视觉回归 🟢 低
 
