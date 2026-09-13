@@ -14,7 +14,7 @@ goal: "关闭 R-01/R-06/R-02/R-03 技术风险 + HUD 系统 8 stories 全量交�
 start: "2026-09-08"
 end: "2026-09-19"
 generated: "2026-09-08"
-updated: "2026-09-12"  # S13-7 done——must-have 全量完成，QA APPROVED WITH CONDITIONS
+updated: "2026-09-13"  # S13-12 done——R-03 D3D12 spike 关闭，QA 条件 C 解除
 
 stories:
   - id: "13-1"
@@ -131,11 +131,11 @@ stories:
     name: "R-03 D3D12 冒烟 spike（非 story）"
     file: "production/spikes/r03-d3d12-smoke-spike.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-09-13"
 
   - id: "13-13"
     name: "hud 008 F1 静音状态图标"

@@ -1,0 +1,16 @@
+{
+	"driver_actual": "see_video_adapter",
+	"driver_arg": "default",
+	"frame_avg_ms": 18.03,
+	"frame_max_ms": 150.0,
+	"frames_sampled": 120,
+	"godot_version": "4.6.3-stable (official)",
+	"screenshot_ok": true,
+	"screenshot_path": "res://prototypes/r03-d3d12-smoke-spike/screenshot-default.png",
+	"screenshot_size": [
+		3840,
+		2071
+	],
+	"shader_compiled": true,
+	"video_adapter": "NVIDIA GeForce RTX 3050"
+}

@@ -13,7 +13,7 @@
 |---|------|------|------|------|------|--------|
 | R-01 | Godot 4.6 双焦点系统在自定义 Control 组件上的实际行为未验证 | 高 | 高 | 🔴 高 | 已关闭（2026-09-08 spike） | ui-programmer |
 | R-02 | Draw Call 超 200 预算（战斗 16 角色卡 + 手牌 + 节点图迷雾） | 中 | 高 | 🔴 高 | 开放 | ui-programmer |
-| R-03 | D3D12 默认渲染器兼容性（Windows 驱动差异） | 中 | 中 | 🟡 中 | 开放 | godot-specialist |
+| R-03 | D3D12 默认渲染器兼容性（Windows 驱动差异） | 中 | 中 | 🟡 中 | 已关闭（2026-09-12 spike） | godot-specialist |
 | R-04 | AccessKit 屏幕阅读器支持的实际可用性（4.5+，未经项目验证） | 中 | 中 | 🟡 中 | 开放 | accessibility-specialist |
 | R-05 | 节点图最坏情况节点数的缩放/平移帧率 | 中 | 高 | 🔴 高 | 开放 | ui-programmer |
 | R-06 | Ogg Vorbis 循环间隙（BGM 无缝循环） | 高 | 中 | 🟡 中 | 开放 | audio-director |
@@ -67,6 +67,7 @@
   3. 验证 Steam 覆盖层（technical-preferences.md 平台说明）与截图工具链在 D3D12 下工作
 - **触发条件**：Sprint 13 首个渲染输出 story
 - **关闭条件**：D3D12 冒烟通过或确认回退策略并记录到 control-manifest
+- **关闭记录（2026-09-12）**：spike 完成——D3D12 冒烟通过（报告 `production/spikes/r03-d3d12-smoke-spike.md`）。双驱动对比全项 PASS：2D 渲染/shader 编译/截图工具链/退出均正常，帧时间相当（18.15 vs 18.03ms，VSync 噪声范围内）。**保持引擎默认 D3D12，无需回退**；回退命令留作应急手段。Steam 覆盖层 + 最低规格硬件归 release 前验证（release-checklist）。
 
 ### R-04 AccessKit 屏幕阅读器可用性 🟡 中
 
