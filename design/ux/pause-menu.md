@@ -1,8 +1,8 @@
 # UX Spec: 暂停菜单 (Pause Menu)
 
-> **Status**: In Design
+> **Status**: Approved（交付实证：hud 005 PauseMenu 已实现并签收，Sprint 13）
 > **Author**: zwzhang + ux-designer
-> **Last Updated**: 2026-07-27
+> **Last Updated**: 2026-09-13
 > **Journey Phase(s)**: 游戏中任意时刻 → 暂停
 > **Template**: UX Spec
 > **Source GDD**: `design/gdd/hud-system.md` §8

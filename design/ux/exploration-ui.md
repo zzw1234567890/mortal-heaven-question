@@ -1,8 +1,8 @@
 # UX Spec: 探索 UI (Exploration UI)
 
-> **Status**: Awaiting Review
+> **Status**: Approved（ux-review APPROVED，2026-09-07，提交 c2bb0f3——11 个新模式入库）
 > **Author**: zwzhang + ux-designer
-> **Last Updated**: 2026-09-07
+> **Last Updated**: 2026-09-13
 > **Journey Phase(s)**: 未知——无玩家旅程地图
 > **Template**: UX Spec
 > **Source GDD**: `design/gdd/exploration-ui-system.md`

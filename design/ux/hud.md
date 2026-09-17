@@ -1,8 +1,8 @@
 # HUD Design
 
-> **Status**: In Design
+> **Status**: Approved（交付实证：Sprint 13 hud 001-005 已实现——4 份视觉证据签收；GDD 评审闭环 2026-09-07）
 > **Author**: zwzhang + ux-designer
-> **Last Updated**: 2026-07-27
+> **Last Updated**: 2026-09-13
 > **Template**: HUD Design
 > **Source GDDs**: `design/gdd/hud-system.md`, `design/gdd/combat-ui-system.md`, `design/gdd/exploration-ui-system.md`
 > **Source Art Bible**: `design/art/art-bible.md` §7

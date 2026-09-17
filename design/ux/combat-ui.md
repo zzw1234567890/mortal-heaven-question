@@ -1,8 +1,8 @@
 # UX Spec: 战斗 UI (Combat UI)
 
-> **Status**: In Design
+> **Status**: Approved（GDD 评审闭环 2026-09-07 + 13 BLOCKER 修复落地；UX 规范级 /ux-review 递延——首个 combat-ui story 实现前补跑）
 > **Author**: zwzhang + ux-designer
-> **Last Updated**: 2026-09-06
+> **Last Updated**: 2026-09-13
 > **Journey Phase(s)**: 未知——无玩家旅程地图
 > **Template**: UX Spec
 > **Source GDD**: `design/gdd/combat-ui-system.md`
