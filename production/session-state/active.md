@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 13
-Task: S13-6 hud 005 就绪度裁决落地（提交 3274238）——下一步 /dev-story
+Task: S13-7 QA 签收完成（APPROVED WITH CONDITIONS）——下一步 /story-done 关闭 S13-7
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -69,3 +69,60 @@ Task: S13-6 hud 005 就绪度裁决落地（提交 3274238）——下一步 /de
 - AC-4/AC-5 手动证据模板创建（pause-menu-evidence.md）——ADVISORY 待签收
 - Code Review：双专家初审 CHANGES REQUIRED → 全修复 → 复审 APPROVED WITH SUGGESTIONS → 3 LOW 直修 2+补 2 回归测试
 - Next recommended：Sprint 13 QA 签收（S13-7）——须先补 TD-006/013 + 本 story + hud 004 视觉证据
+
+## Session Extract — /team-qa 2026-09-12（Sprint 13 QA 签收完成）
+- Verdict：APPROVED WITH CONDITIONS（报告：production/qa/qa-signoff-sprint-13-2026-09-12.md，提交 498d335）
+- 签收前置补齐链：负值 delta 朱砂红（TD-013 验证裁决，提交 6b20687，含回归测试）→ TD-006/013 证据文档创建签收（cultivation-bar / lingshi-deck-counter 各 8/8，提交 56ce7ea）→ debug 宿主 tests/manual/hud_debug.tscn 建立
+- DoD 8/8 达成；must-have S13-1~6 全签收；测试 2598/2597/1 pending/0 failing 零回归
+- 4 项遗留条件（不阻塞 gate）：主流程 E2E N/A（main-menu epic）/ CI 未配置 / 性能 Profiler 递延 S13-12 / realm test_ac010 flaky 建议 Sprint 14
+- 下一步：/story-done 关闭 S13-7 → /retrospective → /gate-check
+
+## Session Extract — /story-done 2026-09-12（S13-7 关闭）
+- Verdict：COMPLETE（QA story 类型——交付物即签收报告，APPROVED WITH CONDITIONS）
+- Story：production/epics/qa/story-001-sprint-13-qa.md — S13-7 Sprint 13 QA 签收
+- sprint-status.yaml：13-7 done（must-have S13-1~7 全量完成），提交 0e643c2
+- Next recommended：/retrospective → /gate-check（presentation-layer-complete，QA 已放行）
+
+## Session Extract — /retrospective 2026-09-12（Sprint 13）
+- 回顾已写入：production/retrospectives/retro-sprint-13-2026-09-12.md（提交 5316aec）
+- 核心：must 7/7 + QA APPROVED WITH CONDITIONS + 零回归 + 25+ 缺陷全闭环；速度校准首次生效（偏差<20%）
+- 短板：should/nice 7 项零启动（窗口剩 7 天）、回顾断档 Sprint 4-12、hud 005 实现代理三次中断
+- 5 项行动项：Sprint 14 容量二次裁剪 / CI 配置 / test_ac010 flaky 根治 / 恢复回顾惯例 / ADVISORY 证据随关即补
+- 下一步：/gate-check（presentation-layer-complete，QA 已放行）；或决策 should/nice 拉入
+
+## Session Extract — /dev-story 2026-09-13（S13-12 R-03 spike 完成）
+- Verdict：COMPLETE（spike 非 story——报告即交付物）
+- 交付：production/spikes/r03-d3d12-smoke-spike.md + prototypes/r03-d3d12-smoke-spike/（harness + 双驱动 JSON + 截图）
+- 结论：D3D12 冒烟通过无需回退；R-03 风险登记册已关闭；QA 签收条件 C 解除
+- sprint-status.yaml：13-12 done（提交 93c8b34）
+- 下一步：S13-8 R-06 Ogg 循环 spike（按既定建议继续）→ 之后视情况关闭冲刺（/gate-check + /sprint-plan new）
+
+## Session Extract — /dev-story 2026-09-13（S13-8 R-06 spike 完成）
+- Verdict：COMPLETE（spike 非 story——报告即交付物）
+- 交付：production/spikes/r06-ogg-loop-spike.md + prototypes/r06-ogg-loop-spike/（harness + 测试音 + 双次运行 JSON）
+- 结论：Ogg 循环实测零间隙零跳变（WASAPI + PCM 录制复跑稳定）——GDD「5-30ms 间隙」假设不成立；BGM 维持 WAV MVP，audio 002 解锁
+- R-06 风险登记册关闭（提交 f43cd1c）；R-03 已于早前关闭（93c8b34）
+- 下一步：关闭冲刺——/gate-check（presentation-layer-complete）→ /sprint-plan new（Sprint 14 容量二次裁剪）
+
+## Session Extract — /gate-check 2026-09-13（presentation-layer-complete 里程碑检查）
+- Verdict：FAIL（里程碑未达成——预期事实：1/2-3 冲刺，非质量信号）
+- 四主管：CD NOT READY / TD CONCERNS / PR CONCERNS / AD READY——共识按计划继续 Sprint 14-15
+- 报告：production/gate-checks/gate-check-presentation-layer-complete-2026-09-13.md（提交 be03fff）
+- UX 状态字段同步（AD 建议当场执行）：hud/exploration-ui/combat-ui/pause-menu → Approved
+- Sprint 14 前置条件（主管共识）：容量二次裁剪（PR 建议 must：main-menu 3 + 009b + audio 001）/ CI 第 1 周 / TD-007/012 排期 / 里程碑预估修正 3 冲刺起
+- 下一步：/sprint-plan new（Sprint 14）——规划前先做容量裁剪决策
+
+## Session Extract — /sprint-plan new 2026-09-13（Sprint 14 计划完成）
+- PR-SPRINT 裁决：REALISTIC（MUST 6.0d/7.5d=80% 利用率，三项监督条件：Day-4 检查点/CI 0.5d timebox/R-02 provisional）
+- 计划写入：production/sprints/sprint-14.md + sprint-status.yaml（14 stories，提交 ce0ac60）
+- MUST：CI 配置 + main-menu 001-003 + 009a/009b（R-02 stub 实测）+ audio 001 + QA 签收
+- SHOULD：TD-007/012+test_ac010 打包 + main-menu 004 + hud 006/007；NICE：main-menu 005 + hud 008
+- 里程碑预估修正：3 冲刺起（Sprint 15 结转负载 12d+ 预警已记入计划）
+- 下一步：/qa-plan sprint（实现开始前）→ /story-readiness（首个 story）
+
+## Session Extract — /qa-plan sprint 2026-09-13（Sprint 14 QA 计划完成）
+- QA 计划写入：production/qa/qa-plan-sprint-14-2026-09-13.md
+- 分类：自动化 5 组（main-menu 001-003 + audio 001 + TD 补齐 ~64 用例）+ Visual/Feel 实测 2（009a/009b）+ CI 验证 + 冒烟 6 项
+- 关键：009b 本地脚本不进 CI；R-02 provisional 关闭流程；分辨率 API 查证前置（main-menu 003）
+- Sprint 14 管线就绪：计划+QA 计划均已写入——冲刺 09-21 启动
+- 下一步：09-21 起按 sprint-status 顺序执行（S14-1 CI 或 main-menu 001 先行）
