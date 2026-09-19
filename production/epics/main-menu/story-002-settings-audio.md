@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-09-19（QL-STORY-READY 裁决修订：总线命名对齐/启动加载归属/滑条键盘路径）
 
 ## Context
 
@@ -18,7 +18,7 @@
 **ADR Decision Summary**: 设置值属「持久设置」——设置面板直接写设置文件，不经 GSM 不经 SaveLoadSystem。音量实时生效+手动持久化（QL-STORY-READY 2026-09-07 裁决：滑条拖动即时生效到总线，点「应用」才写文件，未保存关闭回滚）。
 
 **Engine**: Godot 4.6 | **Risk**: HIGH（双焦点变更在 LLM 知识截止后）
-**Engine Notes**: 滑条为标准 HSlider 控件；音频总线应用经 `AudioServer.set_bus_volume_db()`。**前置：音频总线布局（Master/Music/SFX 三总线）依赖 audio-manager epic 定义**——若该 epic 未先行，本 story 以 default_bus_layout 现有总线实现并在接口层留适配点。
+**Engine Notes**: 滑条为标准 HSlider 控件；音频总线应用经 `AudioServer.set_bus_volume_db()`。**硬依赖：audio 001（S14-7）先行**——总线命名与 audio-manager epic 001 总线表对齐（QL-STORY-READY 2026-09-19 裁决）：三条滑条 → **Master/BGM/SFX** 一一对应（非 Music——audio 001 定义 6 总线无 Music）。
 
 **Control Manifest Rules (this layer)**:
 - Required: `db_from_percent()` 纯函数单测；回滚逻辑可测
@@ -33,9 +33,10 @@
 
 - [ ] 点击设置打开设置界面，含音效/画面/按键/语言 4 个分类（AC-main-menu-007）
 - [ ] 拖动音量滑条时对应总线音量**实时**变化（经 `db_from_percent` 转换）（AC-main-menu-008）
-- [ ] 三条音量滑条：总音量/音乐音量/音效音量（0~100%，1% 步进）
+- [ ] 三条音量滑条：总音量(Master)/音乐音量(BGM)/音效音量(SFX)（0~100%，1% 步进；键盘 ← → 可调节——UX 10a 交互声明）
 - [ ] 点击「应用」时音量值持久化写入设置文件；未保存关闭时回滚到已保存值
-- [ ] 设置面板打开 0.3s 滑入 / 关闭 0.2s 滑出
+- [ ] 启动音量真值 = 设置文件值覆盖总线默认 dB（QL-STORY-READY 2026-09-19 裁决：设置文件胜出——设置文件默认 100%=0dB 覆盖 bus_layout 默认 SFX -3dB；启动加载行为归 audio 005「音量控制行为」story，本 story 提供音量分类读/写/重置接口供其调用）
+- [ ] 设置面板打开 0.3s 滑入 / 关闭 0.2s 滑出（UX 已同步 0.3s）
 
 ---
 
@@ -86,17 +87,17 @@
 **[Integration — automated test specs]:**
 
 - **AC-3**: 滑条→总线端到端
-  - Given: 三条总线存在
+  - Given: BGM/SFX 总线存在（audio 001 交付）
   - When: 音乐滑条设为 50%
-  - Then: `AudioServer.get_bus_volume_db(Music)` == db_from_percent(50)（容差 ±0.01dB）
+  - Then: `AudioServer.get_bus_volume_db(BGM)` == db_from_percent(50)（容差 ±0.01dB）
   - Edge cases: 总音量 0% → Master 总线 -80dB
 
 **[UI — manual verification steps]:**
 
 - **AC-4**: 设置面板交互
   - Setup: 主菜单点击设置
-  - Verify: 0.3s 滑入；4 分类可见；拖动总音量滑条时 BGM 即时可听变化；关闭 0.2s 滑出
-  - Pass condition: 实时生效可感知、动画流畅、分类标签正确
+  - Verify: 0.3s 滑入；4 分类可见；拖动总音量滑条时 BGM 即时可听变化；键盘 ← → 调节滑条同样实时生效；关闭 0.2s 滑出
+  - Pass condition: 实时生效可感知（鼠标+键盘两路径）、动画流畅、分类标签正确
 
 ---
 
@@ -114,5 +115,5 @@
 
 ## Dependencies
 
-- Depends on: Story 001（设置入口）
-- Unlocks: Story 003/004/005（面板框架与分类容器）
+- Depends on: Story 001（设置入口）；audio-manager 001（S14-7——总线布局先行，QL-STORY-READY 2026-09-19 裁决加 blocker）
+- Unlocks: Story 003/004/005（面板框架与分类容器）；audio 005（音量控制行为——消费本 story 音量分类接口）

@@ -44,7 +44,17 @@ stories:
     status: backlog
     owner: "ui-programmer"
     estimate_days: 1.0
-    blocker: "14-2"
+    blocker: "14-2,14-7"
+    completed: ""
+
+  - id: "14-4a"
+    name: "分辨率枚举 API spike（DisplayServer screen_get_resolutions 查证）"
+    file: "production/sprints/sprint-14.md"
+    priority: must-have
+    status: backlog
+    owner: "ui-programmer"
+    estimate_days: 0.5
+    blocker: ""
     completed: ""
 
   - id: "14-4"
@@ -54,7 +64,7 @@ stories:
     status: backlog
     owner: "ui-programmer"
     estimate_days: 1.0
-    blocker: "14-3"
+    blocker: "14-3,14-4a"
     completed: ""
 
   - id: "14-5"
