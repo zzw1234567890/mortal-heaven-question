@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: Integration
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-09-19（QL-STORY-READY 裁决修订：GDD 修订义务入交付/挂载描述同步 ADR/AudioState 枚举归属）
 
 ## Context
 
@@ -15,10 +15,10 @@
 *(Requirement text lives in GDD 验收标准——TR 注册表暂无表现层条目)*
 
 **ADR Governing Implementation**: ADR-0031: 表现层架构基线（§1.2 PersistentLayer）
-**ADR Decision Summary**: AudioManager 为 RefCounted 控制类，启动时实例化并将 AudioStreamPlayer 节点池挂入 SceneManager PersistentLayer（root 直挂 Node，`register_persistent(node)` API）——**结构已定死，本 epic 不得改动**。总线引用一律按名称（子总线使整数索引不可靠）。
+**ADR Decision Summary**: AudioManager 为 RefCounted 控制类，启动时实例化并将 AudioStreamPlayer 节点池经 `SceneManager.register_persistent(node)` 挂入 PersistentLayer——**PersistentLayer 为 SceneManager（Autoload）子节点**（2026-09-09 code-review 修订后结构，非 root 直挂）——结构已定死，本 epic 不得改动。总线引用一律按名称（子总线使整数索引不可靠）。
 
 **Engine**: Godot 4.6 | **Risk**: HIGH（双焦点变更在 LLM 知识截止后，但本 story 无焦点交互）
-**Engine Notes**: AudioBusLayout 资产（`resources/audio/default_bus_layout.tres`）+ AudioServer 运行时管理。AudioServer 不可用的静默模式需可注入的包装层（headless 测试无法直接模拟）。
+**Engine Notes**: AudioBusLayout 资产（`resources/audio/default_bus_layout.tres`）+ AudioServer 运行时管理。**bus_layout 应用路径：project.godot `[audio] buses/default_bus_layout` 设置自动加载**（非代码调 set_bus_layout——AC-1 测试断言运行时 AudioServer 按名称查询）。AudioServer 不可用的静默模式需可注入的包装层（headless 测试无法直接模拟）。**两套默认 dB 关系**：bus_layout 资产默认 dB 为出厂基准；启动时设置文件覆盖（覆盖逻辑归 audio 005，QL-STORY-READY main-menu 002 裁决「设置文件胜出」）——本 story 只保证资产默认值正确，不读设置文件。
 
 **Control Manifest Rules (this layer)**:
 - Required: 总线按名称访问（`AudioServer.get_bus_index("BGM")`）；AudioServer 包装层可注入
@@ -36,6 +36,7 @@
 - [ ] AudioManager（RefCounted）启动实例化，AudioStreamPlayer 节点池挂入 PersistentLayer（ADR-0031 §1.2 定死结构）
 - [ ] AudioServer 不可用时进入静默模式：所有 API 调用 no-op 不崩溃，开发日志记录（边缘 #14）
 - [ ] 全部 API 骨架（play_sfx/play_bgm/stop_bgm/pause_all/resume_all/play_ambient/stop_ambient/set_bus_volume/get_bus_volume/toggle_mute/set_state）签名与 GDD §8 一致
+- [ ] **GDD 修订交付项**（R-06 关闭挂账——风险登记册 2026-09-13）：修订 `design/gdd/audio-system.md` L135——删除「5-30ms 间隙」表述，改为引用 `production/spikes/r06-ogg-loop-spike.md` 实测结论（4.6.3 WASAPI PCM 级零间隙），BGM 维持 WAV MVP；待解决问题 #5 标注已由 R-06 spike 验证关闭
 
 ---
 
@@ -43,8 +44,9 @@
 
 *Derived from ADR-0031 §1.2 Implementation Guidelines:*
 
-- PersistentLayer：SceneManager 启动时创建 root 直挂 Node；AudioManager 启动时实例化（RefCounted 控制类）并注册节点池。**此结构 audio epic 内任何 story 不得改动**。
+- PersistentLayer：SceneManager 启动时创建，**挂为 SceneManager（Autoload）子节点**（2026-09-09 code-review 修订）；AudioManager 启动时实例化（RefCounted 控制类）并经 `SceneManager.register_persistent(node)` 注册节点池。**此结构 audio epic 内任何 story 不得改动**。
 - **总线名称常量**：定义 `AudioBus` 枚举与名称映射（MASTER/BGM/SFX/UI/AMBIENT/VOICE），一切访问经 `get_bus_index(name)`——GDD 总线表中的「索引1/2/3」是结构示意，不作硬编码依据（QL-STORY-READY 2026-09-07：子总线占用索引使数值不稳定）。
+- **AudioState 枚举**（12 值，GDD §8）亦在本 story 定义——set_state 为空实现但类型完整，story 004 过渡矩阵直接消费（QL-STORY-READY 2026-09-19 裁决）。
 - AudioServer 包装：`AudioServerAdapter` 薄层（get/set bus volume、mute 检测）——静默模式 = 适配器检测 AudioServer 不可用后所有调用 no-op + 日志。可注入以便 headless 测试。
 - API 骨架空实现（后续 story 填充），签名与 GDD §8 完全一致。
 
