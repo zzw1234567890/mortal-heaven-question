@@ -1,5 +1,6 @@
 # QA Lead 记忆索引
 
+- [main-menu Story 001 QL 复审 2026-09-12](project_main-menu-story001-ql-review.md) — GAPS 3 BLOCKING（制作人员按钮矛盾、损坏数据源、存档摘要）
 - [main-menu QL 审查 2026-09](project_main-menu-ql-review.md) — 5 stories 全 GAPS；4 个阻塞裁决待用户解决
 - [QA Lead 工作约定](project_qa_conventions.md) — hud 先例标准、TR 占位、tests/unit 尚未建立、清单版本 2026-09-07
 - [combat-ui-interaction QL 审查 2026-09-07](project_combat-ui-interaction-ql-review.md) — 2 ADEQUATE/7 GAPS；10 项 BLOCKING（ESC 仲裁、备战事件流撞车、模式A键盘路径等）

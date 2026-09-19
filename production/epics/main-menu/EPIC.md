@@ -26,13 +26,13 @@ TR 注册表暂无表现层条目——需求以 GDD 验收标准编号占位：
 
 | AC 编号 | Requirement | ADR Coverage |
 |-------|-------------|--------------|
-| AC-main-menu-001~022 | main-menu-system.md §验收标准（22 条，含 dB 音量公式、存档槽、按键重绑定） | ADR-0031 ✅ |
+| AC-main-menu-001~022 | main-menu-system.md §验收标准（21 条——AC-main-menu-005 制作人员已移除 2026-09-19，含 dB 音量公式、存档槽、按键重绑定） | ADR-0031 ✅ |
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | 主菜单场景与按钮组（含制作人员） | UI（Integration 核心） | Ready | ADR-0031 |
+| 001 | 主菜单场景与按钮组 | UI（Integration 核心） | Ready | ADR-0031 |
 | 002 | 设置面板框架与音量控制 | UI（Logic 内核） | Ready | ADR-0031 |
 | 003 | 画面设置与应用/回退（含全局恢复默认） | UI（Logic 内核） | Ready | ADR-0031 |
 | 004 | 按键绑定界面（含启动加载） | UI（Logic 内核） | Ready | ADR-0031 |
@@ -42,7 +42,7 @@ TR 注册表暂无表现层条目——需求以 GDD 验收标准编号占位：
 
 This epic is complete when:
 - All stories are implemented, reviewed, and closed via `/story-done`
-- All acceptance criteria from `design/gdd/main-menu-system.md` are verified（22 条，含性能 AC）
+- All acceptance criteria from `design/gdd/main-menu-system.md` are verified（21 条——制作人员 AC 已移除 2026-09-19，含性能 AC）
 - All Logic and Integration stories have passing test files in `tests/`
 - All UI stories have evidence docs with sign-off in `production/qa/evidence/`
 - 设置变更即时生效并持久化（重启后保留）——AC 含此验证
