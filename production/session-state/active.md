@@ -2,8 +2,8 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: Sprint 13
-Task: S13-7 QA 签收完成（APPROVED WITH CONDITIONS）——下一步 /story-done 关闭 S13-7
+Feature: Sprint 14 预备
+Task: 全部 6 个实现类 must story 就绪度闭环（7242cda→b32691c）——09-21 冲刺启动
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -126,3 +126,40 @@ Task: S13-7 QA 签收完成（APPROVED WITH CONDITIONS）——下一步 /story-
 - 关键：009b 本地脚本不进 CI；R-02 provisional 关闭流程；分辨率 API 查证前置（main-menu 003）
 - Sprint 14 管线就绪：计划+QA 计划均已写入——冲刺 09-21 启动
 - 下一步：09-21 起按 sprint-status 顺序执行（S14-1 CI 或 main-menu 001 先行）
+
+## Session Extract — /story-readiness 2026-09-19（main-menu 001 冲刺前预备）
+- 判定：NEEDS WORK → QL-STORY-READY GAPS（3 BLOCKING + 4 ADVISORY）→ 用户三项裁决全推荐项 → 修订落地（提交 7242cda）
+- GAP-1 制作人员按钮 GDD/UX 矛盾 → 移除（4 按钮：新游戏/继续/设置/退出，整合到通关片尾）——GDD 回写 wireframe/按钮列表/制作人员节/状态表/动画表/UI 需求表/验收标准，EPIC.md 计数 22→21
+- GAP-2 has_continuable_save「全损坏→false」在 meta-list 输入下不可判定（meta.json 无损坏字段）→ 收窄语义：exists==true 判定，损坏检测归 load_game 读档时（与 AC-3 自洽）
+- GAP-3 存档摘要章节字段无数据源 → 降级「上次：[境界] · 游玩 [时长]」（realm+playtime 取自 meta.json）；GAP-4 Estimate 填 1.0d；GAP-5 焦点顺序 4 按钮+初始焦点=继续游戏（无存档回退新游戏）；GAP-6 损坏提示后按钮恢复可用入 AC
+- 附带：GDD 边界澄清新增 2 条（制作人员移除裁决+存档摘要数据源）；qa-lead 记忆新增 story001 审查记录
+- ADVISORY 遗留：GAP-7 制作人员返回路径（随移除裁决失效，无需处理）
+- 下一步：09-21 冲刺启动——S14-1 CI 或 S14-2 main-menu 001 /dev-story（story 已就绪，qa-lead 复审可在 dev-story 前快速过）
+
+## Session Extract — /story-readiness 2026-09-19（main-menu 002/003 冲刺前预备）
+- 判定：双双 GAPS（002：3 BLOCKING+3 ADVISORY；003：4 BLOCKING+5 ADVISORY）→ 用户七项裁决全推荐项 → 修订落地（提交 505143d）
+- 002：总线 Music→BGM 对齐 audio 001 + yaml 14-3 加 blocker 14-7；UX 规范同步（应用按钮 10i+滑条预览语义+AC-SET-01+0.3s 对齐）；SFX 默认冲突裁决设置文件胜出（启动加载归 audio 005）；键盘 ← → 滑条调节入 AC-4
+- 003：分辨率 API 引擎参考零覆盖（qa-lead 实测查证 12 文件）→ spike 独立条目 S14-4a（0.5d，yaml+sprint 计划已加）；画面类生效时机统一点应用；减少动态效果入 scope（AC-6）；恢复默认改注册机制（已注册分类重置+未实现占位不崩溃）；显示模式下拉移出 MVP
+- GDD 边界澄清新增 4 条裁决记录；UX main-menu.md 组件表/AC-SET-01/Data Requirements 同步
+- 遗留 ADVISORY（不阻塞）：002 滑条键盘路径已补；003 画质映射表数据文件断言方式、宽高比过滤规则（桌面宽高比）、720p 布局验证（AC-4 已补）
+- 关键排期影响：S14-4a spike（0.5d）加入 must 链——MUST 总量 6.0d→6.5d，利用率 87%（仍 <100%，Day-4 检查点保底）
+- 下一步：09-21 冲刺启动——S14-1 CI（无依赖）/ S14-4a spike（无依赖）可先行；main-menu 001→002 链按 blocker 顺序
+
+## Session Extract — /story-readiness 2026-09-19（audio 001 冲刺前预备）
+- 判定：GAPS（2 BLOCKING + 4 ADVISORY）→ 用户三项裁决全推荐项 → 修订落地（提交 8e17e27）
+- GAP-1 R-06 的 GDD 修订义务（audio-system.md L135「5-30ms 间隙」+ 问题 #5）无载体 → 入 story 交付项（新 AC——spike 实测零间隙，引 r06-ogg-loop-spike.md）
+- GAP-2「root 直挂 Node」过时描述 → 同步 ADR-0031 2026-09-09 修订版（SceneManager Autoload 子节点，经 register_persistent——scene_manager.gd L216 实存）
+- ADVISORY 全修：Estimate 1.0d / bus_layout 经 project.godot 自动加载 / 两套默认 dB 时序关系固化（出厂基准→audio 005 启动覆盖）/ AudioState 枚举 12 值入本 story 骨架
+- qa-lead 实证全过：11 API 签名与 GDD §8 一致、默认 dB 表一致、引擎参考 audio.md 有覆盖（无 spike 需求——与 003 分辨率零覆盖不同）
+- Sprint 14 预备就绪度总结：main-menu 001/002/003 + audio 001 四个 must story 闭环；修订链 7242cda→505143d→8e17e27
+- 排期注意：S14-3 加 blocker 14-7（audio 001 先行）；S14-4a spike 新条目——MUST 6.5d/7.5d=87%
+- 下一步：09-21 冲刺启动——S14-1 CI / S14-4a spike / S14-7 audio 001 三个无依赖入口任选（audio 001 做完即解锁 002 链）
+
+## Session Extract — /story-readiness 2026-09-19（009a/009b 冲刺前预备——就绪度清零）
+- 判定：双双 GAPS（009a：1 BLOCKING+2 ADVISORY；009b：3 BLOCKING+1 ADVISORY）→ 用户三项裁决全推荐项 → 修订落地（提交 b32691c）
+- 009a：get_rendering_info 引擎参考零覆盖（story 误写前提已有）→ AC-7 改官方文档为源+回写引擎参考义务+Monitor 降级路径；Dependencies 与 EPIC.md 顺序声明一致化（001 与 009a 并行前置）
+- 009b（三项 BLOCKING 同一根因——story 未吸收 stub 版提前到 Sprint 14 的 PR-SPRINT 监督条件 #3）：Dependencies 改仅依赖 009a+双复测义务登记（epic DoD 组件级+Sprint 15+interaction 峰值）；Implementation Notes 增 stub 版声明（占位原型构造，实测为原型级）；AC-1/2 加 stub 标注；AC-7 改 provisional 关闭；AC-4 720p 字号降级占位抽检（font_size_responsive 归 story 001）
+- qa-lead 结论：009b 三项 BLOCKING 是文本级而非结构级（不改变故事骨架），修复后无需全量复审
+- **Sprint 14 预备就绪度总结（本会话四连，6 story 全闭环）**：main-menu 001（7242cda）/ 002+003（505143d）/ audio 001（8e17e27）/ 009a+009b（b32691c）
+- 排期固化：S14-4a spike 新条目（0.5d）；14-3 加 blocker 14-7；MUST 6.5d/7.5d=87%（<100%，Day-4 检查点保底）
+- 下一步：09-21 冲刺启动——无依赖入口：S14-1 CI / S14-4a 分辨率 spike / S14-7 audio 001 / S14-5 009a（四个任选）；按 blocker 链推进
