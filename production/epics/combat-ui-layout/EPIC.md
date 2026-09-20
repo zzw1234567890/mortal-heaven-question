@@ -54,7 +54,7 @@ This epic is complete when:
 | 009a | R-02 合批方案定型（前置架构 spike） | Visual/Feel | Ready | ADR-0031 |
 | 009b | R-02 Draw Call 满场实测关口 | Visual/Feel | Ready | ADR-0031 |
 
-**实现顺序提示**：009a 排在 002 之前（合批方案定型后 002-006 按规范实现，避免独立纹理返工）；001 最先（建立共享纯函数模块与 `tests/unit/combat_ui/` 目录）；009b 在 001-008 全部完成后执行。
+**实现顺序提示**：009a 排在 002 之前（合批方案定型后 002-006 按规范实现，避免独立纹理返工）；001 与 009a 并行为 epic 前置（001 建立共享纯函数模块与 `tests/unit/combat_ui/` 目录，两者无依赖）；009b 在 Sprint 14 以 stub 版先行（QL-STORY-READY 2026-09-19 裁决——占位原型实测，R-02 provisional 关闭），001-008 完成后组件级复测为 epic 关口义务。
 
 ## Next Step
 

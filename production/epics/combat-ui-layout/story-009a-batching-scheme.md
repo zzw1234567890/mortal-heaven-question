@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: Visual/Feel（架构定型）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 0.5d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-09-19（QL-STORY-READY 裁决修订：API 核验改官方文档为源+回写引擎参考义务）
 
 ## Context
 
@@ -17,8 +17,8 @@
 **ADR Governing Implementation**: ADR-0031: 表现层架构基线（§5 渲染预算）
 **ADR Decision Summary**: 图集合批是 **Required pattern 而非事后优化**（ADR-0031 §5）——QL-STORY-READY 2026-09-07 裁决：本 story 拆分前置，**排在 story 002 之前**，产出合批实现规范供 002-006 按此实现，避免先独立纹理实现再全局返工。
 
-**Engine**: Godot 4.6 | **Risk**: HIGH（D3D12 默认渲染器 + Draw Call 测量 API 待引擎参考核验）
-**Engine Notes**: `RenderingServer.get_rendering_info(RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)` 属引擎参考验证范围——实现前核对 `docs/engine-reference/godot/`（4.4-4.6 变更风险）。D3D12 下测量须窗口模式本地运行（headless DC 数不具代表性）。
+**Engine**: Godot 4.6 | **Risk**: HIGH（D3D12 默认渲染器 + Draw Call 测量 API 待核验）
+**Engine Notes**: `RenderingServer.get_rendering_info(RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)` **引擎参考当前零覆盖**（QL-STORY-READY 2026-09-19 实测查证）——核验以**官方文档为源**（docs.godotengine.org 4.6 stable：RenderingServer.get_rendering_info + RenderingInfo 枚举），核验结论**回写 `docs/engine-reference/godot/modules/rendering.md`**；API 不可用则降级 Godot 内置调试器 Monitor 面板人工读数。D3D12 下测量须窗口模式本地运行（headless DC 数不具代表性）。
 
 **Control Manifest Rules (this layer)**:
 - Required: 合批方案文档化（图集结构/HP 条绘制方式/DC 分组方案）；基准原型场景实测
@@ -37,7 +37,7 @@
 - [ ] **基准原型场景**（纯节点无游戏逻辑）：16 角色卡原型实测每位 ≤4 DC
 - [ ] 合批实现规范文档产出（002-006 的实现依据）
 - [ ] fallback 裁剪优先级确认：1) 日志纯文字 Label 2) 飘字批量 RichTextLabel 3) 状态图标显示上限
-- [ ] DC 测量方法核验：引擎参考查证 get_rendering_info API + 本地测量脚本（009b 消费）
+- [ ] DC 测量方法核验：以**官方文档为源**（docs.godotengine.org 4.6 stable）确认 `get_rendering_info` + `RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME` 存在性与语义，核验结论回写 `docs/engine-reference/godot/modules/rendering.md`（当前零覆盖）；产出本地测量脚本（009b 消费）；API 不可用则降级调试器 Monitor 人工读数
 
 ---
 
@@ -92,5 +92,5 @@
 
 ## Dependencies
 
-- Depends on: None（本 epic 内最先执行，与 R-01 spike 同为 Sprint 14 前置）
-- Unlocks: Story 001-006（按方案实现）；Story 009b（复用测量方法）
+- Depends on: None（与 story 001 并行为 epic 前置——两者无依赖；002-006 须在本 story 放行后实现）
+- Unlocks: Story 002-006（按方案实现）；Story 009b（复用测量方法）
