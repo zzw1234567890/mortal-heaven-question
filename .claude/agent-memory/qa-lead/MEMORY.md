@@ -1,5 +1,8 @@
 # QA Lead 记忆索引
 
+- [combat-ui-layout 009a/009b QL 审查 2026-09-19](project_combat-ui-layout-009-ql-review.md) — 009a GAPS 1 BLOCKING（引擎参考无 get_rendering_info）；009b GAPS 3 BLOCKING（stub 矛盾/provisional/依赖）
+- [audio Story 001 QL 审查 2026-09-19](project_audio-story001-ql-review.md) — GAPS 2 BLOCKING（R-06 GDD 修订义务未承接、root 直挂表述过时）+4 ADVISORY；dB/API/PersistentLayer 已验证无缺口
+
 - [main-menu Story 002/003 QL 审查 2026-09-19](project_main-menu-story002-003-ql-review.md) — 均 GAPS；Music≠BGM 总线、UX 未同步应用/即时裁决、分辨率 API 零覆盖、减少动态无归属
 - [main-menu Story 001 QL 复审 2026-09-12](project_main-menu-story001-ql-review.md) — GAPS 3 BLOCKING（制作人员按钮矛盾、损坏数据源、存档摘要）
 - [main-menu QL 审查 2026-09](project_main-menu-ql-review.md) — 5 stories 全 GAPS；4 个阻塞裁决待用户解决
