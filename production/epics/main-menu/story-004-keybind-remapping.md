@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-09-20（QL-STORY-READY 裁决修订：注册机制承接+音频降级+InputMap 快照法）
 
 ## Context
 
@@ -35,8 +35,9 @@
 - [ ] 等待输入时按新键完成绑定+弹出确认（AC-main-menu-016）；按 ESC 取消等待返回列表（GDD 边界澄清 2026-09-07）
 - [ ] 新键已被其他功能绑定时提示「该键已绑定 [功能名]，是否覆盖？」覆盖/取消两分支（AC-main-menu-017）
 - [ ] 恢复默认按键（AC-main-menu-018；全局按钮经 Story 003 调用本 story 的分类重置接口）
+- [ ] **本 story 落地时向 Story 003 的恢复默认注册机制注册按键分类重置接口**（QL-STORY-READY 2026-09-20 裁决承接 2026-09-19 注册机制裁决：重置 = InputMap 恢复默认绑定 + 写设置文件 + 界面刷新；GDD 边界澄清「004/005 落地时各自注册」）
 - [ ] 自定义按键写入设置文件后，**游戏启动时从设置文件加载并应用 InputMap**（重启不失效）
-- [ ] 按键绑定成功 0.15s 弹出新键名；冲突时低沉警告音（音频事件触发）
+- [ ] 按键绑定成功 0.15s 弹出新键名；冲突时低沉警告音（音频事件触发——触发机制以 14-7 落地后的 AudioManager 契约为准，14-7 未完成时降级为日志占位）
 
 ---
 
@@ -51,6 +52,7 @@
 - 等待输入状态机：点击按键格 → 监听输入（ESC=取消）→ 键盘/鼠标同类互换判定 → 冲突检测（纯函数）→ 无冲突直接绑定 / 有冲突弹「覆盖/取消」→ 应用+持久化。
 - 动作列表从 InputMap 枚举或数据驱动配置生成（GDD 按键绑定表为初始默认）。
 - 启动加载：主菜单场景 `_ready` 时调用 `load_bindings()`（在首个游戏场景前生效）。
+- **恢复默认的 InputMap 重置机制**（QL-STORY-READY 2026-09-20 裁决）：**快照法**——启动时快照初始绑定（`_ready` 首次运行时保存 InputMap 当前 action→event 映射），恢复默认 = 回填快照 + 写设置文件 + 界面刷新。不用 `InputMap.load_from_project_settings()`（会波及未列入绑定表的动作，与「动作列表从 InputMap 枚举生成」的 Forbidden 规则冲突）。
 
 ---
 
@@ -58,7 +60,7 @@
 
 *Handled by neighbouring stories — do not implement here:*
 
-- Story 002/003: 设置面板框架、全局恢复默认按钮（本 story 提供按键分类重置接口）
+- Story 002/003: 设置面板框架、全局恢复默认按钮（本 story 提供**并注册**按键分类重置接口——注册到 Story 003 注册机制）
 - audio-manager epic: 冲突警告音本体（本 story 仅触发音频事件）
 - 游戏内（战斗/探索中）的实时按键重映射提示：非 MVP
 
@@ -82,7 +84,12 @@
   - Given: 绑定 F1→出牌1 并应用
   - When: 保存 → 重置 InputMap 为默认 → 从设置文件加载
   - Then: 该 action 的事件 == F1
-  - Edge cases: 多键多 action 同时保存加载；恢复默认后 InputMap == 初始定义
+  - Edge cases: 多键多 action 同时保存加载；恢复默认后 InputMap == 初始定义（快照法——启动时快照初始绑定，恢复默认=回填快照）
+
+- **AC-4**: 注册机制集成
+  - Given: 已自定义按键（如 F1→出牌1）且按键分类已向 Story 003 注册机制注册
+  - When: 全局恢复默认
+  - Then: InputMap 归位至初始定义且注册表遍历含按键分类（重置接口被调用：InputMap 恢复+写设置文件+界面刷新）
 
 **[UI — manual verification steps]:**
 
@@ -107,5 +114,5 @@
 
 ## Dependencies
 
-- Depends on: Story 002（设置面板框架）
+- Depends on: Story 002（设置面板框架）；Story 003（注册机制接口——2026-09-19 裁决，本 story 落地时注册按键分类）；audio 001（14-7，软依赖——警告音契约，未完成时日志占位）
 - Unlocks: None

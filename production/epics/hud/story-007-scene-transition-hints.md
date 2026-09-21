@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: UI
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 0.5d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-09-20（QL-STORY-READY 裁决修订：坊市降级纯函数级+时间注入方案+映射键 SceneID 对）
 
 ## Context
 
@@ -32,10 +32,10 @@
 *From GDD `design/gdd/hud-system.md` §7 过渡提示表，scoped to this story:*
 
 - [ ] 探索→战斗：「进入战斗」+ 战斗名称，持续 1s
-- [ ] 探索→商店：「坊市」图标浮现，持续 0.5s
+- [ ] 探索→商店：「坊市」图标浮现，持续 0.5s——**本 sprint 验证降级为纯函数级**（QL-STORY-READY 2026-09-20 裁决：shop_scene.tscn 不存在且 TransitionType 无对应值，场景级手动验证标 N/A，商店场景落地后补验）
 - [ ] 战斗→探索：无过渡提示（直接过渡）
 - [ ] 地图加载：「加载中...」进度指示，按加载时间显示
-- [ ] 提示由 SceneManager `pre_transition` 信号驱动，自动消失无需玩家交互
+- [ ] 提示由 SceneManager `pre_transition` 信号驱动，自动消失无需玩家交互（定时消失经**可注入计时器**实现——hud story 004 同款时间注入方案，测试以注入时钟推进）
 
 ---
 
@@ -43,10 +43,12 @@
 
 *Derived from ADR-0031 Implementation Guidelines:*
 
-- 订阅 `SceneManager.pre_transition(from, to, type)`，按 (from, to) 组合查提示映射表（数据驱动常量：组合 → {文本/图标, 时长}）。未映射组合（如战斗→探索）不显示。
+- 订阅 `SceneManager.pre_transition(from, to, type)`，按 **(from, to) SceneID 对**查提示映射表（数据驱动常量：组合 → {文本/图标, 时长}）——TransitionType 枚举无商店值，映射键用 SceneID 对而非 TransitionType（与 AC-1 edge「同一转场类型不同 TransitionType」对齐）。未映射组合（如战斗→探索）不显示。
 - 地图加载提示挂接 SceneManager 加载阶段（若加载为异步阶段则显示进度指示，加载完成由 `post_transition` 关闭）。
 - 提示层为 HUD CanvasLayer 内独立子容器，转场期间不受 Story 001 战斗隐藏规则影响（过渡发生在转场中，HUD 可见性切换前后均可显示）。
 - 与 Story 004 通知队列**相互独立**——过渡提示不进通知队列（不同生命周期与触发源）。
+- **定时消失经可注入计时器**（时间注入 API——hud story 004 同款方案）：测试以注入时钟推进 1s/0.5s 断言自动隐藏，无真实等待。
+- **探索→商店**（2026-09-20 裁决）：映射表含 (exploration, shop) 条目即可——纯函数级验证（AC-1 覆盖）；场景级手动验证 N/A（shop 场景未落地，归后续 shop 相关 story）。
 
 ---
 
@@ -76,7 +78,7 @@
 - **AC-2**: 信号驱动显示与自动消失
   - Given: HUD 已挂载
   - When: SceneManager 发射 `pre_transition(exploration, combat, ...)`
-  - Then: 提示容器 visible 且内容正确；时间推进 1s 后自动隐藏
+  - Then: 提示容器 visible 且内容正确；注入时钟推进 1s 后自动隐藏
   - Edge cases: 提示显示期间再次转场（旧提示替换/关闭，确定性规则）
 
 **[UI — manual verification steps]:**
@@ -93,7 +95,7 @@
 **Story Type**: UI（含 Logic 映射判定）
 **Required evidence**:
 - Logic: `tests/unit/hud/test_transition_hint_mapping.gd`（AC-1 映射纯函数）— must exist and pass（BLOCKING）
-- Integration: AC-2 信号驱动断言并入 `tests/integration/hud/hud_scene_visibility_test.gd`（与 Story 001 共用文件，追加用例）— must exist and pass（BLOCKING）
+- Integration: AC-2 信号驱动断言并入 `tests/integration/hud/test_hud_scene_visibility.gd`（与 Story 001 共用文件，追加用例——注意文件名）— must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/transition-hint-evidence.md` + sign-off（视觉效果手动验证）
 
 **Status**: [ ] Not yet created

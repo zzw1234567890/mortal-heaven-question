@@ -124,7 +124,7 @@ stories:
     status: backlog
     owner: "ui-programmer"
     estimate_days: 1.0
-    blocker: "14-3"
+    blocker: "14-3,14-4"
     completed: ""
 
   - id: "14-11"

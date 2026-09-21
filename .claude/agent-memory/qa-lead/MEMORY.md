@@ -1,5 +1,7 @@
 # QA Lead 记忆索引
 
+- [Sprint 14 should 层 QL 审查 2026-09-20](project_sprint14-should-ql-review.md) — 004/006/007 均 GAPS；max_val 恒 0 陷阱、地图名无数据源（is_fallen 模式）、shop 场景不存在、004 注册机制未承接
+
 - [combat-ui-layout 009a/009b QL 审查 2026-09-19](project_combat-ui-layout-009-ql-review.md) — 009a GAPS 1 BLOCKING（引擎参考无 get_rendering_info）；009b GAPS 3 BLOCKING（stub 矛盾/provisional/依赖）
 - [audio Story 001 QL 审查 2026-09-19](project_audio-story001-ql-review.md) — GAPS 2 BLOCKING（R-06 GDD 修订义务未承接、root 直挂表述过时）+4 ADVISORY；dB/API/PersistentLayer 已验证无缺口
 
