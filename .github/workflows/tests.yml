@@ -1,0 +1,72 @@
+# S14-1 CI 测试管道——Godot 4.6 headless + GUT 全量测试套件
+# 任务来源：Sprint 14 S14-1（must，0.5d timebox）
+# 规则依据：.claude/docs/coding-standards.md CI/CD 节——测试是阻塞关卡，坏测试即红
+# 注意：realm 的 test_ac010_realm_up_triggers_gsm_realm_changed 为已知 flaky（S14-9 根治），
+#       本 CI 不禁用、不跳过——若它在 CI 红了，这是真实信号。
+#       save_load 的 1 个 pending 为预期占位，不算失败。
+
+name: Tests
+
+on:
+  push:
+    branches: [master]      # 主干开发：push 到 master 触发
+  pull_request: {}          # 所有 PR 触发（无论目标分支）
+
+permissions:
+  contents: read            # 最小权限原则
+
+env:
+  # 与本地开发环境严格一致（本地为 4.6.3 stable win64）
+  # 升级引擎时仅需修改此一处
+  GODOT_VERSION: "4.6.3"
+
+jobs:
+  gut-tests:
+    name: GUT 全量测试（headless）
+    runs-on: ubuntu-latest
+    timeout-minutes: 40     # 本地全量（152 scripts / 2598 tests）约数分钟，留足余量防挂死
+    steps:
+      # 步骤 1：检出仓库（含已入库的 addons/gut/ 与 .gutconfig.json）
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      # 步骤 2：缓存 Godot 二进制（首次下载约 60s，后续命中缓存秒级恢复）
+      - name: 缓存 Godot 二进制
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-linux-x86_64-${{ env.GODOT_VERSION }}
+
+      # 步骤 3：下载并安装 Godot 4.6.3 stable Linux 版（自托管方案，版本完全可控）
+      - name: 安装 Godot ${{ env.GODOT_VERSION }}（Linux headless）
+        run: |
+          if [ ! -x "$HOME/godot/godot" ]; then
+            mkdir -p "$HOME/godot"
+            curl -fL -o /tmp/godot.zip \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+            unzip -q /tmp/godot.zip -d "$HOME/godot"
+            mv "$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$HOME/godot/godot"
+            chmod +x "$HOME/godot/godot"
+          fi
+          "$HOME/godot/godot" --version
+
+      # 步骤 4：缓存 .godot/ 导入缓存（.gitignore 已忽略该目录，CI 每次需重新导入；
+      #         以 project.godot 哈希为 key，项目配置变更时自动失效）
+      - name: 缓存资源导入缓存（.godot/）
+        uses: actions/cache@v4
+        with:
+          path: .godot
+          key: godot-import-v1-${{ hashFiles('project.godot') }}
+          restore-keys: godot-import-v1-
+
+      # 步骤 5：触发资源导入——headless 下必须先导入资源才能运行测试
+      - name: 导入项目资源
+        run: ~/godot/godot --headless --import
+
+      # 步骤 6：运行 GUT 全量测试套件
+      #         命令与本地验证一致（smoke-2026-09-11：2598 tests 全量通过）
+      #         -gexit 使 GUT 结束后退出并传递退出码：
+      #         配合 .gutconfig.json 的 failure_error_types=[engine, gut]，
+      #         任何测试失败 → 非零退出码 → CI 红
+      - name: 运行 GUT 全量测试
+        run: ~/godot/godot --headless -s addons/gut/gut_cmdln.gd -ginclude_subdirs -gdir=res://tests -gexit
