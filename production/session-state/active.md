@@ -2,8 +2,8 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: Sprint 14 预备
-Task: 全部 6 个实现类 must story 就绪度闭环（7242cda→b32691c）——09-21 冲刺启动
+Feature: Sprint 14 预备（全部就绪度清零）
+Task: should 层三 story 闭环（7b6d24c）——09-21 冲刺启动
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -163,3 +163,13 @@ Task: 全部 6 个实现类 must story 就绪度闭环（7242cda→b32691c）—
 - **Sprint 14 预备就绪度总结（本会话四连，6 story 全闭环）**：main-menu 001（7242cda）/ 002+003（505143d）/ audio 001（8e17e27）/ 009a+009b（b32691c）
 - 排期固化：S14-4a spike 新条目（0.5d）；14-3 加 blocker 14-7；MUST 6.5d/7.5d=87%（<100%，Day-4 检查点保底）
 - 下一步：09-21 冲刺启动——无依赖入口：S14-1 CI / S14-4a 分辨率 spike / S14-7 audio 001 / S14-5 009a（四个任选）；按 blocker 链推进
+
+## Session Extract — /story-readiness 2026-09-20（should 层三 story 冲刺前预备）
+- 判定：全 GAPS（004：1B+3A；006：2B+3A；007：2B+2A）→ 用户五项裁决全推荐项 → 修订落地（提交 7b6d24c）
+- main-menu 004：注册机制承接（AC 注册条目+AC-4 用例+blocker 加 14-4）；警告音降级日志占位；InputMap 重置快照法
+- hud 006：双路径订阅（max_val 恒 0+双写吞域信号——不改 GSM）；地图名附建最小表；层数 +1 换算；阈值 provisional
+- hud 007：坊市降级纯函数级（shop 场景未落地）；时间注入方案；映射键改 SceneID 对；集成文件名改正
+- qa-lead 核心发现：三 story 信号/枚举引用存在性全过，缺口集中在可实现性语义层（hud 002 is_fallen 同模式——5 BLOCKING 中 4 个纯文本修订级）
+- **Sprint 14 预备全景（两个会话五连，9 story 全闭环）**：must 6（001/002/003/audio001/009a/009b）+ should 3（004/006/007）——main-menu 001→7242cda、002/003→505143d、audio001→8e17e27、009a/b→b32691c、should 三连→7b6d24c
+- nice 层（main-menu 005/hud 008）未验——nice 层被裁概率高，留冲刺中按需
+- 下一步：09-21 冲刺启动——四无依赖入口任选：S14-1 CI / S14-4a 分辨率 spike / S14-7 audio 001 / S14-5 009a（main-menu 001 无 blocker 亦可）
