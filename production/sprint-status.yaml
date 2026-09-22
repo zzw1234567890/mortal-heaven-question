@@ -14,14 +14,14 @@ goal: "主菜单 001-003 + R-02 Draw Call 关闭（stub 版）+ CI 回归网 + a
 start: "2026-09-21"
 end: "2026-10-02"
 generated: "2026-09-13"
-updated: "2026-09-13"
+updated: "2026-09-21"
 
 stories:
   - id: "14-1"
     name: "CI 配置（GitHub Actions + GUT headless）"
     file: "production/sprints/sprint-14.md"
     priority: must-have
-    status: ready-for-dev
+    status: review
     owner: "lead-programmer"
     estimate_days: 0.5
     blocker: ""

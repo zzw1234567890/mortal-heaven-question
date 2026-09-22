@@ -1,9 +1,11 @@
 # S14-1 CI 测试管道——Godot 4.6 headless + GUT 全量测试套件
 # 任务来源：Sprint 14 S14-1（must，0.5d timebox）
 # 规则依据：.claude/docs/coding-standards.md CI/CD 节——测试是阻塞关卡，坏测试即红
-# 注意：realm 的 test_ac010_realm_up_triggers_gsm_realm_changed 为已知 flaky（S14-9 根治），
-#       本 CI 不禁用、不跳过——若它在 CI 红了，这是真实信号。
-#       save_load 的 1 个 pending 为预期占位，不算失败。
+# 已知非确定失败（TD-014，S14-9 根治，不禁用不跳过——红了是真实信号）：
+#   - realm test_ac010（GSM 帧末信号时序竞态，Linux CI 两跑两红）
+#   - card_system ac006/ac009（load_threaded 完成顺序竞态，Linux 间歇红）
+#   save_load 的 1 个 pending 为预期占位，不算失败。
+# 2026-09-21 event_system 8 个失败已修复（f187efc：before_each 自建事件子目录）
 
 name: Tests
 

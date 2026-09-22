@@ -2,8 +2,8 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: Sprint 14 预备（全部就绪度清零）
-Task: should 层三 story 闭环（7b6d24c）——09-21 冲刺启动
+Feature: Sprint 14（Day-2）
+Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交 S14-9；下一个入口 S14-7 audio 001 / S14-2 main-menu 001 / S14-5 009a
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -11,33 +11,21 @@ Task: should 层三 story 闭环（7b6d24c）——09-21 冲刺启动
 
 ## 当前任务
 
-**S13-5 hud 004 code-review 闭环完成**（2026-09-10，提交 e8fec98）：
+**S14-1 CI 配置——管道落地，残余失败已登记**（2026-09-21/22，提交 b429789 + f187efc）：
 
-- 三专家初判 CHANGES REQUIRED（B-1 幽灵 Toast 泄漏/B-2 滑入 OVERLAP 两 BLOCKING 实证 + H-1 HUD 转发缺口 + H-2 战斗通知矛盾）→ 用户裁决「修复全部后复审 + H-2 登记后置」
-- 修复：B-1 `_reconcile_toast_nodes` 对账 / B-2 双层结构（Control holder + SlidePanel `.from(-32)`）/ H-1 hud.gd 转发 / S-1 Tween 生命周期 / S-4 注释 / QA G-1/G-2/G-4 测试 / N-1 类型化（我方直修）
-- H-2 登记：GDD 待解决问题 #4 + story Engine Notes——combat_event 展示宿主归 combat-ui epic 裁决
-- 复审：GDScript APPROVED WITH SUGGESTIONS（4 ADVISORY：N-2 error 滑入被 blink 覆盖属声明取舍/N-3 301 行压线/N-4 键风格）+ Godot APPROVED（5/5 headless 实证：泄漏复现消除、OVERLAP=false、Tween 键空间回收）——零 REGRESSION
-- 测试：单元 77/77 + 集成 43/43 + 全量 2574 passing（realm flaky 本轮亦通过）
-- 已提交 e8fec98（src/tests/GDD/story 7 文件）
+- `.github/workflows/tests.yml`：GitHub Actions + Godot 4.6.3 Linux headless 自托管下载 + GUT 全量；缓存二进制与 .godot 导入缓存；push/PR 触发
+- 首跑 12 failing → 根因定位：event_system test_load_templates 8 个——向 `res://assets/events/<subdir>/` 写临时 .tres 但子目录是 git 不追踪的空目录，CI 干净检出后不存在 → ResourceSaver ERR_CANT_OPEN(19)。**git worktree 干净检出 100% 复现**
+- 修复（f187efc）：before_each 对 7 个 TEST_SUBDIRS `make_dir_recursive`（测试自建自清理，card_system fixture 同款模式）→ 二跑 12→3
+- 残余 3 个为测试非确定性（非代码 bug，非 CI 配置问题）：card_system ac006/ac009（load_threaded 完成顺序竞态，Linux 间歇红）+ realm ac010（已知 flaky）——**登记 TD-014 移交 S14-9**，CI 保持红是真实信号，不禁用不跳过
+- 工作流注释已更新已知失败清单；sprint-status.yaml 14-1 → review
 
-## 会话摘录——/code-review 2026-09-10（hud 004 修复闭环）
-- 判定：初判 CHANGES REQUIRED → 修复 → 双专家复审 APPROVED
-- 更改的文件：notification_toast_area.gd（B-1/B-2/S-1）、hud.gd（H-1/N-1）、notification_stack.gd（S-4 注释）、两测试文件（+4 测试）
-- 复审遗留 ADVISORY：N-2 error 通知无滑入位移（blink 同帧 kill，声明取舍）、N-3 文件 301 行压线、N-4 TYPE_META 键风格混用
-- 下一步：/story-done production/epics/hud/story-004-notification-system.md
+## 会话摘录——S14-1 CI 落地 2026-09-21/22
+- 文件：.github/workflows/tests.yml（新建）、tests/unit/event_system/test_load_templates.gd（before_each 自建目录）、docs/tech-debt-register.md（TD-014）、production/sprint-status.yaml（14-1 review）
+- 提交：b429789（工作流）、f187efc（测试修复）——均已推送
+- CI 运行：run 35594865340（12 fail）→ run 35719528459（3 fail，2595 pass）——管道本身工作正常
+- 经验：GitHub job 日志下载需 git credential token + 签名 URL 分段（blob 下载不稳需重试循环）
+- 下一步：S14-1 收尾（14-8 QA 签收时确认）；按 blocker 链选下一 story——S14-7 audio 001（解锁 main-menu 002 链）推荐
 
-## 会话摘录——/dev-story 2026-09-10（hud 004）
-- 故事：production/epics/hud/story-004-notification-system.md——通知/提示系统
-- 更改的文件：notification_stack.gd（新建 159 行）、notification_toast_area.gd + NotificationToastArea.tscn（新建 239 行）、HUD.tscn（挂载）、test_notification_stack.gd（28 测试）+ test_notification_request_interface.gd（6 测试）
-- 编写的测试：34/34 通过
-- 阻塞项：无
-- 偏差：GUT 信号断言 API 签名陷阱以注释留痕（第 5 参消息位吃进 index 槽位）
-- 下一步：/code-review src/ui/hud/notification_stack.gd src/ui/hud/notification_toast_area.gd → /story-done
-
-## 全量测试基线（2026-09-10 修复后更新）
-
-- Scripts: 150 / Tests: 2575 / Passing: 2574 / Pending: 1 / Failing: 0（本轮 realm flaky 亦通过——test_ac010 间歇性维持观察）
-- hud 单元：77/77；hud 集成：43/43
 
 ## Session Extract — /story-done 2026-09-11
 - Verdict：COMPLETE WITH NOTES
