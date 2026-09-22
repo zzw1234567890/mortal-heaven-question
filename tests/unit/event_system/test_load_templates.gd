@@ -24,6 +24,10 @@ var _test_files: Array[String] = []
 func before_each() -> void:
 	es = ES_SCRIPT.new()
 	_test_files.clear()
+	# 确保事件子目录存在——CI 干净检出后 git 不追踪的空目录不存在，
+	# ResourceSaver.save 会因 ERR_CANT_OPEN 失败（与 card_system fixture 同款自建模式）
+	for subdir: String in TEST_SUBDIRS:
+		DirAccess.make_dir_recursive_absolute("res://assets/events/%s" % subdir)
 	# 清理上次测试可能残留的 test_*.tres 文件（防止崩溃残留污染）
 	_cleanup_test_files()
 
