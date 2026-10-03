@@ -31,12 +31,12 @@
 
 *From GDD `design/gdd/audio-system.md`，scoped to this story:*
 
-- [ ] `default_bus_layout.tres` 定义 6 总线 + 3 SFX 子总线（Combat/Card/Explore SFX），默认 dB：Master 0 / BGM 0 / SFX -3 / UI -8 / Ambient -10 / Voice -1
-- [ ] 效果器：Master Limiter（ceiling -0.5dB）、SFX Limiter（ceiling -1dB）、Ambient Reverb（可选）
-- [ ] AudioManager（RefCounted）启动实例化，AudioStreamPlayer 节点池挂入 PersistentLayer（ADR-0031 §1.2 定死结构）
-- [ ] AudioServer 不可用时进入静默模式：所有 API 调用 no-op 不崩溃，开发日志记录（边缘 #14）
-- [ ] 全部 API 骨架（play_sfx/play_bgm/stop_bgm/pause_all/resume_all/play_ambient/stop_ambient/set_bus_volume/get_bus_volume/toggle_mute/set_state）签名与 GDD §8 一致
-- [ ] **GDD 修订交付项**（R-06 关闭挂账——风险登记册 2026-09-13）：修订 `design/gdd/audio-system.md` L135——删除「5-30ms 间隙」表述，改为引用 `production/spikes/r06-ogg-loop-spike.md` 实测结论（4.6.3 WASAPI PCM 级零间隙），BGM 维持 WAV MVP；待解决问题 #5 标注已由 R-06 spike 验证关闭
+- [x] `default_bus_layout.tres` 定义 6 总线 + 3 SFX 子总线（Combat/Card/Explore SFX），默认 dB：Master 0 / BGM 0 / SFX -3 / UI -8 / Ambient -10 / Voice -1
+- [x] 效果器：Master Limiter（ceiling -0.5dB）、SFX Limiter（ceiling -1dB）、Ambient Reverb（可选）
+- [x] AudioManager（RefCounted）启动实例化，AudioStreamPlayer 节点池挂入 PersistentLayer（ADR-0031 §1.2 定死结构）
+- [x] AudioServer 不可用时进入静默模式：所有 API 调用 no-op 不崩溃，开发日志记录（边缘 #14）
+- [x] 全部 API 骨架（play_sfx/play_bgm/stop_bgm/pause_all/resume_all/play_ambient/stop_ambient/set_bus_volume/get_bus_volume/toggle_mute/set_state）签名与 GDD §8 一致
+- [x] **GDD 修订交付项**（R-06 关闭挂账——风险登记册 2026-09-13）：修订 `design/gdd/audio-system.md` L135——删除「5-30ms 间隙」表述，改为引用 `production/spikes/r06-ogg-loop-spike.md` 实测结论（4.6.3 WASAPI PCM 级零间隙），BGM 维持 WAV MVP；待解决问题 #5 标注已由 R-06 spike 验证关闭
 
 ---
 
@@ -106,7 +106,7 @@
 - Integration: `tests/integration/audio/test_bus_layout.gd` — must exist and pass（BLOCKING）
 - Unit: `tests/unit/audio/test_audio_manager_api_skeleton.gd` — must exist and pass（BLOCKING）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created & passing（2026-09-24 验证：集成 19 pass + 单元 10 pass；全量 2626/2628——唯一 fail 为 realm ac010 TD-014 既有 flaky，与本 story 无关）
 
 ---
 
