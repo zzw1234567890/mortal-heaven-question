@@ -173,3 +173,13 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 提交：34e0383（feat 实现）+ 3ed43bc（story 勾选+证据状态）——均已推送；story 验收 6/6 勾选、Test Evidence 标 passing
 - sprint-status：14-7 → review
 - 下一步：/story-done production/epics/audio-manager/story-001-bus-layout-manager-skeleton.md（CI 观察随推送——预期仅 TD-014 已知红）
+
+## Session Extract — /story-done audio 001 2026-09-24
+- 判定：COMPLETE（6/6 AC 全过；测试证据 BLOCKING 项双满足）
+- 验证明细：文件存在性✓/GDD R-06 修订落地✓（L135+L620）/GDD §8 11 API 签名逐字对照✓/零新增 Autoload（恒 25 条）✓/硬编码值检查✓（仅 MUTE_VOLUME_DB 语义常量，dB 数据真源在 .tres）
+- QL-TEST-COVERAGE：ADEQUATE（full 模式 qa-lead 逐文件独立核实——B-1/H/GAP 修复全部真实存在，AC-1~4 全覆盖；3 条 ADVISORY：Reverb 参数归 006、静默恢复等价实例路径、隔离先例好评）
+- LP-CODE-REVIEW：已履行（三方并行审查闭环：CHANGES REQUIRED → 全修 → APPROVED WITH SUGGESTIONS）
+- story 状态：Complete + Completion Notes；EPIC.md 索引同步；sprint-status 14-7 → done（completed 2026-09-24）
+- 提交：34e0383（feat）+ 3ed43bc（story 勾选）+ 524a6fe（14-7 review）已推送；story-done 状态提交随本轮
+- **Sprint 14 进度**：must 7 项中 14-1✓ 14-7✓ 已完成，剩余 14-2（main-menu 001，无 blocker 可开工）/14-4a spike/14-3（blocker 14-2 未解）/14-4/14-5/14-6/14-8
+- 下一步：/story-readiness main-menu 001 → /dev-story（或 14-4a spike 无依赖入口任选）

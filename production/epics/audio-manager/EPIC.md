@@ -43,7 +43,7 @@ This epic is complete when:
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | AudioBusLayout 与 AudioManager 骨架（PersistentLayer） | Integration | Ready | ADR-0031 |
+| 001 | AudioBusLayout 与 AudioManager 骨架（PersistentLayer） | Integration | Complete | ADR-0031 |
 | 002 | BGM 通道——双播放器交叉淡化 | Logic | Ready | ADR-0031 |
 | 003 | SFX 池——16 节点池与淘汰/冷却/随机化 | Logic | Ready | ADR-0031 |
 | 004 | set_state() 编排与过渡矩阵（含 SceneManager 对齐） | Logic + Integration | Ready | ADR-0031 |

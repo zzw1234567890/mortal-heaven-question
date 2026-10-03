@@ -1,12 +1,12 @@
 # Story 001: AudioBusLayout 与 AudioManager 骨架（PersistentLayer 挂载）
 
 > **Epic**: 音频管理
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: Integration
 > **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-22（dev-story 启动——状态 in-progress）
+> **Last Updated**: 2026-09-24（story-done 关闭——验证 COMPLETE）
 
 ## Context
 
@@ -114,3 +114,11 @@
 
 - Depends on: None（SceneManager PersistentLayer 已实现）
 - Unlocks: Story 002~007（骨架与总线结构）
+
+## Completion Notes
+**Completed**：2026-09-24
+**Criteria**：6/6 通过（含 GDD 修订交付项——R-06 关闭挂账经 L135/L620 落地确认）
+**Deviations**：无阻塞偏差。ADVISORY 三项记录在案（Reverb 参数范围断言归 audio 006 消费时补；静默恢复语义为等价实例路径；既有 flaky realm ac010 归 TD-014/S14-9）
+**Test Evidence**：Integration `tests/integration/audio/test_bus_layout.gd`（19 pass）+ Unit `tests/unit/audio/test_audio_manager_api_skeleton.gd`（10 pass）——全量 2626/2628（1 fail = realm ac010 TD-014 既有 flaky，对照实验证明与本 story 无关；1 pending = 既有迁移链占位）
+**Code Review**：已完成（三方并行：godot-gdscript-specialist + godot-specialist + qa-tester）——初判 CHANGES REQUIRED（B-1 转场测试假覆盖）→ B-1/H-A/H-B/H-C + QA GAP-1~3 全部修复 → 复验通过（APPROVED WITH SUGGESTIONS；S 级建议登记归 story 002/005）
+**QL-TEST-COVERAGE**：ADEQUATE（qa-lead 逐文件独立核实——修复真实存在、AC-1~4 全覆盖）
