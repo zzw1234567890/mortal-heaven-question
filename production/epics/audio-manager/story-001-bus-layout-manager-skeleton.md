@@ -6,7 +6,7 @@
 > **Type**: Integration
 > **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-19（QL-STORY-READY 裁决修订：GDD 修订义务入交付/挂载描述同步 ADR/AudioState 枚举归属）
+> **Last Updated**: 2026-09-22（dev-story 启动——状态 in-progress）
 
 ## Context
 

@@ -91,7 +91,7 @@ stories:
     name: "audio-manager 001 总线+AudioManager 骨架"
     file: "production/epics/audio-manager/story-001-bus-layout-manager-skeleton.md"
     priority: must-have
-    status: ready-for-dev
+    status: in-progress
     owner: "engine-programmer"
     estimate_days: 1.0
     blocker: ""

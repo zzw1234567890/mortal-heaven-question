@@ -132,7 +132,7 @@ Godot 的 `AudioServer.set_bus_volume_db(bus_idx, volume_db)` 以 dB 为单位�
 - 场景切换时：旧BGM **淡出**，新BGM **淡入**（具体时长见过渡矩阵）
 - Boss 战时：战斗BGM直接切为Boss BGM
 - BGM 循环播放
-- **无间隙循环限制**：Godot 4.6 的 Ogg Vorbis 在循环边界存在约 5-30ms 间隙。缓解方案：BGM 资产使用 WAV 格式 + `AudioStreamWAV` 的 `loop_begin`/`loop_end` 属性手动设置循环点。如 WAV 文件过大，则使用 OGG 并接受轻微间隙（< 30ms）。
+- **无间隙循环**（2026-09-13 R-06 spike 实测修订）：Godot 4.6.3 的 `AudioStreamOggVorbis` 循环实测**零间隙、零相位跳变**（PCM 级测量，WASAPI 真实驱动，复跑稳定——详见 `production/spikes/r06-ogg-loop-spike.md`），此前「Ogg 循环边界存在约 5-30ms 间隙」的假设不成立。`loop = true` 属性即达样本级无缝循环，无需变通方案。BGM 资产**维持 WAV MVP 规格**（GDD §音频资产格式规范不变）；若后续内存吃紧可无损切换 Ogg（备选风险归零）。资产规格建议：BGM 按 48000Hz 制作可避免 44.1→48k 重采样伪影（轻微优化项）。
 
 **BGM 加载**：
 - 不是"流式"——Godot 不支持从磁盘流式播放。BGM 通过 `ResourceLoader.load_threaded_request()` **异步加载**到内存
@@ -617,5 +617,5 @@ Tween 过渡:
 | 2 | SFX 具体数量需在卡牌系统、战斗系统和探索系统的音频审计完成后最终确定（当前 MVP 估算 50 个） | 加载策略微调 | 架构阶段 |
 | 3 | 是否支持音频资源的热更新（不更新游戏本体替换音频）？取决于 Godot 导出打包方式 | 运维 | 架构阶段 |
 | 4 | 元婴/化神独立探索BGM、商店/事件BGM、身份选择BGM是否在Vertical Slice还是Full Vision追加 | 内容规划 | VS 规划时 |
-| 5 | Godot Ogg Vorbis 循环间隙（5-30ms）是否在 WAV 方案下完全消除？需在 MVP 原型的 Godot 4.6 上实测验证 | 技术验证 | 架构阶段 |
+| 5 | Godot Ogg Vorbis 循环间隙（5-30ms）是否在 WAV 方案下完全消除？需在 MVP 原型的 Godot 4.6 上实测验证 | 技术验证 | **已关闭**——已由 R-06 spike 验证关闭（2026-09-13）：两种格式循环均实测零间隙，详见 `production/spikes/r06-ogg-loop-spike.md` |
 | 6 | 完整配音管线（录音、本地化、唇同步）的范围和预算——Full Vision 决策 | 预算规划 | VS 后评估 |

@@ -140,6 +140,16 @@ var _transition: RefCounted = null
 ## 持久层子模块（惰性初始化，hud Story 001 / GAP-2 裁决）。
 var _persistent_layer: ScenePersistentLayer = null
 
+## AudioManager 实例（audio Story 001——RefCounted 控制类，非 Autoload）。[br]
+## 启动时惰性创建并持有引用（防 RefCounted 提前释放）——节点池经
+## [method register_persistent] 挂入 PersistentLayer（ADR-0031 §1.2）。[br]
+## [br]类型注记：AudioManager 虽定义于表现层，但 [code]class_name[/code]
+## 为全局注册类型，Foundation 层直接静态引用无循环依赖（audio_manager.gd
+## 只引用 AudioEnums/AudioServerAdapter，不反向引用 SceneManager 类型——
+## 同文件 [member _persistent_layer]: ScenePersistentLayer 先例）。静态类型
+## 使消费方免于运行时强转。
+var _audio_manager: AudioManager = null
+
 ## === 依赖注入 ==================================================================
 
 ## 注入的 GSM 引用。null 时使用 GameStateManager Autoload。
@@ -163,6 +173,9 @@ func _ready() -> void:
 	# PersistentLayer 创建（ADR-0031 §1.2——挂为 SceneManager 子节点，
 	# 见 scene_persistent_layer.gd 头注释的等价性说明）
 	_get_persistent_layer().ensure_layer()
+	# AudioManager 启动实例化（audio Story 001——零新增 Autoload，
+	# ADR-0031 §1.2：音频节点池经 PersistentLayer 挂载）
+	_get_audio_manager()
 
 ## === 依赖注入方法 ==============================================================
 
@@ -206,6 +219,31 @@ func _get_persistent_layer() -> ScenePersistentLayer:
 	if _persistent_layer == null:
 		_persistent_layer = ScenePersistentLayer.new(self)
 	return _persistent_layer
+
+
+## 惰性获取 AudioManager 实例（audio Story 001）。[br]
+## 优先消费外部已设置实例（测试经 [method set_audio_manager] 注入 mock）；
+## 否则新建 AudioManager 并将节点池挂入 PersistentLayer。[br]
+## [br][param scene_manager]: 经 [code]preload[/code] 常量静态解析——
+## 路径错误在解析期暴露（优于运行期 [code]load()[/code] 的 null 风险）。
+const _AUDIO_MANAGER_SCRIPT: GDScript = \
+		preload("res://src/ui/audio/audio_manager.gd")
+
+
+func _get_audio_manager() -> AudioManager:
+	if _audio_manager == null:
+		_audio_manager = _AUDIO_MANAGER_SCRIPT.new(self)
+	return _audio_manager
+
+
+## 获取 AudioManager 公共入口（各系统经此消费音频 API——零新增 Autoload）。
+func get_audio_manager() -> AudioManager:
+	return _get_audio_manager()
+
+
+## 注入 AudioManager 实例（测试专用——mock 替代真实创建）。
+func set_audio_manager(am: AudioManager) -> void:
+	_audio_manager = am
 
 ## === 公共 API ==================================================================
 

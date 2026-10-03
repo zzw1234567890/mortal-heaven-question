@@ -45,6 +45,10 @@ IdentitySelectionSystem="*res://src/feature/identity_selection_system.gd"
 StorySystem="*res://src/feature/story_system.gd"
 ProgressionSystem="*res://src/meta/progression_system.gd"
 
+[audio]
+
+buses/default_bus_layout="res://resources/audio/default_bus_layout.tres"
+
 [display]
 
 window/size/viewport_width=1920
