@@ -14,7 +14,7 @@ goal: "主菜单 001-003 + R-02 Draw Call 关闭（stub 版）+ CI 回归网 + a
 start: "2026-09-21"
 end: "2026-10-02"
 generated: "2026-09-13"
-updated: "2026-09-21"
+updated: "2026-09-24"
 
 stories:
   - id: "14-1"
@@ -91,7 +91,7 @@ stories:
     name: "audio-manager 001 总线+AudioManager 骨架"
     file: "production/epics/audio-manager/story-001-bus-layout-manager-skeleton.md"
     priority: must-have
-    status: in-progress
+    status: review
     owner: "engine-programmer"
     estimate_days: 1.0
     blocker: ""

@@ -161,3 +161,15 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - **Sprint 14 预备全景（两个会话五连，9 story 全闭环）**：must 6（001/002/003/audio001/009a/009b）+ should 3（004/006/007）——main-menu 001→7242cda、002/003→505143d、audio001→8e17e27、009a/b→b32691c、should 三连→7b6d24c
 - nice 层（main-menu 005/hud 008）未验——nice 层被裁概率高，留冲刺中按需
 - 下一步：09-21 冲刺启动——四无依赖入口任选：S14-1 CI / S14-4a 分辨率 spike / S14-7 audio 001 / S14-5 009a（main-menu 001 无 blocker 亦可）
+
+## Session Extract — audio 001 code-review 修复与提交 2026-09-24
+- 判定：三方审查（gdscript/godot 主专家/qa-tester）→ CHANGES REQUIRED（B-1 转场测试假覆盖）→ 用户裁决全修 → 闭环
+- B-1：补 test_audio_manager_node_pool_survives_real_transition（真实 change_scene_to_file + 帧轮询，hud 先例）+ 修正原测试误导注释
+- H-A：scene_manager 音频访问器 RefCounted→AudioManager 强类型 + preload 常量（解决 S-1）
+- H-B：adapter _missing_bus_warned 按总线去重一次性告警
+- H-C：守卫正则补 static func + 注释改述；S-6 refcounted 断言改 assert_false(am is Node)（Variant 持有避免解析器恒假报错——踩坑记录）
+- QA GAP-1~3 补齐：未知枚举防御/set_audio_manager 注入/null scene_manager 空池
+- 全量验证：2628 tests / 2626 pass / 1 pending / 1 fail——唯一 fail = realm ac010（TD-014 既有 flaky；对照实验证明与本次修改无关：还原旧版 scene_manager 后同败）
+- 提交：34e0383（feat 实现）+ 3ed43bc（story 勾选+证据状态）——均已推送；story 验收 6/6 勾选、Test Evidence 标 passing
+- sprint-status：14-7 → review
+- 下一步：/story-done production/epics/audio-manager/story-001-bus-layout-manager-skeleton.md（CI 观察随推送——预期仅 TD-014 已知红）
