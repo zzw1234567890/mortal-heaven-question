@@ -16,7 +16,9 @@ extends Control
 ## 读取（_ready + 返回主菜单时 [method _on_save_load_completed] 刷新）。[br]
 ## [br][b]场景导航[/b]：新游戏→身份选择经 [code]SceneManager.request_scene_change(
 ## MAIN_MENU, IDENTITY_SELECT)[/code]（control-manifest 必需——禁止直调
-## change_scene_to_file）；设置目标归 Story 002（Out of Scope——留桩禁用）。[br]
+## change_scene_to_file）；设置按钮（Story 002 恢复启用）→ 实例化
+## [SettingsPanel] 挂载本节点树并打开（ADR-0031 §1 场景内节点——设置面板为
+## 主菜单子 Control，非独立场景切换，不经 SceneManager）。[br]
 ## [br][b]损坏路径[/b]（GDD 边缘情况）：点击继续 → [code]load_game()[/code] 返回非
 ## SUCCESS 或 [signal SaveLoadSystem.save_corrupted] → 弹「存档损坏，无法读取」
 ## AcceptDialog → 确认后返回主菜单（按钮恢复可用）。[br]
@@ -60,6 +62,10 @@ const VERSION_FALLBACK: String = "v?"
 
 const Logic := preload("res://src/ui/main_menu/main_menu_logic.gd")
 
+## SettingsPanel 场景——设置面板实例化源（Story 002；场景内节点模式 ADR-0031 §1）。
+const SETTINGS_PANEL_SCENE: PackedScene = \
+		preload("res://src/ui/main_menu/SettingsPanel.tscn")
+
 ## SceneManager 脚本常量——枚举单一真理来源（SceneID/TransitionType 均为
 ## const，preload 引用不依赖 Autoload 实例存在，与注入式设计兼容——
 ## code-review H-1 裁决：替换裸数字，防枚举重排静默漂移）。
@@ -81,6 +87,10 @@ var animate: bool = true
 
 ## 入场 Tween 句柄（新请求时 kill 防悬挂——先例 PauseMenu._blur_tween）。
 var _intro_tween: Tween = null
+
+## 设置面板实例——复用式单例（首次点击实例化，重开不重建——关闭后
+## [code]visible=false[/code] 留树）。
+var _settings_panel: SettingsPanel = null
 
 ## === 节点引用 ==================================================================
 
@@ -229,11 +239,16 @@ func _on_continue_pressed() -> void:
 			!= SLScript.LoadResult.SUCCESS:
 		_show_corrupt_dialog()
 
-## 设置 → 目标界面归 Story 002（Out of Scope）——按钮禁用 + 留桩注释。[br]
-## story 裁决：不阻塞主流程；Story 002 落地时恢复启用并接 [method _on_settings_pressed]。
+## 设置 → 打开设置面板（AC-main-menu-007；Story 002 恢复启用）。[br]
+## 首次点击实例化 [SettingsPanel] 挂载本节点树（顶层 CanvasItem——
+## 覆盖主菜单按钮区）；重复点击复用实例。[member animate] 透传（reduce-motion
+## 接线点随设置面板动画行为统一）。
 func _on_settings_pressed() -> void:
-	# Story 002 留桩——设置面板本体不在本 story（Out of Scope）。
-	pass
+	if _settings_panel == null or not is_instance_valid(_settings_panel):
+		_settings_panel = SETTINGS_PANEL_SCENE.instantiate()
+		_settings_panel.animate = animate
+		add_child(_settings_panel)
+	_settings_panel.open()
 
 ## 退出 → 关闭进程（AC-main-menu-006；UX 规范：直接退出无确认）。
 func _on_quit_pressed() -> void:
