@@ -13,7 +13,7 @@ config_version=5
 config/name="仙途问道"
 config/description="Roguelike 修仙卡牌对战游戏 —— 从凡人到化神，步步为营"
 config/version="0.1.0-dev"
-run/main_scene="uid://b4505xn14slsi"
+run/main_scene="res://src/ui/main_menu/MainMenu.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://icon.svg"
 

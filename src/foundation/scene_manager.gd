@@ -65,7 +65,7 @@ signal post_transition(from: int, to: int)
 
 ## 编译时常量字典——所有场景文件路径的单一真理来源。O(1) 查询，无文件 I/O。
 const SCENE_PATHS: Dictionary = {
-	SceneID.MAIN_MENU:       "res://src/ui/main_menu/main_menu.tscn",
+	SceneID.MAIN_MENU:       "res://src/ui/main_menu/MainMenu.tscn",
 	SceneID.IDENTITY_SELECT: "res://src/ui/identity_select/identity_select.tscn",
 	SceneID.DECK_EDITING:    "res://src/ui/deck_editing/deck_editing.tscn",
 	SceneID.EXPLORATION:     "res://src/feature/exploration/exploration_scene.tscn",

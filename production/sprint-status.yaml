@@ -31,7 +31,7 @@ stories:
     name: "main-menu 001 主菜单场景与按钮组"
     file: "production/epics/main-menu/story-001-main-menu-scene.md"
     priority: must-have
-    status: ready-for-dev
+    status: in-progress
     owner: "ui-programmer"
     estimate_days: 1.0
     blocker: "14-1"

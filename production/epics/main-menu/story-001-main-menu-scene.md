@@ -6,7 +6,7 @@
 > **Type**: UI（含 Integration 核心）
 > **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-19（QL-STORY-READY 裁决修订：4 按钮/损坏语义收窄/存档摘要降级）
+> **Last Updated**: 2026-09-24（dev-story 启动——状态 in-progress）
 
 ## Context
 

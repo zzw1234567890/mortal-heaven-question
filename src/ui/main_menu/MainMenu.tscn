@@ -1,0 +1,100 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/main_menu/main_menu.gd" id="1_script"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.071, 0.071, 0.086, 1)
+
+[node name="LayoutAnchor" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 96.0
+offset_top = 120.0
+offset_right = 640.0
+offset_bottom = 608.0
+
+[node name="TitleLabel" type="Label" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_right = 480.0
+offset_bottom = 72.0
+text = "仙途问道"
+theme_override_font_sizes/font_size = 48
+
+[node name="ButtonBox" type="VBoxContainer" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_top = 128.0
+offset_right = 320.0
+offset_bottom = 480.0
+theme_override_constants/separation = 16
+
+[node name="NewGameButton" type="Button" parent="LayoutAnchor/ButtonBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 48)
+text = "新游戏"
+theme_override_font_sizes/font_size = 18
+
+[node name="ContinueButton" type="Button" parent="LayoutAnchor/ButtonBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 48)
+text = "继续游戏"
+theme_override_font_sizes/font_size = 18
+
+[node name="SaveSummaryLabel" type="Label" parent="LayoutAnchor/ButtonBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 20)
+theme_override_font_sizes/font_size = 13
+text = ""
+
+[node name="SettingsButton" type="Button" parent="LayoutAnchor/ButtonBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 48)
+disabled = true
+text = "设置"
+theme_override_font_sizes/font_size = 18
+
+[node name="QuitButton" type="Button" parent="LayoutAnchor/ButtonBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 48)
+text = "退出"
+theme_override_font_sizes/font_size = 18
+
+[node name="VersionLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -36.0
+offset_right = 224.0
+offset_bottom = -12.0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 13
+text = "v?"
+
+[node name="CorruptDialog" type="AcceptDialog" parent="."]
+dialog_text = "存档损坏，无法读取"
+
+[connection signal="pressed" from="LayoutAnchor/ButtonBox/NewGameButton" to="." method="_on_new_game_pressed"]
+[connection signal="pressed" from="LayoutAnchor/ButtonBox/ContinueButton" to="." method="_on_continue_pressed"]
+[connection signal="pressed" from="LayoutAnchor/ButtonBox/SettingsButton" to="." method="_on_settings_pressed"]
+[connection signal="pressed" from="LayoutAnchor/ButtonBox/QuitButton" to="." method="_on_quit_pressed"]
+[connection signal="confirmed" from="CorruptDialog" to="." method="_on_corrupt_dialog_confirmed"]
