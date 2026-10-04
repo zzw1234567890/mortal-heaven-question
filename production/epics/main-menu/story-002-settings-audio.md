@@ -6,7 +6,7 @@
 > **Type**: UI（Logic 内核）
 > **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-19（QL-STORY-READY 裁决修订：总线命名对齐/启动加载归属/滑条键盘路径）
+> **Last Updated**: 2026-10-04（QL-STORY-READY 裁决修订：AC-3 参数化三滑条全覆盖/AC-4 可听验证降级路径）
 
 ## Context
 
@@ -87,10 +87,10 @@
 **[Integration — automated test specs]:**
 
 - **AC-3**: 滑条→总线端到端
-  - Given: BGM/SFX 总线存在（audio 001 交付）
-  - When: 音乐滑条设为 50%
-  - Then: `AudioServer.get_bus_volume_db(BGM)` == db_from_percent(50)（容差 ±0.01dB）
-  - Edge cases: 总音量 0% → Master 总线 -80dB
+  - Given: Master/BGM/SFX 总线存在（audio 001 交付）
+  - When: 以 [BGM, SFX, Master] × [0%, 50%, 100%] 参数化轮换设置对应滑条（QL-STORY-READY 2026-10-04 修订：三滑条三总线全覆盖——SFX 漏测会成为永久盲区）
+  - Then: `AudioServer.get_bus_volume_db(总线)` == db_from_percent(输入)（容差 ±0.01dB）
+  - Edge cases: 总音量 0% → Master 总线 -80dB；100% → 0.0dB（is_equal_approx）
 
 **[UI — manual verification steps]:**
 
@@ -98,6 +98,7 @@
   - Setup: 主菜单点击设置
   - Verify: 0.3s 滑入；4 分类可见；拖动总音量滑条时 BGM 即时可听变化；键盘 ← → 调节滑条同样实时生效；关闭 0.2s 滑出
   - Pass condition: 实时生效可感知（鼠标+键盘两路径）、动画流畅、分类标签正确
+  - 可听验证降级路径（QL-STORY-READY 2026-10-04 修订）：若 audio 002（BGM 播放）未交付，「可听变化」可代之以 `AudioServer.get_bus_volume_db()` 表读数实时变化验证，可听确认推迟至 BGM 可播时补做（在证据文件中注明）
 
 ---
 
