@@ -31,14 +31,14 @@
 
 *From GDD `design/gdd/main-menu-system.md`，scoped to this story:*
 
-- [ ] 启动加载完成显示主菜单：标题 + 4 按钮（新游戏/继续游戏/设置/退出）+ 版本号（AC-main-menu-001；制作人员界面已移除——QL-STORY-READY 2026-09-19 裁决，整合到通关片尾）
-- [ ] 无存档时继续游戏按钮灰色不可用（AC-main-menu-002）
-- [ ] 有存档时点击继续游戏加载**最近**存档进入游戏（AC-main-menu-003）
-- [ ] 存档损坏时点击继续游戏弹「存档损坏，无法读取」提示并返回主菜单；提示关闭后继续按钮恢复可用态（GDD 边缘情况）
-- [ ] 点击新游戏进入身份选择界面（AC-main-menu-004）
-- [ ] 点击退出游戏关闭（AC-main-menu-006）
-- [ ] 有存档时继续按钮旁显示存档摘要「上次：[境界] · 游玩 [时长]」（realm+playtime 取自 meta.json；无存档时摘要行隐藏，布局占位保留）
-- [ ] 主菜单背景动画 D3D12 下 60fps（AC-main-menu-020）；1280×720 不溢出（AC-main-menu-021，支持下限）；Draw Call ≤50（AC-main-menu-022）
+- [x] 启动加载完成显示主菜单：标题 + 4 按钮（新游戏/继续游戏/设置/退出）+ 版本号（AC-main-menu-001；制作人员界面已移除——QL-STORY-READY 2026-09-19 裁决，整合到通关片尾）——test_navigation_focus_order_buttons_in_vbox + test_navigation_version_from_project_settings
+- [x] 无存档时继续游戏按钮灰色不可用（AC-main-menu-002）——test_continue_state_* + test_navigation_initial_focus_new_game_without_save
+- [x] 有存档时点击继续游戏加载**最近**存档进入游戏（AC-main-menu-003）——test_latest_save_* + test_corrupt_save_load_targets_latest_slot
+- [x] 存档损坏时点击继续游戏弹「存档损坏，无法读取」提示并返回主菜单；提示关闭后继续按钮恢复可用态（GDD 边缘情况）——test_corrupt_save_*（含 GAP-5 双触发源独立验证）
+- [x] 点击新游戏进入身份选择界面（AC-main-menu-004）——test_navigation_new_game_targets_identity_select（注：identity_select.tscn 为相邻 story 留桩，见 Completion Notes）
+- [x] 点击退出游戏关闭（AC-main-menu-006）——test_navigation_quit_calls_tree_quit（连接契约；真 quit 语义归 AC-5 手动）
+- [x] 有存档时继续按钮旁显示存档摘要「上次：[境界] · 游玩 [时长]」（realm+playtime 取自 meta.json；无存档时摘要行隐藏，布局占位保留）——test_save_summary_* + test_navigation_summary_*
+- [ ] 主菜单背景动画 D3D12 下 60fps（AC-main-menu-020）；1280×720 不溢出（AC-main-menu-021，支持下限）；Draw Call ≤50（AC-main-menu-022）——延迟验证：AC-5/AC-6 手动证据（Visual/Feel，production/qa/evidence/）
 
 ---
 
@@ -122,7 +122,7 @@
 - Integration: `tests/integration/main_menu/test_corrupt_save_continue.gd` + `test_menu_navigation.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/main-menu-scene-evidence.md` + sign-off
 
-**Status**: [ ] Not yet created
+**Status**: [x] 自动化证据已创建且通过（2026-10-04：单元 20/20 + 集成 20/20 + 全量 2667/2668 零失败）；[ ] UI 手动证据 production/qa/evidence/main-menu-scene-evidence.md 待创建
 
 ---
 
@@ -130,3 +130,14 @@
 
 - Depends on: 双焦点 spike（R-01，Sprint 13 首周前置 story——非本 epic 内 story）
 - Unlocks: Story 002~005（设置面板从主菜单入口打开）
+
+## Completion Notes
+**Completed**: 2026-10-04（自动化部分；UI 手动证据待补）
+**Criteria**: 7/8 勾选（1 延迟：AC-5/AC-6 性能与视觉项归手动证据——Visual/Feel 延迟验证）
+**Deviations**: 无
+**Test Evidence**: 单元 tests/unit/main_menu/（test_continue_button_state.gd 7 + test_latest_save_selection.gd 13）+ 集成 tests/integration/main_menu/（test_corrupt_save_continue.gd 9 + test_menu_navigation.gd 11）——全量 2667/2668 零失败（1 pending 为 migration chain 既有）
+**Code Review**: 已完成（三方专家：qa-tester GAPS + godot-specialist ISSUES FOUND + gdscript-specialist APPROVED WITH SUGGESTIONS → 用户裁决全修闭环——BLOCKER-1 主场景 uid 指向旧原型 / H-1 枚举去魔数 / H-2 Variant 注解 / H-3 重入守卫 / GAP-1 焦点真实路径 / GAP-3 竞态分支 / GAP-4 静态守卫 / GAP-5 双触发源 / S-1 文案统一 / S-6 offset 修正）
+
+**已知留桩（QL 留桩语义裁决 2026-10-04）**：
+- 新游戏按钮转场目标 `identity_select.tscn` 尚不存在（身份选择 UI story 范围，Out of Scope）——当前点击经 SceneManager 错误恢复路径静默回退主菜单。AC-4 导航请求正确性已由 mock 测试覆盖；真实目标场景落地后此留桩自动消除，非缺陷。
+- 设置按钮 disabled 留桩（Story 002 范围）。
