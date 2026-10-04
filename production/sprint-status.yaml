@@ -14,7 +14,7 @@ goal: "主菜单 001-003 + R-02 Draw Call 关闭（stub 版）+ CI 回归网 + a
 start: "2026-09-21"
 end: "2026-10-02"
 generated: "2026-09-13"
-updated: "2026-09-24"
+updated: "2026-10-04"
 
 stories:
   - id: "14-1"
@@ -31,11 +31,11 @@ stories:
     name: "main-menu 001 主菜单场景与按钮组"
     file: "production/epics/main-menu/story-001-main-menu-scene.md"
     priority: must-have
-    status: in-progress
+    status: done
     owner: "ui-programmer"
     estimate_days: 1.0
     blocker: "14-1"
-    completed: ""
+    completed: "2026-10-04"
 
   - id: "14-3"
     name: "main-menu 002 设置面板框架与音量控制"
