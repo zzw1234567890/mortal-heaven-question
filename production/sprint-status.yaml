@@ -14,7 +14,7 @@ goal: "主菜单 001-003 + R-02 Draw Call 关闭（stub 版）+ CI 回归网 + a
 start: "2026-09-21"
 end: "2026-10-02"
 generated: "2026-09-13"
-updated: "2026-10-04"
+updated: "2026-10-05"
 
 stories:
   - id: "14-1"
@@ -41,11 +41,11 @@ stories:
     name: "main-menu 002 设置面板框架与音量控制"
     file: "production/epics/main-menu/story-002-settings-audio.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: "ui-programmer"
     estimate_days: 1.0
     blocker: "14-2,14-7"
-    completed: ""
+    completed: "2026-10-05"
 
   - id: "14-4a"
     name: "分辨率枚举 API spike（DisplayServer screen_get_resolutions 查证）"

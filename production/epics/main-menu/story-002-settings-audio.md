@@ -1,12 +1,12 @@
 # Story 002: 设置面板框架与音量控制
 
 > **Epic**: 主菜单与设置
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
 > **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-10-04（QL-STORY-READY 裁决修订：AC-3 参数化三滑条全覆盖/AC-4 可听验证降级路径）
+> **Last Updated**: 2026-10-05
 
 ## Context
 
@@ -31,12 +31,12 @@
 
 *From GDD `design/gdd/main-menu-system.md`，scoped to this story:*
 
-- [ ] 点击设置打开设置界面，含音效/画面/按键/语言 4 个分类（AC-main-menu-007）
-- [ ] 拖动音量滑条时对应总线音量**实时**变化（经 `db_from_percent` 转换）（AC-main-menu-008）
-- [ ] 三条音量滑条：总音量(Master)/音乐音量(BGM)/音效音量(SFX)（0~100%，1% 步进；键盘 ← → 可调节——UX 10a 交互声明）
-- [ ] 点击「应用」时音量值持久化写入设置文件；未保存关闭时回滚到已保存值
-- [ ] 启动音量真值 = 设置文件值覆盖总线默认 dB（QL-STORY-READY 2026-09-19 裁决：设置文件胜出——设置文件默认 100%=0dB 覆盖 bus_layout 默认 SFX -3dB；启动加载行为归 audio 005「音量控制行为」story，本 story 提供音量分类读/写/重置接口供其调用）
-- [ ] 设置面板打开 0.3s 滑入 / 关闭 0.2s 滑出（UX 已同步 0.3s）
+- [x] 点击设置打开设置界面，含音效/画面/按键/语言 4 个分类（AC-main-menu-007）
+- [x] 拖动音量滑条时对应总线音量**实时**变化（经 `db_from_percent` 转换）（AC-main-menu-008）
+- [x] 三条音量滑条：总音量(Master)/音乐音量(BGM)/音效音量(SFX)（0~100%，1% 步进；键盘 ← → 可调节——UX 10a 交互声明）
+- [x] 点击「应用」时音量值持久化写入设置文件；未保存关闭时回滚到已保存值
+- [x] 启动音量真值 = 设置文件值覆盖总线默认 dB（QL-STORY-READY 2026-09-19 裁决：设置文件胜出——设置文件默认 100%=0dB 覆盖 bus_layout 默认 SFX -3dB；启动加载行为归 audio 005「音量控制行为」story，本 story 提供音量分类读/写/重置接口供其调用）
+- [x] 设置面板打开 0.3s 滑入 / 关闭 0.2s 滑出（UX 已同步 0.3s）
 
 ---
 
@@ -110,7 +110,7 @@
 - Integration: `tests/integration/main_menu/test_volume_bus_apply.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/settings-audio-evidence.md` + sign-off
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created — `production/qa/evidence/settings-audio-evidence.md`（2026-10-05 签收）
 
 ---
 
@@ -118,3 +118,23 @@
 
 - Depends on: Story 001（设置入口）；audio-manager 001（S14-7——总线布局先行，QL-STORY-READY 2026-09-19 裁决加 blocker）
 - Unlocks: Story 003/004/005（面板框架与分类容器）；audio 005（音量控制行为——消费本 story 音量分类接口）
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-10-05
+**Criteria**: 6/6 通过（AC-1/AC-6 UI 手动验证已签收；可听验证按降级路径以总线 dB 表读数代证）
+**Deviations**:
+- 未保存关闭无确认弹窗（story AC 直接回滚语义——确认弹窗归 Story 003 统一脏检测机制）
+- 可听验证降级：audio-manager 002（BGM 播放）未交付，「可听变化」以 `AudioServer.get_bus_volume_db()` 表读数代证（自动化已钉死），可听确认推迟至 BGM 可播时补做
+**Test Evidence**:
+- 单元 51/51：test_db_from_percent（9）+ test_settings_rollback（6）+ test_settings_store（10）+ test_settings_panel_close_paths（6）
+- 集成 25/25：test_volume_bus_apply（5，含 use_parameters 9 组参数化三滑条×三档）
+- UI 手动证据：`production/qa/evidence/settings-audio-evidence.md`（2026-10-05 签收）
+**Code Review**: APPROVED WITH SUGGESTIONS（QL-TEST-COVERAGE ADEQUATE + LP-CODE-REVIEW APPROVED WITH SUGGESTIONS）
+**记账项（不阻塞，归后续 story）**:
+- InputManager `tree_changed` 清栈（H-1）——归 InputManager 属主修正
+- main_menu.gd 308 行超限——归 Story 003 前置拆分
+- 模态关闭一致性（关闭后焦点恢复 + 锁释放时序）——与 PauseMenu 打包修复
+- 滑出终点在屏内（M-2）/ 设置文件原子性（S-4）——归视觉打磨 story

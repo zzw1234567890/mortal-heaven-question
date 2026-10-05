@@ -33,7 +33,7 @@ TR 注册表暂无表现层条目——需求以 GDD 验收标准编号占位：
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
 | 001 | 主菜单场景与按钮组 | UI（Integration 核心） | Complete | ADR-0031 |
-| 002 | 设置面板框架与音量控制 | UI（Logic 内核） | Ready | ADR-0031 |
+| 002 | 设置面板框架与音量控制 | UI（Logic 内核） | Complete | ADR-0031 |
 | 003 | 画面设置与应用/回退（含全局恢复默认） | UI（Logic 内核） | Ready | ADR-0031 |
 | 004 | 按键绑定界面（含启动加载） | UI（Logic 内核） | Ready | ADR-0031 |
 | 005 | 语言切换与本地化即时生效 | UI + Integration | Ready | ADR-0031 |
