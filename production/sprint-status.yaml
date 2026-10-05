@@ -51,11 +51,11 @@ stories:
     name: "分辨率枚举 API spike（DisplayServer screen_get_resolutions 查证）"
     file: "production/sprints/sprint-14.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: "ui-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-10-05"
 
   - id: "14-4"
     name: "main-menu 003 画面设置与应用/回退"
