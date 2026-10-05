@@ -23,9 +23,19 @@ const BUSES: Array[int] = [0, 1, 2]  # MASTER / BGM / SFX
 var _temp_path: String = ""
 var panel: Control = null
 var store: Object = null
+## 总线原值快照——after_each 还原（快照模式，与 test_volume_bus_apply.gd
+## 同源；code-review M-3/GAP-1 裁决：定值复位会跨套件污染 SFX -3dB 布局默认）。
+var _orig_bus_dbs: Dictionary = {}
 
 
 func before_each() -> void:
+	# 总线原值快照（before 取值——测试自清理基准）
+	_orig_bus_dbs = {}
+	for bus: int in BUSES:
+		var idx: int = AudioServer.get_bus_index(
+				AudioEnums.BUS_NAMES[bus])
+		if idx >= 0:
+			_orig_bus_dbs[bus] = AudioServer.get_bus_volume_db(idx)
 	# 临时文件路径——每次测试独立（绝无跨测试共享可变状态）
 	_temp_path = "user://settings_test_%d.json" % (Time.get_ticks_msec() \
 			% 1000000 + randi() % 1000)
@@ -43,10 +53,8 @@ func before_each() -> void:
 
 
 func after_each() -> void:
-	# 总线还原（集成测试自清理——story 裁决）：以 default_bus_layout 出厂值
-	# 为基准不现实（SFX -3dB 等），还原到测试进入时快照最稳妥——但更简单的
-	# 项目惯例（test_volume_bus_apply 同源）：统一复位到布局默认 0dB 语义
-	# 由总线测试自行覆盖，这里恢复到保存前的确定值。
+	# 总线还原（集成测试自清理——story 裁决）：还原到测试进入时快照
+	# （code-review M-3/GAP-1：不跨套件污染布局默认值——SFX 出厂 -3dB）。
 	_restore_buses()
 	if panel != null and is_instance_valid(panel):
 		panel.free()
@@ -58,11 +66,12 @@ func after_each() -> void:
 
 
 func _restore_buses() -> void:
-	for bus: int in BUSES:
+	## 总线还原到 before_each 快照（非定值复位——见 after_each 注释）。
+	for bus: int in _orig_bus_dbs.keys():
 		var idx: int = AudioServer.get_bus_index(
 				AudioEnums.BUS_NAMES[bus])
 		if idx >= 0:
-			AudioServer.set_bus_volume_db(idx, 0.0)
+			AudioServer.set_bus_volume_db(idx, float(_orig_bus_dbs[bus]))
 
 
 func _read_file_raw() -> String:
