@@ -153,6 +153,9 @@ func test_open_twice_is_idempotent_keeps_lock_single() -> void:
 			"二次 open 应幂等跳过（滑条不被重置）")
 	assert_true(panel.visible, "面板应保持打开")
 	assert_true(_lock_stack_holds_settings(), "锁应仍在栈中（幂等无副作用）")
+	# GAP-C1 补强（QL-TEST-COVERAGE ADVISORY）：钉死幂等路径的警告侧输出——
+	# 二次 open 应 push_warning 1 次（行为已验证，此处补诊断输出回归守卫）。
+	assert_push_warning_count(1, "二次 open 应 push_warning 1 次")
 
 
 func test_exit_tree_open_state_releases_lock() -> void:
