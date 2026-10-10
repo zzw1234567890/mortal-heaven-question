@@ -1,58 +1,39 @@
 class_name SettingsPanel
 extends Control
-## SettingsPanel —— 设置面板覆盖层（main-menu Story 002）。
+## SettingsPanel —— 设置面板覆盖层（main-menu Story 002/003）。
 ##
-## [b]结构[/b]：全屏遮罩（[code]DimMask[/code] 半透明暗色，UX「设置面板打开」
-## 状态变体）+ 左侧面板 [code]Panel[/code]（宽 640 = 1920 基准的 1/3——UX 面板级
-## 过渡「覆盖左 1/3 留出背景可见，保留右侧水墨世界」）。[br]
-## [br][b]4 分类标签页框架[/b]（AC-main-menu-007）：TabContainer 音效/画面/按键/
-## 语言——音效分类本 story 实现（三滑条 Master/BGM/SFX，QL-STORY-READY
-## 2026-09-19 裁决一一对应），后三类占位容器归 Story 003/004/005 填充。[br]
-## [br][b]音量生效/持久化时机[/b]（GDD 边界澄清 2026-09-07 + story 裁决）：[br]
-## 1. 拖动 [code]value_changed[/code] → [b]实时[/b] [code]AudioServer.
-## set_bus_volume_db()[/code]（即时可听——AC-main-menu-008）；[br]
-## 2. 点「应用」→ 写设置文件（ADR-0031 §2.1 持久设置直写
-## [code]user://settings.json[/code]，不经 GSM 不经 SaveLoadSystem）；[br]
-## 3. 未保存关闭 → 总线回滚到已保存值（[member _saved_volumes] 快照——
-## 拖动中零文件写入，guardrail）。[br]
-## [br][b]总线访问[/b]：一律 [code]AudioServer.get_bus_index(名称)[/code] 动态查找
-## （[code]AudioEnums.BUS_NAMES[/code] 单一真源——禁硬编码索引）。[br]
-## [br][b]输入锁[/b]（ADR-0031 §4 + ADR-0004）：打开时 push MODAL 锁
-## （底层主菜单输入冻结），关闭/退出树时 pop 配对；ESC 经
-## [method _unhandled_input] 兜底接收（先例 [PauseMenu] B-3——模态拥有者
-## 自判 [code]has_lock[/code]；MODAL 锁使 InputManager 路径 B 不拦截本面板的
-## ESC，主菜单未来 ESC 语义不受影响）。[br]
-## [br][b]动画[/b]：打开 0.3s 滑入（自右侧位移入位，ease-out）/ 关闭 0.2s 滑出
-## （ease-in）——story AC 时长（UX 已同步）。[member animate] 为测试注入 +
-## reduce-motion 预留接线点（先例 [member MainMenu.animate]）。[br]
-## [br][b]零轮询[/b]：无 [code]_process()[/code]（滑条信号驱动）。
+## [b]形态[/b]（ADR-0031 §1）：场景内 Control 树，由 [MainMenu] 实例化挂载。[br]
+## [br][b]分类[/b]：TabContainer 四标签——音效（Story 002，实时生效）/ 画面
+## （Story 003，统一「点应用」生效）/ 按键绑定（占位）/ 语言（占位）。[br]
+## [br][b]画面类统一「点应用」生效[/b]（QL-STORY-READY 2026-09-19）：
+## [GraphicsTab] 控件收集待应用值，[method _on_apply_pressed] 统一写引擎
+## + 持久化写文件；关闭时有未应用变更 → 弹确认弹窗（AC-main-menu-013）。[br]
+## [br][b]全局恢复默认[/b]（AC-main-menu-014）：[method _on_reset_all_pressed]
+## 遍历已注册分类逐个重置 + 各 tab 刷新控件。[br]
+## [br][b]零轮询[/b]：无 [code]_process()[/code]。
 ##
 ## @experimental
-## 来源: ADR-0031 §2.1/§4、design/gdd/main-menu-system.md §公式/§边缘情况、
-## design/ux/main-menu.md 10a~10m + 面板级过渡、story-002-settings-audio.md。
+## 来源: ADR-0031、story-002-settings-audio.md、story-003-settings-graphics.md。
 
-## === Visual 常量（数据驱动）====================================================
+## === Visual 常量 ================================================================
 
-## 打开滑入时长（story AC「打开 0.3s 滑入」——UX 面板级过渡已同步 0.3s）。
 const OPEN_DURATION: float = 0.3
-## 关闭滑出时长（story AC「关闭 0.2s 滑出」）。
 const CLOSE_DURATION: float = 0.2
-## 滑入起始位移（px，自右侧入位——UX「从右侧滑入」；数值 = 面板宽度 640）。
 const SLIDE_OFFSET: float = 640.0
-
-## MODAL 锁 source——push/pop 配对标识（ADR-0004）。
 const LOCK_SOURCE: StringName = &"settings_panel"
 
-## === Logic 内核（preload——先例 MainMenu.Logic 模式）==========================
+## === Logic 内核 =================================================================
 
 const Logic := preload("res://src/ui/main_menu/settings_logic.gd")
+const GfxLogic := preload("res://src/ui/main_menu/settings_graphics_logic.gd")
+const StoreScript := preload("res://src/ui/main_menu/settings_store.gd")
 
-## === 固定 UI 词条（本地化豁免注记——先例 MainMenu.TEXT_*：项目暂无本地化
-## 系统，入库后替换为键）=========================================================
+## === 固定 UI 词条 ===============================================================
 
 const TEXT_TITLE: String = "设置"
 const TEXT_CLOSE: String = "关闭"
 const TEXT_APPLY: String = "应用"
+const TEXT_RESET_ALL: String = "恢复默认"
 const TEXT_TAB_AUDIO: String = "音效"
 const TEXT_TAB_GRAPHICS: String = "画面"
 const TEXT_TAB_KEYBINDS: String = "按键绑定"
@@ -60,35 +41,29 @@ const TEXT_TAB_LANGUAGE: String = "语言"
 const TEXT_MASTER: String = "总音量"
 const TEXT_BGM: String = "音乐音量"
 const TEXT_SFX: String = "音效音量"
-## 占位分类文案（内容归 Story 003/004/005——本 story 仅框架容器）。
-const TEXT_PLACEHOLDER_GRAPHICS: String = "画面设置（待实现）"
 const TEXT_PLACEHOLDER_KEYBINDS: String = "按键绑定（待实现）"
 const TEXT_PLACEHOLDER_LANGUAGE: String = "语言（待实现）"
+## 未保存确认弹窗文案（AC-main-menu-013）。
+const TEXT_UNSAVED_CONFIRM: String = "未保存的设置将丢失，确认退出？"
 
-## === 依赖注入（测试可替换）=====================================================
+## === 依赖注入 ===================================================================
 
-## 设置文件读写模块——null 时新建（默认路径 user://settings.json）；
-## 测试注入临时路径实例（先例 PauseMenu.audio_adapter 注入模式）。
 var settings_store: SettingsStore = null
-## 动画开关——测试注入 + reduce-motion 预留接线点（先例 MainMenu.animate）。
 var animate: bool = true
 
-## === 瞬态交互状态（ADR-0031 §2.1）=============================================
+## === 瞬态交互状态 ===============================================================
 
-## 已保存音量快照（{AudioBus 枚举: int 百分比}）——打开时从设置文件读取，
-## 应用成功后更新；未保存关闭的回滚目标。[b]非游戏状态[/b]——面板 UI 脏检测
-## 基准（story：与 Story 003 共用脏检测/回滚机制）。
 var _saved_volumes: Dictionary = {}
-## MODAL 锁持有标志——_exit_tree 兜底 pop 配对（防泄漏锁）。
+## 已保存画面设置快照——打开时从文件读取，应用成功后更新；关闭时脏检测基准。
+var _saved_graphics: Dictionary = {}
 var _lock_held: bool = false
-## 关闭中标志——滑出动画期间屏蔽交互（重复关闭/滑条信号）。
 var _closing: bool = false
-## 滑入/滑出 Tween 句柄（重入时 kill 防悬挂——先例 PauseMenu._blur_tween）。
 var _slide_tween: Tween = null
-## 面板停靠基准 x（滑入/滑出动画的目标/起点）。
 var _base_panel_x: float = 0.0
+## 确认弹窗实例——复用（首次创建后留树）。
+var _confirm_dialog: ConfirmationDialog = null
 
-## === 节点引用 ==================================================================
+## === 节点引用 ===================================================================
 
 @onready var _panel: Control = $Panel
 @onready var _title_label: Label = $Panel/PanelVBox/HeaderBox/TitleLabel
@@ -106,44 +81,36 @@ var _base_panel_x: float = 0.0
 		$Panel/PanelVBox/TabContainer/AudioTab/BgmRow/BgmLabel
 @onready var _sfx_label: Label = \
 		$Panel/PanelVBox/TabContainer/AudioTab/SfxRow/SfxLabel
-@onready var _graphics_placeholder: Label = \
-		$Panel/PanelVBox/TabContainer/GraphicsTab/GraphicsPlaceholder
+@onready var _graphics_tab: GraphicsTab = \
+		$Panel/PanelVBox/TabContainer/GraphicsTab
 @onready var _keybinds_placeholder: Label = \
 		$Panel/PanelVBox/TabContainer/KeybindsTab/KeybindsPlaceholder
 @onready var _language_placeholder: Label = \
 		$Panel/PanelVBox/TabContainer/LanguageTab/LanguagePlaceholder
 @onready var _apply_button: Button = $Panel/PanelVBox/ButtonRow/ApplyButton
+@onready var _reset_all_button: Button = $Panel/PanelVBox/ButtonRow/ResetAllButton
 
-## === 生命周期 ==================================================================
+## === 生命周期 ===================================================================
 
 func _ready() -> void:
 	visible = false
 	_apply_texts()
+	_register_reset_handlers()
 
 func _exit_tree() -> void:
 	if _slide_tween != null and _slide_tween.is_valid():
 		_slide_tween.kill()
 	_release_lock()
 
-## ESC 关闭兜底（先例 PauseMenu._unhandled_input B-3——模态拥有者自判模式）。[br]
-## 面板打开持有 MODAL 锁 → InputManager 路径 B 的 ESC 拦截被锁判定阻断
-## （不误发 [code]pause_requested[/code]）→ 事件流转至本组件；经
-## [method InputManager.has_lock] 确认自己仍是活跃模态拥有者后关闭并标记
-## 已处理（阻止主菜单未来 ESC 语义重复响应）。
 func _unhandled_input(event: InputEvent) -> void:
 	if visible and not _closing and event is InputEventKey \
 			and event.keycode == KEY_ESCAPE and event.pressed and not event.echo:
 		if InputManager.has_lock(LOCK_SOURCE):
 			get_viewport().set_input_as_handled()
-			close()
+			_try_close()
 
-## === 打开/关闭 =================================================================
+## === 打开/关闭 ==================================================================
 
-## 打开设置面板（幂等——已打开时跳过）。[br]
-## 流程：push MODAL 锁 → 从设置文件读取已保存音量（零状态所有权——
-## 每次打开重读，不缓存跨会话副本）→ 滑条/总线对齐到已保存值 →
-## 可见 + 滑入动画（0.3s）→ 键盘焦点锚定总音量滑条（4.6 双焦点：
-## grab_focus 只影响键盘/手柄焦点——先例 PauseMenu）。
 func open() -> void:
 	if visible:
 		push_warning("SettingsPanel.open: 面板已打开——幂等跳过")
@@ -151,20 +118,46 @@ func open() -> void:
 	_closing = false
 	InputManager.push_lock(InputManager.LockType.MODAL, LOCK_SOURCE)
 	_lock_held = true
+	# 音量分类——打开时读取已保存值 + 对齐总线
 	_saved_volumes = _get_store().load_volume_category()
 	_sync_sliders_to(_saved_volumes)
 	_apply_volumes_to_buses(_saved_volumes)
+	# 画面分类——先刷新分辨率下拉（填充 OptionButton 项），再回填控件值。
+	# 顺序不可逆——set_values → _select_resolution 依赖已填充的下拉列表
+	# （对空 OptionButton select(0) 触发越界）。
+	_saved_graphics = _get_store().load_graphics_category()
+	var prev_res := Vector2i(
+			int(_saved_graphics.get(StoreScript.GFX_KEY_RESOLUTION_X, 1920)),
+			int(_saved_graphics.get(StoreScript.GFX_KEY_RESOLUTION_Y, 1080)))
+	# 分辨率回退：以已保存值作 previous，refresh_resolutions 内部经
+	# filter_resolutions 判定（已保存值不在可用列表 → 走回退链）
+	var resolved: Vector2i = _graphics_tab.refresh_resolutions(prev_res)
+	# 回填控件值到已刷新下拉（refresh_resolutions 后 _available_resolutions 非空）
+	_graphics_tab.set_values(_saved_graphics)
+	# 若回退后 differed 则更新快照（下次关闭以实际值作基准）
+	if resolved != prev_res:
+		_saved_graphics[StoreScript.GFX_KEY_RESOLUTION_X] = resolved.x
+		_saved_graphics[StoreScript.GFX_KEY_RESOLUTION_Y] = resolved.y
+	# 可见 + 动画
 	visible = true
 	_base_panel_x = _panel.position.x
 	if animate:
 		_play_slide_in()
 	master_slider.grab_focus()
 
-## 关闭设置面板——未应用变更回滚（story AC：未保存关闭 → 回滚）。[br]
-## 回滚总线到 [member _saved_volumes]（应用成功时已更新为最新保存值——
-## 「先应用后关闭」场景无回滚感知）；滑条同步复位（重开显示已保存值）。
-## pop 锁在滑出动画开始前同步执行（动画期间面板不再持有输入权）。
+## 关闭——有未保存画面变更时弹确认弹窗；无变更或确认后关闭。
 func close() -> void:
+	if not visible or _closing:
+		return
+	_try_close()
+
+func _try_close() -> void:
+	if _has_graphics_unsaved():
+		_show_unsaved_confirm()
+		return
+	_do_close()
+
+func _do_close() -> void:
 	if not visible or _closing:
 		return
 	_closing = true
@@ -182,49 +175,98 @@ func close() -> void:
 	else:
 		_finish_close()
 
-## 滑出动画完成回调——隐藏面板并复位关闭中标志。
 func _on_slide_out_finished() -> void:
 	_finish_close()
 
-## 关闭收尾（动画完成 / animate=false 直达共用）。
 func _finish_close() -> void:
 	visible = false
 	_closing = false
 	_panel.position.x = _base_panel_x
 
-## === 按钮与滑条路由 ============================================================
+## === 按钮路由 ===================================================================
 
-## 滑条拖动/键盘调节 → 总线实时生效（AC-main-menu-008）。[br]
-## [param value]: 滑条当前值（0~100）。[param bus]: 总线枚举
-## （场景 connection binds 绑定——Master=0/BGM=1/SFX=2）。[br]
-## 仅实时预览到总线——[b]不写文件[/b]（guardrail：拖动中无逐帧文件写入）。
+## 音量滑条实时预览（AC-main-menu-008）。
 func _on_slider_value_changed(value: float, bus: int) -> void:
 	if _closing or not visible:
 		return
 	_set_bus_percent(bus, value)
 
-## 应用 → 持久化写入设置文件（ADR-0031 §2.1 直写）。[br]
-## 写入成功后更新 [member _saved_volumes]（后续关闭不再回滚）；失败时
-## push_error 保持面板打开、总线维持当前值（可重试——不静默丢设置）。
+## 应用——写入音量 + 画面到文件，画面统一应用到引擎。
 func _on_apply_pressed() -> void:
 	if _closing or not visible:
 		return
-	var current: Dictionary = _collect_slider_values()
-	if _get_store().save_volume_category(current):
-		_saved_volumes = current
+	var store: SettingsStore = _get_store()
+	# 音量——收集当前滑条值 → 写文件
+	var current_vol: Dictionary = _collect_slider_values()
+	if store.save_volume_category(current_vol):
+		_saved_volumes = current_vol
 	else:
-		push_error("SettingsPanel: 设置写入失败——保持面板打开（可重试）")
+		push_error("SettingsPanel: 音量设置写入失败")
+	# 画面——收集 GraphicsTab 控件值 → 写文件 → 应用到引擎
+	var current_gfx: Dictionary = _graphics_tab.collect()
+	# 上一生效分辨率快照（apply 前的已保存值——分辨率回退候选）
+	var prev_res := Vector2i(
+			int(_saved_graphics.get(StoreScript.GFX_KEY_RESOLUTION_X, 1920)),
+			int(_saved_graphics.get(StoreScript.GFX_KEY_RESOLUTION_Y, 1080)))
+	if store.save_graphics_category(current_gfx):
+		_saved_graphics = current_gfx
+	else:
+		push_error("SettingsPanel: 画面设置写入失败")
+	# 画面引擎应用（点应用统一生效——AC-009~012）
+	var res_result: Dictionary = _graphics_tab.apply_to_engine(current_gfx, prev_res)
+	if bool(res_result.get("fallback_used", false)):
+		push_warning("SettingsPanel: 分辨率回退——该分辨率不支持，已恢复")
 
-## 关闭按钮（UX 10m）——ESC 同路径（未保存回滚）。
+## 恢复默认——遍历已注册分类重置 + 刷新控件。
+func _on_reset_all_pressed() -> void:
+	if _closing or not visible:
+		return
+	var store: SettingsStore = _get_store()
+	store.reset_all_categories()
+	# 刷新各分类控件到默认值
+	_saved_volumes = store.load_volume_category()
+	_sync_sliders_to(_saved_volumes)
+	_apply_volumes_to_buses(_saved_volumes)
+	_saved_graphics = store.load_graphics_category()
+	# 分辨率下拉也刷新——先刷新后回填（同 open() 顺序，防空下拉 select 越界）
+	var prev_res := Vector2i(
+			int(_saved_graphics.get(StoreScript.GFX_KEY_RESOLUTION_X, 1920)),
+			int(_saved_graphics.get(StoreScript.GFX_KEY_RESOLUTION_Y, 1080)))
+	_graphics_tab.refresh_resolutions(prev_res)
+	_graphics_tab.set_values(_saved_graphics)
+	# 画面引擎同步回默认（与音量总线回默认对称——AC-014「全部归位」含引擎态）
+	_graphics_tab.apply_to_engine(_saved_graphics, prev_res)
+
+## 关闭按钮（UX 10m）。
 func _on_close_pressed() -> void:
-	close()
+	_try_close()
 
-## === 文案（本地化豁免注记——TEXT_* 单一真理来源，先例 MainMenu._apply_texts）==
+## === 未保存确认弹窗（AC-main-menu-013）==========================================
+
+func _show_unsaved_confirm() -> void:
+	if _confirm_dialog == null:
+		_confirm_dialog = ConfirmationDialog.new()
+		_confirm_dialog.dialog_text = TEXT_UNSAVED_CONFIRM
+		_confirm_dialog.confirmed.connect(_on_unsaved_confirm_accepted)
+		add_child(_confirm_dialog)
+	_confirm_dialog.popup_centered()
+
+func _on_unsaved_confirm_accepted() -> void:
+	# 丢弃画面变更——回滚控件到 _saved_graphics
+	_graphics_tab.set_values(_saved_graphics)
+	_do_close()
+
+func _has_graphics_unsaved() -> bool:
+	var current: Dictionary = _graphics_tab.collect()
+	return GfxLogic.has_unsaved_changes(current, _saved_graphics)
+
+## === 文案 =======================================================================
 
 func _apply_texts() -> void:
 	_title_label.text = TEXT_TITLE
 	_close_button.text = TEXT_CLOSE
 	_apply_button.text = TEXT_APPLY
+	_reset_all_button.text = TEXT_RESET_ALL
 	_tab_container.set_tab_title(0, TEXT_TAB_AUDIO)
 	_tab_container.set_tab_title(1, TEXT_TAB_GRAPHICS)
 	_tab_container.set_tab_title(2, TEXT_TAB_KEYBINDS)
@@ -232,13 +274,19 @@ func _apply_texts() -> void:
 	_master_label.text = TEXT_MASTER
 	_bgm_label.text = TEXT_BGM
 	_sfx_label.text = TEXT_SFX
-	_graphics_placeholder.text = TEXT_PLACEHOLDER_GRAPHICS
 	_keybinds_placeholder.text = TEXT_PLACEHOLDER_KEYBINDS
 	_language_placeholder.text = TEXT_PLACEHOLDER_LANGUAGE
 
-## === 滑入动画（Tween 纯视觉变换——ADR-0031 §3 豁免）=========================
+## === 恢复默认注册 ===============================================================
 
-## 0.3s 自右侧滑入（UX 面板级过渡 ease-out）。
+func _register_reset_handlers() -> void:
+	var store: SettingsStore = _get_store()
+	store.register_reset_handler("volume", store.reset_volume_category)
+	store.register_reset_handler("graphics", store.reset_graphics_category)
+	# 004 按键 / 005 语言落地时各自注册——未注册占位不崩溃
+
+## === 滑入动画 ===================================================================
+
 func _play_slide_in() -> void:
 	if _slide_tween != null and _slide_tween.is_valid():
 		_slide_tween.kill()
@@ -247,11 +295,8 @@ func _play_slide_in() -> void:
 	_slide_tween.tween_property(_panel, "position:x", _base_panel_x,
 			OPEN_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
-## === 内部辅助 ==================================================================
+## === 内部辅助 ===================================================================
 
-## 设置总线音量（dB）——经 [code]db_from_percent[/code] 转换（GDD §公式）。[br]
-## 总线索引动态查找（禁硬编码——AudioEnums.BUS_NAMES 单一真源）；总线缺失
-## 时 push_warning no-op（布局回归可见）。
 func _set_bus_percent(bus: int, percent: float) -> void:
 	var bus_name: StringName = AudioEnums.BUS_NAMES[bus]
 	var idx: int = AudioServer.get_bus_index(bus_name)
@@ -260,12 +305,10 @@ func _set_bus_percent(bus: int, percent: float) -> void:
 		return
 	AudioServer.set_bus_volume_db(idx, Logic.db_from_percent(percent))
 
-## 批量写总线（打开对齐 / 关闭回滚共用）。
 func _apply_volumes_to_buses(volumes: Dictionary) -> void:
 	for bus: int in volumes.keys():
 		_set_bus_percent(bus, float(volumes[bus]))
 
-## 滑条批量复位（不触发 value_changed——set_value_no_signal）。
 func _sync_sliders_to(volumes: Dictionary) -> void:
 	master_slider.set_value_no_signal(
 			float(volumes.get(AudioEnums.AudioBus.MASTER, 100)))
@@ -274,7 +317,6 @@ func _sync_sliders_to(volumes: Dictionary) -> void:
 	sfx_slider.set_value_no_signal(
 			float(volumes.get(AudioEnums.AudioBus.SFX, 100)))
 
-## 收集滑条当前值（{AudioBus 枚举: int 百分比}——应用写入的载荷结构）。
 func _collect_slider_values() -> Dictionary:
 	return {
 		AudioEnums.AudioBus.MASTER: int(round(master_slider.value)),
@@ -282,16 +324,11 @@ func _collect_slider_values() -> Dictionary:
 		AudioEnums.AudioBus.SFX: int(round(sfx_slider.value)),
 	}
 
-## 获取设置读写模块——注入优先，否则新建（默认路径）。
 func _get_store() -> SettingsStore:
 	if settings_store == null:
 		settings_store = SettingsStore.new()
 	return settings_store
 
-## 释放 MODAL 锁（幂等——_exit_tree 兜底与 close 正常路径共用）。[br]
-## 先经 [method InputManager.has_lock] 确认锁仍在栈中——场景树变更
-## （[code]tree_changed[/code]）已清栈时静默跳过（锁栈清空是合法生命周期，
-## 兜底 pop 不应告警）。
 func _release_lock() -> void:
 	if _lock_held:
 		if InputManager.has_lock(LOCK_SOURCE):

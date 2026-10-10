@@ -50,7 +50,6 @@ const TEXT_NEW_GAME: String = "新游戏"
 const TEXT_CONTINUE: String = "继续游戏"
 const TEXT_SETTINGS: String = "设置"
 const TEXT_QUIT: String = "退出"
-const TEXT_CORRUPTED: String = "存档损坏，无法读取"
 
 ## 版本号缺省回退（ProjectSettings 未配置 version 键时的安全默认——
 ## story Implementation Notes「不硬编码」指不在 UI 层写死版本值，读取失败
@@ -101,7 +100,7 @@ var _settings_panel: SettingsPanel = null
 @onready var settings_button: Button = $LayoutAnchor/ButtonBox/SettingsButton
 @onready var quit_button: Button = $LayoutAnchor/ButtonBox/QuitButton
 @onready var version_label: Label = $VersionLabel
-@onready var corrupt_dialog: AcceptDialog = $CorruptDialog
+@onready var corrupt_dialog: CorruptSaveDialog = $CorruptDialog
 
 ## === 生命周期 ==================================================================
 
@@ -196,7 +195,7 @@ func _on_save_load_completed(_success: bool) -> void:
 ## save_corrupted 信号回调（GDD 边缘情况）——弹「存档损坏，无法读取」提示。[br]
 ## 对话框确认后 [method _on_corrupt_dialog_confirmed] 恢复按钮可用态。
 func _on_save_corrupted(_slot_type: int, _slot_id: int, _reason: String) -> void:
-	_show_corrupt_dialog()
+	corrupt_dialog.show_corrupt()
 
 ## === 按钮路由 ==================================================================
 
@@ -237,7 +236,7 @@ func _on_continue_pressed() -> void:
 	if result.is_empty() \
 			or int(result.get("result", SLScript.LoadResult.DESERIALIZE_ERROR)) \
 			!= SLScript.LoadResult.SUCCESS:
-		_show_corrupt_dialog()
+		corrupt_dialog.show_corrupt()
 
 ## 设置 → 打开设置面板（AC-main-menu-007；Story 002 恢复启用）。[br]
 ## 首次点击实例化 [SettingsPanel] 挂载本节点树（顶层 CanvasItem——
@@ -255,18 +254,6 @@ func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 ## === 损坏对话框 ================================================================
-
-## 弹「存档损坏，无法读取」提示（GDD 边缘情况 + UX「存档读取失败」状态）。[br]
-## 弹窗期间继续按钮保持可用态（meta 层 exists==true 未变——QL-STORY-READY
-## 2026-09-19 裁决：按钮亮起，损坏由读档检测）；确认后统一重刷存档状态。
-func _show_corrupt_dialog() -> void:
-	# 重入守卫（code-review H-3）：真实 SaveLoadSystem.load_game() 的
-	# DESERIALIZE_ERROR 路径同时发 save_corrupted 信号且返回非 SUCCESS——
-	# 信号路径 + 返回值路径在同一调用栈内双触发，此守卫去重防双弹。
-	if corrupt_dialog.visible:
-		return
-	corrupt_dialog.dialog_text = TEXT_CORRUPTED
-	corrupt_dialog.popup_centered()
 
 ## 对话框确认回调——刷新存档状态（确认后按钮恢复可用态语义：若损坏存档
 ## 仍为唯一存档，重刷后依旧亮起——点击再次走损坏路径，与 AC-3 自洽）。

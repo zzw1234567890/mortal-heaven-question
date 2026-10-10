@@ -1,6 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_menu/main_menu.gd" id="1_script"]
+[ext_resource type="Script" path="res://src/ui/main_menu/corrupt_save_dialog.gd" id="2_corrupt_dialog"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -91,6 +92,7 @@ text = "v?"
 
 [node name="CorruptDialog" type="AcceptDialog" parent="."]
 dialog_text = "存档损坏，无法读取"
+script = ExtResource("2_corrupt_dialog")
 
 [connection signal="pressed" from="LayoutAnchor/ButtonBox/NewGameButton" to="." method="_on_new_game_pressed"]
 [connection signal="pressed" from="LayoutAnchor/ButtonBox/ContinueButton" to="." method="_on_continue_pressed"]

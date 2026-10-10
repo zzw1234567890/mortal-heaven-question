@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_menu/settings_panel.gd" id="1_script"]
+[ext_resource type="Script" path="res://src/ui/main_menu/graphics_tab.gd" id="2_graphics_tab"]
 
 [node name="SettingsPanel" type="Control"]
 layout_mode = 3
@@ -126,11 +127,77 @@ value = 100.0
 
 [node name="GraphicsTab" type="VBoxContainer" parent="Panel/PanelVBox/TabContainer"]
 layout_mode = 2
+theme_override_constants/separation = 20
+script = ExtResource("2_graphics_tab")
 
-[node name="GraphicsPlaceholder" type="Label" parent="Panel/PanelVBox/TabContainer/GraphicsTab"]
+[node name="ResolutionRow" type="HBoxContainer" parent="Panel/PanelVBox/TabContainer/GraphicsTab"]
 layout_mode = 2
-text = "画面设置（待实现）"
-theme_override_font_sizes/font_size = 14
+theme_override_constants/separation = 16
+
+[node name="ResolutionLabel" type="Label" parent="Panel/PanelVBox/TabContainer/GraphicsTab/ResolutionRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "分辨率"
+theme_override_font_sizes/font_size = 16
+
+[node name="ResolutionOption" type="OptionButton" parent="Panel/PanelVBox/TabContainer/GraphicsTab/ResolutionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FullscreenRow" type="HBoxContainer" parent="Panel/PanelVBox/TabContainer/GraphicsTab"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="FullscreenLabel" type="Label" parent="Panel/PanelVBox/TabContainer/GraphicsTab/FullscreenRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "全屏"
+theme_override_font_sizes/font_size = 16
+
+[node name="FullscreenOption" type="OptionButton" parent="Panel/PanelVBox/TabContainer/GraphicsTab/FullscreenRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MaxFpsRow" type="HBoxContainer" parent="Panel/PanelVBox/TabContainer/GraphicsTab"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="MaxFpsLabel" type="Label" parent="Panel/PanelVBox/TabContainer/GraphicsTab/MaxFpsRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "帧率限制"
+theme_override_font_sizes/font_size = 16
+
+[node name="MaxFpsOption" type="OptionButton" parent="Panel/PanelVBox/TabContainer/GraphicsTab/MaxFpsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="QualityRow" type="HBoxContainer" parent="Panel/PanelVBox/TabContainer/GraphicsTab"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="QualityLabel" type="Label" parent="Panel/PanelVBox/TabContainer/GraphicsTab/QualityRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "画面质量"
+theme_override_font_sizes/font_size = 16
+
+[node name="QualityOption" type="OptionButton" parent="Panel/PanelVBox/TabContainer/GraphicsTab/QualityRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ReduceMotionRow" type="HBoxContainer" parent="Panel/PanelVBox/TabContainer/GraphicsTab"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ReduceMotionLabel" type="Label" parent="Panel/PanelVBox/TabContainer/GraphicsTab/ReduceMotionRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "减少动态效果"
+theme_override_font_sizes/font_size = 16
+
+[node name="ReduceMotionCheck" type="CheckBox" parent="Panel/PanelVBox/TabContainer/GraphicsTab/ReduceMotionRow"]
+layout_mode = 2
 
 [node name="KeybindsTab" type="VBoxContainer" parent="Panel/PanelVBox/TabContainer"]
 layout_mode = 2
@@ -153,6 +220,12 @@ layout_mode = 2
 alignment = 2
 theme_override_constants/separation = 16
 
+[node name="ResetAllButton" type="Button" parent="Panel/PanelVBox/ButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 40)
+text = "恢复默认"
+theme_override_font_sizes/font_size = 16
+
 [node name="ApplyButton" type="Button" parent="Panel/PanelVBox/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(120, 40)
@@ -160,6 +233,7 @@ text = "应用"
 theme_override_font_sizes/font_size = 16
 
 [connection signal="pressed" from="Panel/PanelVBox/HeaderBox/CloseButton" to="." method="_on_close_pressed"]
+[connection signal="pressed" from="Panel/PanelVBox/ButtonRow/ResetAllButton" to="." method="_on_reset_all_pressed"]
 [connection signal="pressed" from="Panel/PanelVBox/ButtonRow/ApplyButton" to="." method="_on_apply_pressed"]
 [connection signal="value_changed" from="Panel/PanelVBox/TabContainer/AudioTab/MasterRow/MasterSlider" to="." method="_on_slider_value_changed" binds= [0]]
 [connection signal="value_changed" from="Panel/PanelVBox/TabContainer/AudioTab/BgmRow/BgmSlider" to="." method="_on_slider_value_changed" binds= [1]]
