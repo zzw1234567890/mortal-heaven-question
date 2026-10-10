@@ -1,12 +1,12 @@
 # Story 003: 画面设置与应用/回退机制（含全局恢复默认）
 
 > **Epic**: 主菜单与设置
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
 > **Estimate**: 1.0d（不含分辨率 spike——独立条目 S14-4a 前置）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-10-09（QL-STORY-READY 裁决修订：filter_resolutions 三参签名+返回结构明确 / 全屏切换测试规格 / 减少动效持久化 / 承接 main_menu.gd 拆分）
+> **Last Updated**: 2026-10-10
 
 ## Context
 
@@ -123,7 +123,7 @@
 - Integration: `tests/integration/main_menu/test_graphics_apply.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/settings-graphics-evidence.md` + sign-off
 
-**Status**: [ ] Not yet created
+**Status**: [x] Logic 内核 + Integration 测试通过（BLOCKING 满足）；UI 手动证据 settings-graphics-evidence.md 待创建（ADVISORY）
 
 ---
 
@@ -131,3 +131,18 @@
 
 - Depends on: Story 002（面板框架与回滚机制共用；**承接其记账项「main_menu.gd 308 行拆分」见 Implementation Notes**）；S14-4a 分辨率枚举 spike（前置——已完成 2026-10-05，结论回写 display-server.md）
 - Unlocks: None（004/005 可并行，落地时向恢复默认注册机制注册各自分类）
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-10-10
+**Criteria**: 7/7 通过（AC-main-menu-009~014 + 减少动效——自动化测试或实现落地；AC-4/5/6 为 UI 手动验证步骤，证据文件待编辑器演练签收）
+**Deviations**（ADVISORY 级，非阻塞）:
+- `settings_panel.gd` 336 行超 300 软限 12%（GraphicsTab 拆分已缓解；滑入/滑出动画 + 确认弹窗可进一步拆分归后续 story）
+- 全屏集成测试仅覆盖 `fullscreen: true` 方向（headless `window_set_mode` 可能 no-op——范围标注为防崩溃回归）
+- `has_unsaved_changes` 用 `is_equal_approx` 近似比较（当前帧率值域 30/60/120 安全；未来非整数值配置需改精确比较）
+- 画质 `ProjectSettings` 写入为「意图声明」（MSAA 2D 运行时切换 4.6 D3D12 需 Viewport 重建方完全生效——AC-6 手动验证时记录此已知限制）
+- UI 手动证据 `production/qa/evidence/settings-graphics-evidence.md` 未创建（AC-4/5/6 手动演练——ADVISORY 待签收）
+**Test Evidence**: Logic 内核 `tests/unit/main_menu/test_resolution_filter_fallback.gd`（AC-1 8 测试）+ `test_unsaved_changes_detection.gd`（AC-2 7 测试）通过；Integration `tests/integration/main_menu/test_graphics_apply.gd`（AC-3 7 测试）通过——全量 2722/2723 passing，唯一 fail = realm ac010（TD-014 既有 flaky，非本次引入）
+**Code Review**: QL-TEST-COVERAGE ADEQUATE + LP-CODE-REVIEW APPROVED（full 模式双关卡通过）

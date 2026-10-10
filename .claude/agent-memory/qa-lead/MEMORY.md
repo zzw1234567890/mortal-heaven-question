@@ -4,8 +4,11 @@
 
 - [combat-ui-layout 009a/009b QL 审查 2026-09-19](project_combat-ui-layout-009-ql-review.md) — 009a GAPS 1 BLOCKING（引擎参考无 get_rendering_info）；009b GAPS 3 BLOCKING（stub 矛盾/provisional/依赖）
 - [audio Story 001 QL 审查 2026-09-19](project_audio-story001-ql-review.md) — GAPS 2 BLOCKING（R-06 GDD 修订义务未承接、root 直挂表述过时）+4 ADVISORY；dB/API/PersistentLayer 已验证无缺口
+- [audio Story 001 QL-TEST-COVERAGE 2026-10-03](project_audio-story001-ql-test-coverage.md) — ADEQUATE；4 项声明修复逐文件核实为真；3 条 ADVISORY（Reverb 参数、恢复路径语义、GDD L135 反证表述）
 
 - [main-menu Story 002/003 QL 审查 2026-09-19](project_main-menu-story002-003-ql-review.md) — 均 GAPS；Music≠BGM 总线、UX 未同步应用/即时裁决、分辨率 API 零覆盖、减少动态无归属
+- [main-menu Story 002 QL-STORY-READY 2026-10-04](project_main-menu-story002-ql-story-ready.md) — GAPS 2 项；AC-4 可听验证依赖 audio 002 未交付（play_bgm 是桩）、SFX 滑条零自动覆盖；db 边界值全对
+- [main-menu Story 001 QL-TEST-COVERAGE 2026-10-04](project_main-menu-story001-ql-test-coverage.md) — ADEQUATE；GAP-1/3/4/5 修复逐项核实为真；AC-1~4 全 COVERED；AC-5/6 手动证据待建（ADVISORY）
 - [main-menu Story 001 QL 复审 2026-09-12](project_main-menu-story001-ql-review.md) — GAPS 3 BLOCKING（制作人员按钮矛盾、损坏数据源、存档摘要）
 - [main-menu QL 审查 2026-09](project_main-menu-ql-review.md) — 5 stories 全 GAPS；4 个阻塞裁决待用户解决
 - [QA Lead 工作约定](project_qa_conventions.md) — hud 先例标准、TR 占位、tests/unit 尚未建立、清单版本 2026-09-07

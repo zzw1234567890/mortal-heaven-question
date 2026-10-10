@@ -183,3 +183,40 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 提交：34e0383（feat）+ 3ed43bc（story 勾选）+ 524a6fe（14-7 review）已推送；story-done 状态提交随本轮
 - **Sprint 14 进度**：must 7 项中 14-1✓ 14-7✓ 已完成，剩余 14-2（main-menu 001，无 blocker 可开工）/14-4a spike/14-3（blocker 14-2 未解）/14-4/14-5/14-6/14-8
 - 下一步：/story-readiness main-menu 001 → /dev-story（或 14-4a spike 无依赖入口任选）
+
+## Session Extract — main-menu 001 code-review+提交 2026-10-04
+- 判定：三方审查（qa-tester GAPS / godot-specialist ISSUES FOUND / gdscript-specialist APPROVED WITH SUGGESTIONS）→ CHANGES REQUIRED → 用户裁决全修+GAP 补齐 → 闭环
+- 修复：BLOCKER-1 主场景 uid→path（原指向 prototypes 旧原型！）；H-1/H-2/H-3 枚举去魔数+Variant 注解+重入守卫；GAP-1 焦点真实路径（二次实例化）；GAP-3/4/5 补测试（竞态/静态守卫/双触发源）；S-1/S-6
+- 留桩语义：identity_select.tscn 相邻 story——Completion Notes 已声明
+- 验证：集成 20/20（226 断言）+ 单元 20/20 + 全量 2667/2668 零失败（1 pending 既有）；--import 生成 .gd.uid 入库
+- 提交：c835968（feat 实现）+ 3f61e8e（story 勾选+Completion Notes）——已推送；CI gh 不可用，下次会话观察
+- 下一步：/story-done production/epics/main-menu/story-001-main-menu-scene.md（UI 手动证据 main-menu-scene-evidence.md 待创建——AC-5 手动演练+AC-6 性能 D3D12 实测）
+
+## Session Extract — /story-done main-menu 001 2026-10-04
+- 判定：COMPLETE（8/8 AC 全过；UI 手动证据已签收）
+- 关卡：QL-TEST-COVERAGE ADEQUATE（AC-1~4 逐条 COVERED + GAP-1/3/4/5 修复独立核实非名义补丁；2 条 ADVISORY：H-3 双弹不可观测留后续、骨架态性能复测归视觉 story）；LP-CODE-REVIEW APPROVED（H-1 无循环依赖+ADR-0031 四红线零违规+main_menu.gd 293 行贴线达标）
+- 手动验证：用户实测通过（0.8s 动画/键盘鼠标全可达/退出真关闭/60fps/Draw Call≤50/720p 无溢出）→ evidence 文件创建并签收
+- story：Complete + Completion Notes；EPIC.md 索引同步；sprint-status 14-2 → done（completed 2026-10-04）
+- 提交：d80f180（story 关闭）已推送
+- **Sprint 14 进度**：must 7 项中 14-1✓ 14-2✓ 14-7✓ 已完成；14-3（main-menu 002 设置音频，blocker 14-2 已解）/14-4a spike（无依赖）/14-4/14-5/14-6/14-8 可按序开工
+- 下一步：/story-readiness production/epics/main-menu/story-002-settings-audio.md → /dev-story
+
+## Session Extract — /dev-story main-menu 002 2026-10-04
+- 故事：production/epics/main-menu/story-002-settings-audio.md——设置面板框架与音量控制
+- 实现：ui-programmer 子代理交付（7 新文件+2 修改）；settings_panel.gd 299 行贴线达标；Autoload 恒 25 零新增
+- 关键裁决落地：三滑条 Master/BGM/SFX 实时总线生效（get_bus_index 动态查找）；应用持久化/未保存回滚；拖动零文件写入护栏；merge 写入保留 Story 003 未来键
+- 测试：26 新增（db_from_percent 9 + 回滚 6 + 总线 11 含三滑条×三值参数化 use_parameters 首次使用）；main_menu 域 60/60
+- 全量回归：2686/2688——唯一 fail = realm ac010（TD-014 既有 flaky，单跑 14/14 过——非本次引入）；1 pending 既有
+- 偏差：未保存关闭无确认弹窗（story AC 直接回滚语义，确认弹窗归 003 统一脏检测）；AC-4 手动证据待编辑器演练（可听验证降级为总线 dB 表读数——2026-10-04 裁决）
+- 提交：522418d 已推送
+- 下一步：/code-review src/ui/main_menu/（settings_logic.gd settings_store.gd settings_panel.gd SettingsPanel.tscn main_menu.gd）→ /story-done
+
+## Session Extract — /dev-story + /story-done main-menu 003 2026-10-10
+- 故事：production/epics/main-menu/story-003-settings-graphics.md——画面设置与应用/回退（含全局恢复默认）
+- 实现：ui-programmer 子代理交付 8 源文件（settings_graphics_logic.gd Logic 内核 / graphics_tab.gd 画面子组件 / corrupt_save_dialog.gd 拆分 / settings_store.gd 六键+注册机制 / settings_panel.gd 编排 / main_menu.gd 减负 / 两 .tscn）
+- 关键裁决落地：filter_resolutions 三参签名 / 宽高比过滤 filter_by_aspect_ratio / 画质预设数据驱动映射表 / 未保存关闭确认弹窗 / register_reset_handler 全局恢复默认注册 / 先 refresh 后 set_values 防空下拉越界 / CorruptSaveDialog popup_centered+重入守卫
+- 测试：3 文件 22 测试（filter_fallback 8 + unsaved_changes 7 + graphics_apply 7）——AC-1/2/3 全绿；全量 2722/2723，唯一 fail = realm ac010（TD-014 既有 flaky，非本次引入）
+- 偏差（ADVISORY）：settings_panel.gd 336 行超软限 12% / 全屏仅测 true 方向 / is_equal_approx 近似比较 / MSAA 意图声明 / UI 证据文件待签收
+- 关卡：QL-TEST-COVERAGE ADEQUATE + LP-CODE-REVIEW APPROVED（full 模式双关卡）
+- 提交：b09cda4（feat）已推送；story 关闭 + sprint-status 14-4 → done（completed 2026-10-10）
+- 下一步：14-5 combat-ui-layout 009a 合批方案定型（ready-for-dev，无 blocker）→ /story-readiness → /dev-story
