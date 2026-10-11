@@ -241,3 +241,12 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 复测义务双登记：① combat-ui-layout epic DoD（Sprint 15，真实组件+D3D12）② combat-ui-interaction epic 关口（拖拽半透明+峰值交互）
 - Code Review：SKIPPED（架构 spike 无 src/ 实现，prototypes 按放宽标准隔离）
 - 下一步：14-8 Sprint 14 QA 签收（blocker 14-1~14-7 全部 done，现唯一未完成 Must Have）→ /story-readiness → /dev-story
+
+## Session Extract — /dev-story + /story-done Sprint 14 QA 签收（14-8）2026-10-11
+- 故事：production/epics/qa/story-001-sprint-14-qa.md——Sprint 14 QA 签收报告
+- 签收结论：**APPROVED WITH CONDITIONS**——must-have 8 项全交付（14-1 CI + 14-2/3/4 main-menu + 14-4a spike + 14-5/6 combat-ui 009a/009b + 14-7 audio 001 + 14-8 本签收）
+- 零回归验证：GUT 全量 2723 tests / 2722 passing / 1 pending（save_load 多步迁移占位）/ **0 failing**（realm ac010 本次复跑通过——TD-014 既有 flaky 已移交 S14-9）
+- DoD 对照：8/8 达成（测试+证据 / CI 上线 / R-02 有条件关闭+双复测义务 / 主菜单可达设置 / audio 骨架 / 零回归 / 代码审查合并 / 冒烟——唯一遗留为手动冒烟演练，见条件 C）
+- 遗留条件（不阻塞 gate）：A=TD-014 flaky 根治（S14-9 should） / B=R-02 正式关闭（Sprint 15 组件级复测） / C=主菜单 E2E 冒烟（手动编辑器演练）
+- 附带：14-1 状态 review → done（CI workflow 已提交 b429789+11d56a0，全量测试绿——签收时补正）
+- 下一步：Sprint 14 must-have 全清 → /retrospective（回顾）→ /sprint-plan new（Sprint 15 规划）→ /gate-check presentation-layer-complete（里程碑推进）

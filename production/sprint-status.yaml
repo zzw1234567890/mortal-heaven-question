@@ -21,11 +21,11 @@ stories:
     name: "CI 配置（GitHub Actions + GUT headless）"
     file: "production/sprints/sprint-14.md"
     priority: must-have
-    status: review
+    status: done
     owner: "lead-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-09-22"
 
   - id: "14-2"
     name: "main-menu 001 主菜单场景与按钮组"
@@ -101,11 +101,11 @@ stories:
     name: "Sprint 14 QA 签收"
     file: "production/epics/qa/story-001-sprint-14-qa.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "qa-lead"
     estimate_days: 0.5
     blocker: "14-1,14-2,14-3,14-4,14-5,14-6,14-7"
-    completed: ""
+    completed: "2026-10-11"
 
   - id: "14-9"
     name: "TD-007/012 测试缺口 + test_ac010 flaky 根治（打包）"
