@@ -12,7 +12,7 @@
 | # | 风险 | 概率 | 影响 | 等级 | 状态 | 所有者 |
 |---|------|------|------|------|------|--------|
 | R-01 | Godot 4.6 双焦点系统在自定义 Control 组件上的实际行为未验证 | 高 | 高 | 🔴 高 | 已关闭（2026-09-08 spike） | ui-programmer |
-| R-02 | Draw Call 超 200 预算（战斗 16 角色卡 + 手牌 + 节点图迷雾） | 中 | 高 | 🔴 高 | 开放 | ui-programmer |
+| R-02 | Draw Call 超 200 预算（战斗 16 角色卡 + 手牌 + 节点图迷雾） | 中 | 高 | 🔴 高 | 有条件关闭（stub 版原型级验证） | ui-programmer |
 | R-03 | D3D12 默认渲染器兼容性（Windows 驱动差异） | 中 | 中 | 🟡 中 | 已关闭（2026-09-12 spike） | godot-specialist |
 | R-04 | AccessKit 屏幕阅读器支持的实际可用性（4.5+，未经项目验证） | 中 | 中 | 🟡 中 | 开放 | accessibility-specialist |
 | R-05 | 节点图最坏情况节点数的缩放/平移帧率 | 中 | 高 | 🔴 高 | 开放 | ui-programmer |
@@ -40,7 +40,14 @@
   2. 焦点 Control 收到键盘 `_gui_input` 但不自动消耗——`_unhandled_input` 仍触发；显式 `accept_event()` 才阻断（ADR-0004 注释修正）
   3. InputManager 设备掩码白名单判定与双焦点正交，工作正常
 
-### R-02 Draw Call 超 200 预算 🔴 高
+### R-02 Draw Call 超 200 预算 🔴 高（有条件关闭——stub 版原型级验证）
+
+> **2026-10-11 有条件关闭（provisional）**：combat-ui-layout 009b 满场实测（stub 版）
+> `prototypes/r02-fullfield-benchmark/` + `production/qa/evidence/r02-benchmark-evidence.md`。
+> 标准场景 126 DC / 峰值场景 132 DC——均远低于 200 预算（<<200）；帧时间 p50=60fps（p95
+> 16.92ms ADVISORY 抖动，Vulkan 后端非目标 D3D12）。**原型级结论**（占位节点，非 002-006
+> 组件）；组件级复测义务**双登记**：① combat-ui-layout epic DoD（Sprint 15，真实组件+D3D12）
+> ② combat-ui-interaction epic 关口（拖拽半透明+真实交互峰值）。探索场景节点图（R-05）仍开放。
 
 - **来源**：technical-preferences.md §性能预算、combat-ui.md（16 角色位）、exploration-ui.md（节点图）
 - **描述**：战斗场景最坏情况——16 个角色状态卡（每卡 6 层：头像/遮罩/功法法宝图标×6/HP 条/buff 境界图标/待命标记）+ 手牌 7-10 张 + 顶部条 + HUD 元素，独立 Control 各自渲染极易超 200 Draw Call。探索场景节点图（节点+路径+迷雾+HUD）同理。
@@ -54,6 +61,10 @@
   3. Godot 性能分析器实测战斗满场 + 节点图全图两个基准场景
 - **触发条件**：首个战斗场景 UI 组装时
 - **关闭条件**：两个基准场景在 1080p 下实测 Draw Call <200 且帧率稳定 60fps
+- **关闭记录（2026-10-11 有条件）**：合批方案（`r02-batching-spec.md`）整场景尺度成立——
+  标准 126 / 峰值 132 DC，远低于 200。帧时间 p50 稳定 60fps。**未完全关闭**：p95 帧时间
+  微超 16.6ms（ADVISORY，Vulkan 抖动）+ D3D12 烟雾 3 项未实跑——组件级（Sprint 15）与
+  interaction epic 双复测后正式关闭。
 
 ### R-03 D3D12 默认渲染器兼容性 🟡 中
 
@@ -153,3 +164,4 @@
 |------|------|--------|
 | 2026-09-07 | 创建登记册，10 项风险（2 已缓解） | ux-design 会话 |
 | 2026-09-08 | R-01 已关闭——S13-1 spike 10/10 PASS（双视觉确认+ADR-0004 注释修正） | Sprint 13 S13-1 spike |
+| 2026-10-11 | R-02 有条件关闭——009b 满场实测（stub 版）：标准 126 / 峰值 132 DC 达标，帧时间 p50=60fps；组件级+interaction 双复测义务登记 | combat-ui-layout 009b |

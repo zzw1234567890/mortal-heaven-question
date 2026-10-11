@@ -220,3 +220,24 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 关卡：QL-TEST-COVERAGE ADEQUATE + LP-CODE-REVIEW APPROVED（full 模式双关卡）
 - 提交：b09cda4（feat）已推送；story 关闭 + sprint-status 14-4 → done（completed 2026-10-10）
 - 下一步：14-5 combat-ui-layout 009a 合批方案定型（ready-for-dev，无 blocker）→ /story-readiness → /dev-story
+
+## Session Extract — /dev-story + /story-done combat-ui-layout 009a 2026-10-11
+- 故事：production/epics/combat-ui-layout/story-009a-batching-scheme.md——R-02 合批方案定型（前置架构 spike）
+- 实现：架构 spike + 方案定型（无 src/ 生产实现；原型代码按放宽标准 `prototypes/r02-batching-spike/` 隔离）
+- 关键查证：RenderingServer.get_rendering_info 存在（RENDERING_INFO 枚举 11 项 0..10，TOTAL_DRAW_CALLS_IN_FRAME=2）；结论回写 docs/engine-reference/godot/modules/rendering.md
+- 实测（16 角色卡，RTX 3050 Vulkan Forward+ 窗口模式）：baseline 0 / full 96 DC / 6.0 DC·位——「≤4 DC·位」不可行（HP 条 3 draw_rect=3 DC + 文字非单次 draw call），用户裁决 2026-10-11 接受 6 DC/位；整场景 96 << 200 达标，峰值重算 ≈201 贴线
+- 产出：production/qa/evidence/r02-batching-spec.md（五节合批规范：图集/HP条 draw_rect/DC 分组/fallback 裁剪/测量方法）+ prototypes/r02-batching-spike/（spike.gd + benchmark.gd + README.md，009b 复用测量方法）
+- 偏差（ADVISORY）：≤4 DC/位未达标但接受 / fallback 裁剪升级硬约束 / 实测后端 Vulkan 非 D3D12（009b 满场复核）
+- Code Review：SKIPPED（架构 spike 无 src/ 实现，prototypes 按放宽标准隔离）
+- 提交：5638f2d 已推送；story 关闭 + sprint-status 14-5 → done（completed 2026-10-11）
+- 下一步：14-6 combat-ui-layout 009b R-02 Draw Call 满场实测 stub 版（blocker 14-5 已解除）→ /story-readiness → /dev-story
+
+## Session Extract — /dev-story + /story-done combat-ui-layout 009b 2026-10-11
+- 故事：production/epics/combat-ui-layout/story-009b-drawcall-benchmark.md——R-02 Draw Call 满场实测（stub 版）
+- 实现：扩展 009a 原型为标准/峰值两场景（16 角色位+7 手牌+2 阵法+费用栏+日志折叠；峰值加结算面板+攻击箭头 stub+阵法光环+飘字满发）——程序化占位节点，无 src/ 生产实现（prototypes 按放宽标准隔离）
+- 实测（Godot 4.6.3 / Vulkan Forward+ / RTX 3050 窗口模式）：baseline 0 / 标准场景 126 DC / 峰值场景 132 DC——两场景均 <<200 达标；帧时间 p50=16.66ms（=60fps），p95=16.92ms（微超 16.6ms，VSync 抖动——ADVISORY）
+- 产出：prototypes/r02-fullfield-benchmark/（benchmark.gd + README.md）+ production/qa/evidence/r02-benchmark-evidence.md（五节：两场景 DC/帧时间分布/烟雾 stub 声明/fallback 验证/720p 字号）+ risk-register R-02 更新为「有条件关闭（stub 版原型级验证）」
+- 偏差（ADVISORY）：p95 帧时间微超 / D3D12 烟雾 3 项未实跑（Vulkan 后端+程序化占位）/ fallback 优先级实测未触发（余量 68 DC）/ 720p 字号抽检占位
+- 复测义务双登记：① combat-ui-layout epic DoD（Sprint 15，真实组件+D3D12）② combat-ui-interaction epic 关口（拖拽半透明+峰值交互）
+- Code Review：SKIPPED（架构 spike 无 src/ 实现，prototypes 按放宽标准隔离）
+- 下一步：14-8 Sprint 14 QA 签收（blocker 14-1~14-7 全部 done，现唯一未完成 Must Have）→ /story-readiness → /dev-story

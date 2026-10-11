@@ -81,11 +81,11 @@ stories:
     name: "combat-ui-layout 009b R-02 Draw Call 满场实测（stub 版）"
     file: "production/epics/combat-ui-layout/story-009b-drawcall-benchmark.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: "ui-programmer"
     estimate_days: 0.5
-    blocker: "14-5"
-    completed: ""
+    blocker: ""
+    completed: "2026-10-11"
 
   - id: "14-7"
     name: "audio-manager 001 总线+AudioManager 骨架"
