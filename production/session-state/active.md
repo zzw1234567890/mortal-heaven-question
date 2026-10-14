@@ -250,3 +250,11 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 遗留条件（不阻塞 gate）：A=TD-014 flaky 根治（S14-9 should） / B=R-02 正式关闭（Sprint 15 组件级复测） / C=主菜单 E2E 冒烟（手动编辑器演练）
 - 附带：14-1 状态 review → done（CI workflow 已提交 b429789+11d56a0，全量测试绿——签收时补正）
 - 下一步：Sprint 14 must-have 全清 → /retrospective（回顾）→ /sprint-plan new（Sprint 15 规划）→ /gate-check presentation-layer-complete（里程碑推进）
+
+## Session Extract — /retrospective + /sprint-plan new + /gate-check（Sprint 14 收尾）2026-10-13
+- 回顾：`production/retrospectives/retro-sprint-14-2026-10-13.md`——must 8/8 + 零回归 + R-02 有条件关闭；UI story 真实成本校准为 2 日历日/story（行动项 #1）
+- Sprint 15 规划：`production/sprints/sprint-15.md` + `sprint-status.yaml` 已切到 sprint 15（4 must：TD-014 根治 + exploration-ui 001 R-05 关闭 + combat-ui-layout 001/002；must 利用率 93% 触上限，PR-SPRINT REALISTIC WITH CONDITIONS）
+- 里程碑关口检查：`production/gate-checks/gate-check-presentation-layer-complete-2026-10-13.md`——**FAIL（符合预期）**：7 epic 0/7 完整、全流程仅主菜单段可达；主管判定：创意总监 NOT READY、制作人 NOT READY（PR-MILESTONE）、技术总监 CONCERNS、美术总监 CONCERNS
+- 范围仲裁决策点（已写入里程碑文件）：四位主管共识「应砍范围而非仅延里程碑」——预估轨迹 2-3→3+→5+ 三次发散未收敛（实算 45 story ≈ 10-11 冲刺）；提议关口拆两段（MVP 核心循环可演示 / full）+ must 上限降 80% + 技债专属槽位
+- 里程碑文件已更新：目标日期修正 + 实际承载表 + 范围仲裁决策点节
+- 下一步：Sprint 15 实现开始——S15-1 TD-014 根治 → S15-2 exploration-ui 001（R-05 关闭）→ S15-3/4 combat-ui-layout 001/002；实现前先跑 /qa-plan sprint
