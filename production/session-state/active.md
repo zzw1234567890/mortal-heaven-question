@@ -258,3 +258,11 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 范围仲裁决策点（已写入里程碑文件）：四位主管共识「应砍范围而非仅延里程碑」——预估轨迹 2-3→3+→5+ 三次发散未收敛（实算 45 story ≈ 10-11 冲刺）；提议关口拆两段（MVP 核心循环可演示 / full）+ must 上限降 80% + 技债专属槽位
 - 里程碑文件已更新：目标日期修正 + 实际承载表 + 范围仲裁决策点节
 - 下一步：Sprint 15 实现开始——S15-1 TD-014 根治 → S15-2 exploration-ui 001（R-05 关闭）→ S15-3/4 combat-ui-layout 001/002；实现前先跑 /qa-plan sprint
+
+## Session Extract — /qa-plan sprint 15 2026-10-15
+- QA 计划已写入：`production/qa/qa-plan-sprint-15-2026-10-15.md`（9 story 全覆盖——4 must + 3 should + 2 nice）
+- 重点关卡：S15-1 TD-014 闭环标准 = **CI 连续两跑绿**（非单次）；S15-2 R-05 基准 = 目标硬件 D3D12 窗口实测 + risk-register 更新 + 证据文档
+- 自动化测试预估 ~85 个（TD-014 修改 3 + TD-007/012 新建 12 + combat_ui 30 + audio 22 + main_menu 10 + hud 8）
+- 手动证据 5 份（R-05 基准 / layout 001 / card 002 / 003 / keybind 004）——visual/feel+UI 双轨
+- 冒烟新增路径：主菜单三标签页往返 / TD-014 CI 稳定性 / R-05 基准场景 / combat-ui debug 宿主
+- 下一步：S15-1 TD-014 根治（/story-readiness → /dev-story）——连续三冲刺结转的 must 硬关口
