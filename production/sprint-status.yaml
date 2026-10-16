@@ -14,14 +14,14 @@ goal: "exploration-ui 001（R-05 关闭）+ combat-ui-layout 001-002（布局主
 start: "2026-10-13"
 end: "2026-10-23"
 generated: "2026-10-13"
-updated: "2026-10-13"
+updated: "2026-10-16"
 
 stories:
   - id: "15-1"
     name: "TD-014 flaky 根治 + TD-007/012 测试缺口（打包）"
     file: "docs/tech-debt-register.md"
     priority: must-have
-    status: ready-for-dev
+    status: in-progress
     owner: "qa-lead"
     estimate_days: 1.0
     blocker: ""

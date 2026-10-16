@@ -7,7 +7,8 @@ extends GutTest
 ##   - 真实 GSM Autoload——before_each/after_each 清理 player 相关状态
 ##   - watch_signals 验证 realm_upgraded 信号发射 + 载荷
 ##   - 动态分派：var rs: Node 持有，返回值显式类型注解（控制清单 2026-08-05 规则）
-##   - GSM.realm_changed 由帧末 _emit_domain_signal 发射——依赖它的测试需 await process_frame
+##   - GSM.realm_changed 由帧末 _emit_domain_signal 发射——依赖它的测试经
+##     _await_gsm_flush() 有界等待（TD-014 根治——单帧 await 有时序竞态）
 
 const RS_SCRIPT := preload("res://src/core/realm_system.gd")
 
@@ -180,6 +181,23 @@ func test_ac009_realm_up_preserves_cultivation() -> void:
 # AC-010：realm_up 调用 GSM.change_realm 可观察（GSM.realm_changed Cat 1 信号）
 # ============================================================================
 
+## 等待 GSM 帧末 flush 完成（TD-014 根治，S15-1，2026-10-16）。[br]
+## [br][b]旧版缺陷[/b]：单次 [code]await get_tree().process_frame[/code] 与
+## GSM 的 [code]call_deferred("_do_flush")[/code] 在同一帧边界竞争——
+## Linux CI 两跑两红（run 35594865340 + 35719528459）。[br][b]新版[/b]：
+## 有界轮询——等待 pending 缓冲清空（flush 必然先清缓冲再发射），上限 10 帧。
+## 缓冲清空后信号已同步发射完毕，无需再等帧。[br]
+## 不直接调 [code]GameStateManager._flush_pending_changes()[/code]——那会
+## 绕过真实时序、把集成测试退化为半同步断言（保留 Autoload 真实行为验证）。
+func _await_gsm_flush() -> void:
+	for _i: int in range(10):
+		if GameStateManager._pending_changes.is_empty():
+			return
+		await get_tree().process_frame
+	# 尾帧兜底——10 帧后缓冲仍未清空属异常（防 hang：等待循环退出后断言兜底）
+	await get_tree().process_frame
+
+
 func test_ac010_realm_up_triggers_gsm_realm_changed() -> void:
 	GameStateManager.player.realm = 2
 	var realm_changed_received: Array = []
@@ -187,8 +205,8 @@ func test_ac010_realm_up_triggers_gsm_realm_changed() -> void:
 		realm_changed_received.append([o, n])
 	)
 	rs.realm_up(2)
-	# realm_changed 由帧末 _emit_domain_signal 发射——需让出主线程一帧
-	await get_tree().process_frame
+	# realm_changed 由帧末 _emit_domain_signal 发射——等待缓冲清空（flush 已完成）
+	await _await_gsm_flush()
 	assert_eq(realm_changed_received.size(), 1, "GSM.realm_changed Cat 1 信号应发射 1 次")
 	if not realm_changed_received.is_empty():
 		assert_eq(realm_changed_received[0][0], 2, "GSM.realm_changed old 应为 2")
@@ -203,7 +221,7 @@ func test_ac010_realm_up_max_level_no_gsm_realm_changed() -> void:
 		realm_changed_received.append([o, n])
 	)
 	rs.realm_up(5)
-	await get_tree().process_frame
+	await _await_gsm_flush()
 	assert_eq(realm_changed_received.size(), 0, "最高境界突破失败不应触发 GSM.realm_changed")
 
 
