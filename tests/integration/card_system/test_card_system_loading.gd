@@ -23,10 +23,30 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	# TD-014 真因修复（S15-1，2026-10-16 CI 第一跑证据）：先排空未完成的线程
+	# 加载再删文件——否则 ResourceLoader 后台线程在文件删除后打开它们，
+	# 发出 engine ERROR（Cannot open file）→ GUT 把错误归到当时恰在运行的
+	# 测试（ac006 两跑背锅）→ 间歇红。文件尚在时排空，加载正常完成无错误。
+	_drain_pending_loads()
 	_cleanup_test_files()
 	if cs != null:
 		cs.free()
 		cs = null
+
+
+## 排空 cs 未完成的线程加载（文件尚在时调用——before 删除 fixture）。[br]
+## 无断言版本——排空尽力而为（文件存在时必然完成），失败不阻塞清理。
+func _drain_pending_loads() -> void:
+	if cs == null or cs._pending_paths.is_empty():
+		return
+	for _attempt: int in range(3):
+		if cs._pending_paths.is_empty():
+			break
+		for _frame: int in range(100):
+			cs._process(0.016)
+			if cs._pending_paths.is_empty():
+				break
+			OS.delay_msec(4)
 
 
 func _cleanup_test_files() -> void:
