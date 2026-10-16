@@ -266,3 +266,18 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 手动证据 5 份（R-05 基准 / layout 001 / card 002 / 003 / keybind 004）——visual/feel+UI 双轨
 - 冒烟新增路径：主菜单三标签页往返 / TD-014 CI 稳定性 / R-05 基准场景 / combat-ui debug 宿主
 - 下一步：S15-1 TD-014 根治（/story-readiness → /dev-story）——连续三冲刺结转的 must 硬关口
+
+## Session Extract — S15-1 TD-014 根治 + TD-007/012 补齐 2026-10-16
+- Story: S15-1（docs/tech-debt-register.md TD-014/007/012 打包）——must，连续三冲刺结转的硬关口
+- 修改文件：
+  - tests/integration/card_system/test_card_system_loading.gd（ac006 重试驱动 + ac009 顺序不敏感断言 + after_each 排空线程加载——提交 4da6dc4 + 9b52a54）
+  - tests/integration/realm_system/test_realm_up.gd（ac010 _await_gsm_flush 有界轮询替代单帧 await）
+  - tests/integration/hud/mocks/hud_mock_gsm.gd（新建——player 域 + 三信号 mock）
+  - tests/integration/hud/test_realm_bar_signal_wiring.gd（新建 11 测试——TD-007）
+  - tests/integration/hud/test_lingshi_deck_apply_deck_wiring.gd（新建 8 测试——TD-012）
+  - docs/tech-debt-register.md（TD-014/007/012 划线关闭）+ .github/workflows/tests.yml（注释更新）
+- **TD-014 闭环证据：CI run 38897918496（9b52a54）连续两跑绿**（attempt 1 + rerun attempt 2 均 success——2740 tests/2739 passing/1 pending 占位）——PR-SPRINT 监督条件 #2 兑现
+- 真因发现：ac006 CI 失败非「加载慢」——是 ac003/ac005 提交 load_threaded_request 后不驱动完成即删 fixture，后台线程迟滞打开已删文件发出 engine ERROR 被 GUT 归罪到后续运行的 ac006（Windows 快机不显形/Linux 慢机显形——「Linux 间歇红」特征完全吻合）
+- 本地验证：全量 2740 tests/2739 passing/1 pending（89.58s）；card_system 连续三跑全绿；hud 84/84；realm 14/14
+- S15-1 状态：review（实现完成+CI 双跑绿，待 /story-done 类关闭流程——但 S15-1 是技债打包项无故事文件，sprint-status 标 review 即完成态）
+- 下一步：S15-2 exploration-ui 001 节点图基座+R-05 基准（/story-readiness → /dev-story）
