@@ -303,19 +303,31 @@ func _execute_fade_plan(plan: Array[Dictionary]) -> bool:
 			continue
 		var player: AudioStreamPlayer = _bgm_players[player_idx]
 		var play_stream: StringName = cmd[BgmFadePlanner.K_PLAY_STREAM]
+		var delay_sec: float = sequential_delay_sec if is_sequential else 0.0
 		if play_stream != &"":
 			var stream: AudioStream = resolved[play_stream]
 			player.stream = stream
 			player.volume_db = from_db
-			player.play()
-		var delay_sec: float = sequential_delay_sec if is_sequential else 0.0
+			# 顺序式起音延迟：淡出完成前目标侧不起音（AC-BGM-08 字面
+			# 语义——play() 经回调延迟触发，音量插值同窗口 set_delay）
+			if delay_sec > 0.0:
+				_fade_tween.tween_callback(player.play) \
+					.set_delay(delay_sec)
+			else:
+				player.play()
+		# 初值不经 .from()——属性当前值已是计划起点（play 分支显式赋
+		# from_db；续接分支为播放器实际 dB）；且 .from() 在
+		# set_parallel+set_delay 组合下会吞掉 delay（帧级探针实证）
+		# set_delay 须先于 set_trans/set_ease 链式调用——后置会吞掉 delay
+		# 4.6 PropertyTweener 链式顺序敏感（帧级探针实证）
 		var step: PropertyTweener = _fade_tween.tween_property(player,
-			"volume_db", to_db, duration).from(from_db) \
-				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			"volume_db", to_db, duration)
 		if delay_sec > 0.0:
 			step.set_delay(delay_sec)
-		if is_sequential:
-			sequential_delay_sec += duration
+		step.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		# 每条指令时长均累入顺序等待池（sequential 指令消费其当前值——
+		# 平行指令在前时其淡出时长同样构成「前序」，渡劫 b 须等 a 完成）
+		sequential_delay_sec += duration
 		if cmd[BgmFadePlanner.K_STOP_AFTER]:
 			_fade_tween.tween_callback(player.stop) \
 				.set_delay(duration + delay_sec)
