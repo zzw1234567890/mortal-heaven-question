@@ -314,3 +314,19 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 提交：0650083 已推送
 - S15-3 状态：review（待 /story-done 正式关闭）
 - 下一步：S15-4 combat-ui-layout 002 角色状态卡 L0-L5 六层渲染（blocker 15-3 已解除）
+
+
+## Session Extract — S15-4 combat-ui-layout 002 角色状态卡 2026-10-17
+- Story: S15-4 combat-ui-layout 002（must）——实现+测试+证据全链完成
+- 新建文件：
+  - src/ui/combat/shared/combat_ui_rules.gd（hp_bar_color 0.6/0.3 阈值集中 + formation_row_scale 1.0/0.85 纯函数）
+  - src/ui/combat/shared/combat_icon_atlas.gd（stub 程序化图集 256×32——8 格图标 + L1 渐变遮罩；真实图标归美术管线）
+  - src/ui/combat/layout/character_status_card.gd（L0-L5 单 Control 自绘：头像全幅/遮罩/左右 28px 功法法宝栏各≤3/HP条 draw_rect+ATK/buff≤5+境界角标/待命标记/前后排边框）
+  - tests/unit/combat_ui/test_hp_bar_color.gd（4）+ test_formation_row_scale.gd（3）
+  - tests/integration/combat_ui/test_character_card_signal.gd（13——信号驱动/批量免抖/reduce_motion/守卫/无轮询/纯函数消费源码断言/合批共享）
+  - production/qa/evidence/character-card-evidence.md（签收 3/3）
+- 实现要点：R-02 §3 合批分组（图标单图集 draw_texture_rect_region + HP draw_rect 纯色 + 单合并 Label——零子节点拆分）；HP 0.3s Tween 同帧多次 kill 重建终值；阈值集中 CombatUiRules（禁止硬编码）；消费 story 001 CombatUiFont（禁止内联——源码断言锁定）
+- 本地验证：combat_ui unit 15/15 + integration 25/25；全量 2780 tests/2779 passing/1 pending（占位）
+- 提交：d42964b 已推送（网络重试 6 次后成功）
+- S15-4 状态：review（待 /story-done 正式关闭）
+- 下一步：S15-5 audio-manager 002 BGM 交叉淡化（should）或 S15-6 combat-ui 003（blocker 15-4 已解除）
