@@ -75,7 +75,7 @@ stories:
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: "15-4"
-    completed: "2026-10-18"
+    completed: ""
 
   - id: "15-7"
     name: "main-menu 004 按键绑定界面（含启动加载）"
@@ -85,7 +85,7 @@ stories:
     owner: "ui-programmer"
     estimate_days: 1.0
     blocker: ""
-    completed: "2026-10-18"
+    completed: ""
 
   - id: "15-8"
     name: "hud 006 探索 HUD 右下信息组"
@@ -95,7 +95,7 @@ stories:
     owner: "ui-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: "2026-10-18"
+    completed: ""
 
   - id: "15-9"
     name: "audio-manager 003 SFX 池——16 节点池与淘汰/冷却/随机化"
@@ -105,4 +105,4 @@ stories:
     owner: "engine-programmer"
     estimate_days: 1.0
     blocker: ""
-    completed: "2026-10-18"
+    completed: ""
