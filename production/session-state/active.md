@@ -281,3 +281,20 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 本地验证：全量 2740 tests/2739 passing/1 pending（89.58s）；card_system 连续三跑全绿；hud 84/84；realm 14/14
 - S15-1 状态：review（实现完成+CI 双跑绿，待 /story-done 类关闭流程——但 S15-1 是技债打包项无故事文件，sprint-status 标 review 即完成态）
 - 下一步：S15-2 exploration-ui 001 节点图基座+R-05 基准（/story-readiness → /dev-story）
+
+## Session Extract — S15-2 exploration-ui 001 节点图基座 + R-05 关闭 2026-10-17
+- Story: S15-2 exploration-ui 001（must，R-05 行为关卡）——实现+基准+证据+风险关闭全链完成
+- 新建文件：
+  - src/ui/exploration/node_graph_renderer.gd（单 Control _draw() 合批：节点图集 region+边框+文字、连线金实线/暗虚线 draw_dashed_line、迷雾整体覆盖层挖孔）
+  - src/ui/exploration/node_graph_viewport.gd（滚轮 50%-150% 光标锚定缩放 0.2s 平滑 + 中键/边缘平移 + 空格复位 + 整图适配 + 50% 标签隐藏联动 + input_frozen 弹窗冻结）
+  - src/ui/exploration/node_icon_atlas.gd（10 类节点程序化图集 320×32，static 缓存单实例合批前提）
+  - prototypes/r05-node-graph-benchmark/（benchmark.gd + README——复用 R-02 测量方法）
+  - production/qa/evidence/r05-node-graph-benchmark-evidence.md（三 AC 数据 + 签收表 3/3）
+- R-05 基准结果（D3D12 窗口 + VSync off，RTX 3050，1280×720）：AC-1 p95=2.04ms（预算 16.6ms 余量 8 倍）/ AC-2 静态=缩放中=90 DC（预算 200）/ AC-3 迷雾 16→8 节点 DC 90→73 非线性（合批成立）——三 AC 全过
+- R-05 已关闭（risk-register 更新：🔴 高 → 🟢 低，story 010 真实元素复测义务登记）
+- 关键坑固化：renderer Control size=0 时持续平移 ~200 帧后 canvas item 剔除整帧 DC 归零（D3D12/Vulkan 均复现）——PRESET_FULL_RECT 锚点规避，已写入 NodeGraphViewport._init
+- 引擎 API 探测：draw_rect_modulate 不存在；draw_dashed_line 存在（width=-1.0, dash=2.0, aligned=true）
+- **CI flaky 修复（提交 6db5b6f）**：ac010 间歇失败（Windows ~20% 复现）真因 = 无 await 测试残留 GSM pending 泄漏到下一测试 + deferred flush 交错——after_each 直调 _flush_pending_changes 排空（TD-014 同源模式）。CI run 38998504322 连续两跑绿（attempt 1+2 均 success——TD-014 闭环标准）
+- 提交：920abf9（实现+基准+证据）+ 6db5b6f（ac010 flaky 修复）均已推送
+- S15-2 状态：review（Visual/Feel 性能关卡——基准证据已签收，待 /story-done 正式关闭）
+- 下一步：S15-3 combat-ui-layout 001 战场四区域布局骨架（/story-readiness → /dev-story）
