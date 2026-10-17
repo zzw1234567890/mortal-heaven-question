@@ -127,7 +127,7 @@
 - Integration: `tests/integration/audio/test_bgm_crossfade.gd` — must exist and pass（BLOCKING）
 - 听感：R-06 spike 记录（ADVISORY）
 
-**Status**: [x] Created —— tests/unit/audio/test_bgm_fade_planner.gd (12 passing) + tests/unit/audio/test_bgm_stream_cache.gd (6 passing, AC-8) + tests/integration/audio/test_bgm_crossfade.gd (5 passing, 2026-10-17)
+**Status**: [x] Created —— tests/unit/audio/test_bgm_fade_planner.gd (12 passing) + tests/unit/audio/test_bgm_stream_cache.gd (6 passing, AC-8) + tests/integration/audio/test_bgm_crossfade.gd (5 passing, 2026-10-17) + tests/integration/audio/test_bgm_duck_sequential.gd (5 passing, 2026-10-17——QL-TEST-COVERAGE GAPS 补强：duck 执行层全链路 [GAP-1]、sequential 时序 [GAP-2]、矩阵行数值 [GAP-3]、preload_next 接线 [GAP-4])
 
 ---
 
