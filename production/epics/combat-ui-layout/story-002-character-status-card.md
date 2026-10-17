@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 2.0 天（Sprint 15 排期）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-10-17
 
 ## Context
 

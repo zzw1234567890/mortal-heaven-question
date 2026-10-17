@@ -51,7 +51,7 @@ stories:
     name: "combat-ui-layout 002 角色状态卡 L0-L5 六层渲染"
     file: "production/epics/combat-ui-layout/story-002-character-status-card.md"
     priority: must-have
-    status: ready-for-dev
+    status: in-progress
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: "15-3"
