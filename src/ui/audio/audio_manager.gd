@@ -106,15 +106,20 @@ func play_bgm(bgm_id: StringName, options: Dictionary = {}) -> void:
 	var fade_in_sec: float = float(options.get("fade_in_sec", 0.5))
 	var duck_db: Variant = options.get("duck_db", null)
 	var sequential: bool = bool(options.get("sequential", false))
+	# 降低类起点读 BGM 总线实际音量——播放器 dB 与总线 dB 无关（duck
+	# 不触碰播放器音量）；duck 态二次切换从总线当前值续接（AC-BGM-10）
+	var from_db: float = _adapter.get_bus_volume_db(AudioEnums.AudioBus.BGM) \
+			if duck_db != null else _current_bgm_db()
 	var plan: Array[Dictionary] = BgmFadePlanner.plan_transition(
-		_current_bgm_id, bgm_id, _current_bgm_db(), _target_player_db(),
+		_current_bgm_id, bgm_id, from_db, _target_player_db(),
 		fade_out_sec, fade_in_sec, duck_db, sequential)
 	var executed: bool = _execute_fade_plan(plan)
 	if not executed:
 		return  # 边缘 #1：目标曲损坏——状态零变更（旧曲 id/当前侧均保留）
-	if bgm_id != _current_bgm_id:
+	# id 更新仅限真实切曲（duck 不换流——id 始终反映实际在播曲目）
+	if bgm_id != _current_bgm_id and duck_db == null:
 		_current_bgm_id = bgm_id
-		if duck_db == null and bgm_id != &"":
+		if bgm_id != &"":
 			# 切曲成功——目标侧成为新的当前侧（降低类/仅停止不翻转）
 			_current_player_index = 1 - _current_player_index
 			# AC-8：当前曲置保留头 + 逐出超容量条目 + 预加载下一首（可缺省）

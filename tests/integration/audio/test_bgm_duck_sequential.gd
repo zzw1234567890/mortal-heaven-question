@@ -208,3 +208,45 @@ func test_play_bgm_preload_next_option_populates_cache() -> void:
 		"resolve 后 bgm_c 应在流缓存")
 	assert_eq(manager._stream_cache.cached_ids().size() <= 2, true,
 		"常驻 ≤2（guardrail）")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AC-BGM-10（Bus 路径）：duck 态二次 duck 从总线实际 dB 起步——不产生突跳
+# （LP-CODE-REVIEW R-1 回归测试——修复前 from 读播放器 dB，二次 duck 从 0 起步）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_second_duck_continues_from_bus_current_db() -> void:
+	# Given: bgm_a 播放中且总线已 duck 至 -10dB（商店态）
+	manager.play_bgm(&"bgm_a", {"fade_in_sec": FADE_SEC})
+	await sm.get_tree().create_timer(FADE_SEC * 3.0).timeout
+	manager.play_bgm(&"bgm_a", {"duck_db": -10.0, "fade_out_sec": FADE_SEC})
+	await sm.get_tree().create_timer(FADE_SEC * 4.0).timeout
+	assert_almost_eq(manager.get_bus_volume(BGM_BUS), -10.0, 1.0,
+		"前置：总线已处于 -10dB duck 态")
+	# Act: 深度切换至 -20dB（0.4s 加长——headless 帧长内可观测中途值）
+	const LONG_SEC: float = 0.4
+	manager.play_bgm(&"bgm_a", {"duck_db": -20.0, "fade_out_sec": LONG_SEC})
+	# Then: 中途总线音量应单调下降（从 -10 起步），不出现向 0 方向突跳
+	# （修复前 from 读播放器 dB=0 → 总线先跳向 0 再落向 -20）
+	await sm.get_tree().create_timer(LONG_SEC * 0.5).timeout
+	var mid_db: float = manager.get_bus_volume(BGM_BUS)
+	assert_gt(-10.5, mid_db,
+		"二次 duck 中途应从 -10dB 继续下降（实测 %0.1f）" % mid_db)
+	assert_gt(mid_db, -22.0,
+		"二次 duck 中途不应越过目标 -20dB（实测 %0.1f）" % mid_db)
+	# 终态：到达 -20dB
+	await sm.get_tree().create_timer(LONG_SEC * 2.0).timeout
+	assert_almost_eq(manager.get_bus_volume(BGM_BUS), -20.0, 1.5,
+		"二次 duck 终值应到达 -20dB")
+
+func test_duck_request_keeps_current_bgm_id_unchanged() -> void:
+	# R-2 回归：duck 不换流——_current_bgm_id 始终反映实际在播曲目
+	manager.play_bgm(&"bgm_a", {"fade_in_sec": FADE_SEC})
+	await sm.get_tree().create_timer(FADE_SEC * 3.0).timeout
+	assert_eq(manager._current_bgm_id, &"bgm_a", "前置：在播 bgm_a")
+	# Act: 以 bgm_a 之外的 id 发起 duck（修复前会污染 id）
+	manager.play_bgm(&"bgm_a", {"duck_db": -6.0, "fade_out_sec": FADE_SEC})
+	await sm.get_tree().create_timer(FADE_SEC * 3.0).timeout
+	# Then: id 仍为实际在播的 bgm_a（duck 请求不切曲）
+	assert_eq(manager._current_bgm_id, &"bgm_a",
+		"duck 请求不应改写 _current_bgm_id（R-2）")
