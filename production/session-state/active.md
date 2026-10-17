@@ -298,3 +298,19 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 提交：920abf9（实现+基准+证据）+ 6db5b6f（ac010 flaky 修复）均已推送
 - S15-2 状态：review（Visual/Feel 性能关卡——基准证据已签收，待 /story-done 正式关闭）
 - 下一步：S15-3 combat-ui-layout 001 战场四区域布局骨架（/story-readiness → /dev-story）
+
+## Session Extract — S15-3 combat-ui-layout 001 布局骨架 2026-10-17
+- Story: S15-3 combat-ui-layout 001（must）——实现+测试+证据全链完成
+- 新建文件：
+  - src/ui/combat/layout/combat_layout.gd + CombatRoot.tscn（五区域 anchor 百分比骨架 + 进场过渡 + 按钮位 + 音频对接）
+  - src/ui/combat/shared/combat_ui_font.gd（font_size_responsive 共享纯函数——002-006 消费禁止内联）
+  - tests/unit/combat_ui/test_font_size_responsive.gd（8 测试——QA 规格 AC-1 全边界）
+  - tests/integration/combat_ui/test_layout_skeleton.gd（12 测试——五区域存在/anchor/720p 无溢出重叠/按钮位/HUD 战斗隐藏+退出恢复/reduce_motion/过渡完成态/音频 IN_COMBAT 契约）
+  - production/qa/evidence/combat-layout-skeleton-evidence.md（AC-4 手动项归档 + 签收 3/3）
+- 实现要点：anchor 百分比（60/340/180 ÷1080 比率）零像素硬编码；进场 Tween 一次性（零轮询）；AudioManager 注入式（零新增 Autoload）；HUD 隐藏消费 post_transition 矩阵（hud 001 已兑现——集成测试锁定）
+- 字号档位语义修正：<720 档直接保底 12（非 max(round(x*0.85),12)）——QA 规格字面「719→12」；720 档过保底 max(round(x*0.85),12)——edge base=14@720→12
+- 本地验证：combat_ui 20/20；全量 2760 tests/2759 passing/1 pending（占位）
+- CI run 39003941151（0650083）success
+- 提交：0650083 已推送
+- S15-3 状态：review（待 /story-done 正式关闭）
+- 下一步：S15-4 combat-ui-layout 002 角色状态卡 L0-L5 六层渲染（blocker 15-3 已解除）

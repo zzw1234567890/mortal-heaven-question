@@ -41,7 +41,7 @@ stories:
     name: "combat-ui-layout 001 战场四区域布局骨架与共享纯函数模块"
     file: "production/epics/combat-ui-layout/story-001-battlefield-layout-skeleton.md"
     priority: must-have
-    status: in-progress
+    status: review
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: ""
