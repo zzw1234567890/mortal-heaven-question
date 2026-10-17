@@ -29,6 +29,9 @@ const MUTE_VOLUME_DB: float = -80.0
 ## BGM 淡化纯计划器（story 002——数值决策唯一落地处）。
 const BgmFadePlanner := preload("res://src/ui/audio/bgm_fade_planner.gd")
 
+## BGM 流加载与缓存（story 002 AC-8——异步预加载 + 常驻 ≤2 首）。
+const BgmStreamCacheScript := preload("res://src/ui/audio/bgm_stream_cache.gd")
+
 ## AudioServer 适配器——依赖注入（测试可注入 unavailable/mock 实例）。
 var _adapter: AudioServerAdapter = null
 
@@ -60,6 +63,8 @@ var _stream_path_overrides: Dictionary = {}
 ## 测试注入的 bgm_id → AudioStream 对象覆盖表（优先于路径——免落盘
 ## 导入周期，headless GUT 下程序生成流直用）。
 var _stream_overrides: Dictionary = {}
+## BGM 流缓存（AC-8——异步加载/预加载/释放；共享 _stream_path_overrides）。
+var _stream_cache: RefCounted = null
 
 
 ## 构造。[br]
@@ -75,6 +80,7 @@ func _init(scene_manager: Node = null, adapter: AudioServerAdapter = null) -> vo
 		_adapter = AudioServerAdapter.new()
 		if not _adapter.detect_availability():
 			_adapter.unavailable = true
+	_stream_cache = BgmStreamCacheScript.new(_stream_path_overrides)
 	_setup_node_pool()
 
 
@@ -111,6 +117,12 @@ func play_bgm(bgm_id: StringName, options: Dictionary = {}) -> void:
 		if duck_db == null and bgm_id != &"":
 			# 切曲成功——目标侧成为新的当前侧（降低类/仅停止不翻转）
 			_current_player_index = 1 - _current_player_index
+			# AC-8：当前曲置保留头 + 逐出超容量条目 + 预加载下一首（可缺省）
+			_stream_cache.set_current(bgm_id)
+			_stream_cache.trim()
+			var preload_next: Variant = options.get("preload_next", null)
+			if preload_next != null:
+				preload_bgm(preload_next)
 
 
 ## 停止 BGM。[br]
@@ -122,6 +134,13 @@ func stop_bgm(options: Dictionary = {}) -> void:
 		fade_out_sec, 0.0)
 	_execute_fade_plan(plan)
 	_current_bgm_id = &""
+
+
+## 异步预加载 BGM（AC-8——[code]load_threaded_request[/code] 主线程不阻塞；
+## 常驻 ≤2 首：当前 + 预加载下一首）。[br]
+## [param bgm_id]: 预加载的 BGM id（路径经 [member _stream_path_overrides]）。
+func preload_bgm(bgm_id: StringName) -> void:
+	_stream_cache.preload_bgm(bgm_id)
 
 
 ## 暂停所有音频（用于游戏暂停状态）。实现归 story 005（暂停行为）。
@@ -228,23 +247,15 @@ func _target_player_db() -> float:
 	return target.volume_db
 
 
-## 解析 bgm_id → 音频流（测试注入路径覆盖优先；生产按默认路径加载）。[br]
+## 解析 bgm_id → 音频流（对象注入优先 → 流缓存 → 路径表）。[br]
 ## 文件损坏/缺失（GDD 边缘 #1）：返回 null——调用侧保留旧曲继续播放。
+## 路径加载经 [member _stream_cache]（AC-8——缓存命中免 IO；冷路径
+## [code]load_threaded_request + get[/code] 回退）。
 func _resolve_stream(bgm_id: StringName) -> AudioStream:
-	# 对象注入优先（测试直用程序生成流）
+	# 对象注入优先（测试直用程序生成流——优先级高于缓存）
 	if _stream_overrides.has(bgm_id):
 		return _stream_overrides[bgm_id]
-	var path: String = _stream_path_overrides.get(bgm_id, "")
-	if path == "":
-		push_error("AudioManager: BGM '%s' 无资源路径映射（保持旧曲）" % bgm_id)
-		return null
-	if not ResourceLoader.exists(path):
-		push_warning("AudioManager: BGM 路径加载失败或类型不匹配（保持旧曲）: %s" % path)
-		return null
-	var stream: AudioStream = load(path) as AudioStream
-	if stream == null:
-		push_warning("AudioManager: BGM 路径加载失败或类型不匹配（保持旧曲）: %s" % path)
-	return stream
+	return _stream_cache.resolve(bgm_id)
 
 
 ## 执行淡化计划（Tween 薄执行层——数值决策全在 BgmFadePlanner）。[br]

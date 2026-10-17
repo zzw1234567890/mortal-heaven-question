@@ -330,3 +330,22 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 提交：d42964b 已推送（网络重试 6 次后成功）
 - S15-4 状态：review（待 /story-done 正式关闭）
 - 下一步：S15-5 audio-manager 002 BGM 交叉淡化（should）或 S15-6 combat-ui 003（blocker 15-4 已解除）
+
+## Session Extract — S15-5 audio-manager 002 BGM 交叉淡化 2026-10-17
+- Story: S15-5 audio-manager 002（should）——实现+测试全链完成
+- 新建文件：
+  - src/ui/audio/bgm_fade_planner.gd（纯计划器——GDD §9 矩阵数值集中；平行/渡劫 sequential/
+    中断续接从实际 dB/同 id 空计划/降低类单 Bus 指令不切曲；duck 判定先于同 id 检查）
+  - tests/unit/audio/test_bgm_fade_planner.gd（12 测试）
+  - tests/integration/audio/test_bgm_crossfade.gd（5 测试——真实 Tween 0.05s 缩放+await；
+    程序生成 1.0s 静音 WAV 对象注入 _stream_overrides）
+- 修改：src/ui/audio/audio_manager.gd——执行层轮换映射（_current_player_index 0/1 翻转）、
+  _execute_fade_plan 返回 bool、边缘 #1 前置解析（任一目标曲损坏→整计划放弃+状态零变更+
+  push_warning 降级）、ResourceLoader.exists 静默预检
+- 关键修复：①测试流时长 0.1s→1.0s（等待窗口内播完致 playing=false）②固定 players[0]/[1]
+  断言→_cur/_nxt 轮换 helper ③损坏路径 push_error→push_warning（GUT Unexpected Errors 判失败）
+  ④前置解析块移至 kill_fade_tween 之前（避免「Tween no Tweeners」引擎错误）
+- 本地验证：audio 24/24 全绿；全量 2798 tests / 2797 passing / 1 pending（既有占位）
+- 提交：bf9da74 已推送 + CI success；37d9c13 状态更新推送中
+- S15-5 状态：review（待 /story-done 正式关闭）
+- 下一步：S15-6 combat-ui-layout 003 状态标记/阵亡/飘字（blocker 15-4 已解除）或 S15-7 main-menu 004

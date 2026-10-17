@@ -198,6 +198,7 @@ func test_api_skeleton_no_extra_public_apis_beyond_gdd() -> void:
 	for sig: Array in EXPECTED_SIGNATURES:
 		allowed.append(sig[0])
 	allowed.append("get_bgm_players")  # story 规格：节点池访问器（测试/story 002 消费）
+	allowed.append("preload_bgm")  # story 002 AC-8：异步预加载下一首（缓存薄委托）
 	var source: String = FileAccess.get_file_as_string(
 			"res://src/ui/audio/audio_manager.gd")
 	assert_false(source.is_empty(), "audio_manager.gd 源码应可读")
