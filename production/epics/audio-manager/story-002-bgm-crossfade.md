@@ -1,7 +1,7 @@
 # Story 002: BGM 通道——双播放器交叉淡化
 
 > **Epic**: 音频管理
-> **Status**: Ready
+> **Status**: In Review
 > **Layer**: Presentation
 > **Type**: Logic
 > **Estimate**: 1.0 天（Sprint 15 排期）
@@ -127,7 +127,7 @@
 - Integration: `tests/integration/audio/test_bgm_crossfade.gd` — must exist and pass（BLOCKING）
 - 听感：R-06 spike 记录（ADVISORY）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created —— tests/unit/audio/test_bgm_fade_planner.gd (12 tests passing) + tests/integration/audio/test_bgm_crossfade.gd (5 tests passing, 2026-10-17)
 
 ---
 

@@ -61,7 +61,7 @@ stories:
     name: "audio-manager 002 BGM 双播放器交叉淡化"
     file: "production/epics/audio-manager/story-002-bgm-crossfade.md"
     priority: should-have
-    status: in-progress
+    status: review
     owner: "engine-programmer"
     estimate_days: 1.0
     blocker: ""
