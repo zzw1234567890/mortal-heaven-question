@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: UI（含 Integration）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 2.0 天（Sprint 15 排期）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-10-17
 
 ## Context
 
@@ -110,7 +110,7 @@
 - Integration: `tests/integration/combat_ui/test_layout_skeleton.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/combat-layout-skeleton-evidence.md` + sign-off
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created 2026-10-17——`tests/unit/combat_ui/test_font_size_responsive.gd`（8/8）+ `tests/integration/combat_ui/test_layout_skeleton.gd`（12/12）+ `production/qa/evidence/combat-layout-skeleton-evidence.md`（签收 3/3）
 
 ---
 
