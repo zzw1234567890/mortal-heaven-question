@@ -1,5 +1,6 @@
 # QA Lead 记忆索引
 
+- [audio Story 002 QL-TEST-COVERAGE 2026-10-17](project_audio-story002-ql-test-coverage.md) — GAPS；2 BLOCKING（bus duck 执行层+AC-BGM-07 零覆盖、sequential 执行时序无集成测试）+3 ADVISORY
 - [Sprint 14 should 层 QL 审查 2026-09-20](project_sprint14-should-ql-review.md) — 004/006/007 均 GAPS；max_val 恒 0 陷阱、地图名无数据源（is_fallen 模式）、shop 场景不存在、004 注册机制未承接
 
 - [combat-ui-layout 009a/009b QL 审查 2026-09-19](project_combat-ui-layout-009-ql-review.md) — 009a GAPS 1 BLOCKING（引擎参考无 get_rendering_info）；009b GAPS 3 BLOCKING（stub 矛盾/provisional/依赖）
