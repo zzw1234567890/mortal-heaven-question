@@ -14,7 +14,7 @@ goal: "exploration-ui 001（R-05 关闭）+ combat-ui-layout 001-002（布局主
 start: "2026-10-13"
 end: "2026-10-23"
 generated: "2026-10-13"
-updated: "2026-10-16"
+updated: "2026-10-17"
 
 stories:
   - id: "15-1"
@@ -31,7 +31,7 @@ stories:
     name: "exploration-ui 001 节点图渲染基座与 R-05 性能基准"
     file: "production/epics/exploration-ui/story-001-node-graph-base-r05-benchmark.md"
     priority: must-have
-    status: ready-for-dev
+    status: in-progress
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: ""

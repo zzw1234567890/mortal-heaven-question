@@ -4,9 +4,9 @@
 > **Status**: Ready
 > **Layer**: Presentation
 > **Type**: Visual/Feel（性能关卡——EPIC 结构条件首个 story）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 2.0 天（Sprint 15 排期）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-10-16
 
 ## Context
 
@@ -92,7 +92,7 @@
 - `production/qa/evidence/r05-node-graph-benchmark-evidence.md`（帧时间分布 p50/p95/p99 + DC 基准 + 优化路径记录）+ sign-off
 - `production/risk-register/presentation-layer-risks.md` R-05 状态更新
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created — `production/qa/evidence/r05-node-graph-benchmark-evidence.md`（2026-10-17，三 AC 全过 + 签收表 3/3）
 
 ---
 

@@ -15,7 +15,7 @@
 | R-02 | Draw Call 超 200 预算（战斗 16 角色卡 + 手牌 + 节点图迷雾） | 中 | 高 | 🔴 高 | 有条件关闭（stub 版原型级验证） | ui-programmer |
 | R-03 | D3D12 默认渲染器兼容性（Windows 驱动差异） | 中 | 中 | 🟡 中 | 已关闭（2026-09-12 spike） | godot-specialist |
 | R-04 | AccessKit 屏幕阅读器支持的实际可用性（4.5+，未经项目验证） | 中 | 中 | 🟡 中 | 开放 | accessibility-specialist |
-| R-05 | 节点图最坏情况节点数的缩放/平移帧率 | 中 | 高 | 🔴 高 | 开放 | ui-programmer |
+| R-05 | 节点图最坏情况节点数的缩放/平移帧率 | 中 | 高 | 🟢 低 | 已关闭（2026-10-17 基准 stub 版） | ui-programmer |
 | R-06 | Ogg Vorbis 循环间隙（BGM 无缝循环） | 高 | 中 | 🟡 中 | 已关闭（2026-09-13 spike） | audio-director |
 | R-07 | Glow 在 tonemapping 之前处理（4.6 变更）——焦点环/高亮视觉效果回归 | 中 | 低 | 🟢 低 | 开放 | godot-shader-specialist |
 | R-08 | 25 个 Autoload 超软上限——表现层不得新增 Autoload | 低 | 中 | 🟢 低 | 已缓解 | lead-programmer |
@@ -104,6 +104,7 @@
 - **待办措施**：Sprint 13 节点图 story 中含性能基准验收（最坏节点数下缩放平移 60fps）
 - **触发条件**：节点图渲染实现时
 - **关闭条件**：最坏情况基准通过；若不通过，优化（图集/合批/LOD）后复测
+- **关闭记录（2026-10-17）**：stub 版基准通过（exploration-ui 001，证据 `production/qa/evidence/r05-node-graph-benchmark-evidence.md`）——最坏情况（6 层×4 节点 + 层间全连接 80 连线 + 迷雾 16 节点 + 10 类图标）D3D12 实测：缩放平移帧时间 p95=2.04ms（预算 16.6ms，余量 8 倍）；静态/缩放中 DC 均 90（预算 200）；迷雾合批成立（揭雾 16→8 节点 DC 90→73 反向变化——非迷雾节点数线性增长）。渲染基座为单 Control `_draw()` 合批（ADR-0031 §5 全兑现）。**残留**：story 010 真实元素复测时以真实美术图标 + 揭雾动画复跑基准对照（stub 版程序化图集为近似）。
 
 ### R-06 Ogg Vorbis 循环间隙 🟡 中
 
