@@ -27,6 +27,13 @@ func after_each() -> void:
 	# 断开本测试连接到 GSM realm_changed 的所有 callable——Autoload 持久信号不会随 rs.free() 清除
 	for conn: Dictionary in GameStateManager.realm_changed.get_connections():
 		GameStateManager.realm_changed.disconnect(conn["callable"])
+	# 排空 pending 缓冲（TD-014 同源根治，2026-10-17）——无 await 测试（如 ac009）
+	# 的 change_realm 残留 pending 会泄漏到下一测试：残留 deferred flush 与下一测试
+	# 的 connect/realm_up 交错时，下一测试收到 [上一次 old/new] 载荷（实测 old=3 间歇失败，
+	# Windows 本地 ~20% 复现）。after_each 直调 flush（此时已无监听者——发射安全）
+	# 是清理操作，不绕过被测时序（ac010 的 _await_gsm_flush 保持真实 Autoload 路径）。
+	if not GameStateManager._pending_changes.is_empty():
+		GameStateManager._flush_pending_changes()
 	_reset_gsm_state()
 
 
