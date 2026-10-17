@@ -1,7 +1,7 @@
 # Story 002: BGM 通道——双播放器交叉淡化
 
 > **Epic**: 音频管理
-> **Status**: In Review
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: Logic
 > **Estimate**: 1.0 天（Sprint 15 排期）
@@ -135,3 +135,10 @@
 
 - Depends on: Story 001（骨架与总线）；R-06 spike（前置）
 - Unlocks: Story 004（set_state 消费淡化原语）
+
+## Completion Notes
+**Completed**：2026-10-18
+**Criteria**：7/7 通过（听感 ADVISORY 项由 R-06 spike 记录承接）
+**Deviations**：冷路径 load_threaded_get 同步回退（ADR 漂移——LP-CODE-REVIEW 警告级；生产路径经 preload_next 预加载后阻塞窗口极短；story 004 接线时保证切曲恒走预加载路径）
+**Test Evidence**：tests/unit/audio/test_bgm_fade_planner.gd (12) + test_bgm_stream_cache.gd (6) + tests/integration/audio/test_bgm_crossfade.gd (5) + test_bgm_duck_sequential.gd (7)——全量 2810 passing / 1 pending
+**Code Review**：已完成——LP-CODE-REVIEW CHANGES REQUIRED → R-1/R-2 修复（004fc05）后复核通过；QL-TEST-COVERAGE GAPS 四项全部补强

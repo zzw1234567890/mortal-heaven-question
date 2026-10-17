@@ -14,7 +14,7 @@ goal: "exploration-ui 001（R-05 关闭）+ combat-ui-layout 001-002（布局主
 start: "2026-10-13"
 end: "2026-10-23"
 generated: "2026-10-13"
-updated: "2026-10-17"
+updated: "2026-10-18"
 
 stories:
   - id: "15-1"
@@ -61,11 +61,11 @@ stories:
     name: "audio-manager 002 BGM 双播放器交叉淡化"
     file: "production/epics/audio-manager/story-002-bgm-crossfade.md"
     priority: should-have
-    status: review
+    status: done
     owner: "engine-programmer"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-18"
 
   - id: "15-6"
     name: "combat-ui-layout 003 状态标记切换、阵亡处理与飘字"
@@ -75,7 +75,7 @@ stories:
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: "15-4"
-    completed: ""
+    completed: "2026-10-18"
 
   - id: "15-7"
     name: "main-menu 004 按键绑定界面（含启动加载）"
@@ -85,7 +85,7 @@ stories:
     owner: "ui-programmer"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-18"
 
   - id: "15-8"
     name: "hud 006 探索 HUD 右下信息组"
@@ -95,7 +95,7 @@ stories:
     owner: "ui-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-10-18"
 
   - id: "15-9"
     name: "audio-manager 003 SFX 池——16 节点池与淘汰/冷却/随机化"
@@ -105,4 +105,4 @@ stories:
     owner: "engine-programmer"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-18"

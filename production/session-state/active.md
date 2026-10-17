@@ -349,3 +349,22 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 提交：bf9da74 已推送 + CI success；37d9c13 状态更新推送中
 - S15-5 状态：review（待 /story-done 正式关闭）
 - 下一步：S15-6 combat-ui-layout 003 状态标记/阵亡/飘字（blocker 15-4 已解除）或 S15-7 main-menu 004
+
+## Session Extract — S15-5 GAPS 补强完成 2026-10-17
+- GAPS 测试（test_bgm_duck_sequential.gd 5 测试）全绿 → audio 套件 29/29，全量 2808 passing / 1 pending
+- 关键实现修复：sequential 模式 play() 经 tween_callback set_delay 延迟触发
+  （AC-BGM-08 字面语义——此前音量停 -80dB 但 playing=true）
+- 关键测试修复：目标侧引用须在 play_bgm 之前捕获（成功即翻转 _current_player_index，
+  切换后 _nxt 测到旧 a 侧）；preload_next 断言改 resolve 消费在途请求
+- 提交：11bd2d6（GAPS 补强）+ a47c885（story 证据段）——均推送 CI success
+- 下一步：/story-done 阶段 5 LP-CODE-REVIEW（full 模式）→ 完成报告 → story 关闭
+
+## Session Extract — /story-done S15-5 audio-manager 002 关闭 2026-10-18
+- Verdict：COMPLETE WITH NOTES（1 项 ADR 漂移登记——冷路径同步回退，story 004 接线时保证切曲恒走预加载）
+- LP-CODE-REVIEW：CHANGES REQUIRED → R-1（duck 总线续接基线）/R-2（duck 污染 _current_bgm_id）修复 + 回归测试 2 条（004fc05，CI 绿）
+- QL-TEST-COVERAGE：GAPS 四项全部补强（11bd2d6，CI 绿）——test_bgm_duck_sequential.gd 7 测试
+- 测试总量：audio 31/31；全量 2810 passing / 1 pending
+- Story：production/epics/audio-manager/story-002-bgm-crossfade.md → Complete
+- 冲刺状态：15-5 done（2026-10-18）
+- 建议性改进遗留（不阻塞）：_execute_fade_plan 拆分（40 行+复杂度）、audio_manager.gd 351 行超 300 软上限、文档注释三处失同步、stop_bgm 缓存保留头清理、MUTE_VOLUME_DB 与 SILENCE_DB 重复定义
+- 下一步：S15-6 combat-ui-layout 003 状态标记/阵亡/飘字（blocker 15-4 已解除）
