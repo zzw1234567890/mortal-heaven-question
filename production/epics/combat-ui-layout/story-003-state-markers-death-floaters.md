@@ -105,7 +105,7 @@
 
 **Status**: [x] Created —— tests/integration/combat_ui/test_hp_batch_transition.gd（BLOCKING，LP-CODE-REVIEW M-2 补强：CountingCard 子类 apply_hp 计数断言 + H-1 坐标空间回归 2 例 + 沙漏淡出 2 例）
 + test_death_flow.gd (5) + test_floater_pool.gd (池上限/复用/reduce_motion)
-+ mocks/counting_card.gd——combat_ui 套件 57/57 全绿（2026-10-18）；全量回归 2840 passing / 1 pending 存量。
++ mocks/counting_card.gd——combat_ui 套件 57/57 全绿（2026-10-18）；全量回归 2842 passing / 1 pending 存量（2843 tests）。
 UI 手动证据 character-state-death-evidence.md 待录屏签收（ADVISORY）
 
 ---

@@ -355,7 +355,7 @@ func test_floater_origin_offset_container_and_scaled_card() -> void:
 	oc_coordinator.register_card(101, oc_card)
 	await _wait_frames(2)  # 布局生效帧
 	# 计算期望：卡全局中心 = 容器(300,200) + 卡容器(120,60) + 卡(40,30)
-	#   + size(120,168) * scale(0.85) * 0.5 = (520, 361.4)
+	#   + size(120,168) * scale(0.85) * 0.5 = (511, 361.4)
 	var expected_center: Vector2 = oc_card.global_position 	\
 			+ oc_card.size * oc_card.scale * 0.5
 	# Act —— 伤害入队（飘字立即发射）
