@@ -64,8 +64,10 @@ var _slide_tween: Tween = null
 var _base_panel_x: float = 0.0
 ## 确认弹窗实例——复用（首次创建后留树）。
 var _confirm_dialog: ConfirmationDialog = null
-## 按键绑定 store（与 KeybindTab 共享——注册分类重置 + tab 持久化共用）。
-var _keybind_store: KeybindStore = null
+## 按键绑定 store（与 KeybindTab 共享——注册分类重置 + tab 持久化共用）。[br]
+## [MainMenu] 装配时注入已 [code]snapshot_defaults()[/code] 的实例（H-3——
+## 恢复默认的默认基准来自启动快照）；未注入时本地 new（测试路径）。
+var keybind_store: KeybindStore = null
 ## 按键绑定 tab 控件（代码构建挂 KeybindsTab——story 004）。
 var _keybind_tab: KeybindTab = null
 
@@ -302,19 +304,20 @@ func _register_reset_handlers() -> void:
 			_get_keybind_store().reset_keybind_category)
 	# 005 语言落地时各自注册——未注册占位不崩溃
 
-## 按键绑定 tab 装配——代码构建 KeybindTab 挂 KeybindsTab 节点（占位 Label
-## 由 _apply_texts 隐藏；story 允许两选一，选代码构建理由见 keybind_tab.gd
-## 类注释——动作列表数据驱动，静态 .tscn 行节点会双源漂移）。
+## 按键绑定 tab 装配——代码构建 KeybindTab 挂 KeybindsTab 节点（VBoxContainer
+## 直接子级——LP-CODE-REVIEW H-1：不挂占位 Label 之下，父 visible=false 会连
+## 子树隐藏；占位 Label 在 _apply_texts 隐藏）。story 允许两选一，选代码构建
+## 理由见 keybind_tab.gd 类注释——动作列表数据驱动，静态 .tscn 行节点会双源漂移。
 func _setup_keybind_tab() -> void:
-	_keybind_store = KeybindStoreScript.new()
-	# 测试注入共享路径——与宿主 store 同一设置文件（注入项在 _ready 前设置时
-	# 已生效；此处 new 的默认路径供产品路径消费）
-	if _keybind_store != null and is_instance_valid(_keybinds_placeholder):
-		_keybind_tab = KeybindTabScript.new()
-		_keybind_tab.keybind_store = _keybind_store
-		_keybind_tab.animate = animate
-		_keybind_tab.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		_keybinds_placeholder.add_child(_keybind_tab)
+	if _keybinds_placeholder == null or not is_instance_valid(_keybinds_placeholder):
+		return
+	if keybind_store == null:
+		keybind_store = KeybindStoreScript.new()
+	_keybind_tab = KeybindTabScript.new()
+	_keybind_tab.keybind_store = keybind_store
+	_keybind_tab.animate = animate
+	_keybind_tab.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_keybinds_placeholder.get_parent().add_child(_keybind_tab)
 
 ## === 滑入动画 ===================================================================
 
@@ -361,7 +364,7 @@ func _get_store() -> SettingsStore:
 	return settings_store
 
 func _get_keybind_store() -> KeybindStore:
-	return _keybind_store
+	return keybind_store
 
 func _release_lock() -> void:
 	if _lock_held:

@@ -197,9 +197,17 @@ func _ask_overwrite(event: InputEvent, conflicts: Array[StringName]) -> void:
 	_pending_conflict = {"event": event, "actions": conflicts}
 	if _confirm_dialog == null:
 		_confirm_dialog = ConfirmationDialog.new()
+		# 真实信号接线（LP-CODE-REVIEW H-2）：覆盖分支经 confirmed 信号触达；
+		# 取消分支复位等待态（恢复按键格文本 + 停闪烁 + 清悬挂上下文）。
+		_confirm_dialog.confirmed.connect(_overwrite_conflicts)
+		_confirm_dialog.canceled.connect(_on_overwrite_cancelled)
 		add_child(_confirm_dialog)
 	_confirm_dialog.dialog_text = TEXT_CONFLICT_FMT % TEXT_CONFLICT_SEP.join(names)
 	_confirm_dialog.popup_centered()
+
+## 冲突弹窗「取消」——放弃覆盖，退出等待态并复位按键格（AC-017 取消分支）。
+func _on_overwrite_cancelled() -> void:
+	_cancel_capture()
 
 ## === 刷新 / 行构建（数据驱动——InputMap 枚举）==================================
 

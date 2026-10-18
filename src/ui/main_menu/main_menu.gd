@@ -140,12 +140,15 @@ func _load_keybinds() -> void:
 	var store: KeybindStore = keybind_store
 	if store == null:
 		store = KeybindStoreScript.new()
+		keybind_store = store  # 留存共享——SettingsPanel 装配时注入（H-3）
 	store.snapshot_defaults()
 	var bindings: Dictionary = store.load_bindings()
 	if not bindings.is_empty():
 		KeybindStoreScript.apply_bindings(bindings)
 
-## === 文本与版本 ================================================================## 应用固定词条（本地化入库后改为键查找——头注释豁免注记）。[br]
+## === 文本与版本 ================================================================
+
+## 应用固定词条（本地化入库后改为键查找——头注释豁免注记）。[br]
 ## 全部按钮文案统一由代码赋值（单一真理来源——code-review S-1 裁决：
 ## 常量声明而不消费会与 .tscn text 属性形成双源漂移）。
 func _apply_texts() -> void:
@@ -267,6 +270,10 @@ func _on_settings_pressed() -> void:
 	if _settings_panel == null or not is_instance_valid(_settings_panel):
 		_settings_panel = SETTINGS_PANEL_SCENE.instantiate()
 		_settings_panel.animate = animate
+		# 已快照的 keybind store 注入面板（LP-CODE-REVIEW H-3——共享同一实例，
+		# 面板注册的「恢复默认」才能拿到启动时快照的默认基准）
+		if keybind_store != null:
+			_settings_panel.keybind_store = keybind_store
 		add_child(_settings_panel)
 	_settings_panel.open()
 

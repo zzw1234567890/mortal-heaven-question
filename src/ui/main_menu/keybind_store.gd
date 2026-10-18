@@ -111,8 +111,9 @@ func save_bindings(bindings: Dictionary) -> bool:
 
 ## === 应用与重置 ================================================================
 
-## 应用绑定映射到 InputMap（[code]action_set_event[/code] 逐 action 覆写——
-## InputMap API 4.3~4.6 无变更，story 允许清单内）。[br]
+## 应用绑定映射到 InputMap（[code]action_erase_events + action_add_event[/code]
+## 逐 action 覆写——[code]action_set_event[/code] 在 4.6.3 不存在，R-05 spike
+## 实测 [code]has_method=false[/code]，组合语义等价）。[br]
 ## 空绑定映射为 no-op。
 static func apply_bindings(bindings: Dictionary) -> void:
 	for action: Variant in bindings.keys():

@@ -244,6 +244,106 @@ func test_reset_all_includes_keybind_category_and_restores_inputmap() -> void:
 	assert_true(handler_names.has("keybinds"), "注册表应含 keybinds 分类")
 
 
+func test_reset_all_product_path_without_manual_snapshot() -> void:
+	## H-3 回归: 产品路径「恢复默认」走真实快照来源——MainMenu 注入已快照
+	## store 到面板，不手动调 snapshot_defaults（此前缺陷：面板本地 new 的
+	## store 无快照 → reset 必 no-op 失败，被测试手动快照遮住）。
+	# Arrange —— MainMenu 场景 + 注入临时路径的共享 keybind store（_ready
+	# 的 _load_keybinds 在注入实例上快照——不读真实 user://settings.json）
+	var menu: Control = load(
+			"res://src/ui/main_menu/MainMenu.tscn").instantiate()
+	menu.animate = false
+	var shared_kb: Object = StoreScript.new()
+	shared_kb.path = _temp_path
+	menu.keybind_store = shared_kb
+	add_child_autofree(menu)  # _ready 执行（keybind_store 非空 → 共享实例快照）
+	# 打开设置面板（产品路径注入共享 store——H-3 修复接线）
+	menu._on_settings_pressed()
+	var panel: Control = menu._settings_panel
+	assert_not_null(panel, "前置：设置面板已实例化")
+	var panel_kb: Object = panel._get_keybind_store()
+	assert_eq(panel_kb, shared_kb, "面板应共享 MainMenu 的已快照 store（H-3）")
+	# 自定义 F1 + 保存
+	StoreScript.apply_bindings({ACTION_A: [_f1_key()]})
+	panel_kb.save_bindings({ACTION_A: [_f1_key()]})
+	assert_eq(_current_codes(ACTION_A), [KEY_F1], "前置：自定义 F1 已生效")
+	# Act —— 全局恢复默认（面板注册表——不手动 snapshot_defaults）
+	var ok: bool = panel._get_store().reset_all_categories()
+	# Assert —— InputMap 归位快照 Q（产品路径快照来源生效）
+	assert_true(ok, "产品路径全局恢复默认应成功")
+	assert_eq(_current_codes(ACTION_A), [KEY_Q], "reset_all 后应归位快照 Q")
+
+
+func test_keybind_tab_visible_under_keybinds_tab() -> void:
+	## H-1 回归: KeybindTab 挂 KeybindsTab（VBoxContainer）直接子级——产品路径
+	## 按键绑定页内容可见（此前缺陷：挂隐藏占位 Label 之下整树不可见）。
+	# Arrange —— 面板场景（_ready 装配 KeybindTab）
+	var panel_store: Object = SettingsStoreScript.new()
+	panel_store.path = _temp_path
+	var panel: Control = load(
+			"res://src/ui/main_menu/SettingsPanel.tscn").instantiate()
+	panel.animate = false
+	panel.settings_store = panel_store
+	add_child_autofree(panel)
+	panel.visible = true  # 打开面板（产品路径可见性前提）
+	# Act —— 切到按键绑定页 + 定位 KeybindTab（TabContainer 仅当前页可见）
+	var tab_container: TabContainer = panel.get_node(
+			"Panel/PanelVBox/TabContainer")
+	tab_container.current_tab = 2  # KeybindsTab（0=音频 1=画面 2=按键 3=语言）
+	# TabContainer 页可见性经一帧传播（headless 同——deferred 侧更新）
+	await get_tree().process_frame
+	var keybinds_tab: VBoxContainer = tab_container.get_node("KeybindsTab")
+	var keybind_tab_child: Control = null
+	for child: Node in keybinds_tab.get_children():
+		if child is KeybindTab:
+			keybind_tab_child = child
+			break
+	# Assert —— 挂载点正确 + 祖先链无 visible=false（headless 下根窗口不可见，
+	# is_visible_in_tree 恒 false——改查 CanvasItem.visible 属性链）
+	assert_not_null(keybind_tab_child, "KeybindTab 应挂 KeybindsTab 节点下")
+	assert_true(keybind_tab_child.visible,
+			"KeybindTab 自身 visible 应为 true")
+	var ancestor: Node = keybind_tab_child.get_parent()
+	while ancestor is CanvasItem:
+		var anc: CanvasItem = ancestor as CanvasItem
+		assert_true(anc.visible,
+				"祖先 %s 不应隐藏（H-1：不挂隐藏占位 Label 之下）" % anc.name)
+		ancestor = anc.get_parent()
+
+
+func test_conflict_dialog_real_signal_paths() -> void:
+	## H-2 回归: 冲突确认弹窗的真实信号接线——confirmed → 覆盖生效；
+	## canceled → 取消分支复位等待态（此前缺陷：两信号均未连接，覆盖分支
+	## 在真实 UI 不可达）。
+	# Arrange —— 制造冲突上下文（Q 被 test_kb_a 占用，重绑到 test_kb_b）
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_B, button)
+	var result: Dictionary = tab._handle_capture_event(_pressed_event(KEY_Q))
+	assert_eq(str(result.get("result")), "conflict", "前置：冲突分支")
+	var dialog: ConfirmationDialog = tab._confirm_dialog
+	assert_not_null(dialog, "前置：确认弹窗已创建")
+	# Act ① —— canceled 信号（真实接线路径）
+	dialog.canceled.emit()
+	# Assert ① —— 等待态复位：闪烁停 + 冲突上下文清 + 按键格恢复键名
+	assert_eq(str(tab._capturing_action), &"", "取消后应退出等待态")
+	assert_true(tab._pending_conflict.is_empty(), "取消后冲突上下文应清空")
+	assert_eq(_current_codes(ACTION_A), [KEY_Q],
+			"取消后 InputMap 不变（占用者保留 Q）")
+	assert_eq(_current_codes(ACTION_B), [MOUSE_RIGHT],
+			"取消后目标 action 维持原绑定")
+	# Act ② —— 重新制造冲突，confirmed 信号（真实接线路径）
+	tab.begin_capture(ACTION_B, button)
+	assert_eq(str(tab._handle_capture_event(_pressed_event(KEY_Q))
+			.get("result")), "conflict", "前置②：再次进入冲突分支")
+	dialog.confirmed.emit()
+	# Assert ② —— 覆盖生效：新 action 抢占 Q、被占用 action 移除 Q
+	assert_eq(_current_codes(ACTION_B), [KEY_Q],
+			"confirmed 后新 action 应占 Q（真实信号路径）")
+	assert_eq(_current_codes(ACTION_A), [],
+			"confirmed 后被占用 action 应移除 Q")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # UI 状态机（等待输入——可测入口分离）
 # ═══════════════════════════════════════════════════════════════════════════════
