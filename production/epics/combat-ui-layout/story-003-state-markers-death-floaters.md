@@ -1,7 +1,7 @@
 # Story 003: 角色状态标记切换、阵亡处理与飘字
 
 > **Epic**: 战斗 UI——静态布局与角色状态卡
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Integration 核心）
 > **Estimate**: 2.0 天（Sprint 15 排期）
@@ -114,3 +114,10 @@ UI 手动证据 character-state-death-evidence.md 待录屏签收（ADVISORY）
 
 - Depends on: Story 002（角色卡组件与 L5 标记节点）
 - Unlocks: Story 008（全灭信号→结算面板）
+
+## Completion Notes
+**Completed**：2026-10-18
+**Criteria**：7/7 通过（AC-1/2/3 自动化 BLOCKING 锁定；AC-4 走查归档 character-state-death-evidence.md 签收 3/3；文字通道经 game-designer 裁决方案 B 推迟——DEBT-CUI-003）
+**Deviations**：①「待命/已行动」文字通道推迟（DEBT-CUI-003——R-02 合批预算+无本地化系统，图形双通道满足可辨识性，GDD L110-111/L708-709 加注）②ACTED 无逐角色信号——request_acted() 外部驱动入口（战斗侧接线 story 消费）③治疗按 damage 符号判定（CardEffectEngine healing 字段独立信号时需同步）④碎裂动画 modulate 淡出 stub（美术素材归后续）
+**Test Evidence**：tests/integration/combat_ui/test_hp_batch_transition.gd（BLOCKING 24 场景）+ test_death_flow.gd (5) + test_floater_pool.gd (8) + mocks/counting_card.gd——combat_ui 57/57；全量 2843/2842 passing/1 pending 存量；production/qa/evidence/character-state-death-evidence.md 签收 3/3
+**Code Review**：已完成——LP-CODE-REVIEW CHANGES REQUIRED（H-1 坐标空间/M-2 计数断言/AC 文字裁决）→ 修复提交 5289133 → 定向复审 APPROVED → 微瑕修正 65a4eca

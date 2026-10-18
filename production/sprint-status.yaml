@@ -71,11 +71,11 @@ stories:
     name: "combat-ui-layout 003 状态标记切换、阵亡处理与飘字"
     file: "production/epics/combat-ui-layout/story-003-state-markers-death-floaters.md"
     priority: should-have
-    status: review
+    status: done
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-18"
 
   - id: "15-7"
     name: "main-menu 004 按键绑定界面（含启动加载）"

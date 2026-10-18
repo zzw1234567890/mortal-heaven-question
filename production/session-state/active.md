@@ -393,3 +393,15 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
   story 消费）②治疗按 damage 符号判定（CardEffectEngine 独立信号时需同步）③UI 手动证据
   待录屏签收（ADVISORY）
 - 下一步：/story-done S15-6（LP-CODE-REVIEW full 关卡）
+
+## Session Extract — /story-done S15-6 combat-ui 003 关闭 2026-10-18
+- Verdict：COMPLETE（7/7 AC——含文字通道裁决方案 B 推迟）
+- Story：production/epics/combat-ui-layout/story-003-state-markers-death-floaters.md
+- LP-CODE-REVIEW 全链：CHANGES REQUIRED → H-1 坐标空间修复（spawn 全局→局部换算+缩放卡+空位框同父局部）
+  + M-2 CountingCard 计数断言 + AC 文字裁决（game-designer 方案 B，DEBT-CUI-003 登记+GDD 加注+沙漏 0.3s 淡出补齐）
+  → 提交 5289133 CI 绿 → 定向复审 APPROVED → 微瑕修正 65a4eca
+- 建议项一并修复：M-1 全灭守卫/L-1 空卡跳过/L-2 modulate 恢复/死 API card_lookup_cb 移除（setup 四参）
+- 证据：UI 手动证据 character-state-death-evidence.md 签收 3/3（ADVISORY 闭环）；combat_ui 57/57；全量 2842/1 pending 存量
+- Tech debt logged：1 项（DEBT-CUI-003 文字通道）
+- Sprint 15 剩余：15-7 main-menu 004 按键绑定（should，1.0 天）→ 15-8 hud 006（nice）→ 15-9 audio 003（nice）
+- Next recommended：S15-7 main-menu 004 按键绑定界面（含启动加载）
