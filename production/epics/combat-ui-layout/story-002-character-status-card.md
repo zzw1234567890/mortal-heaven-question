@@ -1,7 +1,7 @@
 # Story 002: 角色状态卡组件（L0-L5 分层）
 
 > **Epic**: 战斗 UI——静态布局与角色状态卡
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
 > **Estimate**: 2.0 天（Sprint 15 排期）
@@ -111,7 +111,7 @@
 - Integration: `tests/integration/combat_ui/test_character_card_signal.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/character-card-evidence.md` + sign-off（截图）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created —— tests/unit/combat_ui/test_hp_bar_color.gd (4) + test_formation_row_scale.gd (3) + tests/integration/combat_ui/test_character_card_signal.gd (13) 全绿（2026-10-17，d42964b CI 绿）；UI 证据 production/qa/evidence/character-card-evidence.md 三角色签收
 
 ---
 
@@ -119,3 +119,10 @@
 
 - Depends on: Story 001（容器与共享纯函数）、Story 009a（合批分组方案）
 - Unlocks: Story 003（状态标记消费本组件接口）
+
+## Completion Notes
+**Completed**：2026-10-18
+**Criteria**：全部通过（AC-4 手动走查归档证据文件——三角色签收）
+**Deviations**：stub 程序化图集（真实图标归美术管线 story——替换点 _build_atlas）
+**Test Evidence**：tests/unit/combat_ui/ 7 测试 + tests/integration/combat_ui/test_character_card_signal.gd 13 测试——全绿
+**Code Review**：已跳过正式 LP-CODE-REVIEW（review 模式 full 下遗留——签收表 lead-programmer 行已做技术审查：零 Autoload/零轮询/阈值集中/纯函数消费）

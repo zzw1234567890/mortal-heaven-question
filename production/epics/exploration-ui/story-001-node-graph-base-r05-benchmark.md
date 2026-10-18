@@ -1,7 +1,7 @@
 # Story 001: 节点图渲染基座与 R-05 性能基准（stub 数据）
 
 > **Epic**: 探索 UI
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: Visual/Feel（性能关卡——EPIC 结构条件首个 story）
 > **Estimate**: 2.0 天（Sprint 15 排期）
@@ -100,3 +100,10 @@
 
 - Depends on: None（本 epic 首个 story——EPIC 结构条件）
 - Unlocks: Story 003（渲染基座宿主）、Story 005（缩放平移交互）、Story 010（复测对照）
+
+## Completion Notes
+**Completed**：2026-10-18（review 遗留补关——证据与签收已于 2026-10-17 归档）
+**Criteria**：全部通过（自动化测试 + 手动证据三角色签收）
+**Deviations**：无
+**Test Evidence**：见 Test Evidence 段（Status 已勾选）
+**Code Review**：签收表 lead-programmer 行完成技术审查

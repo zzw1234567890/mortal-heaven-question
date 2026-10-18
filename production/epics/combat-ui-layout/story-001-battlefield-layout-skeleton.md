@@ -1,7 +1,7 @@
 # Story 001: 战场四区域布局骨架与共享纯函数模块
 
 > **Epic**: 战斗 UI——静态布局与角色状态卡
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（含 Integration）
 > **Estimate**: 2.0 天（Sprint 15 排期）
@@ -118,3 +118,10 @@
 
 - Depends on: R-01 双焦点 spike、Story 009a（合批方案定型）、hud story 001（可见性信号）
 - Unlocks: Story 002~008（容器与共享纯函数模块）
+
+## Completion Notes
+**Completed**：2026-10-18（review 遗留补关——证据与签收已于 2026-10-17 归档）
+**Criteria**：全部通过（自动化测试 + 手动证据三角色签收）
+**Deviations**：无
+**Test Evidence**：见 Test Evidence 段（Status 已勾选）
+**Code Review**：签收表 lead-programmer 行完成技术审查
