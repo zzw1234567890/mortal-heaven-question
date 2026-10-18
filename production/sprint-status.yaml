@@ -21,11 +21,11 @@ stories:
     name: "TD-014 flaky 根治 + TD-007/012 测试缺口（打包）"
     file: "docs/tech-debt-register.md"
     priority: must-have
-    status: review
+    status: done
     owner: "qa-lead"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-18"
 
   - id: "15-2"
     name: "exploration-ui 001 节点图渲染基座与 R-05 性能基准"
