@@ -26,6 +26,50 @@ const TYPE_KEY: String = "key"
 ## 序列化字典的事件类型标记——鼠标按钮事件。
 const TYPE_MOUSE: String = "mouse"
 
+## === 设备类（同类替换重绑语义——QL 裁定 2026-10-18 方案 B）=====================
+
+## 设备类标记——键盘。
+const CLASS_KEY: String = "key"
+## 设备类标记——鼠标。
+const CLASS_MOUSE: String = "mouse"
+
+## 判定事件设备类。[br]
+## [b]返回[/b]: [code]CLASS_KEY[/code] / [code]CLASS_MOUSE[/code]；
+## 不支持的事件类型（手柄等）返回空字符串。
+static func device_class(event: InputEvent) -> String:
+	if event is InputEventKey:
+		return CLASS_KEY
+	if event is InputEventMouseButton:
+		return CLASS_MOUSE
+	return ""
+
+## 重绑定（同类替换、异类保留——QL 裁定 2026-10-18 方案 B）：[br]
+## 从 [param action] 绑定集中移除与 [param new_event] 同设备类的全部事件，
+## 再加入 [param new_event]——键盘槽替换、鼠标槽保留（跨设备双绑定如
+## 「确认=Enter/左键」重绑一侧不动另一侧）。[br]
+## [b]纯函数[/b]：返回新映射，不修改入参。调用方自行前置 [method has_event]
+## 同类自重复判定（no-op 语义归调用层）。
+static func rebind_event(bindings: Dictionary, action: StringName,
+		new_event: InputEvent) -> Dictionary:
+	var result: Dictionary = bindings.duplicate(true)
+	var kept: Array[InputEvent] = []
+	var cls: String = device_class(new_event)
+	for existing: InputEvent in result.get(action, []):
+		if device_class(existing) != cls:
+			kept.append(existing)
+	kept.append(new_event)
+	result[action] = kept
+	return result
+
+## 新事件是否已存在于 [param action] 绑定集（同槽判定——同类自重复
+## no-op 前置检查）。
+static func has_event(bindings: Dictionary, action: StringName,
+		event: InputEvent) -> bool:
+	for existing: InputEvent in bindings.get(action, []):
+		if events_same_slot(event, existing):
+			return true
+	return false
+
 ## === ESC 防御 ==================================================================
 
 ## 判定事件是否为 ESC（等待输入层拦截语义——ESC = 取消等待，不可绑定）。[br]

@@ -43,6 +43,11 @@ const TEXT_WAITING: String = "等待输入..."
 const TEXT_BINDING_DOT: String = "..."
 const TEXT_CONFLICT_FMT: String = "该键已绑定 %s，是否覆盖？"
 const TEXT_CONFLICT_SEP: String = "、"
+## 多绑定按键格分隔符（QL 裁定 2026-10-18——GDD 线框「确认 | Enter/左键」
+## 既有显示约定：全事件显示以「 / 」连接）。
+const TEXT_KEY_SEP: String = " / "
+## 纯鼠标 action 收到键盘输入时的提示（可绑设备类 = 默认绑定集出现的设备类）。
+const TEXT_MOUSE_ONLY: String = "该功能仅支持鼠标输入"
 ## 动作显示名映射（仅显示文本——动作[b]列表[/b]本身数据驱动自 InputMap 枚举，
 ## 非硬编码列表；未知 action 回退原名）。
 const ACTION_LABELS: Dictionary = {
@@ -105,7 +110,7 @@ func _handle_capture_event(event: InputEvent) -> Dictionary:
 		_cancel_capture()
 		get_viewport().set_input_as_handled()
 		return {"result": "cancelled"}
-	if not event.pressed or event.echo:
+	if not event.pressed or (event is InputEventKey and event.echo):
 		return {"result": "ignored"}
 	if not (event is InputEventKey or event is InputEventMouseButton):
 		return {"result": "ignored"}
@@ -114,6 +119,20 @@ func _handle_capture_event(event: InputEvent) -> Dictionary:
 			Logic.serialize_event(event))
 	if clean == null:
 		return {"result": "ignored"}
+	# 设备类准入（QL 裁定 2026-10-18）：可绑设备类 = 默认绑定集出现的设备类
+	# ——纯鼠标 action（布阵移动）收键盘输入提示并继续等待（不绑定不退出）。
+	if keybind_store != null:
+		var defaults: Dictionary = keybind_store.get_defaults()
+		if defaults.has(_capturing_action):
+			var allowed: Array[String] = []
+			for default_event: InputEvent in defaults[_capturing_action]:
+				var cls: String = Logic.device_class(default_event)
+				if not cls.is_empty() and not allowed.has(cls):
+					allowed.append(cls)
+			var in_class: String = Logic.device_class(clean)
+			if not in_class.is_empty() and not allowed.has(in_class):
+				push_warning("KeybindTab: " + TEXT_MOUSE_ONLY)
+				return {"result": "ignored", "reason": "device_class"}
 	var conflicts: Array[StringName] = Logic.find_conflicts(
 			clean, _collect_bindings(), _capturing_action)
 	if conflicts.is_empty():
@@ -139,11 +158,17 @@ func begin_capture(action: StringName, button: Button) -> void:
 
 ## === 绑定应用（即时持久化——类注释裁决）========================================
 
-## 提交绑定：应用 InputMap + 写设置文件 + 按键格 0.15s 弹出新键名。
+## 提交绑定：同类替换（QL 裁定 2026-10-18 方案 B——键盘槽替换、鼠标槽保留，
+## 跨设备双绑定如「确认=Enter/左键」重绑一侧不动另一侧）+ 应用 InputMap +
+## 写设置文件 + 按键格 0.15s 弹出新键名。[br]
+## 同类自重复（新事件已在绑定集）→ no-op（弹确认但不变更绑定集）。
 func _commit_binding(action: StringName, event: InputEvent) -> void:
 	var bindings: Dictionary = _collect_bindings()
-	bindings[action] = [event]
-	StoreScript.apply_bindings({action: [event]})
+	if Logic.has_event(bindings, action, event):
+		_end_capture()  # no-op——退出等待态，绑定集不变
+		return
+	bindings = Logic.rebind_event(bindings, action, event)
+	StoreScript.apply_bindings({action: bindings[action]})
 	if keybind_store != null:
 		keybind_store.save_bindings(bindings)
 	_end_capture()
@@ -169,9 +194,7 @@ func _overwrite_conflicts() -> void:
 			bindings[other] = kept
 			StoreScript.apply_bindings({other: kept})
 	var action: StringName = _capturing_action
-	_commit_binding(action, event)
-
-## 取消等待——恢复按键格当前键名 + 停闪烁。
+	_commit_binding(action, event)## 取消等待——恢复按键格当前键名 + 停闪烁。
 func _cancel_capture() -> void:
 	var action: StringName = _capturing_action
 	var button: Button = _capturing_button
@@ -286,9 +309,13 @@ func _collect_bindings() -> Dictionary:
 func action_label(action: StringName) -> String:
 	return str(ACTION_LABELS.get(action, String(action)))
 
-## 当前绑定键名文本（首事件 as_text；无绑定时显示空槽）。
+## 当前绑定键名文本（全事件 [code]as_text[/code] 以「 / 」连接——QL 裁定
+## 2026-10-18：GDD 线框「确认 | Enter/左键」既有约定；无绑定时显示空槽）。
 func _current_key_text(action: StringName) -> String:
 	var events: Array = InputMap.action_get_events(action)
 	if events.is_empty():
 		return "—"
-	return (events[0] as InputEvent).as_text()
+	var parts: Array[String] = []
+	for event: InputEvent in events:
+		parts.append(event.as_text())
+	return TEXT_KEY_SEP.join(parts)

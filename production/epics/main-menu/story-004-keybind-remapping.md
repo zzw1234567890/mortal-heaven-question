@@ -15,10 +15,10 @@
 *(Requirement text lives in GDD 验收标准——TR 注册表暂无表现层条目)*
 
 **ADR Governing Implementation**: ADR-0031: 表现层架构基线（§2.1 持久设置）
-**ADR Decision Summary**: 按键绑定属持久设置——重绑定经 `InputMap.action_set_event` 应用、写设置文件；启动时从设置文件加载应用 InputMap（否则重启失效，QL-STORY-READY 补充）。ESC 在等待输入状态 = 取消等待（不作为可绑定键）。
+**ADR Decision Summary**: 按键绑定属持久设置——重绑定经 `InputMap.action_erase_events + action_add_event` 组合应用（`action_set_event` 在 4.6.3 不存在——R-05 spike 实测）、写设置文件；启动时从设置文件加载应用 InputMap（否则重启失效，QL-STORY-READY 补充）。ESC 在等待输入状态 = 取消等待（不作为可绑定键）。
 
 **Engine**: Godot 4.6 | **Risk**: HIGH（双焦点变更在 LLM 知识截止后）
-**Engine Notes**: 等待输入用 `_unhandled_input`/`_gui_input` 捕获；重绑定的动作列表含鼠标类动作（确认=Enter/左键、取消=右键/Back、布阵移动=鼠标拖拽）——鼠标动作的重绑定语义（QL-STORY-READY 遗留）按「同类输入可互换」（键盘↔键盘、鼠标↔鼠标）实现并注释。
+**Engine Notes**: 等待输入用 `_unhandled_input`/`_gui_input` 捕获；重绑定的动作列表含鼠标类动作（确认=Enter/左键、取消=右键/Back、布阵移动=鼠标拖拽）——鼠标动作的重绑定语义按「同类输入可互换」（键盘↔键盘、鼠标↔鼠标）实现并注释。**多绑定重绑语义**（QL 裁定 2026-10-18）：同类替换、异类保留——键盘槽替换、鼠标槽保留；按键格多事件显示「 / 」连接；纯鼠标 action 拒键盘输入保持等待；同类自重复 no-op。**InputMap API**：`action_set_event` 在 4.6.3 不存在（R-05 spike 实测）——`apply_bindings` 用 `action_erase_events + action_add_event` 组合（语义等价）。
 
 **Control Manifest Rules (this layer)**:
 - Required: 冲突检测纯函数单测；绑定往返（保存→重置→加载）集成测试
@@ -47,7 +47,7 @@
 
 **Logic 内核（BLOCKING 单测目标）**：
 - `find_conflicts(new_event, bindings) -> Array[String]`——新输入事件 vs 现有绑定映射，返回占用该事件的全部 action 列表；无占用返回空。相同 action 内的重复（自己绑自己）不算冲突。
-- 绑定应用往返：`apply_bindings(map)` → 写设置文件；启动加载 `load_bindings()` → `InputMap.action_set_event`——往返等价性用集成测试锁定。
+- 绑定应用往返：`apply_bindings(map)` → 写设置文件；启动加载 `load_bindings()` → InputMap 应用（erase+add 组合——见 Engine Notes）——往返等价性用集成测试锁定。
 
 - 等待输入状态机：点击按键格 → 监听输入（ESC=取消）→ 键盘/鼠标同类互换判定 → 冲突检测（纯函数）→ 无冲突直接绑定 / 有冲突弹「覆盖/取消」→ 应用+持久化。
 - 动作列表从 InputMap 枚举或数据驱动配置生成（GDD 按键绑定表为初始默认）。

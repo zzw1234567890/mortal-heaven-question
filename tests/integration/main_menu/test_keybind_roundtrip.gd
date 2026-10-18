@@ -71,11 +71,17 @@ func after_each() -> void:
 
 
 func _add_temp_action(action: StringName, key_code: int) -> void:
-	## 注册临时动作并绑默认键（模拟 project.godot 动作）。
+	## 注册临时动作并绑默认键（模拟 project.godot 动作——键盘/鼠标按键值域：
+	## ≤32 为鼠标按钮索引，其余为键码）。
 	InputMap.add_action(action)
-	var event: InputEventKey = InputEventKey.new()
-	event.physical_keycode = key_code
-	InputMap.action_add_event(action, event)
+	if key_code <= 32:  # MOUSE_BUTTON_* 枚举值域（1=左 2=右 3=中）
+		var event: InputEventMouseButton = InputEventMouseButton.new()
+		event.button_index = key_code
+		InputMap.action_add_event(action, event)
+	else:
+		var event: InputEventKey = InputEventKey.new()
+		event.physical_keycode = key_code
+		InputMap.action_add_event(action, event)
 	_temp_actions.append(action)
 
 
@@ -338,8 +344,12 @@ func test_conflict_dialog_real_signal_paths() -> void:
 			.get("result")), "conflict", "前置②：再次进入冲突分支")
 	dialog.confirmed.emit()
 	# Assert ② —— 覆盖生效：新 action 抢占 Q、被占用 action 移除 Q
-	assert_eq(_current_codes(ACTION_B), [KEY_Q],
-			"confirmed 后新 action 应占 Q（真实信号路径）")
+	# （方案 B：ACTION_B 默认含鼠标右键——键盘槽换 Q、鼠标槽保留）
+	var codes_after: Array = _current_codes(ACTION_B)
+	assert_true(codes_after.has(KEY_Q),
+			"confirmed 后新 action 键盘槽应占 Q（真实信号路径）")
+	assert_true(codes_after.has(MOUSE_RIGHT),
+			"confirmed 后鼠标槽右键应保留（方案 B）")
 	assert_eq(_current_codes(ACTION_A), [],
 			"confirmed 后被占用 action 应移除 Q")
 
@@ -414,8 +424,11 @@ func test_capture_conflict_overwrite_takes_slot() -> void:
 	assert_eq(str(result.get("result")), "conflict", "前置：冲突分支")
 	# Act —— 模拟用户点「覆盖」（确认回调直调——headless 无真实弹窗交互）
 	tab._overwrite_conflicts()
-	# Assert —— test_kb_b 抢占 Q、test_kb_a 失去 Q
-	assert_eq(_current_codes(ACTION_B), [KEY_Q], "覆盖后新 action 应占 Q")
+	# Assert —— test_kb_b 键盘槽抢占 Q（方案 B：默认右键鼠标槽保留）、
+	# test_kb_a 失去 Q
+	var codes_b: Array = _current_codes(ACTION_B)
+	assert_true(codes_b.has(KEY_Q), "覆盖后新 action 键盘槽应占 Q")
+	assert_true(codes_b.has(MOUSE_RIGHT), "覆盖后鼠标槽右键应保留（方案 B）")
 	assert_eq(_current_codes(ACTION_A), [], "被占用 action 应移除 Q")
 
 
@@ -437,3 +450,89 @@ func test_capture_escape_release_and_echo_ignored() -> void:
 			"ignored", "echo 重复事件应被忽略")
 	# Assert —— 仍在等待态
 	assert_eq(button.text, "等待输入...", "忽略后应保持等待输入态")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 多绑定同类替换语义（QL 裁定 2026-10-18 方案 B）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_rebind_same_device_class_keeps_other_device() -> void:
+	## 方案 B: 跨设备双绑定 action（键盘+鼠标）重绑键盘侧 → 键盘槽替换、
+	## 鼠标槽保留（重绑「确认」到 Q → Enter→Q、左键不动）。
+	# Arrange —— test_kb_a 改为跨设备双绑定（Q + 右键）
+	var mouse: InputEventMouseButton = InputEventMouseButton.new()
+	mouse.button_index = MOUSE_RIGHT
+	StoreScript.apply_bindings({ACTION_A: [_pressed_event(KEY_Q), mouse]})
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	# Act —— 重绑键盘 F1（无冲突）
+	tab.begin_capture(ACTION_A, button)
+	var result: Dictionary = tab._handle_capture_event(_f1_key())
+	# Assert —— 键盘槽 Q→F1、鼠标右键保留
+	assert_eq(str(result.get("result")), "bound", "应成功绑定")
+	var codes: Array = _current_codes(ACTION_A)
+	assert_true(codes.has(KEY_F1), "键盘槽应为 F1")
+	assert_true(codes.has(MOUSE_RIGHT), "鼠标槽右键应保留（同类替换异类保留）")
+	assert_false(codes.has(KEY_Q), "旧键盘 Q 应被替换")
+
+
+func test_rebind_same_device_class_noop_on_duplicate() -> void:
+	## 方案 B 自重复: 重绑 Q 到已绑 Q 的 action → no-op（绑定集不变）。
+	# Arrange —— ACTION_A 当前绑 Q
+	var before: Array = _current_codes(ACTION_A)
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_A, button)
+	# Act —— 按 Q（自己已占——find_conflicts 忽略自己 → no-op 提交路径）
+	var result: Dictionary = tab._handle_capture_event(_pressed_event(KEY_Q))
+	# Assert —— 绑定集不变 + 退出等待态
+	assert_eq(str(result.get("result")), "bound", "自重复走绑定路径（无冲突）")
+	assert_eq(_current_codes(ACTION_A), before, "自重复应 no-op——绑定集不变")
+	assert_eq(str(tab._capturing_action), &"", "no-op 后应退出等待态")
+
+
+func test_rebind_pure_mouse_action_rejects_keyboard() -> void:
+	## 方案 B 准入: 纯鼠标 action（默认绑定集仅鼠标类）收键盘输入 →
+	## 提示 + 保持等待态、绑定集不变（继续等待）。
+	# Arrange —— 快照记录默认（ACTION_B=右键——纯鼠标）+ tab 挂同 store
+	store.snapshot_defaults()
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_B, button)
+	# Act —— 按 F1（键盘——不在允许设备类）
+	var result: Dictionary = tab._handle_capture_event(_f1_key())
+	# Assert —— 拒绝 + 仍在等待态
+	assert_eq(str(result.get("result")), "ignored",
+			"纯鼠标 action 收键盘应被拒绝（设备类准入）")
+	assert_eq(str(result.get("reason", "")), "device_class", "拒绝原因应为设备类")
+	assert_eq(button.text, "等待输入...", "拒绝后应保持等待输入态")
+	assert_eq(_current_codes(ACTION_B), [MOUSE_RIGHT], "绑定集应不变")
+	# Act ② —— 按鼠标中键（同属鼠标类——允许）
+	var middle: InputEventMouseButton = InputEventMouseButton.new()
+	middle.button_index = 3  # MOUSE_BUTTON_MIDDLE
+	middle.pressed = true
+	var result2: Dictionary = tab._handle_capture_event(middle)
+	# Assert ② —— 鼠标类可绑
+	assert_eq(str(result2.get("result")), "bound", "鼠标类输入应可绑纯鼠标 action")
+
+
+func test_conflict_overwrite_keeps_target_other_device_binding() -> void:
+	## 方案 B × 冲突覆盖组合: 重绑「确认」类跨设备 action 到 Q（Q 被他人占）
+	## → 覆盖后他人移除 Q、目标 action 键盘槽换 Q、鼠标槽保留。
+	# Arrange —— ACTION_A 跨设备双绑定（Q + 右键），Q 冲突方 ACTION_B 也占 Q
+	var mouse: InputEventMouseButton = InputEventMouseButton.new()
+	mouse.button_index = MOUSE_RIGHT
+	StoreScript.apply_bindings({ACTION_A: [_pressed_event(KEY_Q), mouse]})
+	StoreScript.apply_bindings({ACTION_B: [_pressed_event(KEY_Q)]})
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_A, button)
+	# Act —— 重绑 F1？不——直接重绑 Q 已被 ACTION_B 占用 → 冲突 → 覆盖
+	assert_eq(str(tab._handle_capture_event(_pressed_event(KEY_Q))
+			.get("result")), "conflict", "前置：Q 冲突 ACTION_B")
+	tab._overwrite_conflicts()
+	# Assert —— ACTION_B 移除 Q（空则清空）；ACTION_A 键盘槽 F1→Q、右键保留
+	assert_eq(_current_codes(ACTION_B), [], "被占用 action 应移除 Q")
+	var codes: Array = _current_codes(ACTION_A)
+	assert_true(codes.has(KEY_Q), "覆盖后键盘槽应为 Q")
+	assert_true(codes.has(MOUSE_RIGHT), "覆盖后鼠标槽右键应保留（方案 B）")
