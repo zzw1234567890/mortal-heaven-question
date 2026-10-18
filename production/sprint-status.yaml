@@ -81,7 +81,7 @@ stories:
     name: "main-menu 004 按键绑定界面（含启动加载）"
     file: "production/epics/main-menu/story-004-keybind-remapping.md"
     priority: should-have
-    status: backlog
+    status: in-progress
     owner: "ui-programmer"
     estimate_days: 1.0
     blocker: ""

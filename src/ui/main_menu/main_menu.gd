@@ -72,6 +72,9 @@ const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
 ## SaveLoadSystem 脚本常量——LoadResult 枚举单一真理来源（同上，H-1 姊妹项：
 ## 点击继续的返回值判定去魔数）。
 const SLScript := preload("res://src/foundation/save_load_system.gd")
+## KeybindStore 脚本常量——启动按键加载（Story 004：键位持久化加载，
+## GDD 边界澄清「重启不失效」）。
+const KeybindStoreScript := preload("res://src/ui/main_menu/keybind_store.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -90,6 +93,8 @@ var _intro_tween: Tween = null
 ## 设置面板实例——复用式单例（首次点击实例化，重开不重建——关闭后
 ## [code]visible=false[/code] 留树）。
 var _settings_panel: SettingsPanel = null
+## 按键绑定 store——启动加载用（Story 004；注入项供测试替换路径）。
+var keybind_store: KeybindStore = null
 
 ## === 节点引用 ==================================================================
 
@@ -107,6 +112,7 @@ var _settings_panel: SettingsPanel = null
 func _ready() -> void:
 	_apply_texts()
 	_apply_version()
+	_load_keybinds()
 	_refresh_save_state()
 	_connect_save_signals()
 	if animate:
@@ -122,9 +128,24 @@ func _exit_tree() -> void:
 	if _intro_tween != null and _intro_tween.is_valid():
 		_intro_tween.kill()
 
-## === 文本与版本 ================================================================
+## === 按键绑定启动加载（Story 004）==============================================
 
-## 应用固定词条（本地化入库后改为键查找——头注释豁免注记）。[br]
+## 启动加载自定义按键（GDD 边界澄清「键位持久化加载」——重启不失效）。[br]
+## [b]顺序[/b]：先快照当前 InputMap 为默认基准（首次 [code]_ready[/code]——
+## 快照法，QL-STORY-READY 2026-09-20 裁决），后从设置文件加载并应用——
+## 顺序不可逆（先加载再快照会把自定义键污染进默认基准）。[br]
+## 文件无 keybinds 键（首次启动）→ 空绑定 → 跳过应用（InputMap 维持
+## project.godot 默认）。
+func _load_keybinds() -> void:
+	var store: KeybindStore = keybind_store
+	if store == null:
+		store = KeybindStoreScript.new()
+	store.snapshot_defaults()
+	var bindings: Dictionary = store.load_bindings()
+	if not bindings.is_empty():
+		KeybindStoreScript.apply_bindings(bindings)
+
+## === 文本与版本 ================================================================## 应用固定词条（本地化入库后改为键查找——头注释豁免注记）。[br]
 ## 全部按钮文案统一由代码赋值（单一真理来源——code-review S-1 裁决：
 ## 常量声明而不消费会与 .tscn text 属性形成双源漂移）。
 func _apply_texts() -> void:

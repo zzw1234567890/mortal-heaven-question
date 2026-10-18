@@ -1,7 +1,7 @@
 # Story 004: 按键绑定界面（含启动加载）
 
 > **Epic**: 主菜单与设置
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
 > **Estimate**: 1.0d

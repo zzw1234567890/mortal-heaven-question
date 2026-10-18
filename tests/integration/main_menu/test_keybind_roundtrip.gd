@@ -1,0 +1,339 @@
+extends GutTest
+## main-menu Story 004 集成测试：绑定应用与持久化往返（QA 规格 AC-2 + AC-4）。
+##
+## 覆盖 QA 规格全部场景与 edge cases（story-004 QA Test Cases）：[br]
+##   - AC-2 主体: F1→测试动作 保存 → 重置 InputMap → 从文件加载 → 事件 == F1[br]
+##   - AC-2 edge: 多键多 action 同时保存加载[br]
+##   - AC-2 edge: 恢复默认后 InputMap == 初始定义（快照法）[br]
+##   - AC-4: 自定义后全局恢复默认 → 注册表遍历含 keybinds + InputMap 归位
+##     快照 + 设置文件已写回默认[br]
+##   - UI 状态机: begin_capture / _handle_capture_event 分离入口——ESC 取消
+##     返回列表、无冲突直接绑定、冲突弹确认（覆盖/取消两分支）
+##
+## 集成范围：KeybindStore（临时 user:// 路径注入）+ 真实 InputMap + KeybindTab
+## 控件 + SettingsPanel 注册机制。测试动作用 [code]InputMap.add_action[/code]
+## 临时注册（[code]test_kb_*[/code] 前缀）避免污染真实动作——after_each 清理。
+## 风格先例：test_graphics_apply.gd（场景实例化 + 引擎态快照还原）。
+
+const Logic: GDScript = preload("res://src/ui/main_menu/keybind_logic.gd")
+const StoreScript: GDScript = preload("res://src/ui/main_menu/keybind_store.gd")
+const TabScript: GDScript = preload("res://src/ui/main_menu/keybind_tab.gd")
+const SettingsStoreScript: GDScript = \
+		preload("res://src/ui/main_menu/settings_store.gd")
+
+## 测试键码（fixture 常量——Godot 全局枚举值，别名防 cyclic reference）。
+const KEY_F1: int = 4194332
+const KEY_Q: int = 81
+const MOUSE_RIGHT: int = 2
+
+## 临时动作名（test_kb_ 前缀——清理时按前缀扫描兜底）。
+const ACTION_A: StringName = &"test_kb_a"
+const ACTION_B: StringName = &"test_kb_b"
+
+var _temp_path: String = ""
+var store: Object = null
+var tab: Control = null
+## 临时动作清理表——before_each 注册、after_each 反注册。
+var _temp_actions: Array[StringName] = []
+
+
+func before_each() -> void:
+	_temp_path = "user://keybind_test_%d.json" % (Time.get_ticks_msec() \
+			% 1000000 + randi() % 1000)
+	store = StoreScript.new()
+	store.path = _temp_path
+	# 临时动作注册（绑 Q 作默认——快照基准）
+	_add_temp_action(ACTION_A, KEY_Q)
+	_add_temp_action(ACTION_B, MOUSE_RIGHT)
+	tab = TabScript.new()
+	tab.animate = false
+	tab.keybind_store = store
+	add_child_autofree(tab)
+
+
+func after_each() -> void:
+	# 临时动作清理（含前缀兜底扫描——防测试中途失败遗留）
+	for action: StringName in _temp_actions:
+		if InputMap.has_action(action):
+			InputMap.action_erase_events(action)
+			InputMap.erase_action(action)
+	_temp_actions = []
+	for action: StringName in InputMap.get_actions():
+		if String(action).begins_with("test_kb_"):
+			InputMap.erase_action(action)
+	if tab != null and is_instance_valid(tab):
+		tab.free()
+	tab = null
+	store = null
+	if not _temp_path.is_empty():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_temp_path))
+		_temp_path = ""
+
+
+func _add_temp_action(action: StringName, key_code: int) -> void:
+	## 注册临时动作并绑默认键（模拟 project.godot 动作）。
+	InputMap.add_action(action)
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = key_code
+	InputMap.action_add_event(action, event)
+	_temp_actions.append(action)
+
+
+func _f1_key() -> InputEventKey:
+	## F1 事件构造（AC-2 Given：绑定 F1）。
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = KEY_F1
+	event.pressed = true
+	return event
+
+
+func _pressed_event(code: int) -> InputEventKey:
+	## 按下态键盘事件（capture 事件驱动用）。
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = code
+	event.pressed = true
+	return event
+
+
+func _current_codes(action: StringName) -> Array:
+	## 动作当前全部绑定键码（physical 优先——与序列化形态一致）。
+	var codes: Array = []
+	for event: InputEvent in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			var key: InputEventKey = event as InputEventKey
+			codes.append(key.physical_keycode \
+					if key.physical_keycode != 0 else key.keycode)
+		elif event is InputEventMouseButton:
+			codes.append((event as InputEventMouseButton).button_index)
+	return codes
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AC-2 主体：单键往返（保存 → 重置 → 加载 → 事件 == F1）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_roundtrip_single_binding_survives_inputmap_reset() -> void:
+	## AC-2: F1→test_kb_a 保存 → InputMap 重置（erase_events）→ 从文件加载
+	## 应用 → 该 action 事件 == F1（重启不失效的文件侧证明）。
+	# Arrange —— F1 绑 test_kb_a + 快照默认 + 保存
+	var f1: InputEventKey = _f1_key()
+	var bindings: Dictionary = {ACTION_A: [f1]}
+	assert_true(store.save_bindings(bindings), "前置：保存应成功")
+	# Act —— 重置 InputMap（模拟重启——project.godot 默认丢失自定义）
+	InputMap.action_erase_events(ACTION_A)
+	assert_eq(InputMap.action_get_events(ACTION_A).size(), 0,
+			"前置：重置后动作无事件")
+	var loaded: Dictionary = store.load_bindings()
+	StoreScript.apply_bindings(loaded)
+	# Assert —— 事件 == F1
+	assert_eq(loaded.size(), 1, "加载应含一个 action")
+	assert_eq(_current_codes(ACTION_A), [KEY_F1], "加载后事件应为 F1")
+
+
+func test_roundtrip_load_empty_file_keeps_inputmap_default() -> void:
+	## AC-2 防御: 文件无 keybinds 键（首启动）→ 空绑定 → 不应用
+	## （InputMap 维持默认——MainMenu._load_keybinds 的空跳过分支）。
+	# Act
+	var loaded: Dictionary = store.load_bindings()
+	# Assert
+	assert_true(loaded.is_empty(), "无 keybinds 键应返回空绑定")
+	# InputMap 维持默认（Q 仍在）
+	assert_eq(_current_codes(ACTION_A), [KEY_Q], "空加载不应扰动 InputMap")
+
+
+func test_roundtrip_preserves_other_categories_in_file() -> void:
+	## merge 语义: 写按键域只覆写 keybinds 键——音量/画面键原样保留。
+	# Arrange —— 先写音量键（模拟 Story 002 已落盘数据）
+	var settings_store: Object = SettingsStoreScript.new()
+	settings_store.path = _temp_path
+	settings_store.save_volume_category({0: 55, 1: 55, 2: 55})
+	# Act —— 写按键域
+	assert_true(store.save_bindings({ACTION_A: [_f1_key()]}), "保存应成功")
+	# Assert —— 音量键保留
+	var volumes: Dictionary = settings_store.load_volume_category()
+	assert_eq(int(volumes.get(0, -1)), 55, "Master 音量键应被保留（merge）")
+	var loaded: Dictionary = store.load_bindings()
+	StoreScript.apply_bindings(loaded)
+	assert_eq(_current_codes(ACTION_A), [KEY_F1], "按键域值应可加载应用")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AC-2 edge：多键多 action 同时保存加载
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_roundtrip_multi_action_multi_event() -> void:
+	## AC-2 edge: 两 action 各自绑定（test_kb_a→F1 键盘、test_kb_b→右键鼠标）
+	## 同时保存 → 重置 → 加载 → 各自归位（键鼠混合载荷）。
+	# Arrange
+	var f1: InputEventKey = _f1_key()
+	var right: InputEventMouseButton = InputEventMouseButton.new()
+	right.button_index = MOUSE_RIGHT
+	assert_true(store.save_bindings(
+			{ACTION_A: [f1], ACTION_B: [right]}), "保存应成功")
+	# Act —— 重置 + 加载
+	InputMap.action_erase_events(ACTION_A)
+	InputMap.action_erase_events(ACTION_B)
+	StoreScript.apply_bindings(store.load_bindings())
+	# Assert —— 各自归位（键鼠混合）
+	assert_eq(_current_codes(ACTION_A), [KEY_F1], "test_kb_a 应为 F1")
+	assert_eq(_current_codes(ACTION_B), [MOUSE_RIGHT], "test_kb_b 应为右键")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AC-2 edge：恢复默认（快照法）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_reset_keybind_category_restores_snapshot() -> void:
+	## AC-2 edge: 快照法——快照初始绑定（test_kb_a→Q）→ 自定义为 F1 →
+	## reset → InputMap 归位 Q + 设置文件写回默认。
+	# Arrange —— 快照（Q / 右键）
+	store.snapshot_defaults()
+	# 自定义为 F1 并保存
+	StoreScript.apply_bindings({ACTION_A: [_f1_key()]})
+	store.save_bindings({ACTION_A: [_f1_key()]})
+	assert_eq(_current_codes(ACTION_A), [KEY_F1], "前置：自定义 F1 已生效")
+	# Act —— 恢复默认
+	assert_true(store.reset_keybind_category(), "reset 应成功")
+	# Assert —— InputMap 归位快照
+	assert_eq(_current_codes(ACTION_A), [KEY_Q], "reset 后应归位快照 Q")
+	# Assert —— 设置文件也写回默认（重启加载的也是默认）
+	StoreScript.apply_bindings(store.load_bindings())
+	assert_eq(_current_codes(ACTION_A), [KEY_Q], "reset 后文件值应为默认 Q")
+
+
+func test_reset_keybind_category_without_snapshot_returns_false() -> void:
+	## 防御: 快照未初始化（未调 snapshot_defaults）→ reset 返回 false no-op
+	## （不崩溃——注册机制遍历容错）。
+	# Act
+	var ok: bool = store.reset_keybind_category()
+	# Assert
+	assert_false(ok, "无快照 reset 应返回 false")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AC-4：注册机制集成（SettingsPanel 注册 + 全局恢复默认）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_reset_all_includes_keybind_category_and_restores_inputmap() -> void:
+	## AC-4: 已自定义按键（F1→test_kb_a）且按键分类已注册 → 全局恢复默认 →
+	## InputMap 归位快照 + 注册表遍历含 keybinds。
+	# Arrange —— SettingsPanel 场景（_ready 注册三分类）+ 快照 + 自定义
+	var panel_store: Object = SettingsStoreScript.new()
+	panel_store.path = _temp_path
+	var panel: Control = load(
+			"res://src/ui/main_menu/SettingsPanel.tscn").instantiate()
+	panel.animate = false
+	panel.settings_store = panel_store
+	add_child_autofree(panel)  # _ready 在此刻执行——_setup_keybind_tab 装配
+	# 面板的 keybind store 与本测试 store 共路径（读写同一临时文件）
+	var panel_keybind_store: Object = panel._get_keybind_store()
+	panel_keybind_store.path = _temp_path
+	# 快照基准：test_kb_a→Q（本测试 before_each 注册的默认）
+	panel_keybind_store.snapshot_defaults()
+	# 自定义 F1 + 保存
+	StoreScript.apply_bindings({ACTION_A: [_f1_key()]})
+	panel_keybind_store.save_bindings({ACTION_A: [_f1_key()]})
+	assert_eq(_current_codes(ACTION_A), [KEY_F1], "前置：自定义 F1 已生效")
+	# Act —— 全局恢复默认（注册表遍历）
+	var ok: bool = panel_store.reset_all_categories()
+	# Assert —— reset 成功 + InputMap 归位快照
+	assert_true(ok, "全局恢复默认应成功")
+	assert_eq(_current_codes(ACTION_A), [KEY_Q], "reset_all 后应归位快照 Q")
+	# Assert —— 注册表遍历含 keybinds（AC-4 字面要求）
+	var handler_names: Array = panel_store._reset_handlers.keys()
+	assert_true(handler_names.has("keybinds"), "注册表应含 keybinds 分类")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# UI 状态机（等待输入——可测入口分离）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_capture_esc_cancels_waiting() -> void:
+	## UI: 等待输入中按 ESC → 取消等待（result=cancelled）+ 按键格恢复键名
+	## + InputMap 不变。
+	# Arrange —— 进入等待输入
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_A, button)
+	assert_eq(button.text, "等待输入...", "前置：等待输入态文案")
+	# Act —— ESC 按下
+	var esc: InputEventKey = InputEventKey.new()
+	esc.physical_keycode = 4194305  # KEY_ESCAPE
+	esc.pressed = true
+	var result: Dictionary = tab._handle_capture_event(esc)
+	# Assert
+	assert_eq(str(result.get("result")), "cancelled", "ESC 应取消等待")
+	assert_true(button.text.begins_with("Q"), "取消后按键格应恢复当前键名（Q 形态）")
+	assert_eq(_current_codes(ACTION_A), [KEY_Q], "取消不应改动 InputMap")
+
+
+func test_capture_new_key_unoccupied_binds_immediately() -> void:
+	## UI: 等待输入中按 F1（无占用）→ 直接绑定（result=bound）+ 即时写文件
+	## + InputMap 生效。
+	# Arrange
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_A, button)
+	# Act —— F1 按下
+	var result: Dictionary = tab._handle_capture_event(_f1_key())
+	# Assert —— 绑定 + 即时持久化（文件侧可加载回 F1）
+	assert_eq(str(result.get("result")), "bound", "无占用键应直接绑定")
+	assert_eq(_current_codes(ACTION_A), [KEY_F1], "InputMap 应即时生效 F1")
+	var loaded: Dictionary = store.load_bindings()
+	var restored: Array = []
+	for event: InputEvent in loaded.get(ACTION_A, []):
+		restored.append(Logic.serialize_event(event))
+	assert_eq(str(restored[0].get("code", "")), str(KEY_F1),
+			"绑定成功即写文件（即时持久化）")
+
+
+func test_capture_conflicting_key_returns_conflict() -> void:
+	## UI: 等待输入中按已被占用的键（Q 被 test_kb_a 占用，重绑到 test_kb_b）
+	## → 冲突分支（result=conflict + actions 含占用者）+ 弹确认框。
+	# Arrange —— 快照后 test_kb_b 重绑 Q（Q 当前被 test_kb_a 占用）
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_B, button)
+	# Act —— Q 按下（test_kb_a 占用中）
+	var result: Dictionary = tab._handle_capture_event(_pressed_event(KEY_Q))
+	# Assert
+	assert_eq(str(result.get("result")), "conflict", "占用键应走冲突分支")
+	var actions: Array = result.get("actions", [])
+	assert_true(actions.has(ACTION_A), "冲突列表应含占用者 test_kb_a")
+	# InputMap 未变（等待覆盖确认）
+	assert_eq(_current_codes(ACTION_A), [KEY_Q], "冲突未确认前 InputMap 不变")
+
+
+func test_capture_conflict_overwrite_takes_slot() -> void:
+	## UI: 冲突确认「覆盖」→ 新 action 抢占槽位、被占用 action 移除该事件。
+	# Arrange —— 制造冲突上下文
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_B, button)
+	var result: Dictionary = tab._handle_capture_event(_pressed_event(KEY_Q))
+	assert_eq(str(result.get("result")), "conflict", "前置：冲突分支")
+	# Act —— 模拟用户点「覆盖」（确认回调直调——headless 无真实弹窗交互）
+	tab._overwrite_conflicts()
+	# Assert —— test_kb_b 抢占 Q、test_kb_a 失去 Q
+	assert_eq(_current_codes(ACTION_B), [KEY_Q], "覆盖后新 action 应占 Q")
+	assert_eq(_current_codes(ACTION_A), [], "被占用 action 应移除 Q")
+
+
+func test_capture_escape_release_and_echo_ignored() -> void:
+	## UI 防御: 等待输入中非按下事件（释放/echo）不触发任何分支。
+	# Arrange
+	var button: Button = Button.new()
+	add_child_autofree(button)
+	tab.begin_capture(ACTION_A, button)
+	# Act —— 释放态 F1
+	var release: InputEventKey = _f1_key()
+	release.pressed = false
+	assert_eq(str(tab._handle_capture_event(release).get("result")), "ignored",
+			"释放事件应被忽略")
+	# Act —— echo 重复 Q
+	var echo_event: InputEventKey = _pressed_event(KEY_Q)
+	echo_event.echo = true
+	assert_eq(str(tab._handle_capture_event(echo_event).get("result")),
+			"ignored", "echo 重复事件应被忽略")
+	# Assert —— 仍在等待态
+	assert_eq(button.text, "等待输入...", "忽略后应保持等待输入态")
