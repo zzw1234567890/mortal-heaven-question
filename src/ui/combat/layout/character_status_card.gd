@@ -86,6 +86,12 @@ var realm: int = 0
 var player_realm: int = 0
 ## 待命/已行动标记（L5 渲染归本 story；切换信号逻辑归 story 003）。
 var is_standby: bool = false
+## 已行动遮罩标志（story 003 AC-2——true 时全卡幅半透明灰色遮罩）。
+## [br][b]语义澄清[/b]（story 002 遗留）：[member is_standby]=false 本渲染
+## 「已行动对勾」，但未覆盖 GDD「灰色遮罩」完整语义——本属性补齐：
+## is_acted=true 同时驱动遮罩+对勾（[method set_acted_state]），默认 false
+## 使 is_standby=false 的旧语义（仅对勾）不自动出现遮罩。
+var is_acted: bool = false
 ## 前后排定位（true 前排——边框样式+缩放决策）。
 var is_front_row: bool = true
 ## 减少动态（进场时从设置读取——进场后静态，零轮询）。
@@ -132,6 +138,9 @@ func _draw() -> void:
 	_draw_badges()
 	# L5 左上待命/已行动标记
 	_draw_standby_badge()
+	# 已行动灰色遮罩（story 003 AC-2——顶层覆盖，L5 标记之上边框之下）
+	if is_acted:
+		draw_rect(Rect2(Vector2.ZERO, size), ACTED_OVERLAY_COLOR)
 	# 前后排边框（最后绘——顶层描边）
 	_draw_border()
 
@@ -196,9 +205,24 @@ func set_front_row(p_front: bool) -> void:
 	_refresh()
 
 
+## === 已行动遮罩常量（story 003 AC-2——数值数据驱动）==========================
+
+## 已行动遮罩色（GDD §角色状态标记——「已行动角色：灰色遮罩」）。
+const ACTED_OVERLAY_COLOR: Color = Color(0.5, 0.5, 0.52, 0.5)
+
 ## 设置待命标记（L5 渲染归本 story——切换信号逻辑归 story 003）。
 func set_standby(p_standby: bool) -> void:
 	is_standby = p_standby
+	_refresh()
+
+
+## 设置已行动状态（story 003 AC-2——灰色遮罩 + 已行动对勾）。[br]
+## true = 遮罩+对勾（遮罩由 [member is_acted] 驱动，对勾由
+## [member is_standby]=false 驱动——两属性合一入口）；false = 清除遮罩。
+func set_acted_state(p_acted: bool) -> void:
+	is_acted = p_acted
+	if p_acted:
+		is_standby = false  # 已行动与待命互斥（FieldState 状态机语义）
 	_refresh()
 
 
