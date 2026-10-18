@@ -489,6 +489,10 @@ func test_rebind_same_device_class_noop_on_duplicate() -> void:
 	assert_eq(str(result.get("result")), "bound", "自重复走绑定路径（无冲突）")
 	assert_eq(_current_codes(ACTION_A), before, "自重复应 no-op——绑定集不变")
 	assert_eq(str(tab._capturing_action), &"", "no-op 后应退出等待态")
+	# M-A 回归：no-op 路径按键格文本恢复（原 _end_capture 不恢复文本——卡死
+	# 「等待输入...」）+ modulate 复位（闪烁中途取消无半透明残留）
+	assert_true(button.text.begins_with("Q"), "no-op 后按键格应恢复当前键名（M-A）")
+	assert_eq(button.modulate.a, 1.0, "no-op 后按键格应无半透明残留（M-A）")
 
 
 func test_rebind_pure_mouse_action_rejects_keyboard() -> void:

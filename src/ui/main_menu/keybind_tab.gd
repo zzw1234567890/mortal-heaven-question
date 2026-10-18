@@ -165,7 +165,9 @@ func begin_capture(action: StringName, button: Button) -> void:
 func _commit_binding(action: StringName, event: InputEvent) -> void:
 	var bindings: Dictionary = _collect_bindings()
 	if Logic.has_event(bindings, action, event):
-		_end_capture()  # no-op——退出等待态，绑定集不变
+		# 同类自重复 no-op——走取消路径复位按键格文本（M-A：_end_capture 不恢复文本，
+		# 按键格会卡死在「等待输入...」）
+		_cancel_capture()
 		return
 	bindings = Logic.rebind_event(bindings, action, event)
 	StoreScript.apply_bindings({action: bindings[action]})
@@ -194,12 +196,15 @@ func _overwrite_conflicts() -> void:
 			bindings[other] = kept
 			StoreScript.apply_bindings({other: kept})
 	var action: StringName = _capturing_action
-	_commit_binding(action, event)## 取消等待——恢复按键格当前键名 + 停闪烁。
+	_commit_binding(action, event)
+
+## 取消等待——恢复按键格当前键名 + 停闪烁。
 func _cancel_capture() -> void:
 	var action: StringName = _capturing_action
 	var button: Button = _capturing_button
 	_end_capture()
 	if button != null and is_instance_valid(button) and action != &"":
+		button.modulate.a = 1.0  # 闪烁周期中途取消复除残留半透明（M-A 同源修复）
 		button.text = _current_key_text(action)
 
 func _end_capture() -> void:
@@ -287,13 +292,13 @@ func _show_new_key(action: StringName, event: InputEvent) -> void:
 	if button == null or not is_instance_valid(button):
 		return
 	if not animate:
-		button.text = event.as_text()
+		button.text = _current_key_text(action)
 		return
 	button.text = TEXT_BINDING_DOT
 	button.modulate.a = 1.0
 	var tween: Tween = create_tween()
 	tween.tween_callback(_set_key_text.bind(button,
-			event.as_text())).set_delay(POPUP_DURATION)
+			_current_key_text(action))).set_delay(POPUP_DURATION)
 
 func _set_key_text(button: Button, text: String) -> void:
 	if button != null and is_instance_valid(button):
