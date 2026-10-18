@@ -368,3 +368,28 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 冲刺状态：15-5 done（2026-10-18）
 - 建议性改进遗留（不阻塞）：_execute_fade_plan 拆分（40 行+复杂度）、audio_manager.gd 351 行超 300 软上限、文档注释三处失同步、stop_bgm 缓存保留头清理、MUTE_VOLUME_DB 与 SILENCE_DB 重复定义
 - 下一步：S15-6 combat-ui-layout 003 状态标记/阵亡/飘字（blocker 15-4 已解除）
+
+## Session Extract — Sprint 15 遗留状态清理 2026-10-18
+- S15-1/2/3/4 review 遗留补关（证据签收齐备+CI 绿——仅状态未翻转）：
+  全部 → done；冲刺 must-have 项 15-1~15-4 全部闭环
+- 提交 1b0eb83 + 5a9ea82 已推送
+- 冲刺剩余：15-6 combat-ui 003（should，blocker 15-4 已解除——就绪）、
+  15-7 main-menu 004（should）、15-8 hud 006（nice）、15-9 audio 003 SFX 池（nice）
+- 下一步：S15-6 combat-ui-layout 003 状态标记/阵亡/飘字
+
+## Session Extract — S15-6 combat-ui 003 实现完成 2026-10-18
+- 实现+测试全链完成（ui-programmer 子代理两轮迭代后全绿）：
+  - src/ui/combat/feedback/combat_feedback_coordinator.gd（编排器——AC-1 入队合并/AC-2 标记切换/
+    AC-3 全灭短路转发/AC-4 阵亡流程）
+  - src/ui/combat/feedback/floater_pool.gd（16 上限飘字池）
+  - src/ui/combat/layout/empty_slot_frame.gd（空位虚线框）
+  - character_status_card.gd 扩展 is_acted 灰色遮罩（is_standby 旧语义不变）
+  - 测试：test_hp_batch_transition.gd (21 场景) + test_death_flow.gd + test_floater_pool.gd
+    + mocks/mock_combat_signals.gd——combat_ui 53/53，全量 2838 passing / 1 pending 存量
+- 提交 63f11ca 推送 CI success
+- headless 修复三个实际问题：飘字方向符号（y+ 向下）、tween chain 完成回收改 finished 信号、
+  帧数等待改 SceneTreeTimer 实时等待
+- 遗留（不阻塞）：①ACTED 无官方逐角色信号——request_acted() 外部驱动入口（战斗侧阶段接线
+  story 消费）②治疗按 damage 符号判定（CardEffectEngine 独立信号时需同步）③UI 手动证据
+  待录屏签收（ADVISORY）
+- 下一步：/story-done S15-6（LP-CODE-REVIEW full 关卡）

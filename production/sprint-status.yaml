@@ -71,10 +71,10 @@ stories:
     name: "combat-ui-layout 003 状态标记切换、阵亡处理与飘字"
     file: "production/epics/combat-ui-layout/story-003-state-markers-death-floaters.md"
     priority: should-have
-    status: backlog
+    status: review
     owner: "ui-programmer"
     estimate_days: 2.0
-    blocker: "15-4"
+    blocker: ""
     completed: ""
 
   - id: "15-7"

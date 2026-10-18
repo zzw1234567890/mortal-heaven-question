@@ -1,12 +1,12 @@
 # Story 003: 角色状态标记切换、阵亡处理与飘字
 
 > **Epic**: 战斗 UI——静态布局与角色状态卡
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Presentation
 > **Type**: UI（Integration 核心）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 2.0 天（Sprint 15 排期）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-10-18
 
 ## Context
 
@@ -103,7 +103,7 @@
 - Integration: `tests/integration/combat_ui/test_hp_batch_transition.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/character-state-death-evidence.md` + sign-off（录屏）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created —— tests/integration/combat_ui/test_hp_batch_transition.gd (21 断言场景 BLOCKING) + test_death_flow.gd (5) + test_floater_pool.gd (池上限/复用/reduce_motion)——combat_ui 套件 53/53 全绿（2026-10-18，63f11ca CI 绿）；全量回归 2838 passing / 1 pending 存量。UI 手动证据 character-state-death-evidence.md 待录屏签收（ADVISORY）
 
 ---
 
