@@ -53,9 +53,6 @@ var _connected_sources: Array = []
 ## HP 终值读取 Callable——签名 [code]func(character_id) -> Dictionary[/code]
 ## 返回 [code]{current: int, max: int}[/code]（注入，读源系统——零状态所有权）。
 var hp_reader_cb: Callable = Callable()
-## 阵亡移除回调——签名 [code]func(character_id) -> Node[/code]，返回卡节点
-## 供动画播放；实际从容器移除由本编排器在动画完成后执行。
-var card_lookup_cb: Callable = Callable()
 
 ## 结算信号（AC-3 全灭短路转发——结算面板本体归 story 008）。
 signal battle_result_forwarded(result: int, rewards: Dictionary)
@@ -65,18 +62,15 @@ signal battle_result_forwarded(result: int, rewards: Dictionary)
 ## [param sources]: 信号源数组——战斗系统 + 上场系统（注入 mock 可测）。[br]
 ## [param p_floater_pool]: 飘字池（预创建；null 时内部新建）。[br]
 ## [param p_hp_reader]: HP 终值读取 Callable（结算帧从源系统读取）。[br]
-## [param p_card_lookup]: 角色 ID → 卡节点查找 Callable（阵亡动画定位卡）。[br]
 ## [param p_reduce_motion]: 减少动态（进场时从设置读取一次）。
 func setup(sources: Array, p_floater_pool: FloaterPool,
-		p_hp_reader: Callable, p_card_lookup: Callable,
-		p_reduce_motion: bool = false) -> void:
+		p_hp_reader: Callable, p_reduce_motion: bool = false) -> void:
 	floater_pool = p_floater_pool if p_floater_pool != null \
 			else FloaterPool.new()
 	add_child(floater_pool)
 	reduce_motion = p_reduce_motion
 	floater_pool.set_reduce_motion(p_reduce_motion)
 	hp_reader_cb = p_hp_reader
-	card_lookup_cb = p_card_lookup
 	for source: Node in sources:
 		_subscribe(source)
 
@@ -138,11 +132,14 @@ func _on_attack_resolved(attack_data: Dictionary) -> void:
 	# 飘字（伤害红下落/治疗绿上浮——池化复用）
 	if floater_pool != null:
 		var card: Control = _cards.get(target_id)
-		var origin: Vector2 = card.global_position + card.size * 0.5 \
-				if card != null else Vector2.ZERO
-		floater_pool.spawn(origin, absi(delta),
-			FloaterPool.FloaterKind.HEAL if delta < 0 \
-				else FloaterPool.FloaterKind.DAMAGE)
+		if card != null:
+			# 卡中心（全局坐标）——size 乘缩放（后排 85% 卡视觉中心偏移），
+			# 池内换算为局部坐标（H-1 坐标空间修正）
+			var origin: Vector2 = card.global_position \
+					+ card.size * card.scale * 0.5
+			floater_pool.spawn(origin, absi(delta),
+				FloaterPool.FloaterKind.HEAL if delta < 0 \
+					else FloaterPool.FloaterKind.DAMAGE)
 	_schedule_flush()
 
 
@@ -211,6 +208,9 @@ func _on_battle_ended(result: int, rewards: Dictionary) -> void:
 	_pending_deltas.clear()
 	_flush_scheduled = false
 	for character_id: int in _death_tweens.keys():
+		var dying_card: Control = _cards.get(character_id)
+		if dying_card != null:
+			dying_card.modulate.a = 1.0  # L-2——中途杀动画恢复不透明（防半透明悬挂）
 		_kill_death_tween(character_id)
 	forwarded_result = result
 	battle_result_forwarded.emit(result, rewards)
@@ -230,6 +230,8 @@ func _on_character_died(character_id: int, side: int,
 ## 阵亡动画执行（两条路径汇合：pending_death 结算帧 / character_died 信号）。[br]
 ## 幂等：已在播或已移除的卡不重播。
 func _play_death(character_id: int) -> void:
+	if forwarded_result != -1:
+		return  # 全灭短路后不再播动画（M-1——结算面板已接管）
 	var card: Control = _cards.get(character_id)
 	if card == null:
 		return
@@ -256,10 +258,12 @@ func _finish_death(character_id: int) -> void:
 	var frame: Control = EmptySlotFrame.new()
 	frame.custom_minimum_size = card.size
 	frame.size = card.size
-	frame.global_position = card.global_position
 	if card.get_parent() != null:
 		card.get_parent().add_child(frame)
 		card.get_parent().remove_child(card)
+		# 同父局部坐标接替（在 add_child 后设置——节点入树前 global 换算
+		# 不可靠；同父下局部坐标等价于卡原位）
+		frame.position = card.position
 	_unregister_card_only(character_id)
 	card.queue_free()
 

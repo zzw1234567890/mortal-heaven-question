@@ -89,10 +89,11 @@ func free_count() -> int:
 
 ## 发射一个飘字（伤害/治疗统一入口——Coordinator 从系统信号载荷计算后调用）。[br]
 ## 池耗尽时回收最旧飘字（占用时间戳最早者）复用——不新建节点。[br]
-## [param position]: 飘字起始位置（目标角色卡中心，本池局部坐标）。[br]
+## [param global_spawn_pos]: 飘字起始位置（目标角色卡中心，**全局坐标**——
+## 池可在任意非原点容器下，本方法内部换算为本池局部坐标）。[br]
 ## [param value]: 显示数值（伤害正值/治疗正值——符号由种类决定颜色与方向）。[br]
 ## [param kind]: [enum FloaterKind] 伤害/治疗。
-func spawn(position: Vector2, value: int, kind: int) -> void:
+func spawn(global_spawn_pos: Vector2, value: int, kind: int) -> void:
 	var index: int = _acquire_index()
 	var label: Label = _pool[index]
 	# 文本格式：伤害带负号（-25），治疗带加号（+25）——与 GDD「红色数字/绿色数字」
@@ -103,7 +104,8 @@ func spawn(position: Vector2, value: int, kind: int) -> void:
 	label.add_theme_font_size_override("font_size", FLOAT_FONT_SIZE)
 	label.add_theme_color_override("font_color",
 		DAMAGE_COLOR if kind == FloaterKind.DAMAGE else HEAL_COLOR)
-	label.position = position
+	# 全局坐标 → 本池局部坐标（池可在非原点容器下——H-1 坐标空间修正）
+	label.position = global_spawn_pos - global_position
 	label.modulate.a = 1.0
 	label.visible = true
 	_play(label, index, kind)

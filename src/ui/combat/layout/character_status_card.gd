@@ -49,6 +49,10 @@ const BADGE_SIZE: float = 20.0
 ## HP 条平滑过渡时长（0.3s 线性——GDD 调优表 0.2~0.5 默认 0.3）。
 const HP_TWEEN_SEC: float = 0.3
 
+## 沙漏标记淡出时长（GDD 动画表 L611 前半句——待命→已就绪 0.3s；
+## 文字通道推迟见 DEBT-CUI-003，角标部分归本 story）。
+const BADGE_FADE_SEC: float = 0.3
+
 ## === 视觉常量（集中定义——R-02 数据驱动条款）=================================
 
 ## 前排边框色（金色实线）。
@@ -101,6 +105,11 @@ var reduce_motion: bool = false
 var _hp_display_ratio: float = 1.0
 ## HP 过渡 Tween 句柄（重入 kill 重建——批量伤害直算终值条款）。
 var _hp_tween: Tween = null
+## 沙漏淡出透明度（>0 时 L5 继续绘制沙漏——待命→已就绪 0.3s 淡出通道；
+## 瞬态视觉状态 §2.1 豁免）。
+var _badge_alpha: float = 0.0
+## 沙漏淡出 Tween 句柄（重入 kill）。
+var _badge_tween: Tween = null
 ## 名+数值合并 Label（R-02 §3 文字合并——单 Label 不拆多）。
 var _stat_label: Label = null
 ## 头像纹理（每角色唯一独立纹理——R-02 §3 头像分组；null 时色块占位）。
@@ -210,9 +219,23 @@ func set_front_row(p_front: bool) -> void:
 ## 已行动遮罩色（GDD §角色状态标记——「已行动角色：灰色遮罩」）。
 const ACTED_OVERLAY_COLOR: Color = Color(0.5, 0.5, 0.52, 0.5)
 
-## 设置待命标记（L5 渲染归本 story——切换信号逻辑归 story 003）。
+## 设置待命标记（L5 渲染归本 story——切换信号逻辑归 story 003）。[br]
+## 待命→已就绪：沙漏标记 0.3s 淡出（GDD 动画表 L611——语义位立即翻转，
+## 视觉通道经 [member _badge_alpha] 渐隐；reduce_motion 瞬时清除）。
 func set_standby(p_standby: bool) -> void:
-	is_standby = p_standby
+	if p_standby:
+		is_standby = true
+		_kill_badge_tween()
+		_badge_alpha = 0.0
+	elif is_standby:
+		is_standby = false
+		if reduce_motion:
+			_badge_alpha = 0.0
+		else:
+			_badge_alpha = 1.0
+			_kill_badge_tween()
+			_badge_tween = create_tween()
+			_badge_tween.tween_method(_set_badge_alpha, 1.0, 0.0, BADGE_FADE_SEC)
 	_refresh()
 
 
@@ -223,6 +246,8 @@ func set_acted_state(p_acted: bool) -> void:
 	is_acted = p_acted
 	if p_acted:
 		is_standby = false  # 已行动与待命互斥（FieldState 状态机语义）
+		_kill_badge_tween()  # 互斥路径直接终结沙漏淡出（对勾+遮罩接替）
+		_badge_alpha = 0.0
 	_refresh()
 
 
@@ -321,11 +346,19 @@ func _draw_badges() -> void:
 ## L5 待命/已行动标记（左上——is_standby=true 待命沙漏 / false 已行动对勾；
 ## 渲染归本 story，切换逻辑归 story 003）。
 func _draw_standby_badge() -> void:
-	var badge_id: int = Icons.IconId.BADGE_STANDBY if is_standby \
-			else Icons.IconId.BADGE_ACTED
+	var badge_id: int
+	var alpha: float = 1.0
+	if is_standby:
+		badge_id = Icons.IconId.BADGE_STANDBY
+	elif _badge_alpha > 0.0:
+		badge_id = Icons.IconId.BADGE_STANDBY  # 淡出中的沙漏（语义已就绪）
+		alpha = _badge_alpha
+	else:
+		badge_id = Icons.IconId.BADGE_ACTED
 	var region: Rect2 = Icons.get_region(badge_id)
 	draw_texture_rect_region(Icons.get_atlas(),
-		Rect2(SIDE_BAR_WIDTH + 2.0, 4.0, BADGE_SIZE, BADGE_SIZE), region)
+		Rect2(SIDE_BAR_WIDTH + 2.0, 4.0, BADGE_SIZE, BADGE_SIZE),
+		region, Color(1.0, 1.0, 1.0, alpha))
 
 
 ## 前后排边框（story AC-4：前排金色实线 / 后排蓝色虚线）。
@@ -346,6 +379,17 @@ func _draw_border() -> void:
 		draw_dashed_line(Vector2(0, h), Vector2(0, 0), BACK_BORDER_COLOR,
 			BORDER_WIDTH, DASH_LENGTH, true)
 
+
+## 沙漏淡出 Tween 插值回调。
+func _set_badge_alpha(value: float) -> void:
+	_badge_alpha = value
+	queue_redraw()
+
+## 沙漏淡出 Tween 重入清理。
+func _kill_badge_tween() -> void:
+	if _badge_tween != null and _badge_tween.is_valid():
+		_badge_tween.kill()
+	_badge_tween = null
 
 ## HP Tween 重入清理（批量伤害终值条款——kill 重建单次过渡）。
 func _kill_hp_tween() -> void:

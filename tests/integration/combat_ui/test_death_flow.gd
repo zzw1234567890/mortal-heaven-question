@@ -29,7 +29,7 @@ func before_each() -> void:
 	card = CardScript.new()
 	container.add_child(card)
 	coordinator.setup([mock], null,
-		Callable(mock, "read_hp"), Callable(), false)
+		Callable(mock, "read_hp"), false)
 	coordinator.register_card(101, card)
 
 
@@ -83,8 +83,7 @@ func test_death_flow_reduce_motion_immediate() -> void:
 	add_child_autofree(rm_container)
 	var rm_card: Control = CardScript.new()
 	rm_container.add_child(rm_card)
-	rm_coordinator.setup([mock], null, Callable(mock, "read_hp"),
-		Callable(), true)
+	rm_coordinator.setup([mock], null, Callable(mock, "read_hp"), true)
 	rm_coordinator.register_card(101, rm_card)
 	# Act —— 阵亡信号
 	rm_coordinator._on_character_died(101, 0, [])

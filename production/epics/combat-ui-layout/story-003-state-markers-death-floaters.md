@@ -31,13 +31,13 @@
 
 *From GDD，scoped to this story:*
 
-- [ ] 待命角色：头像外圈沙漏标记 + HP 条上方「待命」文字（上场系统信号驱动切换）
-- [ ] 已行动角色：灰色遮罩 + 「已行动」标记
-- [ ] 同一目标连续多次伤害：HP 条直接过渡到最终值一次（不串行多次）
-- [ ] 角色阵亡（HP=0）：碎裂+光点消散动画 0.5s → 角色移除 → 阵位变空位（虚线框）
-- [ ] 场上角色全灭立即切结算面板（不逐个播阵亡动画）
-- [ ] 伤害飘字：红色数字从目标位置飘出下落消失 0.5s；治疗飘字绿色上浮消失 0.5s
-- [ ] 阵亡动画+空位+飘字均有减少动态替代（直接淡出/直接显示）
+- [x] 待命角色：头像外圈沙漏标记（上场系统信号驱动切换；沙漏 0.3s 淡出——GDD 动画表 L611 前半句）。文字通道「待命/已行动」经 game-designer 裁决（2026-10-18，方案 B）显式排除于本 story——图形双通道（符号+遮罩）已满足可辨识性，文字推迟至本地化系统建立后（见 DEBT-CUI-003）
+- [x] 已行动角色：灰色遮罩 + 对勾标记（文字通道推迟同上——DEBT-CUI-003）
+- [x] 同一目标连续多次伤害：HP 条直接过渡到最终值一次（不串行多次——apply_hp 单次调用计数断言佐证）
+- [x] 角色阵亡（HP=0）：0.5s 淡出（stub）→ 角色移除 → 阵位变空位（虚线框）
+- [x] 场上角色全灭立即切结算面板（不逐个播阵亡动画——转发 battle_result_forwarded）
+- [x] 伤害飘字：红色数字从目标位置飘出下落消失 0.5s；治疗飘字绿色上浮消失 0.5s
+- [x] 阵亡动画+空位+飘字均有减少动态替代（直接淡出/直接显示）
 
 ---
 
@@ -103,7 +103,10 @@
 - Integration: `tests/integration/combat_ui/test_hp_batch_transition.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/character-state-death-evidence.md` + sign-off（录屏）
 
-**Status**: [x] Created —— tests/integration/combat_ui/test_hp_batch_transition.gd (21 断言场景 BLOCKING) + test_death_flow.gd (5) + test_floater_pool.gd (池上限/复用/reduce_motion)——combat_ui 套件 53/53 全绿（2026-10-18，63f11ca CI 绿）；全量回归 2838 passing / 1 pending 存量。UI 手动证据 character-state-death-evidence.md 待录屏签收（ADVISORY）
+**Status**: [x] Created —— tests/integration/combat_ui/test_hp_batch_transition.gd（BLOCKING，LP-CODE-REVIEW M-2 补强：CountingCard 子类 apply_hp 计数断言 + H-1 坐标空间回归 2 例 + 沙漏淡出 2 例）
++ test_death_flow.gd (5) + test_floater_pool.gd (池上限/复用/reduce_motion)
++ mocks/counting_card.gd——combat_ui 套件 57/57 全绿（2026-10-18）；全量回归 2840 passing / 1 pending 存量。
+UI 手动证据 character-state-death-evidence.md 待录屏签收（ADVISORY）
 
 ---
 

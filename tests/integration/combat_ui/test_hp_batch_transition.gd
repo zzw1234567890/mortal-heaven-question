@@ -13,10 +13,8 @@ const CardScript: GDScript = preload("res://src/ui/combat/layout/character_statu
 const CoordinatorScript: GDScript = preload("res://src/ui/combat/feedback/combat_feedback_coordinator.gd")
 const PoolScript: GDScript = preload("res://src/ui/combat/feedback/floater_pool.gd")
 const MockSignals: GDScript = preload("res://tests/integration/combat_ui/mocks/mock_combat_signals.gd")
+const CountingCard: GDScript = preload("res://tests/integration/combat_ui/mocks/counting_card.gd")
 
-## apply_hp 调用计数（mock 卡注入——Coordinator 持有的卡经此计数）。
-var apply_hp_calls: int = 0
-var last_apply_args: Array = []
 ## battle_result_forwarded 信号计数（AC-3 断言）。
 var forwarded_signals: Array = []
 
@@ -26,34 +24,18 @@ var card: Control = null
 
 
 func before_each() -> void:
-	apply_hp_calls = 0
-	last_apply_args = []
 	forwarded_signals = []
 	mock = MockSignals.new()
 	add_child_autofree(mock)
 	coordinator = CoordinatorScript.new()
 	add_child_autofree(coordinator)
-	card = CardScript.new()
+	# 计数卡（M-2）：apply_hp 覆写计数——证明同帧多次伤害仅 1 次调用
+	card = CountingCard.new()
 	add_child_autofree(card)
-	# mock 卡：apply_hp 计数包装（CardStatusCard 子类太重——直接监听
-	# 属性变化不可行，改为在卡上连接可测入口：用扩展脚本包装）
 	coordinator.setup([mock], null,
-		Callable(mock, "read_hp"), Callable(),
+		Callable(mock, "read_hp"),
 		false)
 	coordinator.register_card(101, card)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 测试辅助——可计数的卡包装
-# ═══════════════════════════════════════════════════════════════════════════════
-
-## 构建计数卡（CharacterStatusCard + apply_hp 钩子注入）。
-func _make_counted_card() -> Control:
-	var counted: Control = CardScript.new()
-	# 注入计数钩子：包装原 apply_hp（method 拦截——GDScript 无 monkey patch，
-	# 改用信号监听近似：监听 card 的 tree_entered 不可行。此处直接用
-	# Coordinator 的 pending 队列行为断言 + card.current_hp 终值断言替代计数）。
-	return counted
 
 
 ## 等待实时秒数（headless 帧率不封顶——帧数等待对时间驱动的 Tween 不可靠，
@@ -74,6 +56,7 @@ func _wait_frames(frames: int) -> void:
 func test_hp_batch_three_attacks_single_transition() -> void:
 	# Arrange —— 源系统 HP 状态：100 → 连续 3 次伤害（-20/-20/-15 → 终值 45）
 	card.apply_hp(100, 100)
+	card.apply_hp_call_count = 0  # Arrange 计数清零（M-2）
 	mock.set_hp(101, 100, 100)
 	# Act —— 同帧连续 3 次 attack_resolved 入队
 	mock.emit_attack(101, 20)
@@ -91,11 +74,17 @@ func test_hp_batch_three_attacks_single_transition() -> void:
 		"同帧 3 次伤害应合并为一次 apply_hp 到终值 45")
 	# Then: 单次 Tween（apply_hp 内 kill 重建——存量机制，此处验证存活一条）
 	assert_not_null(card._hp_tween, "应存在一条 HP 过渡 Tween")
+	# Then: M-2 计数断言——同帧 3 次伤害仅 1 次 apply_hp 调用
+	# （终值断言无法区分「一次直达」与「三次逐次 kill 重建」）
+	assert_eq(card.apply_hp_call_count, 1,
+		"同帧 3 次伤害应仅触发 1 次 apply_hp（合并直达终值）")
+	assert_eq(card.last_apply_args, [45, 100], "终值参数应为 (45, 100)")
 
 
 func test_hp_batch_damage_heal_mix_algebraic_sum() -> void:
 	# Arrange —— 伤害+治疗混合 edge（-30 / +10 / -5 → 终值 75）
 	card.apply_hp(100, 100)
+	card.apply_hp_call_count = 0  # Arrange 计数清零（M-2）
 	mock.set_hp(101, 100, 100)
 	# Act —— 混合入队（治疗 = damage 负值）
 	mock.emit_attack(101, 30)
@@ -107,11 +96,13 @@ func test_hp_batch_damage_heal_mix_algebraic_sum() -> void:
 	await _wait_frames(2)
 	# Then: 终值代数和 75
 	assert_eq(card.current_hp, 75, "伤害+治疗混合终值应为代数和 75")
+	assert_eq(card.apply_hp_call_count, 1, "混合 3 次入队应仅 1 次 apply_hp")
 
 
 func test_hp_batch_lethal_triggers_death_flow() -> void:
 	# Arrange —— 致死 edge（终值 0 + 阵亡流程触发）
 	card.apply_hp(10, 100)
+	card.apply_hp_call_count = 0  # Arrange 计数清零（M-2）
 	mock.set_hp(101, 10, 100)
 	# Act —— 致死一击（is_kill=true → pending_death）
 	mock.emit_attack(101, 10, true)
@@ -126,7 +117,6 @@ func test_hp_batch_lethal_triggers_death_flow() -> void:
 	await _wait_sec(0.9)
 	assert_false(coordinator._cards.has(101), "阵亡动画完成后卡应移除")
 	# 卡已 queue_free——对象不可再访问；从容器查空位框接替（卡原父为测试根容器）
-	var card_parent: Node = self
 	var frame: Control = null
 	for child: Node in get_children():
 		if child.get_script() != null \
@@ -138,11 +128,13 @@ func test_hp_batch_lethal_triggers_death_flow() -> void:
 
 func test_hp_batch_multiple_targets_independent_flush() -> void:
 	# Arrange —— 双目标各一次过渡（合并按目标分组）
-	var card_b: Control = CardScript.new()
+	var card_b: Control = CountingCard.new()
 	add_child_autofree(card_b)
 	coordinator.register_card(202, card_b)
 	card.apply_hp(100, 100)
+	card.apply_hp_call_count = 0  # Arrange 计数清零（M-2）
 	card_b.apply_hp(100, 100)
+	card_b.apply_hp_call_count = 0  # Arrange 计数清零（M-2）
 	mock.set_hp(101, 100, 100)
 	mock.set_hp(202, 100, 100)
 	# Act —— 目标 A 两次 + 目标 B 一次
@@ -153,9 +145,11 @@ func test_hp_batch_multiple_targets_independent_flush() -> void:
 	mock.emit_attack(202, 50)
 	mock.set_hp(202, 50, 100)
 	await _wait_frames(2)
-	# Then: 各目标终值独立
+	# Then: 各目标终值独立 + 各自单次调用
 	assert_eq(card.current_hp, 40, "目标 A 终值 40")
 	assert_eq(card_b.current_hp, 50, "目标 B 终值 50")
+	assert_eq(card.apply_hp_call_count, 1, "目标 A 两次伤害应仅 1 次 apply_hp")
+	assert_eq(card_b.apply_hp_call_count, 1, "目标 B 单次伤害应 1 次 apply_hp")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -177,7 +171,7 @@ func test_standby_cleared_same_frame_multiple_signals_final_state() -> void:
 	card.set_standby(true)
 	# Act —— 同帧：待命清除 + 新角色上场（101 又被部署回待命语义不可能——
 	# 用两角色验证：101 清除 + 202 部署标记待命）
-	var card_b: Control = CardScript.new()
+	var card_b: Control = CountingCard.new()
 	add_child_autofree(card_b)
 	coordinator.register_card(202, card_b)
 	card_b.set_standby(false)
@@ -205,6 +199,33 @@ func test_card_act_state_renders_overlay_flag() -> void:
 	assert_false(card.is_standby, "set_acted_state 应清除待命（互斥）")
 	card.set_acted_state(false)
 	assert_false(card.is_acted, "set_acted_state(false) 应清遮罩")
+
+func test_standby_to_ready_hourglass_fades_0_3s() -> void:
+	# Arrange —— 待命（沙漏显示）
+	card.set_standby(true)
+	# Act —— 待命→已就绪（GDD 动画表 L611 前半句——0.3s 淡出）
+	card.set_standby(false)
+	assert_false(card.is_standby, "语义位应立即翻转（已就绪）")
+	assert_almost_eq(card._badge_alpha, 1.0, 0.01, "淡出应从 1.0 起步")
+	# 中途：透明度下降但未归零
+	await _wait_sec(0.15)
+	assert_true(card._badge_alpha < 1.0 and card._badge_alpha > 0.0,
+		"沙漏标记应正在淡出（0.3s 中点附近）")
+	# 完成后：透明度归零
+	await _wait_sec(0.4)
+	assert_almost_eq(card._badge_alpha, 0.0, 0.01, "淡出完成后应归零")
+
+func test_standby_reentry_during_fade_resets_instantly() -> void:
+	# Arrange —— 淡出进行中重入待命
+	card.set_standby(true)
+	card.set_standby(false)
+	await _wait_sec(0.1)
+	# Act —— 淡出中重新待命
+	card.set_standby(true)
+	# Then: 沙漏立即满透明度显示（无残留淡出）
+	assert_true(card.is_standby, "应回到待命")
+	assert_almost_eq(card._badge_alpha, 0.0, 0.01,
+		"重入待命应终结淡出通道（_badge_alpha 归零）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -307,3 +328,80 @@ func test_damage_floater_spawns_on_attack_resolved() -> void:
 	mock.emit_attack(101, 25)
 	# Then: 池占用 1（同帧立即发射——飘字不入队合并）
 	assert_eq(pool.free_count(), 15, "一次攻击应发射一个伤害飘字")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# H-1 坐标空间回归（LP-CODE-REVIEW：容器偏移 + 后排缩放卡——修复前应红）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_floater_origin_offset_container_and_scaled_card() -> void:
+	# Arrange —— Coordinator 挂在带偏移的容器下（模拟真实战场布局：
+	# 战场容器不在全局原点）；卡后排缩放 85% + 容器内偏移
+	var offset_container: Control = Control.new()
+	offset_container.position = Vector2(300.0, 200.0)
+	add_child_autofree(offset_container)
+	var oc_coordinator: Control = CoordinatorScript.new()
+	offset_container.add_child(oc_coordinator)
+	var oc_container: Control = Control.new()  # 卡容器（独立于 Coordinator）
+	oc_container.position = Vector2(120.0, 60.0)
+	add_child_autofree(oc_container)
+	var oc_card: Control = CardScript.new()
+	oc_container.add_child(oc_card)
+	oc_card.set_front_row(false)  # 后排 85% 缩放
+	oc_card.position = Vector2(40.0, 30.0)
+	oc_card.custom_minimum_size = Vector2(120.0, 168.0)
+	oc_card.size = Vector2(120.0, 168.0)
+	oc_coordinator.setup([mock], null, Callable(mock, "read_hp"), false)
+	oc_coordinator.register_card(101, oc_card)
+	await _wait_frames(2)  # 布局生效帧
+	# 计算期望：卡全局中心 = 容器(300,200) + 卡容器(120,60) + 卡(40,30)
+	#   + size(120,168) * scale(0.85) * 0.5 = (520, 361.4)
+	var expected_center: Vector2 = oc_card.global_position 	\
+			+ oc_card.size * oc_card.scale * 0.5
+	# Act —— 伤害入队（飘字立即发射）
+	mock.emit_attack(101, 25)
+	# Then: 飘字 label 的局部 position + 池全局原点 == 期望卡中心
+	var pool: Control = oc_coordinator.floater_pool
+	var label: Label = null
+	for child: Node in pool.get_children():
+		if child is Label and child.visible:
+			label = child
+			break
+	assert_not_null(label, "应有一个可见飘字")
+	var actual_global: Vector2 = label.global_position
+	assert_almost_eq(actual_global.x, expected_center.x, 0.5,
+		"飘字应在卡中心（含容器偏移与缩放——x）")
+	assert_almost_eq(actual_global.y, expected_center.y, 0.5,
+		"飘字应在卡中心（含容器偏移与缩放——y）")
+
+func test_death_frame_position_offset_container() -> void:
+	# Arrange —— 卡挂在带偏移容器下（非全局原点——修复前
+	# global_position 在 add_child 前设置，空位框落在原点）
+	var off_container: Control = Control.new()
+	off_container.position = Vector2(250.0, 150.0)
+	add_child_autofree(off_container)
+	var off_coordinator: Control = CoordinatorScript.new()
+	add_child_autofree(off_coordinator)
+	var off_card: Control = CardScript.new()
+	off_container.add_child(off_card)
+	off_card.position = Vector2(80.0, 40.0)
+	off_card.size = Vector2(120.0, 168.0)
+	off_coordinator.setup([mock], null, Callable(mock, "read_hp"), false)
+	off_coordinator.register_card(101, off_card)
+	# 取证期望位置（卡 queue_free 前读）
+	var expected_pos: Vector2 = off_card.position
+	# Act —— 阵亡信号 + 动画完成
+	mock.character_died.emit(101, 0, [])
+	await _wait_sec(0.9)
+	# Then: 空位框在卡原局部位置接替（容器局部坐标）
+	var frame: Control = null
+	for child: Node in off_container.get_children():
+		if child.get_script() != null 	\
+			and child.get_script() == preload("res://src/ui/combat/layout/empty_slot_frame.gd"):
+			frame = child
+			break
+	assert_not_null(frame, "空位框应在卡容器内出现")
+	assert_almost_eq(frame.position.x, expected_pos.x, 0.5,
+		"空位框应原位接替（容器局部 x——含容器偏移）")
+	assert_almost_eq(frame.position.y, expected_pos.y, 0.5,
+		"空位框应原位接替（容器局部 y——含容器偏移）")
