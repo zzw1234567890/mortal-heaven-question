@@ -1,13 +1,4 @@
-; 音频总线布局 —— GDD design/gdd/audio-system.md §2 总线架构（audio Epic Story 001）。
-; 结构：6 主总线（Master/BGM/SFX/UI/Ambient/Voice）+ 3 SFX 子总线（Combat/Card/Explore SFX，send 指向 SFX）。
-; 默认 dB（GDD 音量规格表——数据驱动：出厂基准在此资产，启动时设置文件覆盖归 audio 005）：
-;   Master 0 / BGM 0 / SFX -3 / UI -8 / Ambient -10 / Voice -1
-; 效果器（GDD「总线效果最低要求」）：Master Limiter ceiling -0.5dB（防削波）/
-;   SFX Limiter ceiling -1dB（12 SFX 叠加保护）/ Ambient Reverb（可选——保守默认参数）。
-; 注：GDD §2 提到 BGM「带 EQ 效果」，但不在总线效果最低要求内——本资产未实现，
-; 待后续 story 需要 BGM EQ 时再追加（story 001 范围裁决）。
-; 加载路径：project.godot [audio] buses/default_bus_layout 自动应用（非代码 set_bus_layout）。
-[gd_resource type="AudioBusLayout" format=3]
+[gd_resource type="AudioBusLayout" format=3 uid="uid://b0555a3m2je70"]
 
 [sub_resource type="AudioEffectLimiter" id="AudioEffectLimiter_master"]
 ceiling_db = -0.5
@@ -18,6 +9,8 @@ ceiling_db = -1.0
 [sub_resource type="AudioEffectReverb" id="AudioEffectReverb_ambient"]
 
 [resource]
+bus/0/effect/0/effect = SubResource("AudioEffectLimiter_master")
+bus/0/effect/0/enabled = true
 bus/1/name = &"BGM"
 bus/1/solo = false
 bus/1/mute = false
@@ -70,11 +63,3 @@ bus/8/mute = false
 bus/8/bypass_fx = false
 bus/8/volume_db = -1.0
 bus/8/send = &"Master"
-bus/0/name = &"Master"
-bus/0/solo = false
-bus/0/mute = false
-bus/0/bypass_fx = false
-bus/0/volume_db = 0.0
-bus/0/send = &"Master"
-bus/0/effect/0/effect = SubResource("AudioEffectLimiter_master")
-bus/0/effect/0/enabled = true

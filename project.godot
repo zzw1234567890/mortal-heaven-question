@@ -17,6 +17,10 @@ run/main_scene="res://src/ui/main_menu/MainMenu.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://icon.svg"
 
+[audio]
+
+buses/default_bus_layout="res://resources/audio/default_bus_layout.tres"
+
 [autoload]
 
 GameStateManager="*res://src/foundation/game_state_manager.gd"
@@ -44,10 +48,6 @@ TribulationSystem="*res://src/feature/tribulation_system.gd"
 IdentitySelectionSystem="*res://src/feature/identity_selection_system.gd"
 StorySystem="*res://src/feature/story_system.gd"
 ProgressionSystem="*res://src/meta/progression_system.gd"
-
-[audio]
-
-buses/default_bus_layout="res://resources/audio/default_bus_layout.tres"
 
 [display]
 
