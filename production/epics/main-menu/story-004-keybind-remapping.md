@@ -108,7 +108,7 @@
 - Integration: `tests/integration/main_menu/test_keybind_roundtrip.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/keybind-evidence.md` + sign-off
 
-**Status**: [ ] Not yet created
+**Status**: [x] 已创建（2026-10-18）——tests/unit/main_menu/test_keybind_conflict.gd（13）+ tests/integration/main_menu/test_keybind_roundtrip.gd（19）全绿；production/qa/evidence/keybind-evidence.md 签收 3/3
 
 ---
 
