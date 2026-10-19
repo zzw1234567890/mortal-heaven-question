@@ -4,7 +4,7 @@
 > **美术圣经**：design/art/art-bible.md §5.X.6
 > **生成日期**：2026-07-26
 > **审查模式**：Solo（art-director + technical-artist 代理因 API 503 不可用）
-> **状态**：30 个资产已规范 / 0 个已批准 / 0 个生产中 / 0 个完成
+> **状态**：29 个资产已规范 / 0 个已批准 / 0 个生产中 / 0 个完成
 
 ## 技术参数
 
@@ -16,7 +16,7 @@
 | 图层要求 | (1) 符纸基底层（暖灰纹理） (2) 符文朱砂红墨迹层 (3) 边缘晕染层 (4) 卷曲褶皱纹理层 |
 | Godot 导入预设 | 2D Texture, Filter=Disabled, Mipmaps=Off, Compress=Lossless |
 | 单张预估 | ~120KB RGBA8 → ~30KB DXT5 |
-| 总计预估 | 30 张 × 30KB = ~900KB VRAM |
+| 总计预估 | 29 张 × 30KB = ~870KB VRAM |
 
 ## 符文风格速查
 
@@ -29,6 +29,10 @@
 | 特殊符 | 综合特征 | 根据具体效果定制 | 3 |
 
 ---
+
+## 背景处理（本文件全部符箓图统一）
+
+每张符箓图背景均为淡墨氛围（浅绛淡彩）：符纸满幅，符纸外缘铺满淡墨晕染（灰度 88-92%）模拟符纸置于墨案/虚空之上，四角老化淡墨晕染保留，叠低饱和淡彩晕染（S≤25% L≥70%），整体不留纯白外框（覆盖 ≥80%，纯白仅作高光点缀 <20%）；背景无语义色——朱砂红仅在符文上。
 
 ## 攻击符（尖锐放射状）
 
@@ -51,10 +55,10 @@
 - §4 语义色：朱砂红=法术封印（攻击）
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red flame-shaped rune with 3 main strokes bursting upward, thick-to-thin flying-white brush texture, 3 concentric heat-wave rings around rune, slight scorched edges in dry ink, tiny seal-script "火" stamp at bottom right, paper corners slightly curled, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no color except warm gray paper and vermillion red
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red flame-shaped rune with 3 main strokes bursting upward, thick-to-thin flying-white brush texture, 3 concentric heat-wave rings around rune, slight scorched edges in dry ink, tiny seal-script "火" stamp at bottom right, paper corners slightly curled, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, character, landscape, background, colorful, 3D, photorealistic, blue, green, clean paper
+pure white background, empty background, blank background, person, character, colorful, 3D, photorealistic, blue, green, clean paper
 
 **状态：** Needed
 
@@ -79,10 +83,10 @@ person, character, landscape, background, colorful, 3D, photorealistic, blue, gr
 - §4 语义色：朱砂红=雷电封印
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red 5-zigzag lightning rune striking in 5 directions, tiny red splash dots at each zigzag corner, cloud-qi rings around rune, static-electricity fine flying-white at paper edges, "雷" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray paper and vermillion red
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red 5-zigzag lightning rune striking in 5 directions, tiny red splash dots at each zigzag corner, cloud-qi rings around rune, static-electricity fine flying-white at paper edges, "雷" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, smooth
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, smooth
 
 **状态：** Needed
 
@@ -107,10 +111,10 @@ person, landscape, background, colorful, 3D, photorealistic, smooth
 - §4 语义色：朱砂红=天雷
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — single vermillion-red vertical-then-zigzag lightning stroke from top to bottom, extremely dense at top, flying-white scatter at bottom like ground arc, dense red micro-dots in upper half like rain, "引" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — single vermillion-red vertical-then-zigzag lightning stroke from top to bottom, extremely dense at top, flying-white scatter at bottom like ground arc, dense red micro-dots in upper half like rain, "引" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -135,10 +139,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：朱砂红=爆炸
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red triple-blast rune: one dense center circle + 3 directional explosion shockwave rings fading outward, red splash dots between waves like shrapnel, paper edges slightly torn in wave directions, "爆" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red triple-blast rune: one dense center circle + 3 directional explosion shockwave rings fading outward, red splash dots between waves like shrapnel, paper edges slightly torn in wave directions, "爆" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, clean
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, clean
 
 **状态：** Needed
 
@@ -163,10 +167,10 @@ person, landscape, background, colorful, 3D, photorealistic, clean
 - §4 语义色：朱砂红=破甲
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red sharp wedge-shaped rune like an awl piercing a shield, extremely fine point at tip, thick powerful tail, light ink shield outline being pierced at center by red wedge, unstoppable penetration energy, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red sharp wedge-shaped rune like an awl piercing a shield, extremely fine point at tip, thick powerful tail, light ink shield outline being pierced at center by red wedge, unstoppable penetration energy, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, blunt, soft
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, blunt, soft
 
 **状态：** Needed
 
@@ -191,10 +195,10 @@ person, landscape, background, colorful, 3D, photorealistic, blunt, soft
 - §4 语义色：朱砂红=对魔克制
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red crossed double-sword rune, light ink severed demonic-qi cloud below the cross point, tiny "灭" (destroy) stamp at intersection, subtle golden-hint via ink density contrast around edges, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red crossed double-sword rune, light ink severed demonic-qi cloud below the cross point, tiny "灭" (destroy) stamp at intersection, subtle golden-hint via ink density contrast around edges, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, gold
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, gold
 
 **状态：** Needed
 
@@ -219,10 +223,10 @@ person, landscape, background, colorful, 3D, photorealistic, gold
 - §4 语义色：朱砂红=斩妖
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red vertical greatsword rune piercing full length, beast-head shaped crossguard, two faint collapsed beast silhouettes in light ink on either side, red vertical line dense-to-faint along blade spine for lethal strike, "斩" stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red vertical greatsword rune piercing full length, beast-head shaped crossguard, two faint collapsed beast silhouettes in light ink on either side, red vertical line dense-to-faint along blade spine for lethal strike, "斩" stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, animal, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, animal, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -247,10 +251,10 @@ person, animal, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：朱砂红=狂暴力量
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red berserk volcano-eruption rune with 4 thick wild main strokes blasting upward, flying-white and rough edges everywhere, red splash dots flying outward like defense being blasted away, paper edges notably more torn than other talismans, "狂" stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red berserk volcano-eruption rune with 4 thick wild main strokes blasting upward, flying-white and rough edges everywhere, red splash dots flying outward like defense being blasted away, paper edges notably more torn than other talismans, "狂" stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, clean, neat, calm
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, clean, neat, calm
 
 **状态：** Needed
 
@@ -277,10 +281,10 @@ person, landscape, background, colorful, 3D, photorealistic, clean, neat, calm
 - §4 语义色：朱砂红=护盾封印
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on cool-gray aged paper — vermillion-red 3-layer concentric shield circle rune fading from dense inner to light outer, hexagonal ice-crystal pattern in fine red lines within shield, paper tone slightly cooler, clean intact edges, "盾" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except cool gray paper and vermillion
+Chinese ink brush talisman on cool-gray aged paper — vermillion-red 3-layer concentric shield circle rune fading from dense inner to light outer, hexagonal ice-crystal pattern in fine red lines within shield, paper tone slightly cooler, clean intact edges, "盾" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, warm, broken, torn
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, warm, broken, torn
 
 **状态：** Needed
 
@@ -305,10 +309,10 @@ person, landscape, background, colorful, 3D, photorealistic, warm, broken, torn
 - §4 语义色：朱砂红=全体防御
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red thick square shield rune with tiny vajra symbols at 4 corners, "坚" (solid) seal character in bold red within, short red radiating lines from shield edge for party-wide defense, paper thick and flat, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red thick square shield rune with tiny vajra symbols at 4 corners, "坚" (solid) seal character in bold red within, short red radiating lines from shield edge for party-wide defense, paper thick and flat, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, round, circle
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, round, circle
 
 **状态：** Needed
 
@@ -333,10 +337,10 @@ person, landscape, background, colorful, 3D, photorealistic, round, circle
 - §4 语义色：朱砂红=防御
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — simple single vermillion-red circle rune with solid red dot at center, even smooth brush weight, minimal clean aesthetic, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — simple single vermillion-red circle rune with solid red dot at center, even smooth brush weight, minimal clean aesthetic, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, complex, decorative
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, complex, decorative
 
 **状态：** Needed
 
@@ -361,10 +365,10 @@ person, landscape, background, colorful, 3D, photorealistic, complex, decorative
 - §4 语义色：朱砂红=铁壁防御
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red castle-wall rune: thick horizontal base line + battlement zigzag top, fine brick-pattern lines within wall in thin red, rectangular enclosing form, more negative space in upper half, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red castle-wall rune: thick horizontal base line + battlement zigzag top, fine brick-pattern lines within wall in thin red, rectangular enclosing form, more negative space in upper half, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, round
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, round
 
 **状态：** Needed
 
@@ -389,10 +393,10 @@ person, landscape, background, colorful, 3D, photorealistic, round
 - §4 语义色：朱砂红=疗愈
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-soft gray aged paper — vermillion-red water-drop rune with 3 descending smaller dots, 3 concentric ripple arcs at bottom in lighter red, soft warm paper tone, nourishing healing feeling, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-soft gray aged paper — vermillion-red water-drop rune with 3 descending smaller dots, 3 concentric ripple arcs at bottom in lighter red, soft warm paper tone, nourishing healing feeling, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, sharp, aggressive
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, sharp, aggressive
 
 **状态：** Needed
 
@@ -417,10 +421,10 @@ person, landscape, background, colorful, 3D, photorealistic, sharp, aggressive
 - §4 语义色：朱砂红=全体疗愈
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red 5-drop plum-blossom rune arrangement (center + 4 corners), ripples under each, thin red lines connecting all drops into life network, even-blessing party-wide heal energy, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red 5-drop plum-blossom rune arrangement (center + 4 corners), ripples under each, thin red lines connecting all drops into life network, even-blessing party-wide heal energy, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, single
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, single
 
 **状态：** Needed
 
@@ -447,10 +451,10 @@ person, landscape, background, colorful, 3D, photorealistic, single
 - §4 语义色：朱砂红=遁逃
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red S-curve rune winding downward and fading into 3 horizontal ground lines, brush stroke tapering to nothing at bottom like sinking into earth, light ink soil-texture pattern in lower half, "遁" stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red S-curve rune winding downward and fading into 3 horizontal ground lines, brush stroke tapering to nothing at bottom like sinking into earth, light ink soil-texture pattern in lower half, "遁" stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -475,10 +479,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：朱砂红=抽牌加速
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red 3 horizontal speed-line rune strokes accelerating left-to-right, light ink floating leaf above rune suggesting card drawn like leaf to hand, slightly asymmetric paper curl like wind-blown, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red 3 horizontal speed-line rune strokes accelerating left-to-right, light ink floating leaf above rune suggesting card drawn like leaf to hand, slightly asymmetric paper curl like wind-blown, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, static
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, static
 
 **状态：** Needed
 
@@ -503,10 +507,10 @@ person, landscape, background, colorful, 3D, photorealistic, static
 - §4 语义色：朱砂红=冰冻
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on cool-gray aged paper — vermillion-red inward spiral rune freezing from fluid to rigid at center, hexagonal ice-crystal thin red lines woven in, cool gray paper tone, "冰" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except cool gray and vermillion
+Chinese ink brush talisman on cool-gray aged paper — vermillion-red inward spiral rune freezing from fluid to rigid at center, hexagonal ice-crystal thin red lines woven in, cool gray paper tone, "冰" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, warm, fire
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, warm, fire
 
 **状态：** Needed
 
@@ -531,10 +535,10 @@ person, landscape, background, colorful, 3D, photorealistic, warm, fire
 - §4 语义色：朱砂红=净化
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red feather-light rising curve rune tapering to nearly invisible red micro-dot at apex, light ink turbid-qi wisps being pushed out in upper half, cleansing ascending purity energy, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red feather-light rising curve rune tapering to nearly invisible red micro-dot at apex, light ink turbid-qi wisps being pushed out in upper half, cleansing ascending purity energy, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, heavy, dark
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, heavy, dark
 
 **状态：** Needed
 
@@ -559,10 +563,10 @@ person, landscape, background, colorful, 3D, photorealistic, heavy, dark
 - §4 语义色：朱砂红=牌库窥视
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red 3-gate rune: 3 parallel vertical lines with middle brightest, small tiny ink card silhouettes floating above each gate in fan arrangement, faint eye-shaped outline in light ink above for peeking top 3 cards, selective choice energy, "选" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red 3-gate rune: 3 parallel vertical lines with middle brightest, small tiny ink card silhouettes floating above each gate in fan arrangement, faint eye-shaped outline in light ink above for peeking top 3 cards, selective choice energy, "选" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -587,10 +591,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：朱砂红=资源增长
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red double-half-circle wellspring rune: lower half with rising vertical red line (gain 1 energy), upper half with light ink floating leaf (draw 1 card), S-curve red line connecting both halves, resource-bubbling abundance energy, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red double-half-circle wellspring rune: lower half with rising vertical red line (gain 1 energy), upper half with light ink floating leaf (draw 1 card), S-curve red line connecting both halves, resource-bubbling abundance energy, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -615,10 +619,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：朱砂红=魅惑
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-soft gray aged paper — vermillion-red peach-blossom double-spiral rune: outer clockwise + inner counter-clockwise for hypnotic effect, tiny heart-shaped red dot at center, light ink scattered peach petal silhouettes, warm soft seductive atmosphere, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-soft gray aged paper — vermillion-red peach-blossom double-spiral rune: outer clockwise + inner counter-clockwise for hypnotic effect, tiny heart-shaped red dot at center, light ink scattered peach petal silhouettes, warm soft seductive atmosphere, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, sharp, cold
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, sharp, cold
 
 **状态：** Needed
 
@@ -643,10 +647,10 @@ person, landscape, background, colorful, 3D, photorealistic, sharp, cold
 - §4 语义色：朱砂红=窥视
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red vertical heavenly-eye rune: elongated almond-shaped eye with solid red pupil, 3 extremely thin red dashed lines above eye for peeking 3 cards, small red hook below for drawing 1 card, mystical divination energy, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red vertical heavenly-eye rune: elongated almond-shaped eye with solid red pupil, 3 extremely thin red dashed lines above eye for peeking 3 cards, small red hook below for drawing 1 card, mystical divination energy, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, face, landscape, background, colorful, 3D, photorealistic, eye, realistic
+pure white background, empty background, blank background, person, face, colorful, 3D, photorealistic, eye, realistic
 
 **状态：** Needed
 
@@ -673,10 +677,10 @@ person, face, landscape, background, colorful, 3D, photorealistic, eye, realisti
 - §4 语义色：朱砂红=全队驱散
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red complex 9-grid rune of simplified swastika-variant symbols in 3x3 formation, red rays connecting all 9 symbols, light ink turbid-qi wisps being pushed outward from paper edges, vermillion rising sun in upper half for renewal, "破" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red complex 9-grid rune of simplified swastika-variant symbols in 3x3 formation, red rays connecting all 9 symbols, light ink turbid-qi wisps being pushed outward from paper edges, vermillion rising sun in upper half for renewal, "破" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, simple, minimal
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, simple, minimal
 
 **状态：** Needed
 
@@ -701,10 +705,10 @@ person, landscape, background, colorful, 3D, photorealistic, simple, minimal
 - §4 语义色：朱砂红=破空必中
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red space-tearing vertical slash rune from top to bottom with serrated tear texture, fine parallel short red lines along both sides of slash simulating torn space fabric, actual tear in paper along the slash line, unstoppable piercing energy, "破" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red space-tearing vertical slash rune from top to bottom with serrated tear texture, fine parallel short red lines along both sides of slash simulating torn space fabric, actual tear in paper along the slash line, unstoppable piercing energy, "破" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, intact, smooth
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, intact, smooth
 
 **状态：** Needed
 
@@ -729,10 +733,10 @@ person, landscape, background, colorful, 3D, photorealistic, intact, smooth
 - §4 语义色：朱砂红=力量汇聚
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red magnificent 12-arm spiral galaxy rune radiating from center, solid red dot at each arm tip for 12-fold power convergence, dense red central core, light ink energy rings in background, solemn weighty presence, "聚" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red magnificent 12-arm spiral galaxy rune radiating from center, solid red dot at each arm tip for 12-fold power convergence, dense red central core, light ink energy rings in background, solemn weighty presence, "聚" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, simple, minimal
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, simple, minimal
 
 **状态：** Needed
 
@@ -757,10 +761,10 @@ person, landscape, background, colorful, 3D, photorealistic, simple, minimal
 - §4 语义色：朱砂红=天劫
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red heavenly-tribulation rune: sun disk at top as tribulation source, 7 zigzag lightning bolts spreading across entire paper, bolts thickening downward with red spark splashes at tips, light ink cloud layer at top edge, scorched ink marks at bottom, cataclysmic divine punishment energy, "劫" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red heavenly-tribulation rune: sun disk at top as tribulation source, 7 zigzag lightning bolts spreading across entire paper, bolts thickening downward with red spark splashes at tips, light ink cloud layer at top edge, scorched ink marks at bottom, cataclysmic divine punishment energy, "劫" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, gentle
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, gentle
 
 **状态：** Needed
 
@@ -785,10 +789,10 @@ person, landscape, background, colorful, 3D, photorealistic, gentle
 - §4 语义色：朱砂红=复活
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red soul-return rune: 3 S-curve soul-threads rising from bottom (underworld) merging into simplified human silhouette at mid-paper, left half solid red and right half light red for half-HP return, profound resurrection energy, "魂" seal stamp, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, light ink, and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red soul-return rune: 3 S-curve soul-threads rising from bottom (underworld) merging into simplified human silhouette at mid-paper, left half solid red and right half light red for half-HP return, profound resurrection energy, "魂" seal stamp, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, face, landscape, background, colorful, 3D, photorealistic, ghost, skull
+pure white background, empty background, blank background, person, face, colorful, 3D, photorealistic, ghost, skull
 
 **状态：** Needed
 
@@ -815,10 +819,10 @@ person, face, landscape, background, colorful, 3D, photorealistic, ghost, skull
 - §4 语义色：朱砂红=定身
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — vermillion-red binding-chain rune: 3 chain-link lines radiating from central knot with lock symbols at ends (tiny "封" inside circles), bold red "定" (freeze) at center, taut binding tension across paper, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray and vermillion
+Chinese ink brush talisman on warm-gray aged paper — vermillion-red binding-chain rune: 3 chain-link lines radiating from central knot with lock symbols at ends (tiny "封" inside circles), bold red "定" (freeze) at center, taut binding tension across paper, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, free, loose
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, free, loose
 
 **状态：** Needed
 
@@ -843,31 +847,12 @@ person, landscape, background, colorful, 3D, photorealistic, free, loose
 - §4 语义色：朱砂红淡出=隐匿
 
 **生成提示 (Midjourney)：**
-Chinese ink brush talisman on warm-gray aged paper — ultra-minimal vermillion-red 3 vertical fade-out strokes disappearing downward, light ink mist above, abundant negative space contrasting all other talismans for emptiness/concealment, very faint "隐" stamp, minimal Zen aesthetic, curled corners, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except warm gray, faint ink, and pale vermillion
+Chinese ink brush talisman on warm-gray aged paper — ultra-minimal vermillion-red 3 vertical fade-out strokes disappearing downward, light ink mist above, abundant negative space contrasting all other talismans for emptiness/concealment, very faint "隐" stamp, minimal Zen aesthetic, curled corners, the talisman paper filling the frame, its outer edges surrounded by pale ink wash (gray 88-92%) suggesting a dark ink altar or void, no empty white border -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, busy, dense, complex
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, busy, dense, complex
 
 **状态：** Needed
-
----
-
-### ASSET-163 — 傀儡丹（符箓视觉处理）
-
-*注：此条目为丹药系统中的傀儡丹，在视觉上既有丹药的丹丸特征也有符箓的符纸特征。此处列入符箓类以备外包参考。*
-
-| 字段 | 值 |
-|------|-----|
-| 类别 | 精灵 / 2D 符箓符文图 |
-| 尺寸 | 200×280px (LOD-1) / 600×840px (工作分辨率) |
-| 格式 | PNG (RGBA8) + PSD |
-| 命名 | `talisman_kuilei_dan.png` |
-| 卡牌数据 | 稀有度=紫色 费用=3 效果=召唤临时傀儡 |
-
-**视觉描述：**
-参照 ASSET-124（丹药卡）。如需符箓版本的视觉处理：暖灰符纸中央朱砂红符文呈人形傀儡轮廓——一个简化的关节人形，关节处有朱砂红圆点标识活动节点。
-
-**状态：** Needed（备用变体）
 
 ---
 

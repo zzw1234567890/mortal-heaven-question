@@ -22,15 +22,17 @@
 
 | 稀有度 | 纹样 | 数量 | 代表丹药 |
 |--------|------|:--:|------|
-| 白色 | 无纹（光面） | 3 | 低级炼气丹、低级回血丹、速行符* |
+| 白色 | 无纹（光面） | 2 | 低级炼气丹、低级回血丹 |
 | 蓝色 | 单纹（单环线） | 8 | 中级炼气丹、低级聚气丹、清毒丹等 |
 | 紫色 | 双纹（经纬交叉） | 8 | 高级炼气丹、高级回血丹、破障丹等 |
 | 金色 | 三纹（网状龟裂） | 4 | 高级聚气丹、高级渡劫丹、蕴神丹、涅槃丹 |
 | 暗金 | 龙纹（盘龙云气） | 1 | 升灵丹 |
 
-> *注：速行符严格来说不属于丹药，但在视觉类别上归入白色无纹丹药处理。
-
 ---
+
+## 背景处理（本文件全部丹丸图统一）
+
+每张丹丸图背景均为淡墨氛围（浅绛淡彩）：淡墨丹气烟云铺满整幅（灰度 88-92%）取代原底部烟云，叠低饱和淡彩晕染（回血=淡花青、增益=淡青、突破=淡赭，S≤25% L≥70%），丹药居中，铺满卡面不留纯白（覆盖 ≥80%，纯白仅作高光点缀 <20%）；背景无语义色——琉璃金仅在暗金丹缘。
 
 ## 白色品质（无纹·光面）
 
@@ -53,10 +55,10 @@
 - §4 语义色：无色彩=基础品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a single smooth unadorned pill — perfect circle, no surface markings, light ink pearl-like soft edge glow, thin wisp of smoke-cloud below, abundant negative space, minimal Zen aesthetic, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no decoration, no color except light ink
+Chinese ink brush still-life of a single smooth unadorned pill — perfect circle, no surface markings, light ink pearl-like soft edge glow, thin wisp of smoke-cloud below, abundant negative space, minimal Zen aesthetic, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no decoration, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, decoration, color, background, landscape, 3D, photorealistic, metallic
+pure white background, empty background, blank background, texture, pattern, decoration, 3D, photorealistic, metallic, colorful
 
 **状态：** Needed
 
@@ -81,38 +83,10 @@ texture, pattern, decoration, color, background, landscape, 3D, photorealistic, 
 - §4 语义色：无色彩=基础品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a smooth unadorned healing pill — slightly warmer softer ink than basic pill, wider soft halo at edges for nourishing heal feel, slightly thicker smoke-cloud below, minimal Zen aesthetic, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no decoration, no color except soft warm ink
+Chinese ink brush still-life of a smooth unadorned healing pill — slightly warmer softer ink than basic pill, wider soft halo at edges for nourishing heal feel, slightly thicker smoke-cloud below, minimal Zen aesthetic, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no decoration, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
-
-**状态：** Needed
-
----
-
-### ASSET-111 — 速行符（丹药类视觉处理）
-
-| 字段 | 值 |
-|------|-----|
-| 类别 | 精灵 / 2D 丹药静物图 |
-| 尺寸 | 200×280px (LOD-1) / 400×400px (工作分辨率) |
-| 格式 | PNG (RGBA8) + PSD |
-| 命名 | `pill_suxing_fu.png` |
-| 卡牌数据 | 稀有度=白色 费用=0 效果=本回合抽1张牌 |
-
-**视觉描述：**
-一颗无纹丹丸但形态略有不同——丹丸不完全是正圆形，而是微微拉长的椭圆，暗示「速度」。墨色极淡，边缘有风吹过般的淡墨拖尾。烟云不是在下方承托，而是在丹丸后方形成一道横向的淡墨线——如飞驰的轨迹。整体传递「轻、快、瞬」的感觉。
-
-**美术圣经锚点：**
-- §5.X.5 品质纹样：白色=无纹
-- §5.X.5 构图：椭圆居中 + 横向拖尾
-- §4 语义色：无色彩=基础品质
-
-**生成提示 (Midjourney)：**
-Chinese ink brush still-life of a slightly elongated pill with wind-trail — oval not perfectly round, extremely light ink, faint horizontal ink trail behind like speed lines, no supporting cloud below but wind-stream across, transient fast light feeling, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no decoration, no color except faint ink
-
-**反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, round
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -139,10 +113,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, round
 - §4 语义色：无色彩=蓝色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a pill with single ring line — one clean unbroken ink line circling the equator, medium ink density on body, thicker supporting smoke-cloud below, refined simple elegance, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no decoration, no color except ink
+Chinese ink brush still-life of a pill with single ring line — one clean unbroken ink line circling the equator, medium ink density on body, thicker supporting smoke-cloud below, refined simple elegance, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no decoration, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, double line
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, double line, colorful
 
 **状态：** Needed
 
@@ -167,10 +141,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, double line
 - §4 语义色：无色彩=蓝色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a single-ring healing pill — slightly thicker ring line, warmer softer ink than energy pill, smoke-cloud diffusing outward for party-wide heal, faint warm halo above via ink density, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a single-ring healing pill — slightly thicker ring line, warmer softer ink than energy pill, smoke-cloud diffusing outward for party-wide heal, faint warm halo above via ink density, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -195,10 +169,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic
 - §4 语义色：无色彩=蓝色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a single-ring attack pill — ring line positioned slightly above equator, slightly denser ink than same-tier pills for offensive sharpness, smoke-cloud gathering upward like rising qi, forward aggressive energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a single-ring attack pill — ring line positioned slightly above equator, slightly denser ink than same-tier pills for offensive sharpness, smoke-cloud gathering upward like rising qi, forward aggressive energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -223,10 +197,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic
 - §4 语义色：无色彩=蓝色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a detox pill with spiral ring — ring line spiraling from north pole to equator suggesting toxins being expelled, clear crisp ink, one especially clean brush stroke in smoke-cloud like cleansing spring water, purifying clean feeling, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a detox pill with spiral ring — ring line spiraling from north pole to equator suggesting toxins being expelled, clear crisp ink, one especially clean brush stroke in smoke-cloud like cleansing spring water, purifying clean feeling, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, dirty
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, dirty, colorful
 
 **状态：** Needed
 
@@ -251,10 +225,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, dirty
 - §4 语义色：无色彩=蓝色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a faint pill with dashed ring — ring line broken into small segments suggesting flickering in-and-out of visibility, pill body extremely light ink nearly blending into white space, thin smoke offset to one side as if pill is fading, transient disappearing feeling, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except faint ink
+Chinese ink brush still-life of a faint pill with dashed ring — ring line broken into small segments suggesting flickering in-and-out of visibility, pill body extremely light ink nearly blending into white space, thin smoke offset to one side as if pill is fading, transient disappearing feeling, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, solid, opaque
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, solid, opaque, colorful
 
 **状态：** Needed
 
@@ -279,10 +253,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, solid, opaqu
 - §4 语义色：无色彩=蓝色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a shield pill with thick band ring — ring thickened into an equatorial belt suggesting protective wrapping, solid stable ink density, smoke-cloud wrapping lower half of pill like shield support, steady reliable feeling, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a shield pill with thick band ring — ring thickened into an equatorial belt suggesting protective wrapping, solid stable ink density, smoke-cloud wrapping lower half of pill like shield support, steady reliable feeling, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, fragile
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, fragile, colorful
 
 **状态：** Needed
 
@@ -307,10 +281,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, fragile
 - §4 语义色：无色彩=蓝色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a tribulation pill with jagged ring — zigzag ring line suggesting lightning strikes, dark somber ink, smoke-cloud rising upward to canopy above pill like shield against heaven's thunder, resistant defensive feeling, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a tribulation pill with jagged ring — zigzag ring line suggesting lightning strikes, dark somber ink, smoke-cloud rising upward to canopy above pill like shield against heaven's thunder, resistant defensive feeling, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, smooth
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, smooth, colorful
 
 **状态：** Needed
 
@@ -337,10 +311,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, smooth
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a double-ring pill — two lines crossing: one equatorial + one meridional, forming cross at intersection, denser ink than blue tier, thicker taller smoke-cloud, precise advanced feel, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a double-ring pill — two lines crossing: one equatorial + one meridional, forming cross at intersection, denser ink than blue tier, thicker taller smoke-cloud, precise advanced feel, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, single line
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, single line, colorful
 
 **状态：** Needed
 
@@ -365,10 +339,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, single line
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a full-heal pill with thickened double rings — both equatorial and meridional lines doubled into paired thin lines, warm thick ink, smoke-cloud very full wrapping to pill mid-height like abundant healing power, complete fulfilled feeling, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a full-heal pill with thickened double rings — both equatorial and meridional lines doubled into paired thin lines, warm thick ink, smoke-cloud very full wrapping to pill mid-height like abundant healing power, complete fulfilled feeling, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -393,10 +367,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a party-attack pill — crossing point of double rings slightly elevated, smoke-cloud diffusing in all four directions for party-wide buff, full powerful ink, burst-spread combat energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a party-attack pill — crossing point of double rings slightly elevated, smoke-cloud diffusing in all four directions for party-wide buff, full powerful ink, burst-spread combat energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -421,10 +395,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a tribulation-defense pill — one jagged ring (weaken), one thick smooth ring (defend) in deliberate contrast, dark ink, smoke-cloud canopy above pill like barrier against tribulation, balanced offense+defense feel, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a tribulation-defense pill — one jagged ring (weaken), one thick smooth ring (defend) in deliberate contrast, dark ink, smoke-cloud canopy above pill like barrier against tribulation, balanced offense+defense feel, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -449,10 +423,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a debuff-cleanse pill — rings meeting at explosive intersection with micro ink dots radiating outward, crisp sharp ink, smoke-cloud blasting outward from intersection like shockwave, explosive purging sweeping energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a debuff-cleanse pill — rings meeting at explosive intersection with micro ink dots radiating outward, crisp sharp ink, smoke-cloud blasting outward from intersection like shockwave, explosive purging sweeping energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, calm, gentle
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, calm, gentle, colorful
 
 **状态：** Needed
 
@@ -477,10 +451,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, calm, gentle
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a puppet-summon pill — tiny simplified limb dots extending from ring intersection suggesting humanoid form, dense ink, smoke-cloud clumping into shape beneath pill like forming a puppet body, manifestation creative energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a puppet-summon pill — tiny simplified limb dots extending from ring intersection suggesting humanoid form, dense ink, smoke-cloud clumping into shape beneath pill like forming a puppet body, manifestation creative energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, person, figure
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, person, figure, colorful
 
 **状态：** Needed
 
@@ -505,10 +479,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, person, figu
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a supercharged puppet pill — thicker darker rings than standard puppet pill, more defined thicker limb dots with micro radiating lines at tips, larger denser smoke-clump beneath, doubled-intensified feeling, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a supercharged puppet pill — thicker darker rings than standard puppet pill, more defined thicker limb dots with micro radiating lines at tips, larger denser smoke-clump beneath, doubled-intensified feeling, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, thin, delicate
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, thin, delicate, colorful
 
 **状态：** Needed
 
@@ -533,10 +507,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, thin, delica
 - §4 语义色：无色彩=紫色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a critical-hit pill — 8 short spiky lines radiating from ring intersection like starburst, extremely dense ink, smoke-cloud blasting outward from pill surface not below, cocked-and-loaded potential energy, imminent lethal strike tension, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a critical-hit pill — 8 short spiky lines radiating from ring intersection like starburst, extremely dense ink, smoke-cloud blasting outward from pill surface not below, cocked-and-loaded potential energy, imminent lethal strike tension, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, soft, gentle
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, soft, gentle, colorful
 
 **状态：** Needed
 
@@ -563,10 +537,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, soft, gentle
 - §4 语义色：无色彩=金色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a damage-doubling pill with triple-ring net — 3 lines interweaving into fine crackle-glaze mesh, tiny nodes at each intersection, dense rich ink, tornado-spiraling smoke-cloud wrapping pill for doubled power, controlled refined explosive energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a damage-doubling pill with triple-ring net — 3 lines interweaving into fine crackle-glaze mesh, tiny nodes at each intersection, dense rich ink, tornado-spiraling smoke-cloud wrapping pill for doubled power, controlled refined explosive energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, simple
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, simple, colorful
 
 **状态：** Needed
 
@@ -591,10 +565,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, simple
 - §4 语义色：无色彩=金色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a supreme tribulation pill — crackle mesh denser on upper half forming protective net, smoke-cloud canopy forming dome-like shield overhead, deep dark ink, immovable unshakable defense, tribulation-stopping presence, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a supreme tribulation pill — crackle mesh denser on upper half forming protective net, smoke-cloud canopy forming dome-like shield overhead, deep dark ink, immovable unshakable defense, tribulation-stopping presence, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -619,10 +593,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic
 - §4 语义色：无色彩=金色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a mind-expanding pill — crackle pattern resembling cerebral cortex folds suggesting mental boost, two tiny ink petals/pages floating above pill for 2 extra draws, gentle steady smoke-cloud, wise insightful energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a mind-expanding pill — crackle pattern resembling cerebral cortex folds suggesting mental boost, two tiny ink petals/pages floating above pill for 2 extra draws, gentle steady smoke-cloud, wise insightful energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, brain
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, brain, colorful
 
 **状态：** Needed
 
@@ -647,10 +621,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, brain
 - §4 语义色：无色彩（留白）=复活之光
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a phoenix-rebirth pill — vertical central crack illusion in mesh pattern with white light seeping through, crackle mesh spreading from crack like phoenix rising, phoenix-tail feather shaped smoke-flame cradling below, death-to-rebirth nirvana transcendence, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink with strategic white space
+Chinese ink brush still-life of a phoenix-rebirth pill — vertical central crack illusion in mesh pattern with white light seeping through, crackle mesh spreading from crack like phoenix rising, phoenix-tail feather shaped smoke-flame cradling below, death-to-rebirth nirvana transcendence, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, bird, fire
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, bird, fire, colorful
 
 **状态：** Needed
 
@@ -677,10 +651,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, bird, fire
 - §4 语义色：无色彩=金色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a slot-unlock pill — crackle mesh forming keyhole-shaped asymmetric pattern suggesting unlocking, heavy full ink, three faint upward-arrow brush strokes in smoke-cloud for technique+artifact slots opening, boundary-breaking expansion energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a slot-unlock pill — crackle mesh forming keyhole-shaped asymmetric pattern suggesting unlocking, heavy full ink, three faint upward-arrow brush strokes in smoke-cloud for technique+artifact slots opening, boundary-breaking expansion energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, key, lock
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, key, lock, colorful
 
 **状态：** Needed
 
@@ -705,10 +679,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic, key, lock
 - §4 语义色：无色彩=金色品质
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a fusion pill — double-helix interweaving main lines in crackle mesh suggesting two powers merging, rich ink, two smoke columns merging into one beneath pill, synergy superposition 1+1>2 energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink
+Chinese ink brush still-life of a fusion pill — double-helix interweaving main lines in crackle mesh suggesting two powers merging, rich ink, two smoke columns merging into one beneath pill, synergy superposition 1+1>2 energy, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, colorful
 
 **状态：** Needed
 
@@ -733,10 +707,10 @@ texture, pattern, color, background, landscape, 3D, photorealistic
 - §4 语义色：琉璃金=至高品级标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of the supreme dragon pill — cloud-formed dragon shadows coiling around pill surface: head at north pole, body wrapping 3 times, tail fading into smoke at south pole, two micro golden dots at dragon eye position, nine smoke streams cradling from all directions like nine dragons presenting a pearl, supreme sovereign imperial presence, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink and two gold micro-dots
+Chinese ink brush still-life of the supreme dragon pill — cloud-formed dragon shadows coiling around pill surface: head at north pole, body wrapping 3 times, tail fading into smoke at south pole, two micro golden dots at dragon eye position, nine smoke streams cradling from all directions like nine dragons presenting a pearl, supreme sovereign imperial presence, pale ink wash pill-vapor mist background filling the whole card (gray 88-92%), the pill floating amid rising alchemical vapor with a faint low-saturation color wash, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-texture, pattern, color, background, landscape, 3D, photorealistic, dragon, animal, realistic
+pure white background, empty background, blank background, texture, pattern, 3D, photorealistic, dragon, animal, realistic, colorful
 
 **状态：** Needed
 

@@ -4,7 +4,7 @@
 > **美术圣经**：design/art/art-bible.md §5.X.4
 > **生成日期**：2026-07-26
 > **审查模式**：Solo（art-director + technical-artist 代理因 API 503 不可用）
-> **状态**：48 个资产已规范 / 0 个已批准 / 0 个生产中 / 0 个完成
+> **状态**：45 个资产已规范 / 0 个已批准 / 0 个生产中 / 0 个完成
 
 ## 技术参数
 
@@ -16,7 +16,7 @@
 | 图层要求 | (1) 器物主体墨线层 (2) 琉璃金灵光层 (3) 淡墨阴影层 |
 | Godot 导入预设 | 2D Texture, Filter=Disabled, Mipmaps=Off, Compress=Lossless |
 | 单张预估 | ~160KB RGBA8 → ~40KB DXT5 |
-| 总计预估 | 48 张 × 40KB = ~1.9MB VRAM |
+| 总计预估 | 45 张 × 40KB = ~1.8MB VRAM |
 
 ## 材质墨阶表达速查
 
@@ -27,6 +27,10 @@
 | 玉器 | 淡墨半透明，有玉质温润光 | 银翎玉瓶、七宝琉璃树、辟邪玉等 |
 | 法器/道具 | 浓淡交替，精细纹饰 | 大衍罗盘、万灵幡、墨玉符等 |
 | 金属重器 | 浓墨粗线，厚重体量感 | 斩皇刀、乾坤圈、混沌宝瓶等 |
+
+## 背景处理（本文件全部器物图统一）
+
+每张器物图背景均为淡墨氛围（浅绛淡彩）：器物居中悬浮，四周铺满淡墨云气晕染（灰度 88-92%）+ 低饱和淡彩晕（剑器金属=淡金晕、玉器=淡青晕、木质=淡赭晕，S≤25% L≥70%），铺满卡面不留纯白（覆盖 ≥80%，纯白仅作高光点缀 <20%）；背景无语义色——琉璃金仅在器物灵光上。
 
 ## 攻击武器类法宝
 
@@ -49,10 +53,10 @@
 - §4 语义色：琉璃金=灵力光芒
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a slender blue-tinted sword floating in void — gongbi precision linework, single dark ink central ridge line, subtle offset ink shadow blade suggesting "shadow-chasing", faint golden glow at crossguard, light ink drop shadow below, transparent background, white space, ink on rice paper texture -- style "墨骨丹青" --ar 5:7 --no background, no scene, no hand, no person, no color except ink black and subtle gold
+Chinese ink brush still-life of a slender blue-tinted sword floating in void — gongbi precision linework, single dark ink central ridge line, subtle offset ink shadow blade suggesting "shadow-chasing", faint golden glow at crossguard, light ink drop shadow below, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas, white space, ink on rice paper texture -- style "墨骨丹青" --ar 5:7 --no hand, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D render, photorealistic, environment
+pure white background, empty background, blank background, person, hand, character, colorful, 3D render, photorealistic
 
 **状态：** Needed
 
@@ -77,10 +81,10 @@ person, hand, character, background, landscape, colorful, 3D render, photorealis
 - §4 语义色：琉璃金=稀有度视觉信号
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of an upgraded legendary flying sword — wider blade than common version, double-ridge central line, elaborate 9-tier ruyi crossguard, 3 offset ink shadow blades, intense golden glow radiating from both crossguard and blade tip, faint spirit runes etched on blade surface, light ink drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of an upgraded legendary flying sword — wider blade than common version, double-ridge central line, elaborate 9-tier ruyi crossguard, 3 offset ink shadow blades, intense golden glow radiating from both crossguard and blade tip, faint spirit runes etched on blade surface, light ink drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -105,10 +109,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=破防之力
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a massive incomplete ancient sword — raw unfinished blade edges, fractured-then-reforged texture along spine, chaotic golden light leaking from blade cracks rather than crossguard, disproportionately thick blade tip, heavy dark drop shadow suggesting immense weight, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and golden cracks
+Chinese ink brush still-life of a massive incomplete ancient sword — raw unfinished blade edges, fractured-then-reforged texture along spine, chaotic golden light leaking from blade cracks rather than crossguard, disproportionately thick blade tip, heavy dark drop shadow suggesting immense weight, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, clean, polished
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, clean, polished
 
 **状态：** Needed
 
@@ -133,10 +137,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, cl
 - §4 语义色：琉璃金=克制魔道之力
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a massive wide-blade executioner's dao — extremely wide blade, thick spine, paper-thin edge line, righteous talisman marks above blade with vermillion micro-dots, severed demonic-qi stain below in light ink wash, razor-thin golden brilliance line along cutting edge, royal/regal presence, heavy drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black, subtle gold, and micro vermillion dots
+Chinese ink brush still-life of a massive wide-blade executioner's dao — extremely wide blade, thick spine, paper-thin edge line, righteous talisman marks above blade with vermillion micro-dots, severed demonic-qi stain below in light ink wash, razor-thin golden brilliance line along cutting edge, royal/regal presence, heavy drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -161,10 +165,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=攻击力标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a hexagonal-section demonic dagger — 6-sided prism blade not flat, different demonic rune engravings on each face in fine light ink, faint golden glow from 6-edge convergence tip, rough bone-like grip handle contrasting with precise blade, dark warm drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and subtle gold
+Chinese ink brush still-life of a hexagonal-section demonic dagger — 6-sided prism blade not flat, different demonic rune engravings on each face in fine light ink, faint golden glow from 6-edge convergence tip, rough bone-like grip handle contrasting with precise blade, dark warm drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -189,10 +193,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：松石青=克制属性标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a translucent jade-green longsword — semi-transparent blade body like celadon jade, dark ink spine line visible through blade, single thin turquoise-blue line along spine for demon-subduing property, faint cyan sword-qi mist around blade in light ink, simple square crossguard, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and one thin turquoise line
+Chinese ink brush still-life of a translucent jade-green longsword — semi-transparent blade body like celadon jade, dark ink spine line visible through blade, single thin turquoise-blue line along spine for demon-subduing property, faint cyan sword-qi mist around blade in light ink, simple square crossguard, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, neon
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, neon
 
 **状态：** Needed
 
@@ -217,10 +221,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, ne
 - §4 语义色：琉璃金=克制鬼道之力
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a vajra/dorje ritual implement — symmetrical 3-pronged ends, demon-subduing mantra patterns wrapped around central grip, dark ink metallic texture, golden light radiating in trident rays from both prong tips, vajra-throne shaped drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and subtle gold
+Chinese ink brush still-life of a vajra/dorje ritual implement — symmetrical 3-pronged ends, demon-subduing mantra patterns wrapped around central grip, dark ink metallic texture, golden light radiating in trident rays from both prong tips, vajra-throne shaped drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, religious, buddha
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, religious, buddha
 
 **状态：** Needed
 
@@ -245,10 +249,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, re
 - §4 语义色：琉璃金微光=攻击力标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a simple practical trident — utilitarian weapon design, center prong slightly longer than sides, leather-wrap grip texture in rough brush strokes, small subtle gold glint at center prong tip only, clean efficient ink work, light drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and micro gold dot
+Chinese ink brush still-life of a simple practical trident — utilitarian weapon design, center prong slightly longer than sides, leather-wrap grip texture in rough brush strokes, small subtle gold glint at center prong tip only, clean efficient ink work, light drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, ornate, decorative
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, ornate, decorative
 
 **状态：** Needed
 
@@ -273,10 +277,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, or
 - §4 语义色：琉璃金=溅射伤害标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a 3-feather fan — 3 feathers spread at different angles, dark ink quill lines and light ink feather vanes, slightly singed edges in dry-brush texture suggesting flame, subtle gold glint where feathers converge, bamboo-joint handle in ink bamboo painting style, 3-petal fan-shaped drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and subtle gold
+Chinese ink brush still-life of a 3-feather fan — 3 feathers spread at different angles, dark ink quill lines and light ink feather vanes, slightly singed edges in dry-brush texture suggesting flame, subtle gold glint where feathers converge, bamboo-joint handle in ink bamboo painting style, 3-petal fan-shaped drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, bird
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, bird
 
 **状态：** Needed
 
@@ -301,10 +305,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, bi
 - §4 语义色：琉璃金=混乱音波标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a curved sea-beast bone flute — spiral natural bone grain on surface, wave-pattern finger holes not in straight line, coral-like bone growth at mouthpiece, golden ripples emerging from finger holes suggesting confusion-inducing sound waves, dark ink with delicate bone-grain ink wash, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and subtle gold ripples
+Chinese ink brush still-life of a curved sea-beast bone flute — spiral natural bone grain on surface, wave-pattern finger holes not in straight line, coral-like bone growth at mouthpiece, golden ripples emerging from finger holes suggesting confusion-inducing sound waves, dark ink with delicate bone-grain ink wash, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, ocean, sea
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, ocean, sea
 
 **状态：** Needed
 
@@ -329,10 +333,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, oc
 - §4 语义色：琉璃金=控制效果标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a heavy metal ring — thick arm-width ring body, qian-kun trigrams engraved on outer surface (three solid lines above, six broken below), smooth inner ring, metallic highlights via negative space, golden light flowing along trigram engravings — brighter at qian, dimmer at kun, heavy drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of a heavy metal ring — thick arm-width ring body, qian-kun trigrams engraved on outer surface (three solid lines above, six broken below), smooth inner ring, metallic highlights via negative space, golden light flowing along trigram engravings — brighter at qian, dimmer at kun, heavy drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -357,10 +361,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：松石青冷光=冰冻属性标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of an ice-crystal longsword — semi-transparent blade with frost-flower crack patterns in negative space, hexagonal ice-flower crossguard with frost accumulation in fine white flying-brush dots, cool turquoise-blue glimmer from blade spine center, thin cold linework with abundant negative space for ice transparency, extremely light drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and cool turquoise glimmer
+Chinese ink brush still-life of an ice-crystal longsword — semi-transparent blade with frost-flower crack patterns in negative space, hexagonal ice-flower crossguard with frost accumulation in fine white flying-brush dots, cool turquoise-blue glimmer from blade spine center, thin cold linework with abundant negative space for ice transparency, extremely light drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, fire, warm
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, fire, warm
 
 **状态：** Needed
 
@@ -385,10 +389,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, fi
 - §4 语义色：琉璃金=均衡增益标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a rectangular golden brick — heavy square body, seal-script "金光" characters in raised relief on face, meander-pattern border on all four edges, steady subtle golden glow evenly from surface for balanced dual-stat boost, thick square brushwork like building foundation, square drop shadow matching brick projection, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and subtle gold
+Chinese ink brush still-life of a rectangular golden brick — heavy square body, seal-script "金光" characters in raised relief on face, meander-pattern border on all four edges, steady subtle golden glow evenly from surface for balanced dual-stat boost, thick square brushwork like building foundation, square drop shadow matching brick projection, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -413,10 +417,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：朱砂红=毒素，琉璃金=效果触发
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a miniature blood-jade carved skull — vermillion-red bead embedded in forehead for poison lethality, deep dark ink in eye sockets, fine jade crackle texture on cranium surface, faint golden glow seeping from vermillion bead for poison spread, small scale suggesting sinister nature, poison-cloud diffusion shaped drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black, one vermillion dot, and subtle gold
+Chinese ink brush still-life of a miniature blood-jade carved skull — vermillion-red bead embedded in forehead for poison lethality, deep dark ink in eye sockets, fine jade crackle texture on cranium surface, faint golden glow seeping from vermillion bead for poison spread, small scale suggesting sinister nature, poison-cloud diffusion shaped drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, gore, horror, skeleton
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, gore, horror, skeleton
 
 **状态：** Needed
 
@@ -441,10 +445,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, go
 - §4 语义色：琉璃金=伤害增幅，朱砂红=火属性
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a single phoenix tail feather — long straight quill in dark ink center-line, luxuriant vane with flame-like wavy edges, vermillion-red ember rendering at vane edges (5% area max), golden light flowing from quill base to tip like dancing flame, noble regal line quality, extremely light drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black, vermillion edge tint, and gold
+Chinese ink brush still-life of a single phoenix tail feather — long straight quill in dark ink center-line, luxuriant vane with flame-like wavy edges, vermillion-red ember rendering at vane edges (5% area max), golden light flowing from quill base to tip like dancing flame, noble regal line quality, extremely light drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, bird, phoenix
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, bird, phoenix
 
 **状态：** Needed
 
@@ -469,10 +473,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, bi
 - §4 语义色：琉璃金=溅射震荡标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a small bronze bell — rounded body with beast-mask relief pattern in alternating dark/light ink for 3D relief effect, visible clapper suspended inside, golden concentric sound-wave rings radiating downward from bell mouth for splash damage, beast-head loop at top, dark antique ink tone, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold rings
+Chinese ink brush still-life of a small bronze bell — rounded body with beast-mask relief pattern in alternating dark/light ink for 3D relief effect, visible clapper suspended inside, golden concentric sound-wave rings radiating downward from bell mouth for splash damage, beast-head loop at top, dark antique ink tone, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -497,10 +501,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=诅咒伤害标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a dark orb/pearl — swirling spirit-smoke ink wash trapped inside, single crack on surface with golden light leaking downward like tear drops for death-triggered curse damage, deepest ink at crack, explosive-burst shaped drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and golden tear-light
+Chinese ink brush still-life of a dark orb/pearl — swirling spirit-smoke ink wash trapped inside, single crack on surface with golden light leaking downward like tear drops for death-triggered curse damage, deepest ink at crack, explosive-burst shaped drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, ghost
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, ghost
 
 **状态：** Needed
 
@@ -527,10 +531,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, gh
 - §4 语义色：琉璃金=减伤标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a pair of lightweight cloth boots — wind-streamline curves on boot surface in flowing light ink, tiny cloud-pattern engravings on soles, flying ribbons at boot cuffs in flying-white brush technique, subtle golden glow from sole cloud patterns for damage reduction, light breezy ink density, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no foot, no color except ink black and subtle gold
+Chinese ink brush still-life of a pair of lightweight cloth boots — wind-streamline curves on boot surface in flowing light ink, tiny cloud-pattern engravings on soles, flying ribbons at boot cuffs in flying-white brush technique, subtle golden glow from sole cloud patterns for damage reduction, light breezy ink density, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, foot, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, foot, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, foot, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -555,10 +559,10 @@ person, foot, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=全队守护标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a 5-layered shield — each layer in different ink density from dark outer to white core, 5-petal flower shape with one color-light per petal, golden radiance from white core outward along petal veins for party-wide damage ward, cloud-pattern rim engraving, heavy drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of a 5-layered shield — each layer in different ink density from dark outer to white core, 5-petal flower shape with one color-light per petal, golden radiance from white core outward along petal veins for party-wide damage ward, cloud-pattern rim engraving, heavy drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, rainbow, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, rainbow, 3D, photorealistic
 
 **状态：** Needed
 
@@ -583,10 +587,10 @@ person, hand, character, background, landscape, colorful, rainbow, 3D, photoreal
 - §4 语义色：松石青冷光=冰系防御标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of an ice-crystal round shield — semi-transparent shield face with internal frost-flower hexagonal patterns, irregular naturally-frozen ice edge, cool turquoise-blue light softly emanating from center for pure defense, abundant negative space for ice transparency, nearly invisible drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and cool turquoise glimmer
+Chinese ink brush still-life of an ice-crystal round shield — semi-transparent shield face with internal frost-flower hexagonal patterns, irregular naturally-frozen ice edge, cool turquoise-blue light softly emanating from center for pure defense, abundant negative space for ice transparency, nearly invisible drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, water
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, water
 
 **状态：** Needed
 
@@ -611,10 +615,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, wa
 - §4 语义色：琉璃金=生命上限标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a folded flexible scale armor — countless tiny metal scales in fine grid lines, tiny rivet dots at each scale center, leather-trim edges in light ink wash, subtle even golden glow from overall grid pattern for max HP boost, fine precise fish-scale precision, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no body, no color except ink black and subtle gold
+Chinese ink brush still-life of a folded flexible scale armor — countless tiny metal scales in fine grid lines, tiny rivet dots at each scale center, leather-trim edges in light ink wash, subtle even golden glow from overall grid pattern for max HP boost, fine precise fish-scale precision, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, body, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, body, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, body, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -639,10 +643,10 @@ person, body, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=减伤庇护
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a wind-swept robe floating — billowing arc form as if held open by invisible wind, light ink wash with wind streamline patterns at edges, subtle geometric trim at collar and cuffs, soft golden glow from inner lining like hidden sun for wind-protection damage reduction, light flowing line quality, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no body, no color except ink black and subtle gold
+Chinese ink brush still-life of a wind-swept robe floating — billowing arc form as if held open by invisible wind, light ink wash with wind streamline patterns at edges, subtle geometric trim at collar and cuffs, soft golden glow from inner lining like hidden sun for wind-protection damage reduction, light flowing line quality, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, body, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, body, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, body, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -667,10 +671,10 @@ person, body, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=致命伤抵挡
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a rectangular ink-jade talisman tablet — rounded corners, warm semi-translucent jade texture, seal-script "护" (protect) character engraved and filled with golden ink for one-time stored spirit power, hairline crack at edge suggesting imminent shattering on use, warm light ink with jade's characteristic luster, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold inlay
+Chinese ink brush still-life of a rectangular ink-jade talisman tablet — rounded corners, warm semi-translucent jade texture, seal-script "护" (protect) character engraved and filled with golden ink for one-time stored spirit power, hairline crack at edge suggesting imminent shattering on use, warm light ink with jade's characteristic luster, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -697,10 +701,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=额外抽牌标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a pair of spread wings — left wing wind-pattern (flowing curves in light ink), right wing lightning-pattern (zigzag lines in dark ink), golden radiance from center ring where wind and lightning converge with both flowing and bursting qualities, metallic feather-shaft root structure, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no bird, no color except ink black and gold
+Chinese ink brush still-life of a pair of spread wings — left wing wind-pattern (flowing curves in light ink), right wing lightning-pattern (zigzag lines in dark ink), golden radiance from center ring where wind and lightning converge with both flowing and bursting qualities, metallic feather-shaft root structure, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, bird, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, bird, animal, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, bird, animal, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -725,10 +729,10 @@ person, bird, animal, character, background, landscape, colorful, 3D, photoreali
 - §4 语义色：琉璃金=费用储备标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a simple cloth storage pouch — mouth slightly open, embroidered "纳" (store) character on body, light ink qi wisps spilling from mouth, subtle golden glimmer inside pouch mouth for extra resource storage, rough cloth texture in dry-brush technique, ruyi-knot drawstring, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and subtle gold
+Chinese ink brush still-life of a simple cloth storage pouch — mouth slightly open, embroidered "纳" (store) character on body, light ink qi wisps spilling from mouth, subtle golden glimmer inside pouch mouth for extra resource storage, rough cloth texture in dry-brush technique, ruyi-knot drawstring, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -753,10 +757,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=偷取标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a dark demonic-pattern pouch — spiral absorption runes radiating from mouth outward, mouth wide open revealing deep dark ink void, golden light particles being pulled INTO the pouch not radiating out for steal mechanic, rough dark fabric texture, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold particles moving inward
+Chinese ink brush still-life of a dark demonic-pattern pouch — spiral absorption runes radiating from mouth outward, mouth wide open revealing deep dark ink void, golden light particles being pulled INTO the pouch not radiating out for steal mechanic, rough dark fabric texture, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -781,10 +785,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=魅惑灵力标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a pair of delicate silver bells connected by silk thread — peach-blossom openwork filigree on bell bodies, heart-shaped clappers, golden light rippling between the two bells through the filigree for charm energy, fine delicate feminine line quality, light echo-like drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of a pair of delicate silver bells connected by silk thread — peach-blossom openwork filigree on bell bodies, heart-shaped clappers, golden light rippling between the two bells through the filigree for charm energy, fine delicate feminine line quality, light echo-like drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -809,10 +813,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=推演天机、召出法宝牌
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a precise astronomical compass — multi-layered concentric rings with heavenly-stem earthly-branch symbols in extremely fine light ink engraving, compass needle in negative space pointing upward, golden light slowly rotating along outermost ring like celestial orbit, a faint artifact-card silhouette floating above the compass center for drawing artifact cards from the deck, precise scientific-instrument linework, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of a precise astronomical compass — multi-layered concentric rings with heavenly-stem earthly-branch symbols in extremely fine light ink engraving, compass needle in negative space pointing upward, golden light slowly rotating along outermost ring like celestial orbit, a faint artifact-card silhouette floating above the compass center for drawing artifact cards from the deck, precise scientific-instrument linework, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, clock
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, clock
 
 **状态：** Needed
 
@@ -837,10 +841,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, cl
 - §4 语义色：琉璃金=召唤标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a summoning banner — unfurled banner face with many tiny humanoid silhouettes in light ink representing summoned puppets, bone shaft with beast-head finial at top, golden light twinkling from puppet patterns one by one for per-turn summon, banner face light ink, shaft dark ink, puppet-diffusion drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold sparkles
+Chinese ink brush still-life of a summoning banner — unfurled banner face with many tiny humanoid silhouettes in light ink representing summoned puppets, bone shaft with beast-head finial at top, golden light twinkling from puppet patterns one by one for per-turn summon, banner face light ink, shaft dark ink, puppet-diffusion drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -865,10 +869,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=攻防均衡
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a triangular black banner — flag fabric billowing in wind with flying-white and flowing curves, embroidered "风" (wind) character in running script at center, subtle golden glint from small finial at pole tip for balanced offense+defense, bamboo pole, alternating ink density in billowing areas, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and subtle gold
+Chinese ink brush still-life of a triangular black banner — flag fabric billowing in wind with flying-white and flowing curves, embroidered "风" (wind) character in running script at center, subtle golden glint from small finial at pole tip for balanced offense+defense, bamboo pole, alternating ink density in billowing areas, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -893,10 +897,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金暗光=敌方削弱
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a dark long banner — drooping banner face like night curtain with dark yin-qi patterns in layered ink wash, downward-pointing arrow symbol at center for weakening, dark golden downward halo below banner for sapping enemy attack, black-iron pole, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and dark gold
+Chinese ink brush still-life of a dark long banner — drooping banner face like night curtain with dark yin-qi patterns in layered ink wash, downward-pointing arrow symbol at center for weakening, dark golden downward halo below banner for sapping enemy attack, black-iron pole, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -923,10 +927,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：松石青=回复通道，琉璃金=持续回复
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a miniature treasure tree — dark ink bark texture on trunk with dry-brush technique, 7 translucent glaze-like leaves in light ink wash, each leaf vein traced in single turquoise-blue line for 7 healing channels, subtle golden glow from root-soil clump for per-turn healing source, elegant bonsai-like composition, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black, 7 thin turquoise lines, and subtle gold
+Chinese ink brush still-life of a miniature treasure tree — dark ink bark texture on trunk with dry-brush technique, 7 translucent glaze-like leaves in light ink wash, each leaf vein traced in single turquoise-blue line for 7 healing channels, subtle golden glow from root-soil clump for per-turn healing source, elegant bonsai-like composition, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, forest, tree
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, forest, tree
 
 **状态：** Needed
 
@@ -951,10 +955,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, fo
 - §4 语义色：松石青=回复标识，琉璃金=触发瞬间
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a white jade bottle — slender elegant form, warm semi-translucent jade texture, slightly tilted mouth with light ink spirit liquid dripping in single fine thread, turquoise-blue shimmer along drip trajectory for per-turn team heal, silver-feather clan wing-pattern low relief on body, micro golden glint at mouth where liquid emerges, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black, turquoise shimmer, and micro gold
+Chinese ink brush still-life of a white jade bottle — slender elegant form, warm semi-translucent jade texture, slightly tilted mouth with light ink spirit liquid dripping in single fine thread, turquoise-blue shimmer along drip trajectory for per-turn team heal, silver-feather clan wing-pattern low relief on body, micro golden glint at mouth where liquid emerges, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -979,10 +983,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=全体真灵增幅标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of an ancient bone war horn — massive unknown beast horn with natural spiral growth rings, irregular naturally-worn mouth edge, golden fan-shaped blast radiating from horn mouth like battle cry for all true-spirit clan buff, leather binding and bronze rings at root, warm light ink on bone sections, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of an ancient bone war horn — massive unknown beast horn with natural spiral growth rings, irregular naturally-worn mouth edge, golden fan-shaped blast radiating from horn mouth like battle cry for all true-spirit clan buff, leather binding and bronze rings at root, warm light ink on bone sections, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, animal
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, animal
 
 **状态：** Needed
 
@@ -1007,10 +1011,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, an
 - §4 语义色：琉璃金=概率性天赋熄灭
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a bronze oil lamp — tripod base, light ink lamp oil in bowl, wick burning a small flickering flame in negative space with light ink edges, golden light pulsing from flame core — bright then dim cyclically for 30% probability effect, ancient seal-script inscriptions on lamp body, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of a bronze oil lamp — tripod base, light ink lamp oil in bowl, wick burning a small flickering flame in negative space with light ink edges, golden light pulsing from flame core — bright then dim cyclically for 30% probability effect, ancient seal-script inscriptions on lamp body, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, fire
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, fire
 
 **状态：** Needed
 
@@ -1035,10 +1039,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, fi
 - §4 语义色：琉璃金=灵兽增幅标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a partially unrolled hanging scroll painting — light ink spirit-beast silhouettes (tiger, crane, turtle, fox, snake, eagle) subtly quivering with micro ink offsets, golden light flowing along unrolled scroll direction like awakening the painted beasts, jade roller ends, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of a partially unrolled hanging scroll painting — light ink spirit-beast silhouettes (tiger, crane, turtle, fox, snake, eagle) subtly quivering with micro ink offsets, golden light flowing along unrolled scroll direction like awakening the painted beasts, jade roller ends, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, detailed animals
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, detailed animals
 
 **状态：** Needed
 
@@ -1063,10 +1067,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, de
 - §4 语义色：琉璃金=高品质概率标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a 3-legged alchemy furnace — gourd-shaped body, 8-trigram openwork patterns on lid, dark ink metallic texture, beast-paw feet in thick dark ink, golden light spilling from lid trigram openings with tiny sparkles for high-quality crafting boost, light ink alchemical steam around body, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold with sparkles
+Chinese ink brush still-life of a 3-legged alchemy furnace — gourd-shaped body, 8-trigram openwork patterns on lid, dark ink metallic texture, beast-paw feet in thick dark ink, golden light spilling from lid trigram openings with tiny sparkles for high-quality crafting boost, light ink alchemical steam around body, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, fire
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, fire
 
 **状态：** Needed
 
@@ -1091,10 +1095,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, fi
 - §4 语义色：琉璃金=自动伤害触发
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a small mechanical puppet — humanoid silhouette with wooden ball-joints in dark ink lines, open chest cavity revealing gears and clockwork in fine light ink engraving, golden light pulsing periodically from chest mechanism for per-turn auto-damage, blank face with single horizontal line, sound-wave dispersed drop shadow, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no face, no color except ink black and gold
+Chinese ink brush still-life of a small mechanical puppet — humanoid silhouette with wooden ball-joints in dark ink lines, open chest cavity revealing gears and clockwork in fine light ink engraving, golden light pulsing periodically from chest mechanism for per-turn auto-damage, blank face with single horizontal line, sound-wave dispersed drop shadow, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, face, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, face, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, face, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -1119,10 +1123,10 @@ person, face, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=复活之力
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of an ancient bronze mirror — mirror face showing deep vortex of concentric light ink circles shrinking inward instead of reflection, reverse side with 6-realms-of-rebirth relief carvings in fine line engraving, golden light spiraling outward from vortex center like passage from another world for resurrection, cloud-pattern rim, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of an ancient bronze mirror — mirror face showing deep vortex of concentric light ink circles shrinking inward instead of reflection, reverse side with 6-realms-of-rebirth relief carvings in fine line engraving, golden light spiraling outward from vortex center like passage from another world for resurrection, cloud-pattern rim, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, face, hand, reflection, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, face, hand, reflection, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -1147,10 +1151,10 @@ person, face, hand, reflection, character, background, landscape, colorful, 3D, 
 - §4 语义色：琉璃金=净化，松石青=治疗
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a delicate silver-framed dressing mirror — crystal-clear mirror face with light ink ripples expanding outward for debuff cleansing, moon-palace fairy relief on reverse, golden light flowing along ripple edges like gentle moonlight, turquoise-blue glimmer at ripple center for healing boost, entwined-flower frame pattern, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no face, no color except ink black, gold, and one turquoise dot
+Chinese ink brush still-life of a delicate silver-framed dressing mirror — crystal-clear mirror face with light ink ripples expanding outward for debuff cleansing, moon-palace fairy relief on reverse, golden light flowing along ripple edges like gentle moonlight, turquoise-blue glimmer at ripple center for healing boost, entwined-flower frame pattern, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, face, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, face, reflection, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, face, reflection, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -1175,10 +1179,10 @@ person, face, reflection, hand, character, background, landscape, colorful, 3D, 
 - §4 语义色：琉璃金=全队免疫标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a circular bixie-exorcism jade pendant — beast silhouette relief (lion head, horned, winged), warm semi-translucent jade texture in light ink wash, golden light flickering from the beast's eyes as two tiny gold dots for party-wide debuff immunity guard, silk cord above, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and two gold micro-dots
+Chinese ink brush still-life of a circular bixie-exorcism jade pendant — beast silhouette relief (lion head, horned, winged), warm semi-translucent jade texture in light ink wash, golden light flickering from the beast's eyes as two tiny gold dots for party-wide debuff immunity guard, silk cord above, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, animal, lion
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, animal, lion
 
 **状态：** Needed
 
@@ -1203,10 +1207,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, an
 - §4 语义色：朱砂红=击杀，琉璃金=回复
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a blood-red war banner — heavy dark ink with torn battle-damaged irregular edges, giant "杀" (kill) character with single vermillion-red stroke at its core, dark-golden radiance from pole top downward for all demon-faction heal-on-kill, black-iron spear-shaped pole, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black, one vermillion stroke, and dark gold
+Chinese ink brush still-life of a blood-red war banner — heavy dark ink with torn battle-damaged irregular edges, giant "杀" (kill) character with single vermillion-red stroke at its core, dark-golden radiance from pole top downward for all demon-faction heal-on-kill, black-iron spear-shaped pole, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, blood
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, blood
 
 **状态：** Needed
 
@@ -1231,10 +1235,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, bl
 - §4 语义色：琉璃金=区域光环标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a bronze command token — rectangular, raised "苍玄" characters in seal script above, simplified Eastern Domain map contour in fine line engraving below, meander-pattern border, golden light evenly radiating from characters covering the domain map for balanced region-wide buff, bronze-green patina ink wash, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black, patina green tint, and gold
+Chinese ink brush still-life of a bronze command token — rectangular, raised "苍玄" characters in seal script above, simplified Eastern Domain map contour in fine line engraving below, meander-pattern border, golden light evenly radiating from characters covering the domain map for balanced region-wide buff, bronze-green patina ink wash, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic, map
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic, map
 
 **状态：** Needed
 
@@ -1259,10 +1263,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic, ma
 - §4 语义色：琉璃金=随机抽牌标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of an ancient treasure vase — gourd-shaped body with primordial chaos cloud patterns in layered dark/light ink wash, a faint card silhouette emerging from narrow mouth, golden light seeping from deep within belly through the chaos clouds in dappled patches, 3 short feet, dark antique ink tone, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and gold
+Chinese ink brush still-life of an ancient treasure vase — gourd-shaped body with primordial chaos cloud patterns in layered dark/light ink wash, a faint card silhouette emerging from narrow mouth, golden light seeping from deep within belly through the chaos clouds in dappled patches, 3 short feet, dark antique ink tone, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -1287,10 +1291,10 @@ person, hand, character, background, landscape, colorful, 3D, photorealistic
 - §4 语义色：琉璃金（强烈）=每回合随机抽2张牌
 
 **生成提示 (Midjourney)：**
-Chinese ink brush still-life of a fully-realized chaos treasure vase — 40% larger body, dragon-and-cloud fine engraving replacing blurred ink wash, 2 clear beams of card silhouettes alternating at mouth, intense golden radiance 3x the lesser version from all 2 beams, "混沌初开" (primordial chaos opening) seal engraving at base, magnificent primordial creation presence, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no hand, no color except ink black and intense gold
+Chinese ink brush still-life of a fully-realized chaos treasure vase — 40% larger body, dragon-and-cloud fine engraving replacing blurred ink wash, 2 clear beams of card silhouettes alternating at mouth, intense golden radiance 3x the lesser version from all 2 beams, "混沌初开" (primordial chaos opening) seal engraving at base, magnificent primordial creation presence, pale ink wash mist background filling the whole card (gray 88-92%), the artifact floating amid soft ink clouds with a faint low-saturation glow (metal=淡金/jade=淡青/wood=淡赭), no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, hand, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, hand, character, background, landscape, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, hand, character, colorful, 3D, photorealistic
 
 **状态：** Needed
 

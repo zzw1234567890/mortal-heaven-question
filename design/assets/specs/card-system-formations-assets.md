@@ -29,6 +29,10 @@
 
 ---
 
+## 背景处理（本文件全部阵盘图统一）
+
+每张阵盘图背景均为淡墨氛围（浅绛淡彩）：阵盘居中悬浮，四周铺满淡墨星野晕染（灰度 88-92%）+ 低饱和淡青星晕（S≤25% L≥70%），铺满卡面不留纯白（覆盖 ≥80%，纯白仅作高光点缀 <20%）；背景无语义色——琉璃金仅在阵眼。
+
 ## 阵营联动阵（同心圆 + 标记点）
 
 ### ASSET-164 — 青云合击阵
@@ -50,10 +54,10 @@
 - §4 语义色：琉璃金=阵眼标识
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation diagram — 3 concentric circles, 3 sword-shaped markers evenly spaced on outer ring, golden light at center core radiating along 3 radius lines to sword markers, fine sword-pattern spirit text on outer ring, precise gongbi linework, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no person, no color except ink black and gold at center
+Chinese ink brush geometric formation diagram — 3 concentric circles, 3 sword-shaped markers evenly spaced on outer ring, golden light at center core radiating along 3 radius lines to sword markers, fine sword-pattern spirit text on outer ring, precise gongbi linework, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, character, landscape, background, colorful, 3D, photorealistic, organic, messy, hand-drawn
+pure white background, empty background, blank background, person, character, colorful, 3D, photorealistic, organic, messy, hand-drawn
 
 **状态：** Needed
 
@@ -78,10 +82,10 @@ person, character, landscape, background, colorful, 3D, photorealistic, organic,
 - §4 语义色：琉璃金=正道防御阵眼
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — 4 concentric circles, 3 "正" (righteous) seal-script markers on outer ring connected by shield-symbol arcs, golden core with light stopping at second ring forming bright gold defensive halo, upright regular-script spirit text on outer ring, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — 4 concentric circles, 3 "正" (righteous) seal-script markers on outer ring connected by shield-symbol arcs, golden core with light stopping at second ring forming bright gold defensive halo, upright regular-script spirit text on outer ring, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -106,10 +110,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：琉璃金偏移=魔道不稳定能量
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — 3 concentric circles with deliberant breaks in inner rings, 3 claw-mark demonic symbols on outer ring, golden core slightly off-center for unstable tension, wild cursive-style spirit text on outer ring, dark aggressive energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — 3 concentric circles with deliberant breaks in inner rings, 3 claw-mark demonic symbols on outer ring, golden core slightly off-center for unstable tension, wild cursive-style spirit text on outer ring, dark aggressive energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, symmetric, balanced
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, symmetric, balanced
 
 **状态：** Needed
 
@@ -134,10 +138,10 @@ person, landscape, background, colorful, 3D, photorealistic, symmetric, balanced
 - §4 语义色：琉璃金=正邪融合阵眼
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — 4 concentric circles split left/right, left half with 2 "正" markers, right half with 2 claw-mark demonic symbols, interweaving wave patterns where forces meet at center, golden core with arcs connecting to both faction markers, left spirit text regular, right text wild cursive, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — 4 concentric circles split left/right, left half with 2 "正" markers, right half with 2 claw-mark demonic symbols, interweaving wave patterns where forces meet at center, golden core with arcs connecting to both faction markers, left spirit text regular, right text wild cursive, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, uniform, symmetric
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, uniform, symmetric
 
 **状态：** Needed
 
@@ -162,10 +166,10 @@ person, landscape, background, colorful, 3D, photorealistic, uniform, symmetric
 - §4 语义色：琉璃金=丹霞攻击阵眼
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — 2 concentric circles, 2 alchemy-furnace markers on outer ring connected by flame-pattern arcs, golden core light traveling along flame arcs to furnace mouths which glow brightly like alchemical fire, archaic seal-clerical spirit text, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — 2 concentric circles, 2 alchemy-furnace markers on outer ring connected by flame-pattern arcs, golden core light traveling along flame arcs to furnace mouths which glow brightly like alchemical fire, archaic seal-clerical spirit text, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -190,10 +194,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：琉璃金=回复阵眼
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — 3 concentric circles, 2 hexagonal snowflake markers on outer ring connected by water-drop chain (micro concentric rings), golden core pulsing along drop-chain in broken golden arcs for per-turn heal rhythm, cool slender spirit text, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — 3 concentric circles, 2 hexagonal snowflake markers on outer ring connected by water-drop chain (micro concentric rings), golden core pulsing along drop-chain in broken golden arcs for per-turn heal rhythm, cool slender spirit text, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, warm
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, warm
 
 **状态：** Needed
 
@@ -220,10 +224,10 @@ person, landscape, background, colorful, 3D, photorealistic, warm
 - §4 语义色：琉璃金=剑阵阵眼
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — regular pentagon with sword markers at all 5 vertices, 5 intersecting blade-lines forming star pattern inside pentagon, golden core at exact center, fine sword-engraved spirit text on outer ring, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — regular pentagon with sword markers at all 5 vertices, 5 intersecting blade-lines forming star pattern inside pentagon, golden core at exact center, fine sword-engraved spirit text on outer ring, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -248,10 +252,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：琉璃金混沌涡旋=混乱效果
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — slightly distorted triangle with "渊""霜""翎" seal characters at vertices, bidirectional reversal arrows between vertices in light ink, golden chaotic vortex at center (expanding and contracting simultaneously), complex reversed cipher-like spirit text on outer ring, disorienting energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — slightly distorted triangle with "渊""霜""翎" seal characters at vertices, bidirectional reversal arrows between vertices in light ink, golden chaotic vortex at center (expanding and contracting simultaneously), complex reversed cipher-like spirit text on outer ring, disorienting energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, symmetric, orderly, calm
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, symmetric, orderly, calm
 
 **状态：** Needed
 
@@ -276,10 +280,10 @@ person, landscape, background, colorful, 3D, photorealistic, symmetric, orderly,
 - §4 语义色：琉璃金旋转=复活概率
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — regular hexagon with "沐""轮" large seal markers at 2 vertices + 4 small dots, double-helix infinity-loop (∞ variant) spiraling 6 times between the two markers, golden slowly rotating core at helix intersection, circular seal-script spirit text, profound cyclic life-death energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — regular hexagon with "沐""轮" large seal markers at 2 vertices + 4 small dots, double-helix infinity-loop (∞ variant) spiraling 6 times between the two markers, golden slowly rotating core at helix intersection, circular seal-script spirit text, profound cyclic life-death energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, static, linear
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, static, linear
 
 **状态：** Needed
 
@@ -306,10 +310,10 @@ person, landscape, background, colorful, 3D, photorealistic, static, linear
 - §4 语义色：琉璃金=复制卡牌之力
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — regular hexagon with heavenly-stem earthly-branch trigger conditions engraved at each edge midpoint in light ink, complex star-chart constellation map of countless micro-dot connections within, golden core with 6 subtle golden routes to each edge trigger, astronomical star-mansion cipher spirit text on outer ring, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — regular hexagon with heavenly-stem earthly-branch trigger conditions engraved at each edge midpoint in light ink, complex star-chart constellation map of countless micro-dot connections within, golden core with 6 subtle golden routes to each edge trigger, astronomical star-mansion cipher spirit text on outer ring, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, simple, empty
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, simple, empty
 
 **状态：** Needed
 
@@ -334,10 +338,10 @@ person, landscape, background, colorful, 3D, photorealistic, simple, empty
 - §4 语义色：琉璃金脉动=概率魅惑
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — inverted triangle (apex down) with peach-blossom trigger marks on each edge, 3 spiral lines from edge midpoints entangling near center, golden pulsing heart-shaped core for 25% charm probability, seductive curved spirit text on outer ring, disorienting hypnotic energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — inverted triangle (apex down) with peach-blossom trigger marks on each edge, 3 spiral lines from edge midpoints entangling near center, golden pulsing heart-shaped core for 25% charm probability, seductive curved spirit text on outer ring, disorienting hypnotic energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, upright, orderly
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, upright, orderly
 
 **状态：** Needed
 
@@ -364,10 +368,10 @@ person, landscape, background, colorful, 3D, photorealistic, upright, orderly
 - §4 语义色：琉璃金=真灵全族光环
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — regular octagon with 8 different true-spirit clan crests at vertices (feather, scale, horn, claw, wing, whisker, tail, crown simplified), 8 gradient ink lines radiating from center to each crest, intense bright golden core covering entire octagon interior, hundred-clan ancient spirit text on outer ring, magnificent all-encompassing energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and brilliant gold
+Chinese ink brush geometric formation — regular octagon with 8 different true-spirit clan crests at vertices (feather, scale, horn, claw, wing, whisker, tail, crown simplified), 8 gradient ink lines radiating from center to each crest, intense bright golden core covering entire octagon interior, hundred-clan ancient spirit text on outer ring, magnificent all-encompassing energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, small, dim
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, small, dim
 
 **状态：** Needed
 
@@ -392,10 +396,10 @@ person, landscape, background, colorful, 3D, photorealistic, small, dim
 - §4 语义色：琉璃金偏红=魔道击杀回复
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — irregular octagon with unequal edges for demonic chaos, 3 thick dark marked vertices + 5 light small ones, 8 vein-like winding ink lines radiating from center with tiny barbs at tips, dark reddish-gold core for kill-heal demonic power, rough wild spirit text on outer ring, brutal aggressive energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and dark warm gold
+Chinese ink brush geometric formation — irregular octagon with unequal edges for demonic chaos, 3 thick dark marked vertices + 5 light small ones, 8 vein-like winding ink lines radiating from center with tiny barbs at tips, dark reddish-gold core for kill-heal demonic power, rough wild spirit text on outer ring, brutal aggressive energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, regular, orderly, clean
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, regular, orderly, clean
 
 **状态：** Needed
 
@@ -420,10 +424,10 @@ person, landscape, background, colorful, 3D, photorealistic, regular, orderly, c
 - §4 语义色：琉璃金渐淡=减伤光环
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — square with 4 island-archipelago markers at each side, fine star-dot constellation grid filling the interior, golden core fading outward then re-brightening slightly at island markers for protective network, fine star-sand spirit text on outer ring, calm protective cosmic energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and gold
+Chinese ink brush geometric formation — square with 4 island-archipelago markers at each side, fine star-dot constellation grid filling the interior, golden core fading outward then re-brightening slightly at island markers for protective network, fine star-sand spirit text on outer ring, calm protective cosmic energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic
 
 **状态：** Needed
 
@@ -448,10 +452,10 @@ person, landscape, background, colorful, 3D, photorealistic
 - §4 语义色：琉璃金向下=持续伤害光环
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — square with sharp diamond-pointed corners like 4 blades outward, blood-drop markers at each corner, downward-dripping arc lines from center for per-turn damage-over-time, dark gold core seeping downward, sinister spirit text on outer ring, malevolent draining energy, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and dark gold
+Chinese ink brush geometric formation — square with sharp diamond-pointed corners like 4 blades outward, blood-drop markers at each corner, downward-dripping arc lines from center for per-turn damage-over-time, dark gold core seeping downward, sinister spirit text on outer ring, malevolent draining energy, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, bright, uplifting
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, bright, uplifting
 
 **状态：** Needed
 
@@ -476,10 +480,10 @@ person, landscape, background, colorful, 3D, photorealistic, bright, uplifting
 - §4 语义色：琉璃金极辉煌=攻防全增幅
 
 **生成提示 (Midjourney)：**
-Chinese ink brush geometric formation — regular octagon as grandest formation of all 16, 8 diverse hundred-clan crests at vertices, intricate interweaving totem network of countless fine connecting lines, exceptionally brilliant golden core with 8 thick gold beams reaching each crest for full 20% buff transmission, epic hundred-clan saga spirit text on outer ring, most magnificent composition, transparent background -- style "墨骨丹青" --ar 5:7 --no background, no color except ink black and brilliant gold
+Chinese ink brush geometric formation — regular octagon as grandest formation of all 16, 8 diverse hundred-clan crests at vertices, intricate interweaving totem network of countless fine connecting lines, exceptionally brilliant golden core with 8 thick gold beams reaching each crest for full 20% buff transmission, epic hundred-clan saga spirit text on outer ring, most magnificent composition, pale ink wash starfield-void background filling the whole card (gray 88-92%) with a faint low-saturation 淡青 glow, the formation disk floating in this void, no empty white areas -- style "墨骨丹青" --ar 5:7 --no empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, landscape, background, colorful, 3D, photorealistic, simple, small, dim
+pure white background, empty background, blank background, person, colorful, 3D, photorealistic, simple, small, dim
 
 **状态：** Needed
 

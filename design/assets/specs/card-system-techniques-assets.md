@@ -4,7 +4,7 @@
 > **美术圣经**：design/art/art-bible.md §5.X.3
 > **生成日期**：2026-07-26
 > **审查模式**：Solo（art-director + technical-artist 代理因 API 503 不可用——技术约束按美术圣经第 8 部分推导）
-> **状态**：52 个资产已规范 / 0 个已批准 / 0 个生产中 / 0 个完成
+> **状态**：49 个资产已规范 / 0 个已批准 / 0 个生产中 / 0 个完成
 
 ## 技术参数
 
@@ -16,7 +16,7 @@
 | 图层要求 | (1) 墨线骨架层 (2) 松石青真气汇聚层 (3) 朱砂红断点层（攻击型功法） (4) 题字层 |
 | Godot 导入预设 | 2D Texture, Filter=Disabled, Mipmaps=Off, Compress=Lossless |
 | 单张预估 | ~160KB RGBA8 → ~40KB DXT5 |
-| 总计预估 | 52 张 × 40KB = ~2.1MB VRAM |
+| 总计预估 | 49 张 × 40KB = ~1.9MB VRAM |
 
 ## 墨线语言速查
 
@@ -28,6 +28,10 @@
 | 范围/全体型 | 放射线 | 从中央向外均匀辐射的多向线条 | 全体增益/减益光环类 |
 
 ---
+
+## 背景处理（本文件全部运功图统一）
+
+每张运功图背景均为淡墨氛围（浅绛淡彩）：整幅极淡墨晕染（灰度 88-92%）模拟玄门内景/气海虚空，叠低饱和淡彩晕染（攻击型=淡赭暖晕、防御回复型=淡花青冷晕、操控型=淡花青、范围型=淡青，S≤25% L≥70%），铺满卡面不留纯白（覆盖 ≥80%，纯白仅作高光点缀 <20%）；背景无语义色——松石青/朱砂红仅在墨线主体上。
 
 ## 攻击型功法（锐利直线墨迹）
 
@@ -50,10 +54,10 @@
 - §4 语义色：朱砂红断点=攻击标识
 
 **生成提示 (Midjourney)：**
-Traditional Chinese ink wash painting of qi meridians flowing through a cultivator's body -- style "墨骨丹青" monochrome ink skeleton with vermillion red accent dots on sharp angular lines -- abstract internal energy map, 7 sharp straight lines radiating upward from dantian center, diamond-shaped convergence zone at upper center, calligraphy inscription at bottom right, transparent background, ink on rice paper texture, precise linework, Zen minimalism --ar 5:7 --no figure, no character, no face, no background scene, no color except ink black and vermillion red
+Traditional Chinese ink wash painting of qi meridians flowing through a cultivator's body -- style "墨骨丹青" monochrome ink skeleton with vermillion red accent dots on sharp angular lines -- abstract internal energy map, 7 sharp straight lines radiating upward from dantian center, diamond-shaped convergence zone at upper center, calligraphy inscription at bottom right, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas, ink on rice paper texture, precise linework, Zen minimalism --ar 5:7 --no figure, character, face, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, face, portrait, landscape, background, environment, colorful, rainbow, graffiti, digital art, 3D render, photograph, realistic
+pure white background, empty background, blank background, person, human, figure, face, portrait, colorful, rainbow, graffiti, digital art, 3D render, photograph, realistic
 
 **状态：** Needed
 
@@ -78,10 +82,10 @@ person, human, figure, face, portrait, landscape, background, environment, color
 - §4 语义色：朱砂红断点=攻击标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation diagram, 3 thick bold straight brush strokes exploding upward from dantian, fist-impact circular shockwave pattern at convergence center, single vermillion red focal dot at impact center, rough calligraphy inscription, rice paper texture, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no face, no landscape, no color except ink black and vermillion red
+Chinese ink wash qi circulation diagram, 3 thick bold straight brush strokes exploding upward from dantian, fist-impact circular shockwave pattern at convergence center, single vermillion red focal dot at impact center, rough calligraphy inscription, rice paper texture, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, face, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, face, portrait, landscape, background, environment, colorful, 3D, photograph, realistic
+pure white background, empty background, blank background, person, human, figure, face, portrait, colorful, 3D, photograph, realistic
 
 **状态：** Needed
 
@@ -106,10 +110,10 @@ person, human, figure, face, portrait, landscape, background, environment, color
 - §4 语义色：朱砂红断点=攻击标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian map, 5 diagonal slashing brush strokes from dantian outward in blade-cut trajectories, crossed-blade convergence pattern, single vermillion red point at intersection, bold ink density with flying-white edges, rigid clerical script inscription, rice paper texture, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink and vermillion
+Chinese ink wash meridian map, 5 diagonal slashing brush strokes from dantian outward in blade-cut trajectories, crossed-blade convergence pattern, single vermillion red point at intersection, bold ink density with flying-white edges, rigid clerical script inscription, rice paper texture, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, face, portrait, landscape, background, colorful, realistic, photograph, 3D
+pure white background, empty background, blank background, person, human, figure, face, portrait, colorful, realistic, photograph, 3D
 
 **状态：** Needed
 
@@ -134,10 +138,10 @@ person, human, figure, face, portrait, landscape, background, colorful, realisti
 - §4 语义色：朱砂红断点=攻击标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy diagram, 6 medium-density straight brush strokes angled upward with tiny maple-leaf-like forks at tips, sword-flower spiral convergence zone, scattered vermillion red dots like falling leaves, elegant regular script inscription, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion
+Chinese ink wash internal energy diagram, 6 medium-density straight brush strokes angled upward with tiny maple-leaf-like forks at tips, sword-flower spiral convergence zone, scattered vermillion red dots like falling leaves, elegant regular script inscription, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, leaf
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, leaf
 
 **状态：** Needed
 
@@ -162,10 +166,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红断点=攻击标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi flow diagram, 6 thick wild brush strokes radiating in 6 directions from dantian, irregular 6-pointed star convergence, dense vermillion red dots clustered at stroke origins, rough cursive calligraphy with ink drip effect, flying-white texture, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion
+Chinese ink wash qi flow diagram, 6 thick wild brush strokes radiating in 6 directions from dantian, irregular 6-pointed star convergence, dense vermillion red dots clustered at stroke origins, rough cursive calligraphy with ink drip effect, flying-white texture, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, clean
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, clean
 
 **状态：** Needed
 
@@ -190,10 +194,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红断点=攻击标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation, 5 bone-jointed twisted brush strokes with skull-like knots at midpoints, shattered-bone radial convergence pattern, dense vermillion red clusters, dry brush with heavy flying-white for eerie feel, seal script inscription, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no face, no landscape, no color except ink and vermillion
+Chinese ink wash qi circulation, 5 bone-jointed twisted brush strokes with skull-like knots at midpoints, shattered-bone radial convergence pattern, dense vermillion red clusters, dry brush with heavy flying-white for eerie feel, seal script inscription, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, face, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, skeleton
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, skeleton
 
 **状态：** Needed
 
@@ -218,10 +222,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红断点=攻击标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy map, 4 extremely dark thick brush strokes rising like flames from dantian, scorched cracked edges on lines, flame-like vortex convergence, vermillion red dots at mid-stroke burning nodes, charred-ink flying-white calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion
+Chinese ink wash internal energy map, 4 extremely dark thick brush strokes rising like flames from dantian, scorched cracked edges on lines, flame-like vortex convergence, vermillion red dots at mid-stroke burning nodes, charred-ink flying-white calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, fire
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, fire
 
 **状态：** Needed
 
@@ -246,10 +250,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红断点=闪电爆点
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian chart, 9 zigzag lightning-bolt brush strokes exploding upward from dantian, thunderstorm-cloud circular diffusion convergence, vermillion red dots at every zigzag corner point, trembling brush calligraphy, ink bleed at dense stroke clusters, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink and vermillion
+Chinese ink wash meridian chart, 9 zigzag lightning-bolt brush strokes exploding upward from dantian, thunderstorm-cloud circular diffusion convergence, vermillion red dots at every zigzag corner point, trembling brush calligraphy, ink bleed at dense stroke clusters, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, lightning
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, lightning
 
 **状态：** Needed
 
@@ -274,10 +278,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红=伤害标识，松石青=冰系修为属性
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi diagram, 7 frost-crack delicate lines spreading from dantian with icy white flying-white edges, hexagonal snowflake crystal convergence pattern, vermillion red dots at 6 crystal vertices, turquoise-blue center dot for ice attribute, slender calligraphy in thin gold style, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black, vermillion red, and one turquoise dot
+Chinese ink wash qi diagram, 7 frost-crack delicate lines spreading from dantian with icy white flying-white edges, hexagonal snowflake crystal convergence pattern, vermillion red dots at 6 crystal vertices, turquoise-blue center dot for ice attribute, slender calligraphy in thin gold style, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, snowflake, ice, bird, phoenix
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, snowflake, ice, bird, phoenix
 
 **状态：** Needed
 
@@ -302,10 +306,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红断点=致命一击标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy chart, 8 vertical sword-slash brush strokes rising from dantian like heaven-sent blades, sword-array radial convergence with all lines meeting at one vermillion red focal point, ink density gradient suggesting golden glow around edges, upright regular script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion red
+Chinese ink wash internal energy chart, 8 vertical sword-slash brush strokes rising from dantian like heaven-sent blades, sword-array radial convergence with all lines meeting at one vermillion red focal point, ink density gradient suggesting golden glow around edges, upright regular script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, gold, golden
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, gold, golden
 
 **状态：** Needed
 
@@ -330,10 +334,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红=破甲标识，松石青=防御穿透
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi map, 12 extremely dense sharp brush strokes piercing upward through a circular shield formation, shattered-circle convergence pattern with blades penetrating through, dense vermillion red dots at penetration points, turquoise-blue rim on the broken circle edge, heavy clerical script inscription, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black, vermillion red, and one turquoise accent
+Chinese ink wash qi map, 12 extremely dense sharp brush strokes piercing upward through a circular shield formation, shattered-circle convergence pattern with blades penetrating through, dense vermillion red dots at penetration points, turquoise-blue rim on the broken circle edge, heavy clerical script inscription, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, sword
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, sword
 
 **状态：** Needed
 
@@ -358,10 +362,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红断点=击杀成长标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian flow, 6 vein-like pulsating brush strokes with alternating thick-thin rhythm rising from dantian, blood-drop heart-shaped vortex convergence, vermillion red dots lighting up sequentially along strokes from bottom to top, dripping-blood wild cursive calligraphy, warm dark ink tone, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion red
+Chinese ink wash meridian flow, 6 vein-like pulsating brush strokes with alternating thick-thin rhythm rising from dantian, blood-drop heart-shaped vortex convergence, vermillion red dots lighting up sequentially along strokes from bottom to top, dripping-blood wild cursive calligraphy, warm dark ink tone, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, heart, blood, gore
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, heart, blood, gore
 
 **状态：** Needed
 
@@ -386,10 +390,38 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红=转化节点标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation, 5 gradient brush strokes thin-to-thick rising from dantian with thickening at one-third mark, double-helix intertwined blood-shadow convergence pattern, vermillion red dots at stroke-thickening transition points, variable-weight running script calligraphy growing bolder, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion
+Chinese ink wash qi circulation, 5 gradient brush strokes thin-to-thick rising from dantian with thickening at one-third mark, double-helix intertwined blood-shadow convergence pattern, vermillion red dots at stroke-thickening transition points, variable-weight running script calligraphy growing bolder, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic
+
+**状态：** Needed
+
+---
+
+### ASSET-204 — 冥界镇魂功
+
+| 字段 | 值 |
+|------|-----|
+| 类别 | 精灵 / 2D 功法运功图 |
+| 尺寸 | 200×280px (LOD-1) / 800×1120px (工作分辨率) |
+| 格式 | PNG (RGBA8) + PSD |
+| 命名 | `technique_mingjie_zhenhun_gong.png` |
+| 卡牌数据 | 稀有度=紫色 费用=4 效果=绑定角色对灵体伤害翻倍 |
+
+**视觉描述：**
+从丹田区向上放射的七条锐利镇魂墨线——线条如冥界锁链般刚劲，末端微微向内钩，模拟拘锁灵体的动作。中央汇聚区呈镇魂符环——一圈锁链状的符纹环绕丹田，朱砂红点缀于每条墨线的钩端，标识对灵体特化的伤害增幅。墨色偏冷偏硬，有幽冥拘魂的森冷感。题字「冥界镇魂功」以刀刻般的隶书题于右下。
+
+**美术圣经锚点：**
+- §5.X.3 运功图四层构图
+- §5.X.3 墨线语言：锐利钩线=灵体特攻型
+- §4 语义色：朱砂红=对灵体伤害标识
+
+**生成提示 (Midjourney)：**
+Chinese ink wash meridian chart, 7 sharp rigid underworld-chain strokes rising from dantian with inward-hooking tips like binding spirits, soul-suppressing seal-ring convergence with chain-like talisman patterns, vermillion-red dot at each hook tip for spirit-type bonus damage, cold hard ink tone with ghost-binding severity, chiseled clerical-script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
+
+**反向提示 (Stable Diffusion)：**
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, ghost, spirit, chains
 
 **状态：** Needed
 
@@ -416,10 +448,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=生命力标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy chart, 5 gentle curving brush strokes rising from dantian like withered branches sprouting new buds, sprout-shaped circular convergence, turquoise-blue dots at bud tips for life force, soft light ink transitions, warm running-regular calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise accent dots
+Chinese ink wash internal energy chart, 5 gentle curving brush strokes rising from dantian like withered branches sprouting new buds, sprout-shaped circular convergence, turquoise-blue dots at bud tips for life force, soft light ink transitions, warm running-regular calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, tree, plant
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, tree, plant
 
 **状态：** Needed
 
@@ -444,10 +476,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=全队生命力标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi diagram, 8 gentle arcing brush strokes spreading like tree canopy from dantian covering entire frame, tree-crown circular diffusion convergence, turquoise-blue dots at tips of each arc for party-wide life boost, even brush weight with warm round turns, small running-regular calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise accent dots
+Chinese ink wash qi diagram, 8 gentle arcing brush strokes spreading like tree canopy from dantian covering entire frame, tree-crown circular diffusion convergence, turquoise-blue dots at tips of each arc for party-wide life boost, even brush weight with warm round turns, small running-regular calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, tree, leaves
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, tree, leaves
 
 **状态：** Needed
 
@@ -472,10 +504,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=守护核心标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian map, 7 thick embracing arc strokes forming elliptical protective cocoon around dantian area, multi-layered concentric ellipse convergence, single turquoise-blue dot at innermost core, heavy solid brush weight suggesting iron-wall sturdiness, solemn regular script large calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash meridian map, 7 thick embracing arc strokes forming elliptical protective cocoon around dantian area, multi-layered concentric ellipse convergence, single turquoise-blue dot at innermost core, heavy solid brush weight suggesting iron-wall sturdiness, solemn regular script large calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, shield, armor
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, shield, armor
 
 **状态：** Needed
 
@@ -500,10 +532,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=回复源头标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation chart, 4 concentric ripple-like ring strokes spreading outward from dantian with even spacing, spring-well circular convergence with qi bubbling upward, turquoise-blue dot at spring source, light ink density with gentle non-aggressive curves, rounded seal script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash qi circulation chart, 4 concentric ripple-like ring strokes spreading outward from dantian with even spacing, spring-well circular convergence with qi bubbling upward, turquoise-blue dot at spring source, light ink density with gentle non-aggressive curves, rounded seal script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, ghost, demon
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, ghost, demon
 
 **状态：** Needed
 
@@ -528,10 +560,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=星辰庇护标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy diagram, 6 elliptical orbital arc strokes circling dantian like star trajectories at slightly offset angles, star-core dense dot convergence, faint turquoise-blue glow at core periphery for stellar protection, thin precise lines like astronomical chart, slender running script small calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and subtle turquoise
+Chinese ink wash internal energy diagram, 6 elliptical orbital arc strokes circling dantian like star trajectories at slightly offset angles, star-core dense dot convergence, faint turquoise-blue glow at core periphery for stellar protection, thin precise lines like astronomical chart, slender running script small calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, stars, galaxy, space
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, stars, galaxy, space
 
 **状态：** Needed
 
@@ -556,10 +588,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=正道护体标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi map, 4 square-arc brush strokes expanding from dantian with rigid curvature like rounded square corners, square-shield guardian seal convergence, turquoise-blue dot at shield center for righteous protection, thick even brush weight suggesting immovable fortress, square Wei-stele style calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash qi map, 4 square-arc brush strokes expanding from dantian with rigid curvature like rounded square corners, square-shield guardian seal convergence, turquoise-blue dot at shield center for righteous protection, thick even brush weight suggesting immovable fortress, square Wei-stele style calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, shield
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, shield
 
 **状态：** Needed
 
@@ -584,10 +616,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=生命上限提升标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy chart, 5 plump full arc strokes rising from dantian like gently inflated balloons, full balloon-shaped qi-sea convergence, turquoise-blue dot at center for max HP boost, mellow dark ink without harshness, plump regular script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash internal energy chart, 5 plump full arc strokes rising from dantian like gently inflated balloons, full balloon-shaped qi-sea convergence, turquoise-blue dot at center for max HP boost, mellow dark ink without harshness, plump regular script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, balloon
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, balloon
 
 **状态：** Needed
 
@@ -612,10 +644,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=星辰防御标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian chart, 7 small precise arc strokes arranged in Big Dipper constellation pattern rising from dantian, dipper-shaped star-group convergence, faint turquoise-blue glimmer at dipper mouth for stellar defense boost, thin but penetrating line quality like starlight, star-dot small regular calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and subtle turquoise
+Chinese ink wash meridian chart, 7 small precise arc strokes arranged in Big Dipper constellation pattern rising from dantian, dipper-shaped star-group convergence, faint turquoise-blue glimmer at dipper mouth for stellar defense boost, thin but penetrating line quality like starlight, star-dot small regular calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, stars, constellation
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, stars, constellation
 
 **状态：** Needed
 
@@ -640,10 +672,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=自身+团队双重防护
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi diagram, 3 layered feather-wing arc strokes spreading from dantian — inner layer solid, outer 2 layers light and translucent, feather-fan layered convergence, turquoise-blue dot at inner wing root, fainter turquoise particles at outer wing tips for party aura, delicate flowing running script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise with opacity variation
+Chinese ink wash qi diagram, 3 layered feather-wing arc strokes spreading from dantian — inner layer solid, outer 2 layers light and translucent, feather-fan layered convergence, turquoise-blue dot at inner wing root, fainter turquoise particles at outer wing tips for party aura, delicate flowing running script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, wings, feathers, bird
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, wings, feathers, bird
 
 **状态：** Needed
 
@@ -668,10 +700,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=灵兽庇护标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy chart, 6 sleek graceful arc strokes curling around dantian like fox tails with nimble dodging feel, nine-tail fan suggestion with 3 hidden and 3 visible, turquoise-blue dot at fan center for fox spirit protection, light ink density with silky flowing curves, charming slender gold-style calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash internal energy chart, 6 sleek graceful arc strokes curling around dantian like fox tails with nimble dodging feel, nine-tail fan suggestion with 3 hidden and 3 visible, turquoise-blue dot at fan center for fox spirit protection, light ink density with silky flowing curves, charming slender gold-style calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, fox, animal, tail
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, fox, animal, tail
 
 **状态：** Needed
 
@@ -696,10 +728,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=攻防平衡标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation map, 8 balanced symmetric arcs — 4 rising, 4 descending — spreading evenly from dantian, yin-yang taiji balance convergence pattern, turquoise-blue dot at yang eye for balanced dual-stat boost, precise even brush weight like a balance scale, upright small regular calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash qi circulation map, 8 balanced symmetric arcs — 4 rising, 4 descending — spreading evenly from dantian, yin-yang taiji balance convergence pattern, turquoise-blue dot at yang eye for balanced dual-stat boost, precise even brush weight like a balance scale, upright small regular calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, yin yang
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, yin yang
 
 **状态：** Needed
 
@@ -724,10 +756,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=重生标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy diagram, 5 descending-then-ascending arc strokes — sink from dantian to bottom then rise again in lighter ink, phoenix-flame vortex convergence at bottom, turquoise-blue dot at rebirth ascension point, cyclic ink density fading then strengthening, powerful running script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash internal energy diagram, 5 descending-then-ascending arc strokes — sink from dantian to bottom then rise again in lighter ink, phoenix-flame vortex convergence at bottom, turquoise-blue dot at rebirth ascension point, cyclic ink density fading then strengthening, powerful running script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, phoenix, fire, bird
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, phoenix, fire, bird
 
 **状态：** Needed
 
@@ -752,10 +784,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=治疗灵力源泉
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi flow chart, 4 soft ribbon-like spiral arcs circling upward from dantian like flowing sleeves, water-drop life-source convergence, concentrated turquoise-blue glow at drop center for healing power doubling, fine delicate feminine line quality with silk smoothness, graceful flower-pin small regular calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise
+Chinese ink wash qi flow chart, 4 soft ribbon-like spiral arcs circling upward from dantian like flowing sleeves, water-drop life-source convergence, concentrated turquoise-blue glow at drop center for healing power doubling, fine delicate feminine line quality with silk smoothness, graceful flower-pin small regular calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, woman, silk
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, woman, silk
 
 **状态：** Needed
 
@@ -782,10 +814,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青+朱砂红交替=精神控制标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian diagram, 3 spiral vortex strokes coiling upward from dantian like falling peach blossom trajectories, peach-blossom-shaped vortex convergence with outer layer spinning opposite to inner for hypnotic effect, alternating turquoise-blue and vermillion-red dots at spiral nodes for charm energy, soft light ink with hazy ambiguous atmosphere, seductive running-cursive calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black, turquoise, and vermillion dots
+Chinese ink wash meridian diagram, 3 spiral vortex strokes coiling upward from dantian like falling peach blossom trajectories, peach-blossom-shaped vortex convergence with outer layer spinning opposite to inner for hypnotic effect, alternating turquoise-blue and vermillion-red dots at spiral nodes for charm energy, soft light ink with hazy ambiguous atmosphere, seductive running-cursive calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, flower, peach
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, flower, peach
 
 **状态：** Needed
 
@@ -810,10 +842,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青浓郁=冰冻源头标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation, 5 frost-crack spiral strokes slowly coiling upward from dantian with each loop denser than the last, hexagonal ice-flower frozen convergence where spiral stops and crystallizes, concentrated turquoise-blue at ice core for freeze control source, brittle crackled line texture, thin hard calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise
+Chinese ink wash qi circulation, 5 frost-crack spiral strokes slowly coiling upward from dantian with each loop denser than the last, hexagonal ice-flower frozen convergence where spiral stops and crystallizes, concentrated turquoise-blue at ice core for freeze control source, brittle crackled line texture, thin hard calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, ice, snow, frost
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, ice, snow, frost
 
 **状态：** Needed
 
@@ -838,10 +870,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=控制节点标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy map, 6 chain-link spiral strokes extending outward from dantian forming interlocking rings, multi-lock circular convergence with each lock connecting to another spiral for inescapable binding, turquoise-blue dots at each lock junction for control strength nodes, chain-like metal texture in brushwork, iron-line seal script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise dots
+Chinese ink wash internal energy map, 6 chain-link spiral strokes extending outward from dantian forming interlocking rings, multi-lock circular convergence with each lock connecting to another spiral for inescapable binding, turquoise-blue dots at each lock junction for control strength nodes, chain-like metal texture in brushwork, iron-line seal script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, chains, metal
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, chains, metal
 
 **状态：** Needed
 
@@ -866,10 +898,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红=魔物克制伤害标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi diagram, 5 powerful surging spiral strokes coiling upward from dantian with intense rotational speed, sound-wave concentric vortex convergence rippling outward from core, vermillion red dots at each wave crest for double damage against demons, heavy bold ink with percussive impact, rough powerful running script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion red
+Chinese ink wash qi diagram, 5 powerful surging spiral strokes coiling upward from dantian with intense rotational speed, sound-wave concentric vortex convergence rippling outward from core, vermillion red dots at each wave crest for double damage against demons, heavy bold ink with percussive impact, rough powerful running script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, animal, beast, sound
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, animal, beast, sound
 
 **状态：** Needed
 
@@ -894,10 +926,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=净化完成标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian chart, 5 purifying spiral strokes rising from dantian with gradient from dark/turbid at bottom to light/clear at top, funnel-filter convergence with turbid qi entering below and clear qi emerging above, turquoise-blue dot at clear qi exit for purified state, ink density gradient from chaotic to crystal-clear, crisp regular script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black gradient and one turquoise dot
+Chinese ink wash meridian chart, 5 purifying spiral strokes rising from dantian with gradient from dark/turbid at bottom to light/clear at top, funnel-filter convergence with turbid qi entering below and clear qi emerging above, turquoise-blue dot at clear qi exit for purified state, ink density gradient from chaotic to crystal-clear, crisp regular script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, water, filter
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, water, filter
 
 **状态：** Needed
 
@@ -922,10 +954,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=清净心智标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy chart, 4 serene steady spiral strokes rising from dantian with slow meditative rhythm, lotus-throne circular convergence with petals unfolding layer by layer, turquoise-blue dot at lotus heart for mental clarity against debuffs, fine elegant lines without any rough edges, tranquil regular script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash internal energy chart, 4 serene steady spiral strokes rising from dantian with slow meditative rhythm, lotus-throne circular convergence with petals unfolding layer by layer, turquoise-blue dot at lotus heart for mental clarity against debuffs, fine elegant lines without any rough edges, tranquil regular script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, lotus, flower
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, lotus, flower
 
 **状态：** Needed
 
@@ -952,10 +984,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红=全队攻击增幅标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation map, 9 evenly spaced straight lines radiating from dantian in all directions covering entire frame, sun-ray circular diffusion convergence, vermillion red dot at midpoint of each radial line for synchronized party attack boost, uniform powerful brushwork with commanding presence, upright regular script large calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion red dots
+Chinese ink wash qi circulation map, 9 evenly spaced straight lines radiating from dantian in all directions covering entire frame, sun-ray circular diffusion convergence, vermillion red dot at midpoint of each radial line for synchronized party attack boost, uniform powerful brushwork with commanding presence, upright regular script large calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, sun
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, sun
 
 **状态：** Needed
 
@@ -980,10 +1012,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=百族共护标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy diagram, 12 curved radiating strokes from dantian with different clan emblem symbols at each tip, kaleidoscope multi-clan crest convergence, turquoise-blue dot at core fading outward along each arc for clan-wide shared protection network, fine totemic line detail, archaic seal-clerical calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise gradient
+Chinese ink wash internal energy diagram, 12 curved radiating strokes from dantian with different clan emblem symbols at each tip, kaleidoscope multi-clan crest convergence, turquoise-blue dot at core fading outward along each arc for clan-wide shared protection network, fine totemic line detail, archaic seal-clerical calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, totem
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, totem
 
 **状态：** Needed
 
@@ -1008,10 +1040,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红=战斗增幅标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi diagram, 10 radiating strokes from dantian with subtle weapon silhouette suggestions at each tip — blades, spears, axes, halberds, weapon-wheel circular convergence, vermillion red dot at each weapon's edge for unified battle boost, strong angular brushwork with battle-formation severity, chiseled clerical script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion red dots
+Chinese ink wash qi diagram, 10 radiating strokes from dantian with subtle weapon silhouette suggestions at each tip — blades, spears, axes, halberds, weapon-wheel circular convergence, vermillion red dot at each weapon's edge for unified battle boost, strong angular brushwork with battle-formation severity, chiseled clerical script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, weapons, war
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, weapons, war
 
 **状态：** Needed
 
@@ -1036,10 +1068,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红浓郁=血之代价标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian map, 8 dark radiating strokes from dantian with blood-drip effect fading outward, blood-pact brand circular convergence with irregular brand texture, dense vermillion red at each stroke origin for blood-for-power transaction nodes, dark warm ink tone, dripping-blood wild cursive calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and dense vermillion red
+Chinese ink wash meridian map, 8 dark radiating strokes from dantian with blood-drip effect fading outward, blood-pact brand circular convergence with irregular brand texture, dense vermillion red at each stroke origin for blood-for-power transaction nodes, dark warm ink tone, dripping-blood wild cursive calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, blood, gore
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, blood, gore
 
 **状态：** Needed
 
@@ -1064,10 +1096,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=生命守护标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation, 7 square upright radiating lines from dantian forming fortress-wall protective spread, shield-shaped convergence with turquoise-blue life-guardian core and slightly inward-tapered edges, thick even brushwork with unbreakable righteous presence, bold Yan-style regular script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise dot
+Chinese ink wash qi circulation, 7 square upright radiating lines from dantian forming fortress-wall protective spread, shield-shaped convergence with turquoise-blue life-guardian core and slightly inward-tapered edges, thick even brushwork with unbreakable righteous presence, bold Yan-style regular script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, shield, wall
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, shield, wall
 
 **状态：** Needed
 
@@ -1092,10 +1124,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=额外抽牌标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy chart, 8 page-turning arc strokes radiating from dantian with fold at midpoint like flipping card pages, layered book-flip circular convergence with upper and lower layers offset for rhythmic draw timing, turquoise-blue dot at page-turn node for extra draw, lively paper-fluttering line quality, elegant running-regular calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash internal energy chart, 8 page-turning arc strokes radiating from dantian with fold at midpoint like flipping card pages, layered book-flip circular convergence with upper and lower layers offset for rhythmic draw timing, turquoise-blue dot at page-turn node for extra draw, lively paper-fluttering line quality, elegant running-regular calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, book, pages
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, book, pages
 
 **状态：** Needed
 
@@ -1120,10 +1152,38 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=演算天机标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi diagram, 10 counting-rod straight strokes radiating from dantian in trigram-like mathematical pattern, 64-hexagram circular convergence array, turquoise-blue flicker at hexagram core for fate-calculation draw probability boost, ruler-precise geometric linework with mathematical beauty, neat small seal script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash qi diagram, 10 counting-rod straight strokes radiating from dantian in trigram-like mathematical pattern, 64-hexagram circular convergence array, turquoise-blue flicker at hexagram core for fate-calculation draw probability boost, ruler-precise geometric linework with mathematical beauty, neat small seal script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, math, numbers
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, math, numbers
+
+**状态：** Needed
+
+---
+
+### ASSET-203 — 真灵血炼大法
+
+| 字段 | 值 |
+|------|-----|
+| 类别 | 精灵 / 2D 功法运功图 |
+| 尺寸 | 200×280px (LOD-1) / 800×1120px (工作分辨率) |
+| 格式 | PNG (RGBA8) + PSD |
+| 命名 | `technique_zhenling_xuelian_dafa.png` |
+| 卡牌数据 | 稀有度=金色 费用=5 效果=所有真灵角色攻防+20% |
+
+**视觉描述：**
+从丹田区向外放射的血炼纹路墨线——线条如血线锁链般粗粝有力，每条线末端带有真灵图腾印记（兽面/妖纹剪影），象征以血炼真灵之力。中央汇聚区呈血炼法阵的圆环——圆环内层朱砂红标识攻、外层松石青标识防，两色交织成「血炼增幅」的双色光环。墨线偏浓偏暖，有献祭般的肃杀与壮大感。题字「真灵血炼大法」以滴血效果的行草题于右下。
+
+**美术圣经锚点：**
+- §5.X.3 运功图四层构图
+- §5.X.3 墨线语言：血纹放射线=全体真灵增益型
+- §4 语义色：朱砂红（攻）+ 松石青（防）=真灵血炼标识
+
+**生成提示 (Midjourney)：**
+Chinese ink wash qi circulation map, radiating blood-pact vein strokes from dantian with spirit-beast totem emblems at each tip, blood-forge array circular convergence with inner vermillion-red (attack) and outer turquoise-blue (defense) interwoven halos, dense warm ink with sacrificial grandeur, dripping-blood running-cursive calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
+
+**反向提示 (Stable Diffusion)：**
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, beast, blood, gore
 
 **状态：** Needed
 
@@ -1150,10 +1210,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红=攻击力增幅标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian chart, 3 clean simple straight strokes rising from dantian with unadorned clarity, small sword-tip diamond convergence, vermillion red dot at tip for basic attack boost, clean ink without decorative excess, simple regular script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and vermillion dot
+Chinese ink wash meridian chart, 3 clean simple straight strokes rising from dantian with unadorned clarity, small sword-tip diamond convergence, vermillion red dot at tip for basic attack boost, clean ink without decorative excess, simple regular script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic
 
 **状态：** Needed
 
@@ -1178,10 +1238,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=月华治疗增幅
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi circulation, 4 moonlight-soft faint arc strokes rising from dantian with cloud-veiled moon haziness, crescent moon convergence emerging from mist, turquoise-blue glow like moonlight at crescent core for healing boost, extremely light ink with abundant negative space, slender running script small calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise glow
+Chinese ink wash qi circulation, 4 moonlight-soft faint arc strokes rising from dantian with cloud-veiled moon haziness, crescent moon convergence emerging from mist, turquoise-blue glow like moonlight at crescent core for healing boost, extremely light ink with abundant negative space, slender running script small calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, moon, night
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, moon, night
 
 **状态：** Needed
 
@@ -1206,10 +1266,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=炼丹增幅，朱砂红=炼器增幅
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy diagram, complex network of radiating and interconnecting brush strokes forming alchemical-symbol-like precise composition, alchemy-furnace vortex convergence with qi and artifact patterns intertwined, alternating turquoise-blue (alchemy boost) and vermillion-red (crafting boost) dots, fine gongbi-precision linework, neat clerical script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black, turquoise, and vermillion dots
+Chinese ink wash internal energy diagram, complex network of radiating and interconnecting brush strokes forming alchemical-symbol-like precise composition, alchemy-furnace vortex convergence with qi and artifact patterns intertwined, alternating turquoise-blue (alchemy boost) and vermillion-red (crafting boost) dots, fine gongbi-precision linework, neat clerical script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, furnace, machine
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, furnace, machine
 
 **状态：** Needed
 
@@ -1234,10 +1294,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=神识恢复标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi flow, 6 fragmentary discontinuous brush strokes drifting upward from dantian like scattered soul fragments slowly coalescing, misty soul-gathering circular convergence forming spiritual consciousness, turquoise-blue dot at each fragment connection for per-turn mental recovery, light floating ethereal line quality, staccato running-regular calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and turquoise dots
+Chinese ink wash qi flow, 6 fragmentary discontinuous brush strokes drifting upward from dantian like scattered soul fragments slowly coalescing, misty soul-gathering circular convergence forming spiritual consciousness, turquoise-blue dot at each fragment connection for per-turn mental recovery, light floating ethereal line quality, staccato running-regular calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, ghost, spirit
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, ghost, spirit
 
 **状态：** Needed
 
@@ -1262,10 +1322,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：朱砂红（死亡）+ 松石青（重生）=轮回标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash meridian map, 7 samsara arc strokes descending below dantian through a faint death-line then rising back stronger in darker ink, infinity-symbol figure-8 convergence, vermillion-red dot at descent/death point, turquoise-blue at ascent/rebirth point, ink density transition from light in descent to dark in ascent, solemn regular script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black, one vermillion, and one turquoise dot
+Chinese ink wash meridian map, 7 samsara arc strokes descending below dantian through a faint death-line then rising back stronger in darker ink, infinity-symbol figure-8 convergence, vermillion-red dot at descent/death point, turquoise-blue at ascent/rebirth point, ink density transition from light in descent to dark in ascent, solemn regular script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, skeleton, death
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, skeleton, death
 
 **状态：** Needed
 
@@ -1290,10 +1350,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=防御，朱砂红=攻击
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy chart, 6 solemn radiating strokes extending in 6 directions like divine light, three-layered lotus bloom convergence with turquoise-blue at heart for defense and vermillion red at petal tips for attack, mellow warm dignified brushwork like religious mural, solemn regular script large calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black, one turquoise, and vermillion dots
+Chinese ink wash internal energy chart, 6 solemn radiating strokes extending in 6 directions like divine light, three-layered lotus bloom convergence with turquoise-blue at heart for defense and vermillion red at petal tips for attack, mellow warm dignified brushwork like religious mural, solemn regular script large calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, buddha, religion, temple
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, buddha, religion, temple
 
 **状态：** Needed
 
@@ -1318,10 +1378,10 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青+朱砂红混合=混沌之力标识（混沌秘功=从牌库抽功法牌）
 
 **生成提示 (Midjourney)：**
-Chinese ink wash qi diagram, chaotic formless brush strokes billowing outward from dantian like primordial chaos, treasure-vase vortex convergence with qi coalescing at mouth, turquoise and vermillion blended dots at vase mouth for double material output when bound to Chaos Vase, extremely dark ink with heavy flying-white for primordial undivided feel, archaic oracle-bone calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and blended turquoise-vermillion dots
+Chinese ink wash qi diagram, chaotic formless brush strokes billowing outward from dantian like primordial chaos, treasure-vase vortex convergence with qi coalescing at mouth, turquoise and vermillion blended dots at vase mouth for double material output when bound to Chaos Vase, extremely dark ink with heavy flying-white for primordial undivided feel, archaic oracle-bone calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic, vase, bottle
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic, vase, bottle
 
 **状态：** Needed
 
@@ -1346,18 +1406,12 @@ person, human, figure, portrait, landscape, background, colorful, 3D, photograph
 - §4 语义色：松石青=生命力吸收标识
 
 **生成提示 (Midjourney)：**
-Chinese ink wash internal energy map, 4 dark gentle arc strokes rising from dantian with inward-hooking tips like absorbing life force, suction-cup vortex convergence drawing qi into dantian core, turquoise-blue dot at suction point for life return on kill, dark soft ink tone, gentle running script calligraphy, transparent background -- style "墨骨丹青" --ar 5:7 --no figure, no person, no landscape, no color except ink black and one turquoise dot
+Chinese ink wash internal energy map, 4 dark gentle arc strokes rising from dantian with inward-hooking tips like absorbing life force, suction-cup vortex convergence drawing qi into dantian core, turquoise-blue dot at suction point for life return on kill, dark soft ink tone, gentle running script calligraphy, pale ink wash background filling the whole card (gray 88-92%) suggesting an inner qi-sea realm, with a faint low-saturation color wash (attack=warm 赭石/defense=cool 花青), no empty white areas -- style "墨骨丹青" --ar 5:7 --no figure, person, empty background, plain white background, pure white background, blank background, vibrant colors, saturated colors, high saturation, colorful
 
 **反向提示 (Stable Diffusion)：**
-person, human, figure, portrait, landscape, background, colorful, 3D, photograph, realistic
+pure white background, empty background, blank background, person, human, figure, portrait, colorful, 3D, photograph, realistic
 
 **状态：** Needed
-
----
-
-### ASSET-063 — 轮回道经（重复条目已覆盖）
-
-*参见 ASSET-059*
 
 ---
 

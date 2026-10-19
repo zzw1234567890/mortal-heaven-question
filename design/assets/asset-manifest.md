@@ -7,9 +7,9 @@
 
 | 总数 | 已规范 | 进行中 | 完成 | 已批准 |
 |-------|--------|-------------|------|----------|
-| 223 | 223 | 0 | 0 | 0 |
+| 239 | 239 | 0 | 0 | 0 |
 
-**全部 223 个卡牌资产已完成规范——6 个规范文件就位。角色立绘从 15 张扩展到 38 张（12 核心 + 23 独立角色 + 3 通用）。**
+**全部 239 个卡牌插画资产已完成规范——6 个规范文件就位。角色立绘 38 张（12 核心 + 23 独立角色 + 3 通用），其余 201 张为 LOD-1 卡牌插画。**
 
 ## 按上下文分组的资产
 
@@ -56,13 +56,13 @@
 | ASSET-201 | 卫天寒 全身立绘 | 精灵 / 2D 角色 | Needed | design/assets/specs/card-system-characters-assets.md |
 | ASSET-202 | 余子童 全身立绘 | 精灵 / 2D 角色 | Needed | design/assets/specs/card-system-characters-assets.md |
 
-### system：card-system — 功法卡运功图（52 张）
+### system：card-system — 功法卡运功图（49 张）
 
 | 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
 |--------------|------|----------|--------|-----------|
-| ASSET-016 ~ ASSET-063 | 52 张功法运功图 | 精灵 / 2D 功法 | Needed | design/assets/specs/card-system-techniques-assets.md |
+| ASSET-016 ~ 062 + 203 ~ 204 | 49 张功法运功图 | 精灵 / 2D 功法 | Needed | design/assets/specs/card-system-techniques-assets.md |
 
-### system：card-system — 法宝卡器物静物图（48 张）
+### system：card-system — 法宝卡器物静物图（45 张）
 
 | 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
 |--------------|------|----------|--------|-----------|
@@ -72,13 +72,13 @@
 
 | 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
 |--------------|------|----------|--------|-----------|
-| ASSET-109 ~ ASSET-133 | 25 张丹丸图 + 速行符/傀儡丹/冲脉丹/融灵丹 | 精灵 / 2D 丹药 | Needed | design/assets/specs/card-system-pills-assets.md |
+| ASSET-109 ~ ASSET-133 | 24 张丹丸图 | 精灵 / 2D 丹药 | Needed | design/assets/specs/card-system-pills-assets.md |
 
-### system：card-system — 符箓卡符纸墨迹图（30 张）
+### system：card-system — 符箓卡符纸墨迹图（29 张）
 
 | 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
 |--------------|------|----------|--------|-----------|
-| ASSET-134 ~ ASSET-163 | 30 张符纸符文图 | 精灵 / 2D 符箓 | Needed | design/assets/specs/card-system-talismans-assets.md |
+| ASSET-134 ~ ASSET-162 | 29 张符纸符文图 | 精灵 / 2D 符箓 | Needed | design/assets/specs/card-system-talismans-assets.md |
 
 ### system：card-system — 阵法卡阵盘几何图（16 张）
 
@@ -101,8 +101,8 @@
 | 文件 | 资产范围 | 卡牌类型 | 行数（约） |
 |------|:--:|------|:--:|
 | `design/assets/specs/card-system-characters-assets.md` | ASSET-001 ~ 015 | 角色卡 | 662 |
-| `design/assets/specs/card-system-techniques-assets.md` | ASSET-016 ~ 063 | 功法卡 | ~1,100 |
+| `design/assets/specs/card-system-techniques-assets.md` | ASSET-016 ~ 062 + 203 ~ 204 | 功法卡 | ~1,100 |
 | `design/assets/specs/card-system-artifacts-assets.md` | ASSET-064 ~ 108 | 法宝卡 | ~900 |
 | `design/assets/specs/card-system-pills-assets.md` | ASSET-109 ~ 133 | 丹药卡 | ~550 |
-| `design/assets/specs/card-system-talismans-assets.md` | ASSET-134 ~ 163 | 符箓卡 | ~650 |
+| `design/assets/specs/card-system-talismans-assets.md` | ASSET-134 ~ 162 | 符箓卡 | ~650 |
 | `design/assets/specs/card-system-formations-assets.md` | ASSET-164 ~ 179 | 阵法卡 | ~500 |
