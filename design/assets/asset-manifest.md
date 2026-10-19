@@ -1,15 +1,15 @@
 # 资产清单
 
-> 最后更新：2026-07-26
-> 来源：`design/gdd/card-system.md`、`design/art/art-bible.md`
+> 最后更新：2026-10-19
+> 来源：`design/gdd/card-system.md`、`design/art/art-bible.md`、`design/gdd/realm-system.md`
 
 ## 进度摘要
 
 | 总数 | 已规范 | 进行中 | 完成 | 已批准 |
 |-------|--------|-------------|------|----------|
-| 239 | 239 | 0 | 0 | 0 |
+| 262 | 262 | 0 | 0 | 0 |
 
-**全部 239 个卡牌插画资产已完成规范——6 个规范文件就位。角色立绘 38 张（12 核心 + 23 独立角色 + 3 通用），其余 201 张为 LOD-1 卡牌插画。**
+**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张，共 262 个资产已规范。**
 
 ## 按上下文分组的资产
 
@@ -86,6 +86,39 @@
 |--------------|------|----------|--------|-----------|
 | ASSET-164 ~ ASSET-179 | 16 张阵盘几何图 | 精灵 / 2D 阵法 | Needed | design/assets/specs/card-system-formations-assets.md |
 
+### system：environment-scenes — 环境场景背景（6 张）
+
+| 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
+|--------------|------|----------|--------|-----------|
+| ASSET-205 | 主菜单云海背景（main_menu_cloud_sea） | 环境 / 2D 场景背景 | Needed | design/assets/specs/environment-scenes-assets.md |
+| ASSET-206 | 东域山岳·皴法基准（env_east_mountains_cunfa） | 环境 / 2D 场景背景 | Needed | design/assets/specs/environment-scenes-assets.md |
+| ASSET-207 | 碎星海域·泼墨基准（env_star_sea_pomo） | 环境 / 2D 场景背景 | Needed | design/assets/specs/environment-scenes-assets.md |
+| ASSET-208 | 苍玄中央·界画基准（env_cangxuan_city_jiehua） | 环境 / 2D 场景背景 | Needed | design/assets/specs/environment-scenes-assets.md |
+| ASSET-209 | 归墟遗迹·枯笔基准（env_ruins_kubi） | 环境 / 2D 场景背景 | Needed | design/assets/specs/environment-scenes-assets.md |
+| ASSET-210 | 问道终局·大写意基准（env_final_daxieyi） | 环境 / 2D 场景背景 | Needed | design/assets/specs/environment-scenes-assets.md |
+
+### system：map-card-illustrations — 地图卡片插图（17 张）
+
+| 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
+|--------------|------|----------|--------|-----------|
+| ASSET-211 | 青云剑宗（qingyun_sword_sect） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-212 | 血渊秘境（xueyuan_secret_realm） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-213 | 云澜城（yunlan_city） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-214 | 丹霞谷（danxia_valley） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-215 | 苍玄正道盟（cangxuan_league） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-216 | 苍玄古战场（cangxuan_battlefield） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-217 | 碎星外环（suixing_outer_ring） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-218 | 碎星内海（suixing_inner_sea） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-219 | 万古殿（wangu_palace） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-220 | 西域古林（xiyu_ancient_forest） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-221 | 西域边境（xiyu_border） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-222 | 西域（xiyu_desert） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-223 | 慕兰草原（mulan_grassland） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-224 | 归墟通道（guixu_passage） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-225 | 归墟·浮云陆（guixu_floating_cloud） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-226 | 归墟·万妖谷（guixu_demon_valley） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+| ASSET-227 | 归墟·古魔战场（guixu_demon_battlefield） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
+
 ### 待规范：系统其他资产
 
 | 类别 | 数量 | 状态 |
@@ -93,6 +126,7 @@
 | UI 图标 | ~48 | 待 /asset-spec |
 | VFX/粒子 | 12 | 待 /asset-spec |
 | 音频 | 25 | 待 /asset-spec（仅描述） |
+| 环境场景扩展（6 事件类型 × 5 区域全矩阵） | ~30 | 待 /asset-spec（首批 5 域基准图已入 ASSET-206~210，后续同区域场景以其为笔法基准） |
 
 ---
 
@@ -106,3 +140,5 @@
 | `design/assets/specs/card-system-pills-assets.md` | ASSET-109 ~ 133 | 丹药卡 | ~550 |
 | `design/assets/specs/card-system-talismans-assets.md` | ASSET-134 ~ 162 | 符箓卡 | ~650 |
 | `design/assets/specs/card-system-formations-assets.md` | ASSET-164 ~ 179 | 阵法卡 | ~500 |
+| `design/assets/specs/environment-scenes-assets.md` | ASSET-205 ~ 210 | 环境场景背景 | ~180 |
+| `design/assets/specs/map-card-illustrations-assets.md` | ASSET-211 ~ 227 | 地图卡片插图 | ~330 |
