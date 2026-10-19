@@ -107,7 +107,7 @@ calculate_reincarnation_points(run_data) → int:
 | result | enum | "victory" / "death" | 本局结束方式 |
 | elites_killed | int | [0, ∞) | 本局击杀精英数（上限按境界：3/6/10/15/20） |
 | bosses_killed | int | [0, ∞) | 本局击杀Boss数（上限按境界：1/3/5/7/10） |
-| unique_cards_collected | int | [0, 222] | 本局收集的不同卡牌种类数 |
+| unique_cards_collected | int | [0, 215] | 本局收集的不同卡牌种类数 |
 | alchemy_count | int | [0, ∞) | 炼丹操作次数 |
 | forge_count | int | [0, ∞) | 炼器操作次数 |
 
@@ -378,7 +378,7 @@ calculate_reincarnation_points(run_data) → int:
 | result | enum | "victory" / "death" | 本局结束方式 |
 | elites_killed | int | [0, ∞) | 本局击杀精英数 |
 | bosses_killed | int | [0, ∞) | 本局击杀Boss数 |
-| unique_cards_collected | int | [0, 222] | 本局收集的不同卡牌种类数 |
+| unique_cards_collected | int | [0, 215] | 本局收集的不同卡牌种类数 |
 | alchemy_count | int | [0, ∞) | 炼丹操作次数 |
 | forge_count | int | [0, ∞) | 炼器操作次数 |
 

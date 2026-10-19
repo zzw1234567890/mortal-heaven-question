@@ -19,7 +19,7 @@
 ## Context
 
 **GDD**: `design/gdd/card-effect-engine.md`
-**Requirement**: `TR-effect-001`（4 种效果类型——即时/持续/触发式/替代——覆盖 222 张卡牌）
+**Requirement**: `TR-effect-001`（4 种效果类型——即时/持续/触发式/替代——覆盖 215 张卡牌）
 *（需求文本见 `docs/architecture/tr-registry.yaml`——审查时读取最新版）*
 
 **ADR Governing Implementation**: ADR-0009（卡牌效果引擎——Resource 模板 + RefCounted 运行时实例 + 栈式结算）

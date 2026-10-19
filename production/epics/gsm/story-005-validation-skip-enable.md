@@ -106,7 +106,7 @@ func add_card_to_collection(inst_dict: Dictionary) → bool:
 游戏启动 → Autoload 链按 project.godot 顺序执行:
 
 ① GSM._ready()       # validation_enabled=false，初始化数据树
-② CardSystem._ready() # 加载 222 个 .tres 模板 -> 构建 templates 字典
+② CardSystem._ready() # 加载 215 个 .tres 模板 -> 构建 templates 字典
                        # 调用 GSM.enable_validation(templates)
 ③ GSM 接收调用         # validation_enabled=true，发射 card_validation_ready
 ④ 其他 Autoload ready  # 此后可安全调用 add_card_to_collection()
@@ -132,7 +132,7 @@ func add_card_to_collection(inst_dict: Dictionary) → bool:
   - Given: `validation_enabled = false`，CardSystem 准备好 `{card_001: ..., card_002: ...}`
   - When: `GSM.enable_validation(card_db)`
   - Then: `validation_enabled == true`；`card_validation_ready` 信号发射；此后 `add_card_to_collection({template_id: "card_001"})` 成功返回 true
-  - 边界情况: `card_db` 包含 222 个条目 -> 性能可接受
+  - 边界情况: `card_db` 包含 215 个条目 -> 性能可接受
 
 - **AC-023**: 重复调用 enable_validation 被拒绝
   - Given: `validation_enabled = true`（已激活）

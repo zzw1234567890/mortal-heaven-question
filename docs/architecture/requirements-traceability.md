@@ -13,7 +13,7 @@
 | GDD 需求 ID | 需求描述 | ADR 覆盖 | Story 覆盖 |
 |-------------|---------|----------|-----------|
 | TR-card-001 | 卡牌模板/实例分离数据模型 | ADR-0006 | 待 /create-stories |
-| TR-card-002 | 222 张卡牌数据库 | ADR-0006 | 待 /create-stories |
+| TR-card-002 | 215 张卡牌数据库 | ADR-0006 | 待 /create-stories |
 | TR-card-003 | 卡组编辑系统 | ADR-0023 | 待 /create-stories |
 | TR-combat-001 | 7 阶段战斗状态机 | ADR-0008 | 待 /create-stories |
 | TR-combat-002 | 卡牌效果解析引擎 | ADR-0009 | 待 /create-stories |

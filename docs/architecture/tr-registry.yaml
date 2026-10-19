@@ -147,7 +147,7 @@ requirements:
   - id: TR-card-002
     system: card
     gdd: design/gdd/card-system.md
-    requirement: "222 个模板文件的异步加载策略——防止启动卡顿"
+    requirement: "215 个模板文件的异步加载策略——防止启动卡顿"
     created: 2026-07-25
     status: active
     covered_by: ADR-0006
@@ -237,7 +237,7 @@ requirements:
   - id: TR-effect-001
     system: card-effect-engine
     gdd: design/gdd/card-effect-engine.md
-    requirement: "4 种效果类型（即时/持续/触发式/替代）覆盖 222 张卡牌"
+    requirement: "4 种效果类型（即时/持续/触发式/替代）覆盖 215 张卡牌"
     created: 2026-07-25
     status: active
     covered_by: ADR-0009

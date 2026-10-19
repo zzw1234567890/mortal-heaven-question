@@ -11,7 +11,7 @@
 ## Context
 
 **GDD**: `design/gdd/card-system.md`
-**Requirement**: `TR-card-002`（222 个模板文件的异步加载策略——防止启动卡顿）
+**Requirement**: `TR-card-002`（215 个模板文件的异步加载策略——防止启动卡顿）
 *（需求文本见 `docs/architecture/tr-registry.yaml`——审查时读取最新版）*
 
 **ADR Governing Implementation**: ADR-0006（卡牌数据模型——Template/Instance 分离 + Resource 序列化）
