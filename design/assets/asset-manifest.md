@@ -1,15 +1,15 @@
 # 资产清单
 
-> 最后更新：2026-10-19
+> 最后更新：2026-10-20
 > 来源：`design/gdd/card-system.md`、`design/art/art-bible.md`、`design/gdd/realm-system.md`
 
 ## 进度摘要
 
 | 总数 | 已规范 | 进行中 | 完成 | 已批准 |
 |-------|--------|-------------|------|----------|
-| 316 | 316 | 0 | 0 | 0 |
+| 361 | 361 | 0 | 0 | 0 |
 
-**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张 + UI 图标 54 个，共 316 个资产已规范。**
+**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张 + UI 图标 54 个 + 敌方/Boss/NPC 实体 45 个，共 361 个资产已规范。**
 
 ## 按上下文分组的资产
 
@@ -132,6 +132,18 @@
 | ASSET-271 ~ 275 | 境界图标（5：炼气→化神——形状复杂度递增编码） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
 | ASSET-276 ~ 281 | 通用 UI 图标（6：暂停/锁定/关闭/设置/通关标记/迷雾） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
 
+### system：combat-entities — 敌方/Boss/NPC 实体立绘（45 个）
+
+> 视觉描述母清单：`design/assets/entity-inventory.md`（本表只列编号映射，视觉概述以 E01~E30/B01~B06/NPC-001~009 锚定该文档）
+
+| 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
+|--------------|------|----------|--------|-----------|
+| ASSET-282 ~ 291 | 敌方原型 炼气域（10：青云外门弟子→海盗散修） | 精灵 / 2D 敌方 | Needed | design/assets/specs/combat-entities-assets.md |
+| ASSET-292 ~ 301 | 敌方原型 筑基域（10：苍玄执事→慕兰战士） | 精灵 / 2D 敌方 | Needed | design/assets/specs/combat-entities-assets.md |
+| ASSET-302 ~ 311 | 敌方原型 金丹~化神域（10：归墟巡游者→上古邪修） | 精灵 / 2D 敌方 | Needed | design/assets/specs/combat-entities-assets.md |
+| ASSET-312 ~ 317 | Boss 实体（6：墨渊/正魔怨灵/万古殿殿灵/慕兰大萨满/古魔残躯/天劫化身——含多阶段 LOD） | 精灵 / 2D Boss | Needed | design/assets/specs/combat-entities-assets.md |
+| ASSET-318 ~ 326 | NPC 实体（9：掌柜→守阁长老——3 商店+3 事件+3 剧情） | 精灵 / 2D NPC | Needed | design/assets/specs/combat-entities-assets.md |
+
 ### 待规范：系统其他资产
 
 | 类别 | 数量 | 状态 |
@@ -139,7 +151,6 @@
 | VFX/粒子 | 12 | 待 /asset-spec |
 | 音频 | 25 | 待 /asset-spec（仅描述） |
 | 环境场景扩展（6 事件类型 × 5 区域全矩阵） | ~30 | 待 /asset-spec（首批 5 域基准图已入 ASSET-206~210，后续同区域场景以其为笔法基准） |
-| 敌方/Boss/NPC 实体（30 敌方 + 6 Boss + 9 NPC） | ~55 | 待 /asset-spec（entity-inventory.md 已有完整清单，占位编号 ASSET-ENEMY/BOSS/NPC-XXX 待正式分配） |
 
 ---
 
@@ -156,3 +167,4 @@
 | `design/assets/specs/environment-scenes-assets.md` | ASSET-205 ~ 210 | 环境场景背景 | ~180 |
 | `design/assets/specs/map-card-illustrations-assets.md` | ASSET-211 ~ 227 | 地图卡片插图 | ~330 |
 | `design/assets/specs/ui-icons-assets.md` | ASSET-228 ~ 281 | UI 图标（SVG 矢量） | ~200 |
+| `design/assets/specs/combat-entities-assets.md` | ASSET-282 ~ 326 | 敌方/Boss/NPC 实体立绘 | ~150 |
