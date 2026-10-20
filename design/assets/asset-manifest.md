@@ -7,9 +7,9 @@
 
 | 总数 | 已规范 | 进行中 | 完成 | 已批准 |
 |-------|--------|-------------|------|----------|
-| 361 | 361 | 0 | 0 | 0 |
+| 373 | 373 | 0 | 0 | 0 |
 
-**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张 + UI 图标 54 个 + 敌方/Boss/NPC 实体 45 个，共 361 个资产已规范。**
+**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张 + UI 图标 54 个 + 敌方/Boss/NPC 实体 45 个 + VFX 12 个，共 373 个资产已规范。**
 
 ## 按上下文分组的资产
 
@@ -144,11 +144,27 @@
 | ASSET-312 ~ 317 | Boss 实体（6：墨渊/正魔怨灵/万古殿殿灵/慕兰大萨满/古魔残躯/天劫化身——含多阶段 LOD） | 精灵 / 2D Boss | Needed | design/assets/specs/combat-entities-assets.md |
 | ASSET-318 ~ 326 | NPC 实体（9：掌柜→守阁长老——3 商店+3 事件+3 剧情） | 精灵 / 2D NPC | Needed | design/assets/specs/combat-entities-assets.md |
 
+### system：vfx — 视觉特效（12 个，程序动效为主）
+
+| 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
+|--------------|------|----------|--------|-----------|
+| ASSET-327 | 伤害飘字（朱砂红上飞 40px/0.6s） | VFX / 程序动效 | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-328 | 治疗飘字（松石青上飞 30px/0.5s） | VFX / 程序动效 | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-329 | 阵亡消散（淡墨晕染 2-3s+一笔朱砂红） | VFX / shader+序列 | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-330 | 费用光粒消散（弹跳 400ms+松石青微粒） | VFX / CPUParticles2D | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-331 | 阵法光环（墨阶脉动，阵营纯墨） | VFX / draw+shader | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-332 | 天劫雷光（水墨枝杈笔触+琉璃金微光） | VFX / 笔触 sprite | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-333 | 突破丹青释放（唯一主导色彩态，余韵 3-5s） | VFX / 全屏动效 | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-334 | 修为条特效（松石青境界渐进） | VFX / HUD 动效 | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-335 | 抽牌/出牌动画（500ms 四段式） | VFX / Tween 轨迹 | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-336 | 攻击选择（脉冲+落笔箭头线） | VFX / draw line | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-337 | 探索节点/迷雾（溶解过渡 0.4-0.6s） | VFX / 程序动效 | Needed | design/assets/specs/vfx-assets.md |
+| ASSET-338 | 胜负结算（卷轴翻开+朱砂红点缀） | VFX / 布局动画 | Needed | design/assets/specs/vfx-assets.md |
+
 ### 待规范：系统其他资产
 
 | 类别 | 数量 | 状态 |
 |------|:--:|------|
-| VFX/粒子 | 12 | 待 /asset-spec |
 | 音频 | 25 | 待 /asset-spec（仅描述） |
 | 环境场景扩展（6 事件类型 × 5 区域全矩阵） | ~30 | 待 /asset-spec（首批 5 域基准图已入 ASSET-206~210，后续同区域场景以其为笔法基准） |
 
@@ -168,3 +184,4 @@
 | `design/assets/specs/map-card-illustrations-assets.md` | ASSET-211 ~ 227 | 地图卡片插图 | ~330 |
 | `design/assets/specs/ui-icons-assets.md` | ASSET-228 ~ 281 | UI 图标（SVG 矢量） | ~200 |
 | `design/assets/specs/combat-entities-assets.md` | ASSET-282 ~ 326 | 敌方/Boss/NPC 实体立绘 | ~150 |
+| `design/assets/specs/vfx-assets.md` | ASSET-327 ~ 338 | 视觉特效（程序动效为主） | ~180 |
