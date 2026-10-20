@@ -7,9 +7,9 @@
 
 | 总数 | 已规范 | 进行中 | 完成 | 已批准 |
 |-------|--------|-------------|------|----------|
-| 373 | 373 | 0 | 0 | 0 |
+| 398 | 398 | 0 | 0 | 0 |
 
-**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张 + UI 图标 54 个 + 敌方/Boss/NPC 实体 45 个 + VFX 12 个，共 373 个资产已规范。**
+**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张 + UI 图标 54 个 + 敌方/Boss/NPC 实体 45 个 + VFX 12 个 + 音频 25 条（约 40 文件），共 398 个资产已规范。**
 
 ## 按上下文分组的资产
 
@@ -161,11 +161,22 @@
 | ASSET-337 | 探索节点/迷雾（溶解过渡 0.4-0.6s） | VFX / 程序动效 | Needed | design/assets/specs/vfx-assets.md |
 | ASSET-338 | 胜负结算（卷轴翻开+朱砂红点缀） | VFX / 布局动画 | Needed | design/assets/specs/vfx-assets.md |
 
+### system：audio — 音频资产（25 条：BGM 8 + SFX 16 + 环境音 4 组，纯描述）
+
+| 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
+|--------------|------|----------|--------|-----------|
+| ASSET-339 ~ 346 | BGM（8 曲：主菜单古琴/探索三阶/战斗三档/胜负短曲） | 音频 / BGM | Needed | design/assets/specs/audio-assets.md |
+| ASSET-347 ~ 353 | 卡牌 SFX（7：抽牌+六类出牌——card-system 权威） | 音频 / SFX | Needed | design/assets/specs/audio-assets.md |
+| ASSET-354 ~ 359 | 战斗/突破 SFX（6：命中/阵亡/雷鸣/突破/掉落） | 音频 / SFX | Needed | design/assets/specs/audio-assets.md |
+| ASSET-360 ~ 363 | 探索/事件 SFX（4：节点/地图/事件/行动力） | 音频 / SFX | Needed | design/assets/specs/audio-assets.md |
+| ASSET-364 ~ 365 | UI SFX（2 组：确认取消/面板绑定） | 音频 / SFX | Needed | design/assets/specs/audio-assets.md |
+| ASSET-366 | 角色语音组（3 主角 发声+情绪） | 音频 / Voice | Needed | design/assets/specs/audio-assets.md |
+| ASSET-367 ~ 370 | 环境音（4 组 9 层：山/海/洞窟/室内——五域预设映射） | 音频 / 环境音 | Needed | design/assets/specs/audio-assets.md |
+
 ### 待规范：系统其他资产
 
 | 类别 | 数量 | 状态 |
 |------|:--:|------|
-| 音频 | 25 | 待 /asset-spec（仅描述） |
 | 环境场景扩展（6 事件类型 × 5 区域全矩阵） | ~30 | 待 /asset-spec（首批 5 域基准图已入 ASSET-206~210，后续同区域场景以其为笔法基准） |
 
 ---
@@ -185,3 +196,4 @@
 | `design/assets/specs/ui-icons-assets.md` | ASSET-228 ~ 281 | UI 图标（SVG 矢量） | ~200 |
 | `design/assets/specs/combat-entities-assets.md` | ASSET-282 ~ 326 | 敌方/Boss/NPC 实体立绘 | ~150 |
 | `design/assets/specs/vfx-assets.md` | ASSET-327 ~ 338 | 视觉特效（程序动效为主） | ~180 |
+| `design/assets/specs/audio-assets.md` | ASSET-339 ~ 370 | 音频（BGM/SFX/环境音，纯描述） | ~200 |
