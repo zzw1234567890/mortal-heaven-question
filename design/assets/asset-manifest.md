@@ -7,9 +7,9 @@
 
 | 总数 | 已规范 | 进行中 | 完成 | 已批准 |
 |-------|--------|-------------|------|----------|
-| 262 | 262 | 0 | 0 | 0 |
+| 316 | 316 | 0 | 0 | 0 |
 
-**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张，共 262 个资产已规范。**
+**卡牌插画 239 张（6 规范文件）+ 环境场景背景 6 张 + 地图卡片插图 17 张 + UI 图标 54 个，共 316 个资产已规范。**
 
 ## 按上下文分组的资产
 
@@ -119,14 +119,27 @@
 | ASSET-226 | 归墟·万妖谷（guixu_demon_valley） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
 | ASSET-227 | 归墟·古魔战场（guixu_demon_battlefield） | 环境 / 2D 地图卡插图 | Needed | design/assets/specs/map-card-illustrations-assets.md |
 
+### system：ui-icons — UI 图标（54 个，SVG 矢量）
+
+| 资产 ID 范围 | 名称 | 类别 | 状态 | 规范文件 |
+|--------------|------|----------|--------|-----------|
+| ASSET-228 ~ 233 | 卡牌类型图标（6：人形/卷轴/法器/阵盘/丹丸/符纸） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+| ASSET-234 ~ 243 | 探索节点图标（10：入口/战斗/精英/Boss/事件/商店/传送/灵泉/渡劫台/回复点） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+| ASSET-244 ~ 247 | 资源图标（4：灵石/修为/行动力/卡组） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+| ASSET-248 ~ 251 | 战斗行动图标（4：攻击/防御/使用/取消） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+| ASSET-252 ~ 267 | 状态效果图标（16：5 Buff + 11 Debuff——纯墨白形状编码） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+| ASSET-268 ~ 270 | 阵营图标（3：正道/魔道/中立——纯墨线框） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+| ASSET-271 ~ 275 | 境界图标（5：炼气→化神——形状复杂度递增编码） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+| ASSET-276 ~ 281 | 通用 UI 图标（6：暂停/锁定/关闭/设置/通关标记/迷雾） | UI / SVG 图标 | Needed | design/assets/specs/ui-icons-assets.md |
+
 ### 待规范：系统其他资产
 
 | 类别 | 数量 | 状态 |
 |------|:--:|------|
-| UI 图标 | ~48 | 待 /asset-spec |
 | VFX/粒子 | 12 | 待 /asset-spec |
 | 音频 | 25 | 待 /asset-spec（仅描述） |
 | 环境场景扩展（6 事件类型 × 5 区域全矩阵） | ~30 | 待 /asset-spec（首批 5 域基准图已入 ASSET-206~210，后续同区域场景以其为笔法基准） |
+| 敌方/Boss/NPC 实体（30 敌方 + 6 Boss + 9 NPC） | ~55 | 待 /asset-spec（entity-inventory.md 已有完整清单，占位编号 ASSET-ENEMY/BOSS/NPC-XXX 待正式分配） |
 
 ---
 
@@ -142,3 +155,4 @@
 | `design/assets/specs/card-system-formations-assets.md` | ASSET-164 ~ 179 | 阵法卡 | ~500 |
 | `design/assets/specs/environment-scenes-assets.md` | ASSET-205 ~ 210 | 环境场景背景 | ~180 |
 | `design/assets/specs/map-card-illustrations-assets.md` | ASSET-211 ~ 227 | 地图卡片插图 | ~330 |
+| `design/assets/specs/ui-icons-assets.md` | ASSET-228 ~ 281 | UI 图标（SVG 矢量） | ~200 |
