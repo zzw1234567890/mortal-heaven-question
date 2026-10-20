@@ -27,6 +27,9 @@ var hud: CanvasLayer = null
 func _ready() -> void:
 	hud = HUD_SCENE.instantiate()
 	add_child(hud)
+	# hud 006 手动验证前置：HUD 可见性矩阵默认全隐藏（Story 001——主菜单场景
+	# Node3D 无场景 ID），debug 宿主直开 ContentLayer 供探索信息组走查。
+	hud.content_layer.visible = true
 	_print_instructions()
 
 func _input(event: InputEvent) -> void:
@@ -43,12 +46,16 @@ func _input(event: InputEvent) -> void:
 		KEY_8: _set_deck_count(_current_deck_limit() + 1)
 		KEY_9: _set_deck_count(_current_deck_limit())
 		KEY_0: _reset_all()
+		KEY_Q: _enter_exploration()
+		KEY_W: _consume_ap()
+		KEY_E: _restore_ap()
 
 func _print_instructions() -> void:
-	print("=== hud_debug 宿主（TD-006/TD-013）===")
+	print("=== hud_debug 宿主（TD-006/TD-013 + hud 006 探索信息组）===")
 	print("1-4: 修为 45%/80%/95%/100%（蓝/紫/金脉动/满值）")
 	print("5: 落难破碎光效  6/7: 灵石 +100/-50 浮动")
 	print("9: 卡组达上限黄  8: 卡组超限红+闪烁  0: 重置")
+	print("Q: 进入探索地图（青云剑宗 层3/5 AP 5/5→消耗看分段格）——hud 006 验证")
 	print("（卡组 limit 经 DeckEditingSystem.get_deck_limit() 动态取——炼气期默认 20）")
 
 func _get_gsm() -> Node:
@@ -133,3 +140,48 @@ func _current_deck_limit() -> int:
 	if ds != null and ds.has_method(&"get_deck_limit"):
 		return ds.get_deck_limit()
 	return 20
+
+## 进入探索地图——hud 006 探索信息组手动验证驱动（AC-3/AC-4）。[br]
+## 经 ExplorationSystem.enter_map 真实路径写入 GSM exploration 域
+## （set_exploration_map + set_exploration_ap 单帧双写 → batch_updated →
+## HUD 信息组双路径刷新），随后消耗 AP 验证分段格与颜色阈值。[br]
+## [b]场景链说明[/b]：完整游戏需经身份选择 UI（identity-selection-system epic
+## Backlog，identity_select.tscn 未落地）→ 主菜单「新游戏」点击后
+## SceneManager 转场失败静默回退——此为已知留桩（main-menu story-001
+## Completion Notes 声明），非 hud 006 缺陷。debug 宿主直接驱动数据域，
+## 绕过未落地的场景链。
+func _enter_exploration() -> void:
+	var es: Node = get_node_or_null("/root/ExplorationSystem")
+	if es == null or not es.has_method(&"enter_map"):
+		push_error("hud_debug: ExplorationSystem Autoload 不存在")
+		return
+	es.enter_map(&"qing_yun_jian_zong", 1, 5)
+	var gsm: Node = _get_gsm()
+	if gsm != null:
+		# 走到层 3（0 基 layer=2——非首层的中间层，验证 layer+1 换算显示「层3/5」）
+		gsm.set_exploration_position(2, 0)
+	print("[Q] 已进入青云剑宗（AP 5/5，位置 层3）——观察右下信息组")
+	print("    再按 W 消耗 1 AP 看分段格熄灭；按 E 恢复 2 AP 看点亮/颜色阈值")
+
+## 消耗 1 AP——GSM 原子写入（单写 → 帧末域信号路径 action_points_changed）。[br]
+## hud 006 AC-4：分段格熄灭 + 颜色阈值（5/5→4/5 normal；连按到 1/5 critical）。
+func _consume_ap() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var current: int = int(gsm.exploration.get("action_points", 0))
+	if current <= 0:
+		print("[W] AP 已为 0——按 E 恢复")
+		return
+	gsm.set_exploration_ap(current - 1, int(gsm.exploration.get("max_action_points", 5)))
+	print("[W] AP = %d/%d" % [current - 1,
+			int(gsm.exploration.get("max_action_points", 5))])
+
+## 恢复 2 AP——GSM restore_action_points（单写 → 域信号路径——AC-2 路径对偶）。
+func _restore_ap() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	gsm.restore_action_points(2)
+	print("[E] AP = %d/%d（恢复 +2）" % [int(gsm.exploration.get("action_points", 0)),
+			int(gsm.exploration.get("max_action_points", 5))])

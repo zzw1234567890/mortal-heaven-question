@@ -1,0 +1,76 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/hud/exploration_info_area.gd" id="1_script"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_info"]
+font_size = 20
+font_color = Color(0.10196078514957428, 0.10196078514957428, 0.10196078514957428, 1)
+
+[node name="ExplorationInfoArea" type="Control"]
+custom_minimum_size = Vector2(200, 90)
+layout_mode = 3
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 200.0
+offset_bottom = 90.0
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="PanelBackground" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.960784, 0.941176, 0.890196, 0.85)
+
+[node name="MapLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 200.0
+offset_bottom = 26.0
+mouse_filter = 2
+text = "未知地域"
+horizontal_alignment = 2
+label_settings = SubResource("LabelSettings_info")
+
+[node name="ApSegmentLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 32.0
+offset_right = 140.0
+offset_bottom = 58.0
+mouse_filter = 2
+text = "░░░░░"
+horizontal_alignment = 0
+label_settings = SubResource("LabelSettings_info")
+
+[node name="ApCountLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 140.0
+offset_top = 32.0
+offset_right = 200.0
+offset_bottom = 58.0
+mouse_filter = 2
+text = "0/0"
+horizontal_alignment = 2
+label_settings = SubResource("LabelSettings_info")
+
+[node name="LayerLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 64.0
+offset_right = 200.0
+offset_bottom = 90.0
+mouse_filter = 2
+text = "层1/1"
+horizontal_alignment = 2
+label_settings = SubResource("LabelSettings_info")

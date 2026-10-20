@@ -1,12 +1,12 @@
 # Story 004: 按键绑定界面（含启动加载）
 
 > **Epic**: 主菜单与设置
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
 > **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: 2026-09-20（QL-STORY-READY 裁决修订：注册机制承接+音频降级+InputMap 快照法）
+> **Last Updated**: 2026-10-20（story-done 关闭——判定 COMPLETE）
 
 ## Context
 
@@ -116,3 +116,10 @@
 
 - Depends on: Story 002（设置面板框架）；Story 003（注册机制接口——2026-09-19 裁决，本 story 落地时注册按键分类）；audio 001（14-7，软依赖——警告音契约，未完成时日志占位）
 - Unlocks: None
+
+## Completion Notes
+**Completed**：2026-10-20
+**Criteria**：7/7 通过（AC-015~018 + 注册承接 + 启动加载 + 弹键名/警告音降级——全自动化锁定，AC-3 手动走查 12 项归档签收 3/3）
+**Deviations**：ADVISORY 3 条（QL-TEST-COVERAGE 2026-10-20 full 模式）：①跨设备非冲突缺独立单测用例（集成层行为断言互补覆盖——`test_rebind_same_device_class_keeps_other_device`）；②`MainMenu._load_keybinds` 非空分支无入口级端到端断言（由 store 级往返 + H-3 产品路径测试拼接覆盖）；③AC-4「界面刷新」半边归手动证据口径（#10）。另：DEBT-MM-004（三文件超 300 行软上限 + KeybindStore 文件读写重复）已登记 tech-debt-register，main-menu epic 收尾前拆分 story；冲突警告音 `push_warning` 日志占位——AudioManager 契约落地 story 接线（story AC 明文允许）
+**Test Evidence**：tests/unit/main_menu/test_keybind_conflict.gd（13）+ tests/integration/main_menu/test_keybind_roundtrip.gd（19）全绿；production/qa/evidence/keybind-evidence.md 签收 3/3；全量 2875/2874 passing/1 pending 存量（0 failing）
+**Code Review**：已完成（LP-CODE-REVIEW full 关卡闭环：CHANGES REQUIRED → H-1/H-2/H-3 修复 7ed1076 + M-1 方案 B 9b2bc07 + M-A afe3488 → 定向复审 2026-10-20 APPROVED——四项修复核实真实存在未回退，ADR-0031 红线 25 Autoload/零状态所有权/零轮询全合规）

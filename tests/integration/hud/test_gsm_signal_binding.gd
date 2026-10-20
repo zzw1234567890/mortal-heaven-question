@@ -10,17 +10,26 @@ extends GutTest
 ## 断言显示文本）——共享 mock_gsm 仅 session 域无 resource_changed 信号，免建
 ## hud 专用 mock。
 ##
+## [br]hud Story 006 追加（2026-10-20 QL 复核 GAP-2）：ExplorationInfoArea
+## AP 数据绑定双路径（AC-2）——batch 路径（set_exploration_ap 单帧双写）+
+## 域信号路径（restore_action_points 单写 → 帧末 flush 单条变更 →
+## action_points_changed）。保存-复原模式扩展到 exploration.* 域。
+##
 ## Story 类型为 Integration（含 Logic 内核 BLOCKING 单测在 unit/hud/）——
-## 此文件为 AC-3 阻塞项。[br]风格先例：tests/unit/cultivation_system/
-## test_gain_cultivation.gd（真实 GSM + _flush + after_each 复原）。
+## 此文件为 AC-3 / AC-2（story 006）阻塞项。[br]风格先例：
+## tests/unit/cultivation_system/test_gain_cultivation.gd（真实 GSM + _flush +
+## after_each 复原）。
 
 const BAR_SCENE: PackedScene = preload("res://src/ui/hud/LingshiDeckBar.tscn")
+const INFO_SCENE: PackedScene = preload("res://src/ui/hud/ExplorationInfoArea.tscn")
 
 var gsm: Node = null
 var bar: Control = null
+var info: Control = null
 var _saved_lingshi: int = 0
 var _saved_ling_cai_low: int = 0
 var _saved_deck: Array = []
+var _saved_exploration: Dictionary = {}
 
 
 func before_each() -> void:
@@ -34,6 +43,16 @@ func before_each() -> void:
 	_saved_lingshi = int(gsm.player.resources.ling_shi)
 	_saved_ling_cai_low = int(gsm.player.resources.ling_cai.low)
 	_saved_deck = gsm.deck.current_deck.duplicate()
+	# Story 006：exploration.* 域保存（duplicate 防引用共享）+ 基线复位。
+	_saved_exploration = gsm.exploration.duplicate(true)
+	gsm.exploration = {
+		"current_map": &"qing_yun_jian_zong",
+		"node_position": {"layer": 2, "idx": 0},
+		"visited_nodes": [],
+		"action_points": 5,
+		"max_action_points": 5,
+		"map_states": {},
+	}
 	# 独立基线值——避免与用例间残留耦合
 	gsm.player.resources.ling_shi = 100
 	# 注：不再手写 _signal_chain_depth——对 static var 的 set() 语义不可靠，
@@ -46,6 +65,10 @@ func before_each() -> void:
 	# 信号处理后显示文本直接落位终值（组件 animate 注入点，测试/共享）。
 	bar.animate = false
 	add_child(bar)
+	# Story 006：ExplorationInfoArea 挂载（直连真实 GSM；ExplorationSystem
+	# Autoload 依赖注入——get_total_layers 读真实缓存，无写路径不受影响）。
+	info = INFO_SCENE.instantiate()
+	add_child(info)
 
 
 func after_each() -> void:
@@ -58,13 +81,23 @@ func after_each() -> void:
 				gsm.batch_updated.disconnect(bar._on_batch_updated)
 		bar.free()
 	bar = null
+	if info != null and is_instance_valid(info):
+		# Story 006：同上摘除订阅后释放
+		if gsm != null and is_instance_valid(gsm):
+			if gsm.action_points_changed.is_connected(info._on_action_points_changed):
+				gsm.action_points_changed.disconnect(info._on_action_points_changed)
+			if gsm.batch_updated.is_connected(info._on_batch_updated):
+				gsm.batch_updated.disconnect(info._on_batch_updated)
+		info.free()
+	info = null
 	if gsm != null and is_instance_valid(gsm):
-		# 复原灵石/灵材/卡组原值（测试自行清理——G4 裁决；直写绕过缓冲不触发
-		# 信号）。
+		# 复原灵石/灵材/卡组/exploration 原值（测试自行清理——G4 裁决；直写
+		# 绕过缓冲不触发信号）。
 		gsm.set("_pending_changes", {})
 		gsm.player.resources.ling_shi = _saved_lingshi
 		gsm.player.resources.ling_cai.low = _saved_ling_cai_low
 		gsm.deck.current_deck = _saved_deck
+		gsm.exploration = _saved_exploration.duplicate(true)
 	gsm = null
 
 
@@ -213,3 +246,93 @@ func test_ac004_negative_delta_shows_red_color() -> void:
 	var expected_normal: Color = Color("#1A1A1A")
 	assert_eq(delta_label.label_settings.font_color, expected_normal,
 			"正值 delta 文本应复位墨色 #1A1A1A")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# hud Story 006 AC-2：AP 数据绑定双路径（QL 复核 2026-10-20 GAP-2）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func _ap_text() -> String:
+	return str(info.get_node(^"ApCountLabel").text)
+
+
+func _ap_segment_text() -> String:
+	return str(info.get_node(^"ApSegmentLabel").text)
+
+
+func test_ac002_batch_path_set_exploration_ap_updates_display() -> void:
+	## AC-2 主体: set_exploration_ap(2, 5) 单帧双写（action_points +
+	## max_action_points 两条缓冲 → 帧末 batch_updated，域信号不发射）→
+	## HUD AP 显示更新为 2/5
+	# Arrange —— 基线 5/5（before_each 直写，无信号）
+	assert_eq(_ap_text(), "5/5", "前置：挂载后应显示基线 5/5")
+	# Act —— 单帧双写（走 batch_updated 路径）
+	gsm.set_exploration_ap(2, 5)
+	await _flush()
+	# Assert
+	assert_eq(_ap_text(), "2/5", "set_exploration_ap(2,5) 后应显示 2/5（batch 路径）")
+
+
+func test_ac002_domain_signal_path_restore_updates_display() -> void:
+	## AC-2 ②（GAP-2 修订新增）: restore_action_points(2) 单写 action_points →
+	## 帧末 flush 单条变更 → 域信号 action_points_changed 路径（行动力恢复
+	## 节点事件的真实路径——gsm_atomic_writes.gd L349）。max_val 恒 0 不消费。
+	# Arrange —— 消耗到 1/5（直写基线，绕过信号）
+	gsm.exploration.action_points = 1
+	info._refresh()
+	assert_eq(_ap_text(), "1/5", "前置：基线显示 1/5")
+	# Act —— 单写恢复（走域信号路径：缓冲仅 1 条 → action_points_changed）
+	gsm.restore_action_points(2)
+	await _flush()
+	# Assert
+	assert_eq(_ap_text(), "3/5", "restore_action_points(2) 后应显示 3/5（域信号路径）")
+
+
+func test_ac002_consecutive_changes_last_one_wins() -> void:
+	## AC-2 edge: 连续变更——最后一次生效（同帧多次 _buffer_change 保留
+	## 首次 old、更新末次 new → 帧末一次 batch）
+	# Arrange —— 基线 5/5（before_each）
+	# Act —— 同帧三次 set_exploration_ap
+	gsm.set_exploration_ap(4, 5)
+	gsm.set_exploration_ap(1, 5)
+	gsm.set_exploration_ap(3, 5)
+	await _flush()
+	# Assert
+	assert_eq(_ap_text(), "3/5", "连续变更后应显示最后值 3/5")
+
+
+func test_ac002_hidden_then_restored_shows_latest_value() -> void:
+	## AC-2 edge: 进战斗隐藏期间变更——恢复可见后显示最新值（ContentLayer
+	## 整体显隐归 Story 001 可见性矩阵，此处以组件 visible=false 模拟，
+	## 隐藏期间信号照常刷新数据——story 003 同型用例先例）
+	# Arrange —— 模拟战斗隐藏
+	info.visible = false
+	# Act —— 隐藏期间变更（组件未脱树，订阅保持）
+	gsm.set_exploration_ap(2, 5)
+	await _flush()
+	# Assert —— 恢复可见后显示最新值
+	info.visible = true
+	assert_eq(_ap_text(), "2/5", "隐藏期间变更、恢复可见后应显示最新值 2/5")
+
+
+func test_ac002_batch_path_updates_segments() -> void:
+	## AC-2 附带（AC-4 分段格联动）: AP 从 5 消耗到 3 → 5 格分段中 3 格
+	## 点亮（█）、2 格熄灭（░）——判定源 ApDisplayRules 共享纯函数
+	# Arrange —— 基线 5/5（before_each）
+	# Act
+	gsm.set_exploration_ap(3, 5)
+	await _flush()
+	# Assert
+	assert_eq(_ap_segment_text(), "███░░", "AP 3/5 分段应为 ███░░（3 格点亮 2 格熄灭）")
+
+
+func test_ac002_batch_other_paths_ignored() -> void:
+	## AC-2 补充（过滤规格）: batch_updated 携带非 AP 路径（灵石）——不触发
+	## AP 显示刷新。区分性断言：直写 AP 到 2 绕过信号（组件缓存保持 5/5），
+	## 过滤失效时 _refresh 读到 2 → 文本变 2/5 → 断言失败。
+	# Arrange —— 直写新值绕过信号（组件显示保持 5/5 基线）
+	gsm.exploration.action_points = 2
+	# Act —— 发非 AP 路径 batch（灵石变更）
+	gsm.batch_updated.emit({"player.resources.ling_shi": {"old": 100, "new": 150}})
+	# Assert —— AP 显示未被刷新（保持基线 5/5）
+	assert_eq(_ap_text(), "5/5", "非 AP 路径 batch 不应触发 AP 显示刷新（应保持 5/5）")

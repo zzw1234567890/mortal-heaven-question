@@ -14,7 +14,7 @@ goal: "exploration-ui 001（R-05 关闭）+ combat-ui-layout 001-002（布局主
 start: "2026-10-13"
 end: "2026-10-23"
 generated: "2026-10-13"
-updated: "2026-10-18"
+updated: "2026-10-20"
 
 stories:
   - id: "15-1"
@@ -81,21 +81,21 @@ stories:
     name: "main-menu 004 按键绑定界面（含启动加载）"
     file: "production/epics/main-menu/story-004-keybind-remapping.md"
     priority: should-have
-    status: in-progress
+    status: done
     owner: "ui-programmer"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-20"
 
   - id: "15-8"
     name: "hud 006 探索 HUD 右下信息组"
     file: "production/epics/hud/story-006-exploration-hud-info.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "ui-programmer"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-10-20"
 
   - id: "15-9"
     name: "audio-manager 003 SFX 池——16 节点池与淘汰/冷却/随机化"

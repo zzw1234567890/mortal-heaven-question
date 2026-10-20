@@ -1,5 +1,8 @@
 # QA Lead 记忆索引
 
+- [hud Story 006 QL-TEST-COVERAGE 2026-10-20](project_hud-story006-ql-test-coverage.md) — ADEQUATE；AC-1/AC-2/LP④ 逐项核实 COVERED；3 ADVISORY（域信号用例经 batch 伴随发射不可区分、未知地图回退零覆盖、命名/路径偏差）
+- [hud Story 006 QL 复核 2026-10-20](project_hud-story006-ql-review.md) — GAPS；layers 数据源差距成立但主审修复方案有误（_map_config 扁平+读档清空）；域信号路径零覆盖
+- [main-menu Story 004 QL-TEST-COVERAGE 2026-10-20](project_main-menu-story004-ql-test-coverage.md) — ADEQUATE；AC-1/2/4 全场景断言核实为真（InputMap 实查/文件回读/注册表遍历）；3 ADVISORY
 - [audio Story 002 QL-TEST-COVERAGE 2026-10-17](project_audio-story002-ql-test-coverage.md) — GAPS；2 BLOCKING（bus duck 执行层+AC-BGM-07 零覆盖、sequential 执行时序无集成测试）+3 ADVISORY
 - [Sprint 14 should 层 QL 审查 2026-09-20](project_sprint14-should-ql-review.md) — 004/006/007 均 GAPS；max_val 恒 0 陷阱、地图名无数据源（is_fallen 模式）、shop 场景不存在、004 注册机制未承接
 

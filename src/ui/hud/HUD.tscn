@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/ui/hud/hud.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/RealmBar.tscn" id="2_realm_bar"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/LingshiDeckBar.tscn" id="3_lingshi_deck_bar"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/NotificationToastArea.tscn" id="4_notification_toast_area"]
 [ext_resource type="PackedScene" path="res://src/ui/hud/PauseMenu.tscn" id="5_pause_menu"]
+[ext_resource type="PackedScene" path="res://src/ui/hud/ExplorationInfoArea.tscn" id="6_exploration_info_area"]
 
 [node name="HUD" type="CanvasLayer"]
 layer = 90
@@ -42,10 +43,20 @@ offset_bottom = 68.0
 
 [node name="ExplorationInfoArea" type="Control" parent="ContentLayer"]
 layout_mode = 1
-anchors_preset = 3
-grow_horizontal = 2
-grow_vertical = 2
+anchors_preset = 2
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -216.0
+offset_top = -106.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 0
 mouse_filter = 2
+
+[node name="ExplorationInfoArea" parent="ContentLayer/ExplorationInfoArea" instance=ExtResource("6_exploration_info_area")]
 
 [node name="NotificationArea" type="Control" parent="ContentLayer"]
 layout_mode = 1

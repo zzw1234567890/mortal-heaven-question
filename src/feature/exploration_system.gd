@@ -309,6 +309,35 @@ func resolve_node(node_id: int) -> void:
 			pass  # 入口无交互
 
 
+## 只读查询——当前地图总层数，从 DAG 缓存推导（hud Story 006 LP 跨域
+## 预协调 2026-10-20 APPROVED WITH CONDITIONS）。[br]
+## [br][b]数据源[/b]：节点 ID 编码 [code]layer * 100 + idx[/code]
+## （exploration_dag_builder.gd L46-50），故总层数 =
+## [code]max(_node_details.keys()) / 100 + 1[/code]。每次调用现算不缓存——
+## O(n) max() 无性能问题，勿加失效逻辑（LP 明示）。[br]
+## [br][b]守卫链[/b]（先例 move_to_node / can_move_to / resolve_node——
+## ADR-0014 R7；get_node_graph 为无守卫测试桩、非先例）:[br]
+##   1. [code]_dag_ready[/code] 未就绪 → push_warning + 返回安全默认 1[br]
+##   2. [code]_node_details[/code] 空集（_ready 有三条 _dag_ready=true 但缓存
+##      空的路径——LP 条件①）→ push_warning + 返回安全默认 1[br]
+## [br][b]只读[/b]：不修改任何状态——HUD 展示「层 x/总层数」的唯一许可入口
+## （HUD 禁止调用 get_node_graph()/get_node_details() 测试桩取层数——LP 条件③）。[br]
+## [br][b]返回[/b]: 总层数（≥1；空缓存/未就绪时返回 1——显示「层 x/1」的
+## 占位语义，UI 侧不做额外分支）。[br]
+## [br]来源: ADR-0014 R7 + hud Story 006（2026-10-20 QL 复核 GAP-1 + LP 条件②④⑤）。
+func get_total_layers() -> int:
+	# _dag_ready 守卫（ADR-0014 R7——先例 resolve_node L274）
+	if not _dag_ready:
+		push_warning("ExplorationSystem.get_total_layers: DAG 缓存未就绪，返回安全默认值 1")
+		return 1
+	# 空集防御（LP 条件①——_ready 有三条 _dag_ready=true 但缓存空的路径）
+	if _node_details.is_empty():
+		push_warning("ExplorationSystem.get_total_layers: 节点详情缓存为空，返回安全默认值 1")
+		return 1
+	# 节点 ID 编码 layer*100+idx → 最大 ID 整除 100 即最大层索引（0 基），+1 转 1 基
+	return int(_node_details.keys().max()) / 100 + 1
+
+
 ## 检查 from→to 是否邻接（graph[from] 包含 to）。
 func _is_reachable(from_node: int, to_node: int) -> bool:
 	if not _node_graph.has(from_node):
