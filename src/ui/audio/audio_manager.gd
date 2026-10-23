@@ -13,7 +13,12 @@ extends RefCounted
 ## SFX 池归 story 003，本 story 不创建。[br]
 ## [br][b]API 骨架[/b]：11 个方法签名与 GDD §8 逐字一致——set_state 编排归
 ## story 004；[method play_bgm]/[method stop_bgm] 自 story 002 起为真实实现
-## （[code]BgmFadePlanner[/code] 纯计划器 + Tween 薄执行层）。[br]
+## （[code]BgmFadePlanner[/code] 纯计划器 + Tween 薄执行层）；
+## [method play_sfx] 自 story 003 起委托 [code]SfxPool[/code] Logic 内核
+## （冷却/淘汰/随机化/UI 打断）。[br]
+## SFX 池（story 003）：16 节点（12 活跃 + 4 余量）+ UI 单实例播放器与
+## BGM 双播放器同挂 PersistentLayer（[method _setup_node_pool] 建好 16+1
+## 节点后经 [code]set_pool_nodes[/code]/[code]set_ui_player[/code] 注入）。[br]
 ## [br][b]静默模式[/b]（GDD 边缘 #14）：AudioServer 不可用时所有 API no-op
 ## 不崩溃、日志记录一次——经注入的 [member _adapter] 的
 ## [code]unavailable[/code] 标志实现。[br]
@@ -31,6 +36,13 @@ const BgmFadePlanner := preload("res://src/ui/audio/bgm_fade_planner.gd")
 
 ## BGM 流加载与缓存（story 002 AC-8——异步预加载 + 常驻 ≤2 首）。
 const BgmStreamCacheScript := preload("res://src/ui/audio/bgm_stream_cache.gd")
+
+## SFX 池 Logic 内核（story 003——冷却/淘汰/随机化/UI 打断确定性逻辑）。
+const SfxPoolScript := preload("res://src/ui/audio/sfx_pool.gd")
+
+## SFX 池调优参数资产路径（story 003——数据驱动，改数值不改代码；
+## 与 default_bus_layout.tres 同构的 .tres 出厂基准）。
+const SFX_POOL_CONFIG_PATH := "res://resources/audio/sfx_pool_config.tres"
 
 ## AudioServer 适配器——依赖注入（测试可注入 unavailable/mock 实例）。
 var _adapter: AudioServerAdapter = null
@@ -66,6 +78,15 @@ var _stream_overrides: Dictionary = {}
 ## BGM 流缓存（AC-8——异步加载/预加载/释放；共享 _stream_path_overrides）。
 var _stream_cache: RefCounted = null
 
+## SFX 池 Logic 内核（story 003——由 _init 构造并注入节点池/UI 槽/流解析器）。
+var _sfx_pool: RefCounted = null
+
+## SFX 通用池播放器节点（16 个——12 活跃 + 4 余量，挂 PersistentLayer）。
+var _sfx_players: Array[AudioStreamPlayer] = []
+
+## UI 音效单实例播放器（UI 总线——独立槽，不参与通用池）。
+var _ui_sfx_player: AudioStreamPlayer = null
+
 
 ## 构造。[br]
 ## [br][param scene_manager]: SceneManager 引用（节点池挂载目标——生产传 Autoload，
@@ -81,17 +102,24 @@ func _init(scene_manager: Node = null, adapter: AudioServerAdapter = null) -> vo
 		if not _adapter.detect_availability():
 			_adapter.unavailable = true
 	_stream_cache = BgmStreamCacheScript.new(_stream_path_overrides)
+	var sfx_config: SfxPoolConfig = null
+	if ResourceLoader.exists(SFX_POOL_CONFIG_PATH):
+		sfx_config = load(SFX_POOL_CONFIG_PATH) as SfxPoolConfig
+	_sfx_pool = SfxPoolScript.new(Time.get_ticks_msec,
+			RandomNumberGenerator.new(), sfx_config)
 	_setup_node_pool()
 
 
 ## === GDD §8 API 骨架（签名逐字一致——本 story 空桩）=========================
 
-## 播放 SFX。[br]
+## 播放 SFX（story 003——委托 SFX 池 Logic 内核）。[br]
 ## [br][param sfx_id]: SFX 资源标识符。[br]
-## [param options]: 可选参数（volume_db/pitch/eviction_priority/delay_sec）——
-## 完整语义见 GDD §8。实现归 story 003（SFX 池）。
+## [param options]: 可选参数（volume_db/pitch/eviction_priority/is_attack_sfx/
+## bus——完整语义见 GDD §8 + story 003 Engine Notes；[code]delay_sec[/code]
+## 归 story 004 编排（播放时机触发），本 story 忽略）。冷却/淘汰/随机化/
+## UI 打断全部确定性逻辑在 SfxPool.request_sfx 内完成。
 func play_sfx(sfx_id: StringName, options: Dictionary = {}) -> void:
-	pass  # story 003：SFX 池逻辑
+	_sfx_pool.request_sfx(sfx_id, options)
 
 
 ## 播放 BGM（自动处理交叉淡入淡出）。[br]
@@ -208,10 +236,11 @@ func set_state(state: AudioEnums.AudioState) -> void:
 
 ## === 内部实现 ==================================================================
 
-## 实例化 BGM 双播放器节点池并挂入 PersistentLayer。[br]
-## [br]节点命名与 GDD §4 BGM 架构一致（bgm_player_a/bgm_player_b——交叉淡化
-## 归 story 002）。[code]process_mode = PROCESS_MODE_ALWAYS[/code]（ADR-0031 §1.2——
-## 暂停中节点不被冻结，暂停行为由暂停逻辑显式控制）。[br]
+## 实例化节点池并挂入 PersistentLayer。[br]
+## [br]节点命名与 GDD §4/§5 架构一致（bgm_player_a/bgm_player_b 交叉淡化归
+## story 002；sfx_player_0..15 + ui_sfx_player 归 story 003）。
+## [code]process_mode = PROCESS_MODE_ALWAYS[/code]（ADR-0031 §1.2——暂停中节点
+## 不被冻结，暂停行为由暂停逻辑显式控制）。[br]
 ## [br]_scene_manager 为 null 时跳过挂载（单元测试直建 AudioManager 场景——
 ## 无须 SceneManager）。
 func _setup_node_pool() -> void:
@@ -224,11 +253,49 @@ func _setup_node_pool() -> void:
 		player.process_mode = Node.PROCESS_MODE_ALWAYS
 		_bgm_players.append(player)
 		_scene_manager.register_persistent(player)
+	# SFX 通用池：16 节点（12 活跃 + 4 余量——GDD §5/§7 调优表）
+	for i: int in _sfx_pool.pool_size():
+		var sfx_player := AudioStreamPlayer.new()
+		sfx_player.name = "sfx_player_%d" % i
+		sfx_player.bus = AudioEnums.BUS_NAMES[AudioEnums.AudioBus.SFX]
+		sfx_player.process_mode = Node.PROCESS_MODE_ALWAYS
+		_sfx_players.append(sfx_player)
+		_scene_manager.register_persistent(sfx_player)
+	# UI 音效单实例槽（独立——不参与通用池，GDD §7 打断语义）
+	_ui_sfx_player = AudioStreamPlayer.new()
+	_ui_sfx_player.name = "ui_sfx_player"
+	_ui_sfx_player.bus = AudioEnums.BUS_NAMES[AudioEnums.AudioBus.UI]
+	_ui_sfx_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	_scene_manager.register_persistent(_ui_sfx_player)
+	# 注入 SFX 池（节点池所有权仍归本类/PersistentLayer——SfxPool 只持引用）
+	_sfx_pool.set_pool_nodes(_sfx_players)
+	_sfx_pool.set_ui_player(_ui_sfx_player)
+	_sfx_pool.set_stream_resolver(_resolve_sfx_stream)
 
 
 ## 获取 BGM 播放器池（story 002 交叉淡化消费；测试断言挂载结构用）。
 func get_bgm_players() -> Array[AudioStreamPlayer]:
 	return _bgm_players
+
+
+## 获取 SFX 通用池播放器节点（story 003 测试断言挂载结构用）。
+func get_sfx_players() -> Array[AudioStreamPlayer]:
+	return _sfx_players
+
+
+## 获取 UI 音效单实例播放器（story 003 测试断言挂载结构用）。
+func get_ui_sfx_player() -> AudioStreamPlayer:
+	return _ui_sfx_player
+
+
+## 解析 sfx_id → AudioStream（注入 SfxPool 的流解析器——AC-7）。[br]
+## 当前 SFX 资产（~50）归资产管线任务（story Out of Scope）——资产未落盘前
+## 解析始终返回 null，由 SfxPool 静默丢弃 + push_warning（每 id 一次）。
+## 对象覆盖表 [member _stream_overrides] 优先（测试注入程序生成流直用）。
+func _resolve_sfx_stream(sfx_id: StringName) -> AudioStream:
+	if _stream_overrides.has(sfx_id):
+		return _stream_overrides[sfx_id]
+	return null
 
 
 ## === BGM 交叉淡化执行层（story 002——Tween 薄执行）===========================

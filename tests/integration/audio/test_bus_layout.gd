@@ -226,6 +226,40 @@ func test_audio_manager_bgm_players_bus_routing() -> void:
 		assert_eq(p.bus, &"BGM", "BGM 播放器 bus 应为 \"BGM\"（按名称路由）")
 
 
+func test_audio_manager_startup_creates_sfx_pool_under_persistent_layer() -> void:
+	## story 003 AC（16 节点池挂 PersistentLayer）：SFX 通用池 16 节点 +
+	## UI 单实例槽挂入 PersistentLayer（与 BGM 双播放器同结构——
+	## audio Story 001 AC-2 同款断言先例，story 003 消费 16 节点池）
+	# Arrange
+	var am: RefCounted = _audio_manager_of(sm)
+	var layer: Node = sm.get_node_or_null(^"PersistentLayer")
+	# Act + Assert
+	assert_not_null(layer, "PersistentLayer 应存在")
+	var sfx_players: Array = am.get_sfx_players()
+	assert_eq(sfx_players.size(), 16, "SFX 通用池应含 16 节点（12 活跃 + 4 余量）")
+	for p: AudioStreamPlayer in sfx_players:
+		assert_eq(p.get_parent(), layer,
+				"SFX 播放器 '%s' 应挂在 PersistentLayer 下" % p.name)
+		assert_eq(p.bus, &"SFX", "SFX 播放器 '%s' bus 应为 \"SFX\"（按名称路由）" % p.name)
+	var ui_player: AudioStreamPlayer = am.get_ui_sfx_player()
+	assert_not_null(ui_player, "UI 音效单实例槽应存在")
+	assert_eq(ui_player.get_parent(), layer, "UI 音效槽应挂在 PersistentLayer 下")
+	assert_eq(ui_player.bus, &"UI", "UI 音效槽 bus 应为 \"UI\"（独立槽不参与通用池）")
+
+
+func test_audio_manager_sfx_pool_process_mode_always() -> void:
+	## story 003 AC: SFX 节点池 process_mode == PROCESS_MODE_ALWAYS
+	## （ADR-0031 §1.2——音频节点池统一要求，与 BGM 双播放器一致）
+	# Arrange
+	var am: RefCounted = _audio_manager_of(sm)
+	# Act + Assert
+	for p: AudioStreamPlayer in am.get_sfx_players():
+		assert_eq(p.process_mode, Node.PROCESS_MODE_ALWAYS,
+				"SFX 播放器 '%s' 的 process_mode 应为 PROCESS_MODE_ALWAYS" % p.name)
+	assert_eq(am.get_ui_sfx_player().process_mode, Node.PROCESS_MODE_ALWAYS,
+			"UI 音效槽的 process_mode 应为 PROCESS_MODE_ALWAYS")
+
+
 func test_audio_manager_node_pool_survives_scene_transition() -> void:
 	## AC-2 edge: 模拟场景切换后节点池仍存在（不随场景卸载）。[br]
 	## [b]覆盖边界[/b]：test_mode 下 Phase 3-5 被跳过（scene_manager.gd

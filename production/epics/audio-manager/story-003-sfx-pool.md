@@ -1,12 +1,12 @@
 # Story 003: SFX 池——16 节点池与淘汰/冷却/随机化
 
 > **Epic**: 音频管理
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: Logic
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 1.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-10-23（story-done 关闭——QL ADEQUATE + LP APPROVED WITH SUGGESTIONS）
 
 ## Context
 
@@ -24,6 +24,7 @@
 - Required: SfxPool 类时间注入（clock: Callable）+ RNG 注入；信号断言（sfx_cooldown_discarded / sfx_pool_exhausted）
 - Forbidden: 硬编码 MAX_SIMULTANEOUS 等参数（调优参数表数据驱动）
 - Guardrail: 冷却/淘汰判定不逐帧轮询（请求时惰性计算）
+- Performance: 预计无性能影响——冷却/淘汰/随机化均在 `play_sfx` 请求时惰性计算，无 `_process` 逐帧轮询（仅 16 节点池 + 字典查找，O(12) 淘汰扫描）
 
 ---
 
@@ -31,15 +32,15 @@
 
 *From GDD `design/gdd/audio-system.md`，scoped to this story:*
 
-- [ ] 卡牌 SFX 播放随机化：pitch ∈ [0.9, 1.1]、volume ∈ -3dB±3dB（AC-SFX-01）
-- [ ] 12 槽满时按「优先级→年龄」淘汰，新请求优先级更高则播放（AC-SFX-02）
-- [ ] 12 槽全优先级 2 时拒绝 + `sfx_pool_exhausted` 信号（AC-SFX-03）
-- [ ] 同 sfx_id 冷却 50ms：窗口内（elapsed < 50ms）丢弃 + `sfx_cooldown_discarded` 信号；≥50ms 接受并重置（AC-SFX-04/05，边界澄清 2026-09-07）
-- [ ] 战斗攻击 SFX 100ms 门控（options.is_attack_sfx 标记）（AC-SFX-06）
-- [ ] SFX 缺失静默失败 + push_warning，不影响其他 SFX（AC-SFX-07 / 边缘 #2）
-- [ ] 异步加载失败→标记不可用→后续静默丢弃（边缘 #15）
-- [ ] UI 音效打断规则：新 UI 音效打断旧 UI 音效；最低播放时长 80ms（GDD §7，边界澄清 2026-09-07 归本 story）
-- [ ] 16 节点池（12 活跃 + 4 余量）挂 PersistentLayer
+- [x] 卡牌 SFX 播放随机化：pitch ∈ [0.9, 1.1]、volume ∈ -3dB±3dB（AC-SFX-01）
+- [x] 12 槽满时按「优先级→年龄」淘汰，新请求优先级更高则播放（AC-SFX-02）
+- [x] 12 槽全优先级 2 时拒绝 + `sfx_pool_exhausted` 信号（AC-SFX-03）
+- [x] 同 sfx_id 冷却 50ms：窗口内（elapsed < 50ms）丢弃 + `sfx_cooldown_discarded` 信号；≥50ms 接受并重置（AC-SFX-04/05，边界澄清 2026-09-07）
+- [x] 战斗攻击 SFX 100ms 门控（options.is_attack_sfx 标记）（AC-SFX-06）
+- [x] SFX 缺失静默失败 + push_warning，不影响其他 SFX（AC-SFX-07 / 边缘 #2）
+- [x] 异步加载失败→标记不可用→后续静默丢弃（边缘 #15）
+- [x] UI 音效打断规则：新 UI 音效打断旧 UI 音效；最低播放时长 80ms（GDD §7，边界澄清 2026-09-07 归本 story）
+- [x] 16 节点池（12 活跃 + 4 余量）挂 PersistentLayer
 
 ---
 
@@ -127,7 +128,7 @@
 **Required evidence**:
 - Logic: `tests/unit/audio/test_sfx_pool.gd` — must exist and pass（BLOCKING）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created & passing（2026-10-23 验证：test_sfx_pool 18 例全过 + test_bus_layout 挂载 2 例 + test_audio_manager_api_skeleton 白名单扩展；全量 2920/2921——1 pending 为既有 save_load 迁移链占位，非本次引入）
 
 ---
 
@@ -135,3 +136,11 @@
 
 - Depends on: Story 001（节点池与骨架）
 - Unlocks: Story 004（场景状态触发 SFX 清理等）
+
+## Completion Notes
+**Completed**：2026-10-23
+**Criteria**：9/9 通过（AC-SFX-01 随机化 / 02 优先级→年龄淘汰 / 03 全优先级 2 拒绝 / 04-05 冷却 49-50 分界 / 06 攻击门控 99-100 分界 / 07 缺失静默失败 / 边缘 #15 / §7 UI 打断 + 80ms 最低时长 / 16 节点池挂 PersistentLayer）
+**Deviations**：无阻塞偏差。SfxPool 调优参数（max_simultaneous 等 10 项）按 Forbidden 规则落地为 SfxPoolConfig Resource + `.tres` 资产数据驱动（非 const 硬编码）——LP 初审 REJECT 后闭环。S 级建议 4 项留待 story 004（补静音语义与 game-designer 确认 / `_find` 反查索引 / `active_count` 与 `_active_count` 重复 / 4 余量节点用途说明）。
+**Test Evidence**：Logic `tests/unit/audio/test_sfx_pool.gd`（18 例，AC-1~AC-8 含 49/50、99/100 边界 + finished 补静音路径）+ Integration `tests/integration/audio/test_bus_layout.gd`（16 节点挂载 + 总线路由 + process_mode 2 例）+ Unit `tests/unit/audio/test_audio_manager_api_skeleton.gd`（白名单扩展）——全量 2920 passing / 1 pending 存量（save_load 迁移链占位）
+**Code Review**：已完成（LP-CODE-REVIEW 两轮：初审 REJECT——调优参数 const 硬编码 Forbidden 违规 → 修复为数据驱动后 APPROVED WITH SUGGESTIONS；QL-TEST-COVERAGE 两轮：初审 GAPS——AC-8 80ms 最低时长零覆盖 → 补测后 ADEQUATE）
+**QL-TEST-COVERAGE**：ADEQUATE（qa-lead 逐文件核实——AC-1~AC-8 全 COVERED；残留 2 项 ADVISORY：dead preload 已清理 + 边缘 #15 状态机简化可观测行为一致）

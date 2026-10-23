@@ -14,7 +14,7 @@ goal: "exploration-ui 001（R-05 关闭）+ combat-ui-layout 001-002（布局主
 start: "2026-10-13"
 end: "2026-10-23"
 generated: "2026-10-13"
-updated: "2026-10-20"
+updated: "2026-10-23"
 
 stories:
   - id: "15-1"
@@ -101,8 +101,8 @@ stories:
     name: "audio-manager 003 SFX 池——16 节点池与淘汰/冷却/随机化"
     file: "production/epics/audio-manager/story-003-sfx-pool.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "engine-programmer"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-23"
