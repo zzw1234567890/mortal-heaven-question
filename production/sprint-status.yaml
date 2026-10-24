@@ -21,11 +21,11 @@ stories:
     name: "身份选择 UI 场景落地（含 SCENE_PATHS 串联）"
     file: "production/epics/identity-selection-system/story-004-identity-select-ui.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: "ui-programmer"
     estimate_days: 2.0
-    blocker: "identity 001-003 关闭（Day-1）"
-    completed: ""
+    blocker: ""
+    completed: "2026-10-24"
 
   - id: "16-2"
     name: "exploration-ui 002 地图选择界面"

@@ -277,3 +277,91 @@ func test_navigation_quit_calls_tree_quit() -> void:
 			"QuitButton.pressed 应连接到 _on_quit_pressed（场景声明）")
 	assert_true(menu.has_method("_on_quit_pressed"),
 			"退出路由方法应存在（quit 真调用由 AC-5 手动验证）")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AC-4（identity-selection Story S16-1 追加）：场景落盘 + 读档绕过
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 身份选择场景注册路径（SceneManager.SCENE_PATHS IDENTITY_SELECT 条目）。
+const IDENTITY_SELECT_SCENE_PATH: String = \
+		"res://src/ui/identity_select/identity_select.tscn"
+
+
+## 读档跳过专用 mock 场景管理器——带 [signal post_transition]（IdentitySelect
+## 读档跳过需等 post_transition 后 call_deferred 导航，godot-specialist 修正）。
+class LoadMockSceneManager:
+	extends Node
+	signal post_transition(from: int, to: int)
+
+	var change_calls: Array = []
+
+	func get_current_scene_id() -> int:
+		return SM.SceneID.IDENTITY_SELECT
+
+	func request_scene_change(from: int, to: int, type: int) -> bool:
+		change_calls.append([from, to, type])
+		return true
+
+
+## 读档跳过专用 mock IdentitySelectionSystem——selected=true 触发跳过分支。
+class LoadMockIdentitySystem:
+	extends Node
+
+	var selected: bool = false
+
+	func is_identity_selected() -> bool:
+		return selected
+
+	func get_available_identities() -> Array[Dictionary]:
+		return []
+
+	func get_identity_preview(_identity_id: StringName) -> Dictionary:
+		return {}
+
+
+func test_navigation_new_game_targets_identity_select_scene_exists() -> void:
+	## AC-4（S16-1 追加）: 新游戏 → 目标 IDENTITY_SELECT + identity_select.tscn
+	## 已落盘（存在性断言仅针对 IDENTITY_SELECT；EXPLORATION 场景文件存在性
+	## 是 exploration story 002 的延迟项，不在断言范围）。
+	# Arrange（before_each 已注入 menu + mock_sm）
+	# Act
+	menu._on_new_game_pressed()
+	# Assert
+	assert_eq(mock_sm.change_calls.size(), 1, "request_scene_change 应被调用 1 次")
+	if mock_sm.change_calls.size() == 1:
+		assert_eq(mock_sm.change_calls[0][1], SM.SceneID.IDENTITY_SELECT,
+				"转场目标应为 IDENTITY_SELECT")
+	assert_true(ResourceLoader.exists(IDENTITY_SELECT_SCENE_PATH),
+			"identity_select.tscn 应已落盘（SceneManager 注册路径目标）")
+
+
+func test_navigation_load_path_bypasses_identity_select_to_exploration() -> void:
+	## AC-4 Edge: 读档路径绕过身份选择——IdentitySelect 场景读档跳过 → 目标
+	## EXPLORATION。仅断言导航请求发出 + SceneID 正确，不断言 EXPLORATION 场景
+	## 文件存在（exploration story 002 延迟项）。[br]
+	## [b]post_transition 信号驱动[/b]：_ready 期间 _transitioning 仍 true，直接
+	## 导航会被 SceneManager 并发守卫拒绝——必须等 post_transition 后
+	## call_deferred 请求（godot-specialist 高风险修正）。
+	# Arrange —— selected=true 触发跳过分支
+	var skip_sm: LoadMockSceneManager = LoadMockSceneManager.new()
+	var skip_isys: LoadMockIdentitySystem = LoadMockIdentitySystem.new()
+	skip_isys.selected = true
+	var screen: Control = load(IDENTITY_SELECT_SCENE_PATH).instantiate()
+	screen.animate = false
+	screen.scene_manager = skip_sm
+	screen.identity_system = skip_isys
+	add_child(screen)
+	# Assert —— _ready 同步阶段不发出导航请求（并发守卫）
+	assert_eq(skip_sm.change_calls.size(), 0, "post_transition 前不应发出导航请求")
+	# Act —— 模拟 Phase 4 转场完成
+	skip_sm.post_transition.emit(0, SM.SceneID.IDENTITY_SELECT)
+	await get_tree().process_frame
+	# Assert —— 导航请求发出 + SceneID 正确
+	assert_eq(skip_sm.change_calls.size(), 1, "读档跳过应发出 1 次导航请求")
+	if skip_sm.change_calls.size() == 1:
+		assert_eq(skip_sm.change_calls[0][1], SM.SceneID.EXPLORATION,
+				"读档跳过目标应为 EXPLORATION（SceneID 正确）")
+	screen.free()
+	skip_sm.free()
+	skip_isys.free()

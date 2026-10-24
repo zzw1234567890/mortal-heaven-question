@@ -4,9 +4,10 @@
 > **Story**: 003
 > **Type**: Logic
 > **ADR**: ADR-0022
-> **Status**: In Progress
+> **Status**: Complete
 > **Estimate**: 0.5d
 > **Dependencies**: Story 001
+> **Last Updated**: 2026-10-24（story-done 关闭——Sprint 12 遗留实现翻转）
 
 ## 描述
 
@@ -32,3 +33,10 @@
 
 - `design/gdd/identity-selection-system.md` §6 身份重选/读档
 - ADR-0022 §is_identity_selected / §get_current_identity / §读档行为
+
+## Completion Notes
+**Completed**：2026-10-24
+**Criteria**：4/4 通过（is_identity_selected 未选/已选 / get_current_identity / 读档跳过）
+**Deviations**：无。实现早于 story 关闭（Sprint 12 已落盘），本次为状态翻转补关。
+**Test Evidence**：Logic `tests/unit/identity_selection_system/test_identity_query.gd`（4 例，全过）——2026-10-24 复跑通过
+**Code Review**：已完成（Sprint 12 既有实现，非本冲刺新增代码——无新增审查动作）

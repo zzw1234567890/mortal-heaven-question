@@ -1,0 +1,175 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/identity_select/identity_select.gd" id="1_script"]
+
+[node name="IdentitySelect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.071, 0.071, 0.086, 1)
+
+[node name="LayoutAnchor" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 96.0
+offset_top = 64.0
+offset_right = 1824.0
+offset_bottom = 1016.0
+
+[node name="TitleLabel" type="Label" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_right = 720.0
+offset_bottom = 56.0
+text = "选择你的开局身份"
+theme_override_font_sizes/font_size = 32
+
+[node name="GridContainer" type="GridContainer" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_top = 96.0
+offset_right = 900.0
+offset_bottom = 450.0
+columns = 3
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 16
+
+[node name="DetailPanel" type="Panel" parent="LayoutAnchor"]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+offset_top = 490.0
+offset_right = 900.0
+offset_bottom = 720.0
+
+[node name="NameLabel" type="Label" parent="LayoutAnchor/DetailPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 884.0
+offset_bottom = 48.0
+theme_override_font_sizes/font_size = 20
+
+[node name="DeckLabel" type="Label" parent="LayoutAnchor/DetailPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 56.0
+offset_right = 884.0
+offset_bottom = 92.0
+theme_override_font_sizes/font_size = 14
+
+[node name="CharacterLabel" type="Label" parent="LayoutAnchor/DetailPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 100.0
+offset_right = 884.0
+offset_bottom = 136.0
+theme_override_font_sizes/font_size = 14
+
+[node name="TalentLabel" type="Label" parent="LayoutAnchor/DetailPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 144.0
+offset_right = 884.0
+offset_bottom = 180.0
+theme_override_font_sizes/font_size = 14
+
+[node name="HintLabel" type="Label" parent="LayoutAnchor/DetailPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 188.0
+offset_right = 884.0
+offset_bottom = 218.0
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.42, 0.4, 0.37, 1)
+
+[node name="ConfirmButton" type="Button" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_top = 760.0
+offset_right = 240.0
+offset_bottom = 808.0
+text = "确认选择"
+theme_override_font_sizes/font_size = 18
+
+[node name="LockedDialog" type="AcceptDialog" parent="."]
+title = "未解锁身份"
+dialog_text = "该身份需要轮回天赋『苍玄行者』解锁"
+
+[node name="ConfirmDialog" type="ConfirmationDialog" parent="."]
+title = "确定选择"
+ok_button_text = "确定"
+cancel_button_text = "返回重选"
+
+[node name="NameLabel" type="Label" parent="ConfirmDialog"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 120.0
+offset_bottom = 32.0
+text = ""
+
+[node name="Avatars" type="HBoxContainer" parent="ConfirmDialog"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 36.0
+offset_right = 200.0
+offset_bottom = 68.0
+
+[node name="NarrativeOverlay" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Dim" type="ColorRect" parent="NarrativeOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.85)
+
+[node name="TextLabel" type="Label" parent="NarrativeOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -120.0
+offset_right = 400.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 22
+
+[connection signal="pressed" from="LayoutAnchor/ConfirmButton" to="." method="_on_confirm_pressed"]
+[connection signal="confirmed" from="ConfirmDialog" to="." method="_on_confirm_dialog_confirmed"]
+[connection signal="canceled" from="ConfirmDialog" to="." method="_on_confirm_dialog_canceled"]

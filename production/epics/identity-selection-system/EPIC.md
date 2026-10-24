@@ -3,16 +3,17 @@
 > **Layer**: Feature
 > **GDD**: `design/gdd/identity-selection-system.md`
 > **Architecture Module**: 探索与经济子系统 — IdentitySelectionSystem Autoload #21
-> **Status**: Backlog
-> **Stories**: 3 stories（标题级预创建——AC 待 `/dev-story` 填充）
+> **Status**: In Progress
+> **Stories**: 4 stories（001-003 Complete——Feature 层逻辑；004 UI 场景归表现层收尾）
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | 身份模板 const Dictionary（6 个）+ 查询 API | Logic | Not Started | ADR-0022 |
-| 002 | apply_identity 原子操作（编排现有服务 API） | Integration | Not Started | ADR-0022 |
-| 003 | is_identity_selected / get_current_identity | Logic | Not Started | ADR-0022 |
+| 001 | 身份模板 const Dictionary（6 个）+ 查询 API | Logic | Complete | ADR-0022 |
+| 002 | apply_identity 原子操作（编排现有服务 API） | Integration | Complete | ADR-0022 |
+| 003 | is_identity_selected / get_current_identity | Logic | Complete | ADR-0022 |
+| 004 | 身份选择 UI 场景（6 卡 2×3 + 确认流程 + SCENE_PATHS 串联） | UI（Logic 内核） | Not Started | ADR-0022, ADR-0031 |
 
 ## Overview
 

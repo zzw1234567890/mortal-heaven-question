@@ -405,3 +405,106 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - Tech debt logged：1 项（DEBT-CUI-003 文字通道）
 - Sprint 15 剩余：15-7 main-menu 004 按键绑定（should，1.0 天）→ 15-8 hud 006（nice）→ 15-9 audio 003（nice）
 - Next recommended：S15-7 main-menu 004 按键绑定界面（含启动加载）
+
+## Session Extract — /story-done S15-7 main-menu 004 关闭 2026-10-20
+- Verdict：COMPLETE（7/7 AC——冲突检测/往返/注册机制全自动化，AC-3 手动走查 12 项签收 3/3）
+- Story：production/epics/main-menu/story-004-keybind-remapping.md — main-menu 004 按键绑定界面（含启动加载）
+- 关卡（full 模式）：QL-TEST-COVERAGE ADEQUATE（3 条 ADVISORY：跨设备单测/入口级 E2E/界面刷新断言）；LP-CODE-REVIEW 定向复审 APPROVED（H-1/H-2/H-3/M-A 修复核实真实存在未回退，ADR-0031 红线 25 Autoload/零状态所有权/零轮询全合规）
+- 测试证据：unit 13 + integration 19 全绿；全量 2875/2874 passing/1 pending 存量（本地复跑验证）
+- 实现链提交：b252ba5（feat）+ 7ed1076（H 修复）+ 9b2bc07（M-1 方案 B）+ afe3488（M-A）+ 395f665（证据签收）——均已推送
+- Tech debt：DEBT-MM-004 已登记（三文件超 300 行 + KeybindStore 读写重复——epic 收尾前拆分 story）；无需新增
+- Sprint 15 剩余：15-8 hud 006（nice，0.5d）/ 15-9 audio 003 SFX 池（nice，1.0d）——must/should 全清
+- Next recommended：冲刺收尾流程——/retrospective → /sprint-plan new（或先拉 15-8/15-9 nice 项）；工作区注意：资产侧 2 个未提交改动（asset-manifest.md + ui-icons-assets.md）属另一线程，勿混入本 story 提交
+
+## Session Extract — /story-readiness hud 006 冲刺中预备 2026-10-20
+- 判定：NEEDS WORK → QL-STORY-READY GAPS（2 BLOCKING + 1 ADVISORY）→ 用户裁决全部采纳 → 修订落地
+- GAP-1 总层数数据源：备选路径 map_states[map_id].layers 不可行（键从未写入）；主审建议 _map_config[map_id].layers 亦被 QL 驳回（扁平无 map_id 键 + 读档清空）→ 收窄为 get_total_layers() DAG 缓存推导（max(node_id)/100+1）
+- LP 跨域预协调（ExplorationSystem 加只读方法）：APPROVED WITH CONDITIONS 五条件并入——空集防御 push_warning+默认值 1 / doc 注释 / 禁用测试桩 API 取层数 / exploration 侧三例单测 / 守卫先例改 move_to_node 系（get_node_graph 是无守卫测试桩）
+- GAP-2 AC-2 补域信号用例（restore_action_points 单写走 action_points_changed——对齐 story 002 双路径对偶先例）；GAP-3 未知 map_id 回退「未知地域」+push_warning
+- 三处修订均为文本级（不动骨架），Test Evidence 补 exploration 侧条目；story 维持 Ready 可直接 /dev-story
+- 下一步：/dev-story production/epics/hud/story-006-exploration-hud-info.md（S15-8，nice，0.5d）
+
+## 会话摘录——/dev-story hud 006 探索信息组 2026-10-20
+- 故事：production/epics/hud/story-006-exploration-hud-info.md——探索 HUD 右下信息组（S15-8）
+- 更改的文件：src/ui/shared/ap_display_rules.gd（新建 84 行——AP 阈值+分段共享纯函数）、
+  src/feature/exploration_system.gd（+29——get_total_layers 只读方法，LP 五条件全遵守）、
+  src/ui/hud/exploration_info_area.gd（新建 240 行）、ExplorationInfoArea.tscn（新建）、
+  HUD.tscn（挂载到既有占位）、tests/unit/hud/test_ap_color_threshold.gd（13）、
+  tests/unit/exploration_system/test_get_total_layers.gd（6——新建非追加，目录一主题一文件惯例）、
+  tests/integration/hud/test_gsm_signal_binding.gd（9→15，+6 含域信号 restore_action_points 路径）
+- 独立复跑验证：全量 2900 tests / 2899 passing / 1 pending 存量 / 0 failing——零回归（编排者亲自 headless 复跑）
+- LP 条件独立核实：双守卫（_dag_ready + is_empty）落地 / 组件 grep 无测试桩 API 调用 / 守卫先例注释正确
+- 偏差（ADVISORY）：①exploration 侧新建文件而非追加（目录组织惯例——语义等价）②阈值边界语义「≤ 含边界」（1/5→critical、5/10→warning——单测锁定，签批后如调整须同步）③分段格文本占位字符 █/░（真实图集归美术管线）④exploration_system.gd 594 行既有超限（+29 纯增量）
+- 阻塞项：无代码阻塞；production/qa/evidence/exploration-hud-info-evidence.md 手动证据待创建签收（AC-3/AC-4——ADVISORY 级）
+- 下一步：/code-review src/ui/shared/ap_display_rules.gd src/ui/hud/exploration_info_area.gd src/feature/exploration_system.gd → /story-done
+
+## 会话摘录——hud 006 LP-CODE-REVIEW 修复闭环 2026-10-20
+- LP-CODE-REVIEW（full 首审）：CHANGES REQUIRED——H-1（HUD.tscn 容器 anchors_preset=3 零 offset，
+  组件 200×90 展开到屏幕底边以下整体不可见——测试独立实例化组件故抓不到）+ M-1（未知地图
+  push_warning 在幂等守卫前，AP 双发射下刷屏）
+- 用户裁决全修：H-1 锚点改 preset 2 + offset -216/-106/-16/-16（16px 边距规范）；
+  M-1 守卫前移（首见告警一次）；S-1 顺手补 _connect_once doc 注释
+- 修复后全量 2900/2899 passing/1 pending 存量/0 failing——零回归
+- 定向复审：APPROVED（三处修复逐项核实通过；LP 五条件/ADR-0031 红线首审已全过）
+- QL-TEST-COVERAGE：ADEQUATE（AC-1 全 edge case/AC-2 双路径含域信号/LP④三例全覆盖；
+  3 ADVISORY：域信号用例不可区分性【GSM 伴随发射系统属性】/「未知地域」回退零覆盖【规格自身缺口】/
+  测试函数名 three_of_five_returns_warning 与断言 normal 不符）
+- 遗留：AC-3/AC-4 手动验证 evidence（production/qa/evidence/exploration-hud-info-evidence.md）
+  待用户进探索场景目视确认后签收——H-1 正是该类缺陷，headless 不可替代
+- 建议项登记（不阻塞）：S-2 位置刷新搭便车脆弱点（exploration-ui epic 补订阅）/
+  S-3 层数文本集成断言可注入 mock / S-4 story 证据路径 exploration→exploration_system 更正
+- 下一步：用户手动验证 AC-3/AC-4 → /story-done story-006（呈完成报告→裁决关闭）
+
+## Session Extract — 美术资产线收尾 2026-10-20（本会话·独立于 hud story 线）
+- 提交 8 个（84efc06~9f73a50），全部只含本线文件，未触碰 hud/main-menu story 改动
+- combat-entities spec（ASSET-282~326）+ 实体立绘 56 张四批生成落盘
+  assets/characters/enemies|npcs/（MVP 15 + VS 25 + FV 14 + 天劫尾款 2；积分 774→606）
+- VFX spec（ASSET-327~338，12 程序动效，7 项跨文档冲突按美术圣经优先裁决——
+  阵亡晕染 vs 碎裂与 DEBT-CUI-003 关联需登记）
+- 音频 spec（ASSET-339~370，25 条纯描述；响度以 audio-system 为准；
+  采样率统一 48kHz/24bit 源）
+- manifest 总数 316→398；速查表已同步；待规范仅剩环境场景扩展 ~30
+- 用户验收：56 张实体候选件在 Downloads/jimeng_entities/ 待抽检
+  （重点：古魔残躯三阶段/天劫 4 变体/妖兵 3 变体）
+- Next（本线）：①用户抽检后按名重生成不满意张 ②环境场景扩展 spec
+  （~30，等事件系统推进时定 6 事件类型清单）③VFX spec 阵亡条目与
+  combat-ui 003 实现差异登记 DEBT
+
+## Session Extract — /story-done hud 006（2026-10-20）
+- Verdict: COMPLETE WITH NOTES（H-2 墨字可见性修复——PanelBackground 米白 #F5F0E3 @85%）
+- Story: production/epics/hud/story-006-exploration-hud-info.md — 探索 HUD 右下信息组
+- Tech debt logged: None（H-1/H-2/M-1 均在 LP 复审前闭合，非遗留）
+- 手动验证：hud_debug.tscn 窗口目视 AC-3/AC-4 通过（米白卡片可见 + 分段格熄灭/点亮/变色）
+- evidence: production/qa/evidence/exploration-hud-info-evidence.md（签收）
+- 建议项（未阻塞，随 exploration-ui epic）：S-2 位置刷新搭便车 / S-3 层数断言可注入 mock / S-4 story 证据路径更正
+- Next: 提交 hud 006 本线文件（不含 design/assets/*）
+
+## Session Extract — /story-done audio-manager 003（2026-10-23）
+- Verdict: COMPLETE WITH NOTES（调优参数 const 硬编码 → SfxPoolConfig 数据驱动资产，LP 初审 REJECT 后闭环）
+- Story: production/epics/audio-manager/story-003-sfx-pool.md — SFX 池 16 节点池与淘汰/冷却/随机化
+- Tech debt logged: None（S-1/S-2/S-3 与补静音语义留待 story 004，非遗留阻塞）
+- 测试：test_sfx_pool.gd 18 例 + test_bus_layout 挂载 2 例 + api_skeleton 白名单扩展；全量 2920 passing / 1 pending 存量
+- Next: sprint 15 全 9 故事完成 → /smoke-check sprint → /team-qa sprint → /retrospective → /gate-check → /sprint-plan new
+
+<!-- QA RUN: 2026-10-24 | Sprint: sprint-15 | Verdict: APPROVED WITH CONDITIONS | Report: production/qa/qa-signoff-sprint-15-2026-10-24.md -->
+
+<!-- QA-PLAN：2026-10-24 | System：sprint-16 | Plan written：production/qa/qa-plan-sprint-16-2026-10-24.md -->
+
+<!-- IDENTITY-CLOSURE：2026-10-24 | story 001/002/003 状态翻转 Complete（Sprint 12 遗留实现）+ story 004 UI 场景创建 | 28/28 identity 测试通过 -->
+
+## Session Extract — /dev-story identity-selection 004（2026-10-24）
+- Verdict: 实现完成（3 测试缺陷已修复 + 1 契约修正 is_input_allowed 签名）
+- Story: production/epics/identity-selection-system/story-004-identity-select-ui.md — 身份选择 UI 场景
+- 文件: src/ui/identity_select/identity_select.gd + identity_select.tscn（新增）
+- 测试: test_identity_unlock_gate.gd 8 例（新增）+ test_menu_navigation.gd 追加 2 例
+- 全量: 2931 tests / 2930 passing / 1 pending 存量（save_load 占位，非本次引入）
+- 引擎风险修正: 读档跳过 post_transition+call_deferred / 卡片 FOCUS_ALL / is_input_allowed 设备区分
+- Next: /code-review src/ui/identity_select/identity_select.gd → /story-done story-004
+
+## Session Extract — /story-done identity-selection 004（2026-10-24）
+- Verdict: COMPLETE（10/10 AC 通过；code-review 两轮闭环）
+- Story: production/epics/identity-selection-system/story-004-identity-select-ui.md — 身份选择 UI 场景
+- Deviations: 音频最小接入（set_state 替代 SFX，归 audio 004）/ 本地化豁免 / UI evidence 待补（ADVISORY）
+- Tech debt logged: None（偏差均为 story 范围豁免，非遗留阻塞）
+- 测试: test_identity_unlock_gate.gd 10 例 + test_menu_navigation.gd 追加 2 例；全量 2933/2932/1 pending 存量
+- Next: S16-2 exploration-ui 002 地图选择界面（ready-for-dev）

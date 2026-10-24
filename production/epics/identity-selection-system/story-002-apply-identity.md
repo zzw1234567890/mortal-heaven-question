@@ -4,9 +4,10 @@
 > **Story**: 002
 > **Type**: Integration
 > **ADR**: ADR-0022
-> **Status**: In Progress
+> **Status**: Complete
 > **Estimate**: 0.5d
 > **Dependencies**: Story 001
+> **Last Updated**: 2026-10-24（story-done 关闭——Sprint 12 遗留实现翻转）
 
 ## 描述
 
@@ -45,3 +46,10 @@
 
 - `design/gdd/identity-selection-system.md` §3 身份选择流程、§公式#1 天赋效果注册
 - ADR-0022 §apply_identity 8 步原子操作序列
+
+## Completion Notes
+**Completed**：2026-10-24
+**Criteria**：11/11 通过（apply_identity 8 步原子操作 / 有效 ID / 无效 ID / 未解锁 ID / ResourceSystem 失败回滚）
+**Deviations**：无。实现早于 story 关闭（Sprint 12 已落盘），本次为状态翻转补关。
+**Test Evidence**：Integration `tests/unit/identity_selection_system/test_apply_identity.gd`（11 例，全过）——2026-10-24 复跑通过
+**Code Review**：已完成（Sprint 12 既有实现，非本冲刺新增代码——无新增审查动作）

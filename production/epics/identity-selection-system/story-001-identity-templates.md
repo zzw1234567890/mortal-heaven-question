@@ -4,8 +4,9 @@
 > **Story**: 001
 > **Type**: Logic
 > **ADR**: ADR-0022
-> **Status**: In Progress
+> **Status**: Complete
 > **Estimate**: 0.5d
+> **Last Updated**: 2026-10-24（story-done 关闭——Sprint 12 遗留实现翻转）
 
 ## 描述
 
@@ -42,3 +43,10 @@
 
 - `design/gdd/identity-selection-system.md` §1 身份定义结构、§2 六种身份详细定义、§7 身份影响范围
 - ADR-0022 §关键接口 `get_available_identities()` / `get_identity_preview()`
+
+## Completion Notes
+**Completed**：2026-10-24
+**Criteria**：13/13 通过（6 身份模板 / 字段完整性 / 查询 API / 解锁判定 / 推荐标注 / ling_shi / talent / initial_deck / character_slots）
+**Deviations**：无。实现早于 story 关闭（Sprint 12 Story 013 拆分已落盘），本次为状态翻转补关——13 条 AC 均已由既有实现与测试覆盖。
+**Test Evidence**：Logic `tests/unit/identity_selection_system/test_identity_templates.gd`（13 例，全过）——2026-10-24 复跑 28/28 passing（templates 13 + apply_identity 11 + query 4）
+**Code Review**：已完成（Sprint 12 既有实现，非本冲刺新增代码——无新增审查动作）
