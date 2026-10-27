@@ -1,12 +1,12 @@
 # Story 002: 地图选择界面
 
 > **Epic**: 探索 UI
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（含 Integration 入口）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 2.0d
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-10-26（story-done 关闭——S16-2 实现完成）
 
 ## Context
 
@@ -102,4 +102,17 @@
 ## Dependencies
 
 - Depends on: Story 001（无需——独立界面；但建议 001 先行建立渲染预算意识）
+- Feature 层数据源缺口（S16-2 实现时以 UI 侧 stub 先行，2026-10-24 裁决）：探索系统 `get_map_list()` / 重入 API / `map_reentry_denied` 信号 / 地图元数据表（名称/难度/境界要求）均未实现——本 story 按 story 已声明的「stub 载荷先行 + 记录依赖缺口上报」执行，UI 侧内置 stub 地图数据作为 fallback，Feature 层补齐后替换。
 - Unlocks: Story 003（进入地图后的节点图）、Story 009（解锁提示跳转目标）
+
+## Completion Notes
+**Completed**：2026-10-26
+**Criteria**：10/10 通过（已解锁彩色可点/未解锁灰锁 / 重入费用 / 重入确认弹窗明细 / 灵石不足灰显 / 苍玄古战场不可重入 / 悬停需X境界 / 直接进入 0 灵石意图 / 顶部余额 / 横向滚动三路径 / 锁定灰显+锁+悬停）
+**Deviations**：
+- 本地化豁免——TEXT_* const 块集中管理，项目暂无本地化系统（沿用 S16-1 先例注记）。
+- stub 载荷先行——探索系统 `get_map_list()` 载荷扩展未实现，UI 侧 `map_data_stub.gd` 提供 fallback（依赖缺口裁决，Feature 层补齐后整体删除）。
+- UI 手动证据 `production/qa/evidence/map-select-screen-evidence.md` 待补（ADVISORY，随 /team-qa 签收流程一并补齐）。
+**Test Evidence**：Logic `tests/unit/exploration_ui/test_map_select_logic.gd`（19 例：AC-1/3/4/5/6/7 纯函数 + entry_action 5 回归含 QA-S16-2-001 苍玄古战场）— 全过；全量 2952 tests / 2951 passing / 1 pending 存量（save_load 占位，非本次引入）。
+**Code Review**：lead-programmer + godot-gdscript-specialist + godot-specialist + qa-tester 四路并行审查——Required 全数闭环（余额标签前缀 bug / 苍玄古战场路由缺陷 / 锁定卡 TRANS_BACK 过冲→TRANS_QUAD / 死代码清理 / stub 拆分 map_data_stub.gd）。qa-tester 提交 2 缺陷：QA-S16-2-001（苍玄古战场点击误发 enter_map_requested，S2）与 QA-S16-2-002（余额标签误用标题常量，S3）——均修复并以回归测试锁定。
+**Test Evidence (UI manual)**：[ ] Not yet created——待 /team-qa 签收时补 `production/qa/evidence/map-select-screen-evidence.md`。
+**Feature 层补齐后补测义务**：重入流 Integration 测试（确认 → 扣费一致性 → `map_reentry_denied` 拒绝 toast → 信号下游连接）——stub 阶段无真实数据源，Feature 层实现 `get_map_list()`/重入 API 后必须补做，本 story 已记录但不在本 story 验收范围。

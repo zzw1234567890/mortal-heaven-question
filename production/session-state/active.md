@@ -508,3 +508,29 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - Tech debt logged: None（偏差均为 story 范围豁免，非遗留阻塞）
 - 测试: test_identity_unlock_gate.gd 10 例 + test_menu_navigation.gd 追加 2 例；全量 2933/2932/1 pending 存量
 - Next: S16-2 exploration-ui 002 地图选择界面（ready-for-dev）
+
+## Session Extract — /dev-story exploration-ui 002（2026-10-26）
+- Verdict: 实现完成（4 纯函数 + 场景落盘 + 薄容器闭合 EXPLORATION 占位）
+- Story: production/epics/exploration-ui/story-002-map-select-screen.md — 地图选择界面
+- 文件: src/ui/exploration/map_card.gd + map_select_screen.gd + map_select_screen.tscn（新增）；src/feature/exploration/exploration_scene.gd + .tscn（新增薄容器）
+- 测试: test_map_select_logic.gd 14 例（新增，14/14 passed）
+- 场景验证: exploration_scene.tscn 加载 → MapSelectScreen 挂载 → 8 张卡片渲染（headless 验证通过）
+- 引擎风险: 脚本 new() vs PackedScene.instantiate()（.tscn 节点树须 instantiate）
+- 依赖缺口: stub 载荷（get_map_list/reentry 契约 Feature 层未实现）——UI 侧 fallback，补齐后替换
+- Next: /code-review src/ui/exploration/map_select_screen.gd → /story-done story-002
+
+## Session Extract — /code-review exploration-ui 002（2026-10-26）
+- Verdict: CHANGES REQUIRED（4 专家并行审查——LP/GDScript/godot-specialist/qa-tester 各 CHANGES REQUIRED/GAPS）
+- Required 修复（全数落地）：余额标签前缀 bug（TEXT_TITLE→TEXT_BALANCE_PREFIX）/ 苍玄古战场路由缺陷（QA-S16-2-001，新增 entry_action 纯函数+5 回归测试）/ 锁定卡 TRANS_BACK 过冲→TRANS_QUAD / 死代码删除（scene_manager/pending_enter_id/TEXT_BALANCE_SUFFIX）
+- 建议采纳：键盘 ui_accept 激活卡片 / 手柄设备限定（防吞方向键焦点）/ 卡片 SHRINK_CENTER 防拉伸 / 资源类型过滤 / stub 拆分 map_data_stub.gd（map_select_screen 407→372 行）
+- 测试: test_map_select_logic.gd 14→19 例（entry_action 5 回归含苍玄古战场），19/19 passed；场景加载验证 8 卡渲染
+- Next: 全量测试套件确认 → /story-done story-002
+
+## Session Extract — /story-done exploration-ui 002（2026-10-26）
+- Verdict: COMPLETE WITH NOTES（10/10 AC 通过；code-review 四路并行 + Required 全闭环）
+- Story: production/epics/exploration-ui/story-002-map-select-screen.md — 地图选择界面
+- Deviations: 本地化豁免 / stub 载荷先行（map_data_stub.gd）/ UI evidence 待补（ADVISORY）
+- Tech debt logged: None（偏差均为 story 范围豁免，非遗留阻塞）
+- 测试: test_map_select_logic.gd 19 例（含 entry_action 5 回归 + QA-S16-2-001 苍玄古战场）；全量 2952/2951/1 pending 存量
+- 缺陷修复: QA-S16-2-001（苍玄古战场路由）/ QA-S16-2-002（余额标签前缀）
+- Next: S16-3 exploration-ui 003 节点图数据接入（blocked by 16-2——现已解锁）

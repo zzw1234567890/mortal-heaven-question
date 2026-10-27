@@ -14,7 +14,7 @@ goal: "核心循环可演示第一跳——身份选择场景落地（消除冒�
 start: "2026-10-24"
 end: "2026-11-02"
 generated: "2026-10-24"
-updated: "2026-10-24"
+updated: "2026-10-26"
 
 stories:
   - id: "16-1"
@@ -31,11 +31,11 @@ stories:
     name: "exploration-ui 002 地图选择界面"
     file: "production/epics/exploration-ui/story-002-map-select-screen.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-10-26"
 
   - id: "16-3"
     name: "exploration-ui 003 节点图数据接入与节点状态渲染"

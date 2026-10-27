@@ -1,0 +1,96 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/exploration/map_select_screen.gd" id="1_script"]
+
+[node name="MapSelectScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.071, 0.071, 0.086, 1)
+
+[node name="LayoutAnchor" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 96.0
+offset_top = 64.0
+offset_right = 1824.0
+offset_bottom = 1016.0
+
+[node name="TitleLabel" type="Label" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_right = 360.0
+offset_bottom = 56.0
+theme_override_font_sizes/font_size = 32
+
+[node name="BalanceLabel" type="Label" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_right = 0.0
+offset_bottom = 56.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_top = 96.0
+offset_right = 1728.0
+offset_bottom = 620.0
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="CardRow" type="HBoxContainer" parent="LayoutAnchor/ScrollContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="ReentryDialog" type="ConfirmationDialog" parent="."]
+title = "重入地图"
+ok_button_text = "确认传送"
+cancel_button_text = "取消"
+
+[node name="VBox" type="VBoxContainer" parent="ReentryDialog"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 380.0
+offset_bottom = 200.0
+theme_override_constants/separation = 8
+
+[node name="MapLineLabel" type="Label" parent="ReentryDialog/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+
+[node name="CostDetailLabel" type="Label" parent="ReentryDialog/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+
+[node name="BalanceLabel" type="Label" parent="ReentryDialog/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+
+[node name="WarnLabel" type="Label" parent="ReentryDialog/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.9, 0.75, 0.3, 1)
+
+[connection signal="confirmed" from="ReentryDialog" to="." method="_on_reentry_confirmed"]
+[connection signal="canceled" from="ReentryDialog" to="." method="_on_reentry_canceled"]
