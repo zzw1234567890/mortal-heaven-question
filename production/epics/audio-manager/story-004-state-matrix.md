@@ -1,12 +1,12 @@
 # Story 004: set_state() 编排与过渡矩阵
 
 > **Epic**: 音频管理
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: Logic + Integration
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 1.5 天
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-10-30
 
 ## Context
 
@@ -119,7 +119,7 @@
 - Logic: `tests/unit/audio/test_state_matrix.gd` — must exist and pass（BLOCKING）
 - Integration: `tests/integration/audio/test_scene_signal_binding.gd` + 更新后的 scene_manager 单测 — must exist and pass（BLOCKING）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created — 单元 67 例 + 集成 42 例 + scene_manager 72 例，全量 3019/3020 通过
 
 ---
 
@@ -127,3 +127,18 @@
 
 - Depends on: Story 001/002（骨架与淡化原语）、Story 006 接口（环境音动作——可先以 stub 对接）
 - Unlocks: 各 UI epic 的 set_state 调用侧
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-10-30
+**Criteria**: 6/6 通过（AC-1 矩阵完整性 / AC-2 参数完备 / AC-3 TransitionType 映射 / AC-4 场景信号驱动 / AC-5 SceneManager 回归 / AC-6 幂等）
+**Deviations**（ADVISORY，均非本 story 阻塞）:
+1. 主菜单启动引导缺口——`_current_state=-1` 无启动路径触发 `set_state(MAIN_MENU)`，首转场前主菜单 BGM 不播放。归属 story 007（BGM 存档恢复）或启动引导 story，需与 producer/gameplay 协调。
+2. `TRANSITION_AUDIO_PARAMS` 降级后无运行时消费者（dead data，仅测试守护）——建议后续 story 清理，本轮已补矩阵↔引用层交叉断言止血。
+3. GDD §9 边界澄清注记「22 行」与实表 24 行漂移（`design/gdd/audio-system.md:600`）——需 game-designer 修正为「24 行」。
+4. `_enter_state` 引导进入 MAIN_MENU 经 `params_for_state` fallback 得 0.5s 淡入，与矩阵「→主菜单 1.5s 淡入」不一致——建议后续为 MAIN_MENU 补专门 params。
+5. QA 缺口 6/7（私有状态无公共读取器、通配行 vs N/A 规则语义冲突）记录待裁决。
+**Test Evidence**: Logic `tests/unit/audio/test_state_matrix.gd`（67 例）+ Integration `tests/integration/audio/test_scene_signal_binding.gd`（42 例）+ scene_manager 单测（72 例）——全量通过
+**Code Review**: 四路并行（lead-programmer / godot-specialist / gdscript-specialist / qa-tester）——2 阻塞项（循环 preload 环、N/A 状态漂移）已修复闭环，Required Changes 全清

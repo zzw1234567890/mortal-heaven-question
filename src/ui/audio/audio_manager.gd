@@ -40,6 +40,9 @@ const BgmStreamCacheScript := preload("res://src/ui/audio/bgm_stream_cache.gd")
 ## SFX 池 Logic 内核（story 003——冷却/淘汰/随机化/UI 打断确定性逻辑）。
 const SfxPoolScript := preload("res://src/ui/audio/sfx_pool.gd")
 
+## 状态过渡矩阵 Logic 内核（story 004——GDD §9 24 行唯一真源 + TransitionType 映射）。
+const StateTransitionMatrixScript := preload("res://src/ui/audio/state_transition_matrix.gd")
+
 ## SFX 池调优参数资产路径（story 003——数据驱动，改数值不改代码；
 ## 与 default_bus_layout.tres 同构的 .tres 出厂基准）。
 const SFX_POOL_CONFIG_PATH := "res://resources/audio/sfx_pool_config.tres"
@@ -87,6 +90,10 @@ var _sfx_players: Array[AudioStreamPlayer] = []
 ## UI 音效单实例播放器（UI 总线——独立槽，不参与通用池）。
 var _ui_sfx_player: AudioStreamPlayer = null
 
+## 当前音频状态（[enum AudioEnums.AudioState]）——set_state 幂等守卫与
+## SceneManager 信号源状态映射的源态（非游戏状态，音频自身运行态）。
+var _current_state: int = -1
+
 
 ## 构造。[br]
 ## [br][param scene_manager]: SceneManager 引用（节点池挂载目标——生产传 Autoload，
@@ -108,6 +115,13 @@ func _init(scene_manager: Node = null, adapter: AudioServerAdapter = null) -> vo
 	_sfx_pool = SfxPoolScript.new(Time.get_ticks_msec,
 			RandomNumberGenerator.new(), sfx_config)
 	_setup_node_pool()
+	# story 004：场景级转换自动触发——绑定 SceneManager pre_transition 信号
+	# → TransitionType→AudioState 映射 → set_state（AC-4 场景信号驱动）。
+	# is_connected 防护（与 hud.gd setup 先例对齐——防重复连接导致一次信号
+	# 触发多次 set_state）。
+	if _scene_manager != null and _scene_manager.has_signal(&"pre_transition"):
+		if not _scene_manager.pre_transition.is_connected(_on_pre_transition):
+			_scene_manager.pre_transition.connect(_on_pre_transition)
 
 
 ## === GDD §8 API 骨架（签名逐字一致——本 story 空桩）=========================
@@ -227,11 +241,74 @@ func toggle_mute() -> void:
 
 
 ## 切换指定场景音频状态（编排 BGM 切换、环境音淡入淡出、SFX 清理等）。[br]
-## [br][param state]: [enum AudioEnums.AudioState] 枚举值。[br]
-## 内部经 GDD §9 过渡矩阵执行——矩阵实现归 story 004（本 story 空桩，
-## 枚举类型已完整定义供直接消费）。
+## [br][b]编排[/b]（story 004）：查 [code]StateTransitionMatrix.transition_params[/code]
+## 矩阵行（键 = 切换前状态 → 目标状态）→ 按行字段执行：[br]
+##   - [code]action == pause/resume[/code] → [method pause_all]/[method resume_all]；[br]
+##   - [code]duck_db != null[/code]（降低/恢复类）→ [method play_bgm] duck 语义
+##   （BGM 总线 dB 过渡，不切曲）；[br]
+##   - 切曲类 → [method play_bgm] 交叉淡化（sequential 渡劫顺序式）；[br]
+##   - 无行（N/A 或同态）→ 幂等 no-op。[br]
+## [br][b]幂等[/b]（AC-6）：同 [param state] 重复调用直接返回（无重启/无重复淡化）。[br]
+## [br][b]N/A 转换回滚[/b]（2026-10-29 code-review 阻塞项修复）：无矩阵行的转换
+## 视为「拒绝转换」——[member _current_state] 不推进、保持源态，并 push_warning
+## 一次。状态与音频实际状态始终保持同源一致（避免 N/A 后从错误源态出发的
+## 漂移链，如商店→战斗被误触发后战斗→探索错误切曲而非恢复）。[br]
+## [br][param state]: [enum AudioEnums.AudioState] 枚举值。
 func set_state(state: AudioEnums.AudioState) -> void:
-	pass  # story 004：过渡矩阵
+	var target: int = int(state)
+	if _current_state == target:
+		return  # AC-6 幂等：同状态重复调用无副作用
+	var from_state: int = _current_state
+	if from_state < 0:
+		# 引导进入（无前置状态）——按入口 BGM 直接淡入，查目标态参数
+		_current_state = target
+		_enter_state(target)
+		return
+	var row: Dictionary = StateTransitionMatrixScript.transition_params(
+			from_state, target)
+	if row.is_empty():
+		# N/A 转换 / 无行——拒绝转换：状态回滚（不推进），音频零动作
+		push_warning("AudioManager.set_state: N/A 转换 %d → %d 无矩阵行——拒绝，状态保持 %d" % [from_state, target, from_state])
+		return
+	_current_state = target
+	var action: StringName = row[StateTransitionMatrixScript.K_ACTION]
+	if action == StateTransitionMatrixScript.ACTION_PAUSE:
+		pause_all()
+		return
+	if action == StateTransitionMatrixScript.ACTION_RESUME:
+		resume_all()
+		return
+	var duck_db: Variant = row[StateTransitionMatrixScript.K_DUCK_DB]
+	var fade_out_sec: float = float(row[StateTransitionMatrixScript.K_FADE_OUT_SEC])
+	var fade_in_sec: float = float(row[StateTransitionMatrixScript.K_FADE_IN_SEC])
+	var sequential: bool = bool(row[StateTransitionMatrixScript.K_SEQUENTIAL])
+	var bgm_id: StringName = row[StateTransitionMatrixScript.K_BGM]
+	if duck_db != null:
+		# 降低/恢复类——BGM 总线 dB 过渡，不切曲（play_bgm duck 语义）
+		play_bgm(_current_bgm_id, {"fade_out_sec": fade_out_sec,
+				"fade_in_sec": fade_in_sec, "duck_db": duck_db})
+	else:
+		# 切曲类——交叉淡化（sequential 渡劫顺序式）
+		play_bgm(bgm_id, {"fade_out_sec": fade_out_sec,
+				"fade_in_sec": fade_in_sec, "sequential": sequential})
+	# 环境音 dB 偏移（story 006 接口——未实现前静默跳过，仅记录数据）
+	# 经 call() 间接调用：story 006 尚未定义 set_ambient_delta，直接调用
+	# 会在本脚本编译期解析失败（GDScript 静态解析非存在方法）。
+	var ambient_delta: float = float(row[StateTransitionMatrixScript.K_AMBIENT_DELTA_DB])
+	if ambient_delta != 0.0 and has_method(&"set_ambient_delta"):
+		call(&"set_ambient_delta", ambient_delta)
+
+
+## 引导进入状态（无前置状态）——入口 BGM 直接淡入（切曲类）或 no-op（duck 态）。[br]
+## [br][param target]: 目标 [enum AudioEnums.AudioState]。[br]
+## 时长参数查 [BgmFadePlanner.params_for_state]（目标态塌缩查询——与矩阵同源）。
+func _enter_state(target: int) -> void:
+	var bgm_id: StringName = StateTransitionMatrixScript.entry_bgm(target)
+	if bgm_id == &"":
+		return  # duck/no-bgm 态——无入口曲（引导进入 no-op）
+	var params: Dictionary = BgmFadePlanner.params_for_state(target)
+	play_bgm(bgm_id, {"fade_out_sec": 0.0, "fade_in_sec": float(params["fade_in_sec"]),
+			"sequential": bool(params["sequential"])})
 
 
 ## === 内部实现 ==================================================================
@@ -421,3 +498,20 @@ func _kill_fade_tween() -> void:
 	if _fade_tween != null and _fade_tween.is_valid():
 		_fade_tween.kill()
 	_fade_tween = null
+
+
+## === 状态编排内部（story 004——矩阵执行与场景信号绑定）======================
+
+## 场景转场前信号回调（AC-4）——TransitionType→AudioState 映射 → set_state。[br]
+## [br]转场中二次 pre_transition（续接语义）：中断当前 Tween 由
+## [method _execute_fade_plan] 的 kill 重建实现（委托 story 002），本回调仅
+## 按最新转场类型触发目标态。[br]
+## [br][param from]: 源场景 ID。[param to]: 目标场景 ID。[param type]: 转场类型。
+func _on_pre_transition(from: int, to: int, type: int) -> void:
+	var target_state: int = StateTransitionMatrixScript.map_transition_type(
+			from, to, type)
+	if target_state < 0:
+		return  # 未映射（NONE/防御性）——跳过
+	# 状态对齐：当前态与目标态一致时无动作（幂等）；当前态与本次转场的
+	# 源态预期不符时仍按目标态推进（引导/续接——矩阵无行则 no-op）
+	set_state(target_state as AudioEnums.AudioState)

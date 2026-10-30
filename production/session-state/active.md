@@ -534,3 +534,23 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 测试: test_map_select_logic.gd 19 例（含 entry_action 5 回归 + QA-S16-2-001 苍玄古战场）；全量 2952/2951/1 pending 存量
 - 缺陷修复: QA-S16-2-001（苍玄古战场路由）/ QA-S16-2-002（余额标签前缀）
 - Next: S16-3 exploration-ui 003 节点图数据接入（blocked by 16-2——现已解锁）
+
+## Session Extract — /dev-story + /code-review + /story-done exploration-ui 003（2026-10-27）
+- Verdict: COMPLETE WITH NOTES（12/12 AC 通过；LP-CODE-REVIEW 两轮 REJECT→APPROVE、QL-TEST-COVERAGE 两轮 GAPS→闭环）
+- Story: production/epics/exploration-ui/story-003-node-graph-data-states.md — 节点图数据接入与节点状态渲染
+- 文件: src/ui/exploration/node_state_logic.gd（Logic 内核 6 纯函数）+ node_graph_data_stub.gd + map_generated_stub.gd + node_graph_screen.gd/.tscn（新增）；node_graph_renderer.gd（六态渲染 + tooltip + 渡劫台灰斜线 + 金色脉冲）；src/feature/exploration/exploration_scene.gd（挂载点 + trigger_map_load）
+- 测试: test_node_state_logic.gd 22 例（单元）+ test_node_graph_render.gd 18 例（集成）——全量 2991/2992 + 1 pending 存量，零回归
+- Required 修复（code-review 首轮 REJECT 全闭环）：B-1 stub 回退判定（Autoload 存在→map_generated 信号源存在）+ 端到端 trigger_map_load 回归；H-1 AC-8 渡劫台灰斜线；H-2 AC-10 悬停 tooltip（_gui_input 命中检测，零轮询）；H-3 _fogged_positions states 分支对称
+- QL-TEST-COVERAGE GAPS 闭环：AC-9 连线 _is_edge_visited 两例；AC-11 渡劫台金色脉冲（TRIBULATION_GLOW_COLOR 类型恒常发光）+ 精英红边框 border_is_type 断言
+- Deviations: 本地化豁免 / stub 载荷先行（Feature 层 map_generated/get_node_detail 未实现）/ UI evidence 待补（ADVISORY）
+- Next: S16-4 audio 004 set_state 编排与过渡矩阵（should-have，ready-for-dev，未阻塞）
+
+## Session Extract — /dev-story + /code-review + /story-done audio 004（2026-10-30）
+- Verdict: COMPLETE WITH NOTES（6/6 AC 通过；code-review 四路并行，2 阻塞项全闭环）
+- Story: production/epics/audio-manager/story-004-state-matrix.md — set_state 编排与过渡矩阵
+- 文件: src/ui/audio/state_transition_matrix.gd（新增，Logic 内核 24 行矩阵真源）+ src/ui/audio/audio_manager.gd（set_state 编排 + _enter_state + _on_pre_transition 信号绑定）+ src/foundation/scene_manager.gd（TRANSITION_AUDIO_PARAMS 数值修正）
+- 测试: test_state_matrix.gd 67 例（单元）+ test_scene_signal_binding.gd 42 例（集成）+ scene_manager 72 例——全量 3019/3020 + 1 pending 存量，零回归
+- Required 修复（code-review 2 阻塞项全闭环）：①循环 preload 环解耦（矩阵本地 TT_*/SCENE_IDENTITY_SELECT 镜像常量 + 枚举交叉断言守护，删 _SceneManager preload）；②set_state N/A 状态漂移（_current_state 推进移到 row 非空检查后——N/A 回滚 + push_warning）；③is_connected 防护（对齐 hud.gd 先例）
+- 测试缺口补齐：entry_bgm 全 10 态映射 / N/A 回滚×2（单元+信号路径）/ 矩阵↔TRANSITION_AUDIO_PARAMS 交叉断言 / AC-3 魔数→枚举常量 / 双 AudioManager 监听清理（不调 sm._ready + set_audio_manager）
+- Deviations（ADVISORY，非遗留阻塞）：①主菜单启动引导缺口（归属 story 007）；②TRANSITION_AUDIO_PARAMS dead data（后续 story 清理）；③GDD §9「22 行」vs 实表 24 行漂移；④MAIN_MENU 引导淡入 0.5s vs 矩阵 1.5s；⑤QA 缺口 6/7 待裁决
+- Next: S16-5 combat-ui-layout 004 顶部条三组件（should-have，ready-for-dev，未阻塞）

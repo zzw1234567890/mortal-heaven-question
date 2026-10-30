@@ -84,10 +84,11 @@ func test_audio_params_game_to_menu() -> void:
 
 
 func test_audio_params_explore_to_combat() -> void:
-	## AC-2: EXPLORE_TO_COMBAT → 0.5s cut + fade_in
+	## AC-2: EXPLORE_TO_COMBAT → 0.5s fade_out + fade_in
+	## （story 004 修正：cut → fade_out——与 GDD §9 矩阵真源对齐）
 	var entry: Dictionary = _params[SM.TransitionType.EXPLORE_TO_COMBAT]
 	assert_eq(entry.duration_seconds, 0.5, "E2C 时长应为 0.5s")
-	assert_eq(entry.from_behavior, &"cut", "E2C 前场景行为——快速切入")
+	assert_eq(entry.from_behavior, &"fade_out", "E2C 前场景行为——0.5s 快速淡出")
 	assert_eq(entry.to_behavior, &"fade_in", "E2C 新场景行为")
 
 
@@ -100,11 +101,13 @@ func test_audio_params_combat_to_explore() -> void:
 
 
 func test_audio_params_tribulation() -> void:
-	## AC-2: TRIBULATION → 0.3s cut + cut
+	## AC-2: TRIBULATION → 0.3s fade_out + fade_in（顺序式）
+	## （story 004 修正：cut+cut → 顺序式淡出/淡入 0.3s——Boss 冲击感例外）
 	var entry: Dictionary = _params[SM.TransitionType.TRIBULATION]
 	assert_eq(entry.duration_seconds, 0.3, "TRIB 时长应为 0.3s")
-	assert_eq(entry.from_behavior, &"cut", "TRIB 前场景行为——硬切")
-	assert_eq(entry.to_behavior, &"cut", "TRIB 新场景行为——硬切")
+	assert_eq(entry.from_behavior, &"fade_out", "TRIB 前场景行为——0.3s 淡出")
+	assert_eq(entry.to_behavior, &"fade_in", "TRIB 新场景行为——0.3s 淡入")
+	assert_true(entry.get("sequential", false), "TRIB 应为顺序式（先淡出完成再淡入）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

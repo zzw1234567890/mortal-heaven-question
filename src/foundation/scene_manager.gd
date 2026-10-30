@@ -85,7 +85,11 @@ const SCENE_PATHS: Dictionary = {
 ## 音频系统通过 [signal pre_transition] 的 [code]type[/code] 参数索引本表。[br]
 ## [br][b]角色[/b]: SceneManager 提供数据契约——音频系统执行实际的 BGM 淡入/淡出。[br]
 ## [b]维护[/b]: 新增 TransitionType 值时必须同步向本表添加条目——否则音频系统
-## 的 [code]match[/code] 语句将报 missing-branch 编译警告。
+## 的 [code]match[/code] 语句将报 missing-branch 编译警告。[br]
+## [br][b]真源裁定[/b]（ADR-0031 + GDD 边界澄清 2026-09-07）：音频行为唯一真源是
+## GDD §9 过渡矩阵（audio-manager story 004 [code]state_transition_matrix.gd[/code]）；
+## 本表降级为场景级引用层。数值已与矩阵对齐：探索→战斗 0.5s 淡出（非硬切）、
+## 渡劫 0.3s 顺序式（先淡出完成再淡入，[code]sequential[/code] 标记）。
 const TRANSITION_AUDIO_PARAMS: Dictionary = {
 	TransitionType.MENU_TO_GAME: {
 		duration_seconds = 1.5,
@@ -99,7 +103,7 @@ const TRANSITION_AUDIO_PARAMS: Dictionary = {
 	},
 	TransitionType.EXPLORE_TO_COMBAT: {
 		duration_seconds = 0.5,
-		from_behavior = &"cut",
+		from_behavior = &"fade_out",
 		to_behavior = &"fade_in",
 	},
 	TransitionType.COMBAT_TO_EXPLORE: {
@@ -109,8 +113,9 @@ const TRANSITION_AUDIO_PARAMS: Dictionary = {
 	},
 	TransitionType.TRIBULATION: {
 		duration_seconds = 0.3,
-		from_behavior = &"cut",
-		to_behavior = &"cut",
+		from_behavior = &"fade_out",
+		to_behavior = &"fade_in",
+		sequential = true,
 	},
 }
 

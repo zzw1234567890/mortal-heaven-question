@@ -14,7 +14,7 @@ goal: "核心循环可演示第一跳——身份选择场景落地（消除冒�
 start: "2026-10-24"
 end: "2026-11-02"
 generated: "2026-10-24"
-updated: "2026-10-26"
+updated: "2026-10-30"
 
 stories:
   - id: "16-1"
@@ -41,21 +41,21 @@ stories:
     name: "exploration-ui 003 节点图数据接入与节点状态渲染"
     file: "production/epics/exploration-ui/story-003-node-graph-data-states.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "ui-programmer"
     estimate_days: 1.5
-    blocker: "16-2"
-    completed: ""
+    blocker: ""
+    completed: "2026-10-27"
 
   - id: "16-4"
     name: "audio 004 set_state 编排与过渡矩阵"
     file: "production/epics/audio-manager/story-004-state-matrix.md"
     priority: should-have
-    status: ready-for-dev
+    status: done
     owner: "engine-programmer"
     estimate_days: 1.5
     blocker: ""
-    completed: ""
+    completed: "2026-10-30"
 
   - id: "16-5"
     name: "combat-ui-layout 004 顶部条三组件"
