@@ -73,6 +73,9 @@ var pause_button_slot: Control = null
 ## SceneManager 持有（ADR-0031 §1.2 零新增 Autoload））。
 var _audio_manager: AudioManager = null
 
+## 顶部条三组件组装器（story 004——阶段指示器/阵法区/战斗日志）。
+var combat_topbar: CombatTopbar = null
+
 
 ## 注入音频管理器（战斗场景挂载时由 SceneManager.get_audio_manager() 传入）。
 func set_audio_manager(p_audio_manager: AudioManager) -> void:
@@ -176,6 +179,18 @@ func _build_layout() -> void:
 	_anchor_ratio(pause_button_slot, 1.0 - 48.0 / 1920.0, 6.0 / 1080.0,
 			1.0 - 6.0 / 1920.0, 6.0 / 1080.0 + 48.0 / 1080.0)
 	topbar.add_child(pause_button_slot)
+	# 顶部条三组件组装器（story 004——日志入口/阶段指示器/阵法区；
+	# 系统信号接线由场景挂载侧经 bind_signals 注入）
+	combat_topbar = CombatTopbar.new()
+	combat_topbar.name = "CombatTopbar"
+	combat_topbar.anchor_left = 0.0
+	combat_topbar.anchor_right = 1.0 - 60.0 / 1920.0  # 留出暂停按钮位右端
+	combat_topbar.anchor_top = 0.0
+	combat_topbar.anchor_bottom = 1.0
+	combat_topbar.offset_left = 8.0
+	combat_topbar.offset_top = 6.0
+	combat_topbar.offset_bottom = -6.0
+	topbar.add_child(combat_topbar)
 	# 撤退按钮位（右上角常驻——独立于顶部条，内容/行为归 008/interaction）
 	retreat_button_slot = _make_zone("RetreatButtonSlot")
 	retreat_button_slot.custom_minimum_size = Vector2(48, 48)

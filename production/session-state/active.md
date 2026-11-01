@@ -554,3 +554,13 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 测试缺口补齐：entry_bgm 全 10 态映射 / N/A 回滚×2（单元+信号路径）/ 矩阵↔TRANSITION_AUDIO_PARAMS 交叉断言 / AC-3 魔数→枚举常量 / 双 AudioManager 监听清理（不调 sm._ready + set_audio_manager）
 - Deviations（ADVISORY，非遗留阻塞）：①主菜单启动引导缺口（归属 story 007）；②TRANSITION_AUDIO_PARAMS dead data（后续 story 清理）；③GDD §9「22 行」vs 实表 24 行漂移；④MAIN_MENU 引导淡入 0.5s vs 矩阵 1.5s；⑤QA 缺口 6/7 待裁决
 - Next: S16-5 combat-ui-layout 004 顶部条三组件（should-have，ready-for-dev，未阻塞）
+
+## Session Extract — /dev-story + /code-review + /story-done combat-ui-layout 004（2026-11-01）
+- Verdict: COMPLETE WITH NOTES（8/8 AC 通过；code-review 四路并行，6 实现缺陷 + 测试缺口全闭环）
+- Story: production/epics/combat-ui-layout/story-004-topbar-indicator-formation-log.md — 顶部条三组件（阶段指示器/阵法区/战斗日志）
+- 文件: src/ui/combat/layout/phase_indicator.gd + formation_zone.gd + combat_log.gd + combat_topbar.gd（新增）；combat_layout.gd（挂载 CombatTopbar）
+- 测试: test_phase_indicator_signal.gd 11 例 + test_log_phase2_autocollapse.gd 7 例 + test_formation_zone.gd 7 例（集成）+ mocks——全量 3044/3045 + 1 pending 存量，零回归
+- Required 修复（code-review 6 缺陷全闭环）：①日志面板高度锚定父控件→视口 50% 换算（get_viewport_rect + is_inside_tree 兜底）；②阵名解析链断裂→FormationZone 内 _resolve_slot（formation_info_cb/tag_color_cb 回调）；③滚动陈旧 max_value→call_deferred 帧末读新鲜值；④set_initial_phase 孤儿→battle_started 信号绑定（阶段 0 + 回合 1）；⑤formation_deactivated 清空槽位→set_slot_active(false) 保留阵名（DEPLOYED_UNACTIVE 语义）；⑥DEFAULT_AURA_COLOR 死代码→真实兜底
+- 测试缺口补齐：get_step_states 进度格 / 阶段切换音回调 / 切换动画 Tween（reduce_motion 跳过）/ 半屏 50% 断言 / 滚动真实底部（max_value - page）
+- Deviations（ADVISORY，非遗留阻塞）：①本地化豁免（LABEL_TEXT/PHASE_NAMES 中文硬编码）；②font_size 硬编码（13/14/18 归 accessibility）；③CombatTopbar.unbind_signals 未实现（信号源与组件同生死）
+- Next: S16-6 combat-ui-layout 005 费用栏与牌库/弃牌计数（should-have，未阻塞）

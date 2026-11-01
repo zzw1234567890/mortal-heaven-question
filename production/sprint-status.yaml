@@ -14,7 +14,7 @@ goal: "核心循环可演示第一跳——身份选择场景落地（消除冒�
 start: "2026-10-24"
 end: "2026-11-02"
 generated: "2026-10-24"
-updated: "2026-10-30"
+updated: "2026-11-01"
 
 stories:
   - id: "16-1"
@@ -61,11 +61,11 @@ stories:
     name: "combat-ui-layout 004 顶部条三组件"
     file: "production/epics/combat-ui-layout/story-004-topbar-indicator-formation-log.md"
     priority: should-have
-    status: ready-for-dev
+    status: done
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-11-01"
 
   - id: "16-6"
     name: "combat-ui-layout 005 费用栏与牌库/弃牌计数"
