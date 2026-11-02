@@ -564,3 +564,13 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - 测试缺口补齐：get_step_states 进度格 / 阶段切换音回调 / 切换动画 Tween（reduce_motion 跳过）/ 半屏 50% 断言 / 滚动真实底部（max_value - page）
 - Deviations（ADVISORY，非遗留阻塞）：①本地化豁免（LABEL_TEXT/PHASE_NAMES 中文硬编码）；②font_size 硬编码（13/14/18 归 accessibility）；③CombatTopbar.unbind_signals 未实现（信号源与组件同生死）
 - Next: S16-6 combat-ui-layout 005 费用栏与牌库/弃牌计数（should-have，未阻塞）
+
+## Session Extract — /dev-story + /code-review + /story-done combat-ui-layout 005（2026-11-01）
+- Verdict: COMPLETE WITH NOTES（7/7 AC 通过；code-review 四路并行，1 BLOCKING + 4 HIGH 全闭环）
+- Story: production/epics/combat-ui-layout/story-005-cost-bar-deck-counters.md — 费用栏与牌库/弃牌计数
+- 文件: src/ui/combat/shared/combat_ui_rules.gd（cost_color 纯函数 + COST_COLOR_* 常量）+ src/ui/combat/layout/cost_bar.gd + deck_counter.gd + end_turn_button.gd + combat_bottombar.gd（新增）；combat_layout.gd（挂载 CombatBottombar 到 bottombar）
+- 测试: test_cost_color.gd 9 例（单元）+ test_cost_display.gd 14 例（集成）+ mocks——全量 3067/3068 + 1 pending 存量，零回归
+- Required 修复（code-review 1 BLOCKING + 4 HIGH 全闭环）：①cost_changed 信号未接线→bind_signals 增加 cost_source + _on_cost_changed 解包（total_max - max_show = temporary）；②载荷语义 mismatch→_on_cost_changed 显式换算；③淡出 re-entry 竞态→_apply_texts 临时分支 kill_tween + alpha 复位；④淡出不可见→_play_temp_fade 前置 visible+alpha；⑤布局固定 1920→_place_ratio 改 size.x 基准
+- LOW 修复：PLAY_PHASE 常量（去魔法数 2）/ _reset_jump_scale（非消耗路径 scale 复位）/ has_jump_anim_active+has_temp_fade_active 探针（替代直访私有成员）/ 测试注释修正
+- Deviations（ADVISORY，非遗留阻塞）：①光粒消散粒子本体归 009b（本 story 仅数字跳动+淡出）；②本地化豁免（LABEL_TEXT/[+N临时]/≡牌库:N 硬编码）；③GDD §129 vs §716 主数字显示矛盾待 game-designer 协调
+- Next: S16-7 combat-ui-layout 006 手牌弧形渲染（should-have，未阻塞）

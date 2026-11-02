@@ -76,6 +76,9 @@ var _audio_manager: AudioManager = null
 ## 顶部条三组件组装器（story 004——阶段指示器/阵法区/战斗日志）。
 var combat_topbar: CombatTopbar = null
 
+## 底部条三组件组装器（story 005——费用栏/牌库计数/结束出牌按钮）。
+var combat_bottombar: CombatBottombar = null
+
 
 ## 注入音频管理器（战斗场景挂载时由 SceneManager.get_audio_manager() 传入）。
 func set_audio_manager(p_audio_manager: AudioManager) -> void:
@@ -191,6 +194,18 @@ func _build_layout() -> void:
 	combat_topbar.offset_top = 6.0
 	combat_topbar.offset_bottom = -6.0
 	topbar.add_child(combat_topbar)
+	# 底部条三组件组装器（story 005——费用栏/牌库计数/结束出牌按钮；
+	# 系统信号接线由场景挂载侧经 bind_signals 注入）
+	combat_bottombar = CombatBottombar.new()
+	combat_bottombar.name = "CombatBottombar"
+	combat_bottombar.anchor_left = 0.0
+	combat_bottombar.anchor_right = 1.0
+	combat_bottombar.anchor_top = 0.5
+	combat_bottombar.anchor_bottom = 1.0
+	combat_bottombar.offset_left = 8.0
+	combat_bottombar.offset_top = 8.0
+	combat_bottombar.offset_bottom = -8.0
+	bottombar.add_child(combat_bottombar)
 	# 撤退按钮位（右上角常驻——独立于顶部条，内容/行为归 008/interaction）
 	retreat_button_slot = _make_zone("RetreatButtonSlot")
 	retreat_button_slot.custom_minimum_size = Vector2(48, 48)

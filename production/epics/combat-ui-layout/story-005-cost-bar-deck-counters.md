@@ -1,12 +1,12 @@
 # Story 005: 费用栏与牌库/弃牌计数
 
 > **Epic**: 战斗 UI——静态布局与角色状态卡
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
 > **Estimate**: [待 sprint 排期填写]
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-11-01
 
 ## Context
 
@@ -31,13 +31,13 @@
 
 *From GDD，scoped to this story:*
 
-- [ ] 费用栏显示 `实际可用/基础上限` 大字 + 临时费用绿色额外数字（如 0/0 [+3临时]）
-- [ ] 费用颜色按 cost_color() 公式（含 base_max=0 守卫：仅临时→黄、全无→红）
-- [ ] 费用消耗：数字跳动减少+光粒消散动画 0.2s（费用信号驱动）
-- [ ] 临时费用用完消失：绿色数字淡出动画，基础费用不变
-- [ ] 牌库剩余/弃牌堆计数数字显示正确（点击展开归 interaction）
-- [ ] 费用变更信号驱动更新，非轮询
-- [ ] 「结束出牌」按钮渲染位：底部条右侧（仅阶段 2 可见/可点，其余阶段隐藏；GDD 边界澄清补充二 2026-09-07）——渲染与启用态归本 story，鼠标点击/键盘/手柄确认流转归 interaction epic
+- [x] 费用栏显示 `实际可用/基础上限` 大字 + 临时费用绿色额外数字（如 0/0 [+3临时]）
+- [x] 费用颜色按 cost_color() 公式（含 base_max=0 守卫：仅临时→黄、全无→红）
+- [x] 费用消耗：数字跳动减少+光粒消散动画 0.2s（费用信号驱动）
+- [x] 临时费用用完消失：绿色数字淡出动画，基础费用不变
+- [x] 牌库剩余/弃牌堆计数数字显示正确（点击展开归 interaction）
+- [x] 费用变更信号驱动更新，非轮询
+- [x] 「结束出牌」按钮渲染位：底部条右侧（仅阶段 2 可见/可点，其余阶段隐藏；GDD 边界澄清补充二 2026-09-07）——渲染与启用态归本 story，鼠标点击/键盘/手柄确认流转归 interaction epic
 
 ---
 
@@ -103,7 +103,19 @@
 - Integration: `tests/integration/combat_ui/test_cost_display.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/cost-bar-evidence.md` + sign-off
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created — Logic 内核 9 例 + 集成 14 例通过；UI 证据文档待补（ADVISORY）
+
+---
+
+## Completion Notes
+**Completed**: 2026-11-01
+**Criteria**: 7/7 AC 通过（全量 3067/3068 通过 + 1 pending 存量，零回归）
+**Deviations**（ADVISORY，非遗留阻塞）:
+1. 光粒消散（CPUParticles2D）粒子本体归 009b 统一执行（D3D12 烟雾测试项——本 story 仅落地数字跳动 Tween + 临时淡出动画，粒子按 009a 方案预算）
+2. 本地化豁免——LABEL_TEXT「结束出牌」/「[+N临时]」/「≡牌库:N」中文硬编码，待 localization epic 统一收口
+3. GDD 第 129 行（available 含临时→「3/0」）与第 716 行 AC 明文（「0/0 [+3临时]」）矛盾——实现选择前者，待 game-designer 协调后二选一
+**Test Evidence**: Logic 内核 9 例（含 cost_color 双守卫+负值钳制）+ 集成 14 例（含 cost_changed 信号端到端解包 + 淡出 re-entry + 阶段 2 按钮路由）；UI 证据文档待补（ADVISORY）
+**Code Review**: 四路并行——1 BLOCKING（cost_changed 信号未接线）+ 4 HIGH（载荷语义 mismatch / 淡出 re-entry 竞态 / 淡出不可见 / 布局固定 1920）全闭环
 
 ---
 

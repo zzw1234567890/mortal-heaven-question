@@ -71,11 +71,11 @@ stories:
     name: "combat-ui-layout 005 费用栏与牌库/弃牌计数"
     file: "production/epics/combat-ui-layout/story-005-cost-bar-deck-counters.md"
     priority: should-have
-    status: ready-for-dev
+    status: done
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-11-01"
 
   - id: "16-7"
     name: "audio 005 暂停/静音/总线音量控制"
