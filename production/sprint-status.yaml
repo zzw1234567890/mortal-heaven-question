@@ -14,10 +14,9 @@ goal: "核心循环可演示第一跳——身份选择场景落地（消除冒�
 start: "2026-10-24"
 end: "2026-11-02"
 generated: "2026-10-24"
-updated: "2026-11-01"
+updated: "2026-11-02"
 
-stories:
-  - id: "16-1"
+stories:  - id: "16-1"
     name: "身份选择 UI 场景落地（含 SCENE_PATHS 串联）"
     file: "production/epics/identity-selection-system/story-004-identity-select-ui.md"
     priority: must-have
@@ -78,14 +77,14 @@ stories:
     completed: "2026-11-01"
 
   - id: "16-7"
-    name: "audio 005 暂停/静音/总线音量控制"
-    file: "production/epics/audio-manager/story-005-pause-mute-bus-control.md"
-    priority: nice-to-have
-    status: backlog
-    owner: "engine-programmer"
-    estimate_days: 0.5
-    blocker: "16-4"
-    completed: ""
+    name: "combat-ui-layout 006 手牌弧形渲染"
+    file: "production/epics/combat-ui-layout/story-006-hand-arc-rendering.md"
+    priority: should-have
+    status: done
+    owner: "ui-programmer"
+    estimate_days: 2.0
+    blocker: ""
+    completed: "2026-11-02"
 
   - id: "16-8"
     name: "hud 008 静音图标 F1"

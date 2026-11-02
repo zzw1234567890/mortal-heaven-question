@@ -79,6 +79,9 @@ var combat_topbar: CombatTopbar = null
 ## 底部条三组件组装器（story 005——费用栏/牌库计数/结束出牌按钮）。
 var combat_bottombar: CombatBottombar = null
 
+## 手牌区组装器（story 006——弧形渲染/灰显/灵能预览/敌方卡背）。
+var hand_area: HandArea = null
+
 
 ## 注入音频管理器（战斗场景挂载时由 SceneManager.get_audio_manager() 传入）。
 func set_audio_manager(p_audio_manager: AudioManager) -> void:
@@ -206,6 +209,21 @@ func _build_layout() -> void:
 	combat_bottombar.offset_top = 8.0
 	combat_bottombar.offset_bottom = -8.0
 	bottombar.add_child(combat_bottombar)
+	# 手牌区组装器（story 006——弧形渲染/灰显/灵能预览/敌方卡背；
+	# 全屏覆盖层，卡牌按全屏坐标弧形定位——挂在根末层（bottombar 之上）；
+	# 系统信号接线由场景挂载侧经 bind_signals 注入）
+	hand_area = HandArea.new()
+	hand_area.name = "HandArea"
+	hand_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hand_area.anchor_left = 0.0
+	hand_area.anchor_right = 1.0
+	hand_area.anchor_top = 0.0
+	hand_area.anchor_bottom = 1.0
+	hand_area.offset_left = 0.0
+	hand_area.offset_top = 0.0
+	hand_area.offset_right = 0.0
+	hand_area.offset_bottom = 0.0
+	add_child(hand_area)
 	# 撤退按钮位（右上角常驻——独立于顶部条，内容/行为归 008/interaction）
 	retreat_button_slot = _make_zone("RetreatButtonSlot")
 	retreat_button_slot.custom_minimum_size = Vector2(48, 48)

@@ -1,12 +1,12 @@
 # Story 006: 手牌区弧形渲染与静态状态
 
 > **Epic**: 战斗 UI——静态布局与角色状态卡
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 2.0d（S16-7）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-11-02
 
 ## Context
 
@@ -31,14 +31,14 @@
 
 *From GDD + UX，scoped to this story:*
 
-- [ ] 手牌弧形渲染（圆弧公式）：单张无弧度、多张按角度分布、旋转从 -half 到 +half 单调
-- [ ] >7 张堆叠：间距优先+角度自适应（合成语义按 GDD 公式 2 裁决注释）；最小间距 40% 卡宽守卫
-- [ ] Z 层序：中心卡 z_index 最高（确定性规则，入纯函数单测）
-- [ ] 手牌静态状态：费用不足灰显（降饱和+费用图标灰）；阶段 2 外灵能预览（60% 饱和度+🔒，可悬停不可拖）
-- [ ] 手牌 0 张：显示「无手牌」提示文字；手牌满 10 抽牌溢出：卡牌从牌库直飞弃牌堆+提示文字 2s 淡出
-- [ ] 抽牌入场动画：卡牌从牌库位置飞入弧形位 0.3s/张（系统信号驱动，非用户输入）
-- [ ] 敌方手牌背面区：敌方角色区上方小区域显示卡背（仅动画起始位置，不可交互）
-- [ ] 手牌重排动画 0.2s ease-out（手牌变更信号驱动）
+- [x] 手牌弧形渲染（圆弧公式）：单张无弧度、多张按角度分布、旋转从 -half 到 +half 单调
+- [x] >7 张堆叠：间距优先+角度自适应（合成语义按 GDD 公式 2 裁决注释）；最小间距 40% 卡宽守卫
+- [x] Z 层序：中心卡 z_index 最高（确定性规则，入纯函数单测）
+- [x] 手牌静态状态：费用不足灰显（降饱和+费用图标灰）；阶段 2 外灵能预览（60% 饱和度+🔒，可悬停不可拖）
+- [x] 手牌 0 张：显示「无手牌」提示文字；手牌满 10 抽牌溢出：提示文字 2s 淡出
+- [x] 抽牌入场动画：卡牌从牌库位置飞入弧形位 0.3s/张（系统信号驱动，非用户输入）
+- [x] 敌方手牌背面区：敌方角色区上方小区域显示卡背（仅动画起始位置，不可交互）
+- [x] 手牌重排动画 0.2s ease-out（手牌变更信号驱动）
 
 ---
 
@@ -115,7 +115,20 @@
 - Logic 内核: `tests/unit/combat_ui/test_hand_card_position.gd` + `test_card_overlap_offset.gd` + `test_hand_card_z_index.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/hand-arc-evidence.md` + sign-off（各卡数截图）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created — Logic 内核 25 例（8 位置 + 4 合成 + 7 重叠 + 7 层序）+ 集成 12 例通过；UI 证据文档 `production/qa/evidence/hand-arc-evidence.md` 已创建
+
+---
+
+## Completion Notes
+**Completed**: 2026-11-02
+**Criteria**: 8/8 AC 通过（全量 3104/3103 通过 + 1 pending 存量，零回归）
+**Deviations**（ADVISORY，非遗留阻塞）:
+1. 卡面美术 stub——`HandCard` 为缩略卡（底色+稀有度描边+卡名/费用/类型），卡面插画归资产管线（story Out of Scope 明确）
+2. 满 10 抽牌溢出的「牌库→弃牌堆」飞行动画实体归 feedback 层，本 story 只落提示文字 2s 淡出（动画起止锚点由本组件估算）
+3. 信号契约占位——`card_drawn`/`card_overflow`/`hand_changed` 三信号在 CombatSystem 尚无发射点（抽牌管线归后续 story），本 story 以 mock 契约锁定接线（同 story 004/005 stub 先行模式）
+4. 本地化豁免——`无手牌`/`手牌已满，卡牌进入弃牌堆`/类型标签 6 词中文硬编码，待 localization epic 统一收口（同 story 005 豁免口径）
+**Test Evidence**: Logic 内核 25 例（含 >7 张合成语义唯一期望锁定 + 窄屏响应式卡宽收缩）+ 集成 12 例（含 hand_changed 载荷重建 + reduce_motion 抽牌精确终位 + 溢出提示双路径）；UI 证据文档已创建
+**Code Review**: 四路并行——1 BLOCKING（≤7 张半径法圆弧偏离 GDD §1）+ 2 HIGH（快照刷新闭环断裂 / 4 Label 违背 R-02 §3 合批 + EnemyHandBack 未设 size）全闭环，LOW 类型标注/深拷贝/魔数重复同步收口
 
 ---
 
