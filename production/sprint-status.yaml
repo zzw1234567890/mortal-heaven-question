@@ -9,99 +9,100 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 
-sprint: 16
-goal: "核心循环可演示第一跳——身份选择场景落地（消除冒烟留桩）+ exploration 002/003 主体启动 + audio 004 过渡矩阵"
-start: "2026-10-24"
-end: "2026-11-02"
-generated: "2026-10-24"
+sprint: 17
+goal: "核心循环第二跳——节点交互+部署/结算面板+S16 nice 结转+QA 视觉路径落地"
+start: "2026-11-03"
+end: "2026-11-12"
+generated: "2026-11-02"
 updated: "2026-11-02"
 
-stories:  - id: "16-1"
-    name: "身份选择 UI 场景落地（含 SCENE_PATHS 串联）"
-    file: "production/epics/identity-selection-system/story-004-identity-select-ui.md"
+stories:
+  - id: "17-1"
+    name: "exploration-ui 005 节点移动交互"
+    file: "production/epics/exploration-ui/story-005-node-move-interaction.md"
     priority: must-have
-    status: done
-    owner: "ui-programmer"
-    estimate_days: 2.0
-    blocker: ""
-    completed: "2026-10-24"
-
-  - id: "16-2"
-    name: "exploration-ui 002 地图选择界面"
-    file: "production/epics/exploration-ui/story-002-map-select-screen.md"
-    priority: must-have
-    status: done
-    owner: "ui-programmer"
-    estimate_days: 2.0
-    blocker: ""
-    completed: "2026-10-26"
-
-  - id: "16-3"
-    name: "exploration-ui 003 节点图数据接入与节点状态渲染"
-    file: "production/epics/exploration-ui/story-003-node-graph-data-states.md"
-    priority: must-have
-    status: done
+    status: ready-for-dev
     owner: "ui-programmer"
     estimate_days: 1.5
     blocker: ""
-    completed: "2026-10-27"
+    completed: ""
 
-  - id: "16-4"
-    name: "audio 004 set_state 编排与过渡矩阵"
-    file: "production/epics/audio-manager/story-004-state-matrix.md"
+  - id: "17-2"
+    name: "combat-ui-layout 007 部署面板框架"
+    file: "production/epics/combat-ui-layout/story-007-deploy-panel-framework.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: "ui-programmer"
+    estimate_days: 2.0
+    blocker: ""
+    completed: ""
+
+  - id: "17-3"
+    name: "exploration-ui 006 节点交互弹窗"
+    file: "production/epics/exploration-ui/story-006-node-interaction-popups.md"
+    priority: must-have
+    status: backlog
+    owner: "ui-programmer"
+    estimate_days: 1.5
+    blocker: "17-1"
+    completed: ""
+
+  - id: "17-4"
+    name: "combat-ui-layout 008 结算/撤退面板"
+    file: "production/epics/combat-ui-layout/story-008-settlement-retreat-panels.md"
+    priority: must-have
+    status: backlog
+    owner: "ui-programmer"
+    estimate_days: 2.0
+    blocker: "17-2"
+    completed: ""
+
+  - id: "17-5"
+    name: "combat-ui-interaction 001 输入锁基座"
+    file: "production/epics/combat-ui-interaction/story-001-input-lock-base.md"
     priority: should-have
-    status: done
+    status: backlog
+    owner: "ui-programmer"
+    estimate_days: 1.5
+    blocker: ""
+    completed: ""
+
+  - id: "17-6"
+    name: "audio 005 暂停/静音/总线控制"
+    file: "production/epics/audio-manager/story-005-pause-mute-bus-control.md"
+    priority: should-have
+    status: ready-for-dev
     owner: "engine-programmer"
-    estimate_days: 1.5
+    estimate_days: 0.5
     blocker: ""
-    completed: "2026-10-30"
+    completed: ""
 
-  - id: "16-5"
-    name: "combat-ui-layout 004 顶部条三组件"
-    file: "production/epics/combat-ui-layout/story-004-topbar-indicator-formation-log.md"
+  - id: "17-7"
+    name: "main-menu 005 语言切换"
+    file: "production/epics/main-menu/story-005-language-switch.md"
     priority: should-have
-    status: done
+    status: ready-for-dev
     owner: "ui-programmer"
-    estimate_days: 2.0
+    estimate_days: 1.0
     blocker: ""
-    completed: "2026-11-01"
+    completed: ""
 
-  - id: "16-6"
-    name: "combat-ui-layout 005 费用栏与牌库/弃牌计数"
-    file: "production/epics/combat-ui-layout/story-005-cost-bar-deck-counters.md"
-    priority: should-have
-    status: done
-    owner: "ui-programmer"
-    estimate_days: 2.0
-    blocker: ""
-    completed: "2026-11-01"
-
-  - id: "16-7"
-    name: "combat-ui-layout 006 手牌弧形渲染"
-    file: "production/epics/combat-ui-layout/story-006-hand-arc-rendering.md"
-    priority: should-have
-    status: done
-    owner: "ui-programmer"
-    estimate_days: 2.0
-    blocker: ""
-    completed: "2026-11-02"
-
-  - id: "16-8"
+  - id: "17-8"
     name: "hud 008 静音图标 F1"
     file: "production/epics/hud/story-008-mute-icon.md"
-    priority: nice-to-have
+    priority: should-have
     status: backlog
     owner: "ui-programmer"
     estimate_days: 0.5
-    blocker: "16-7"
+    blocker: "17-6"
     completed: ""
 
-  - id: "16-9"
-    name: "main-menu 005 语言切换"
-    file: "production/epics/main-menu/story-005-language-switch.md"
+  - id: "17-9"
+    name: "exploration-ui 004 AP 指示器"
+    file: "production/epics/exploration-ui/story-004-ap-indicator.md"
     priority: nice-to-have
     status: backlog
     owner: "ui-programmer"
-    estimate_days: 1.0
+    estimate_days: 1.5
     blocker: ""
     completed: ""

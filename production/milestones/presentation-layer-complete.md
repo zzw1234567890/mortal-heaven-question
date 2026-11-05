@@ -7,7 +7,9 @@
 
 ## 关口条件
 
-- [ ] 7 个 Presentation 层 epic（hud / main-menu / audio-manager / combat-ui-layout / combat-ui-interaction / exploration-ui / deck-editing-ui）全部 Complete
+> **两段式路径（2026-10-24 范围仲裁裁决 + 2026-11-02 勘误）**：里程碑按「核心循环 MVP 两段式」推进——第一段 Sprint 16-17（主菜单→身份选择→地图选择→节点图→战斗→结算），**deck-editing-ui 后置**（非关口阻塞项）。下条「7 个 epic 全部 Complete」按两段式解读：核心循环链路上的 epic 为硬性关口，deck-editing-ui 于核心循环 MVP 达成后另行排期。
+
+- [ ] 7 个 Presentation 层 epic（hud / main-menu / audio-manager / combat-ui-layout / combat-ui-interaction / exploration-ui / deck-editing-ui）全部 Complete（两段式解读——deck-editing-ui 后置）
 - [ ] 三个红色风险关闭：
   - [ ] R-01 双焦点 spike 完成，OQ-02 关闭（Sprint 13 首周前置 story）
   - [ ] R-02 Draw Call 基准：战斗满场实测 <200 且 60fps
