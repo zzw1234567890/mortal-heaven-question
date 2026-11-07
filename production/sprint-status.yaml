@@ -14,7 +14,7 @@ goal: "核心循环第二跳——节点交互+部署/结算面板+S16 nice 结�
 start: "2026-11-03"
 end: "2026-11-12"
 generated: "2026-11-02"
-updated: "2026-11-02"
+updated: "2026-11-07"
 
 stories:
   - id: "17-1"
@@ -31,11 +31,11 @@ stories:
     name: "combat-ui-layout 007 部署面板框架"
     file: "production/epics/combat-ui-layout/story-007-deploy-panel-framework.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "ui-programmer"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-11-07"
 
   - id: "17-3"
     name: "exploration-ui 006 节点交互弹窗"

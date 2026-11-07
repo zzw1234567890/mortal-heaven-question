@@ -20,6 +20,9 @@ extends Control
 
 ## === 区域常量（1920×1080 基准 → anchor 百分比）=============================
 
+## 备战面板脚本（story 007——全屏覆盖层，默认隐藏）。
+const DeployPanelScript := preload("res://src/ui/combat/deploy/deploy_panel.gd")
+
 ## 顶部条高度（px）→ anchor 百分比（60/1080）。
 const TOPBAR_HEIGHT_RATIO: float = 60.0 / 1080.0
 ## 敌方区高度（~340px → 340/1080）。
@@ -81,6 +84,10 @@ var combat_bottombar: CombatBottombar = null
 
 ## 手牌区组装器（story 006——弧形渲染/灰显/灵能预览/敌方卡背）。
 var hand_area: HandArea = null
+
+## 备战面板（story 007——战斗开始前的部署界面；默认隐藏，由场景挂载侧
+## 经 [method show_deploy_panel] 打开）。
+var deploy_panel: DeployPanel = null
 
 
 ## 注入音频管理器（战斗场景挂载时由 SceneManager.get_audio_manager() 传入）。
@@ -232,6 +239,42 @@ func _build_layout() -> void:
 	retreat_button_slot.anchor_right = 1.0 - 12.0 / 1920.0
 	retreat_button_slot.anchor_top = 60.0 / 1080.0 + 8.0 / 1080.0
 	retreat_button_slot.anchor_bottom = 60.0 / 1080.0 + 8.0 / 1080.0 + 48.0 / 1080.0
+	# 备战面板（story 007——全屏覆盖层，默认隐藏；数据/信号接线由场景挂载侧注入）
+	deploy_panel = DeployPanelScript.new()
+	deploy_panel.name = "DeployPanel"
+	deploy_panel.anchor_left = 0.0
+	deploy_panel.anchor_right = 1.0
+	deploy_panel.anchor_top = 0.0
+	deploy_panel.anchor_bottom = 1.0
+	deploy_panel.offset_left = 120.0
+	deploy_panel.offset_top = 80.0
+	deploy_panel.visible = false
+	add_child(deploy_panel)
+
+
+## 打开备战面板（数据与信号接线由场景挂载侧在调用前经 [method DeployPanel.setup] 完成）。[br]
+## [param p_max_deploy]: 当前境界上场人数上限。[br]
+## [param p_realm_id]: 当前境界 ID（决定阵位布局预览）。[br]
+## [param p_battle_title]: 战斗名称标题。[br]
+## [br][b]未注入依赖时[/b]（审查 H1）：面板只能出空骨架——此处 push_warning 显式暴露，
+## 避免「生产路径静默空面板」。
+func show_deploy_panel(p_max_deploy: int, p_realm_id: int, p_battle_title: String) -> void:
+	if deploy_panel == null:
+		return
+	if not deploy_panel.has_sources():
+		push_warning("CombatLayout.show_deploy_panel: 未注入 gsm/card_system——"
+				+ "面板将显示空名册（由场景挂载侧调用 DeployPanel.setup() 修复）")
+	deploy_panel.set_battle_title(p_battle_title)
+	# 单次取数下发（审查 H2）：max_deploy/realm_id 与名册同一次 apply_roster，
+	# 避免「先按默认上限 0 刷新一遍」导致首轮全部误判为可替换 + 双重建卡
+	deploy_panel.load_roster(p_max_deploy, p_realm_id)
+	deploy_panel.visible = true
+
+
+## 关闭备战面板（确认出战/返回探索后由上层调用）。
+func hide_deploy_panel() -> void:
+	if deploy_panel != null:
+		deploy_panel.visible = false
 
 
 ## 区域容器工厂（Control——内容后续 story 填充）。
