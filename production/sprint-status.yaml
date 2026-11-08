@@ -14,18 +14,18 @@ goal: "核心循环第二跳——节点交互+部署/结算面板+S16 nice 结�
 start: "2026-11-03"
 end: "2026-11-12"
 generated: "2026-11-02"
-updated: "2026-11-07"
+updated: "2026-11-08"
 
 stories:
   - id: "17-1"
     name: "exploration-ui 005 节点移动交互"
     file: "production/epics/exploration-ui/story-005-node-move-interaction.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "ui-programmer"
     estimate_days: 1.5
     blocker: ""
-    completed: ""
+    completed: "2026-11-07"
 
   - id: "17-2"
     name: "combat-ui-layout 007 部署面板框架"
@@ -41,11 +41,11 @@ stories:
     name: "exploration-ui 006 节点交互弹窗"
     file: "production/epics/exploration-ui/story-006-node-interaction-popups.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: "ui-programmer"
     estimate_days: 1.5
     blocker: "17-1"
-    completed: ""
+    completed: "2026-11-08"
 
   - id: "17-4"
     name: "combat-ui-layout 008 结算/撤退面板"
