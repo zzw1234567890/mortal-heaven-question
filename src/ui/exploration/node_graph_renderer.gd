@@ -71,6 +71,18 @@ const TRIBULATION_GLOW_COLOR: Color = Color(1.0, 0.667, 0.0, 0.4)
 const TRIBULATION_TYPE: int = 9
 ## 已访问节点暗化强度（AC-4——稍暗）。
 const VISITED_DIM_ALPHA: float = 0.35
+## 悬停可达节点放大倍率（story-005 AC-5——UX 规格 110%）。[br]
+## [b]单一视觉来源[/b]：悬停放大归渲染层（本类消费 [member hovered_node]），
+## 交互组件不再叠加放大环（避免两套视觉来源——ADR-0031 §4）。
+const HOVER_SCALE_RATIO: float = 1.1
+## 键盘焦点环色——松石青（ADR-0031 §4「键盘/手柄焦点：松石青 2px 外部光环」）。
+const FOCUS_RING_COLOR: Color = Color("#40E0D0")
+
+## === 信号 ==================================================================
+
+## 悬停目标变化（[param node_id] = -1 表示无悬停）。交互层如需响应悬停可订阅；
+## 悬停视觉本身由本类绘制（单一来源）。
+signal hover_changed(node_id: int)
 
 ## === 渲染输入（stub 数据——003 接真实源）=================================
 
@@ -91,8 +103,13 @@ var show_labels: bool = true
 ## 驱动本字段逐步递增——超过该层的节点不绘制（AC-1 逐层浮现；动画时序归手动证据）。
 var reveal_max_layer: int = -1
 ## 当前悬停节点 ID（-1 = 无）——[method hit_test_node] 命中检测维护，
-## [method _draw_hover_tooltip] 绘制悬停预览（AC-10；0.3s 浮出时序归手动证据）。
+## [method _draw_hover_tooltip] 绘制悬停预览（AC-10；0.3s 浮出时序归手动证据）。[br]
+## [b]悬停放大[/b]（AC-5）：可达节点绘制时放大 [constant HOVER_SCALE_RATIO]——
+## 悬停视觉单一来源在本类（ADR-0031 §4 鼠标悬停态）。
 var hovered_node: int = -1
+## 键盘焦点节点 ID（-1 = 无）——[method set_focused_node] 注入（A3 键盘路径）。[br]
+## 焦点环为松石青 2px 外环（ADR-0031 §4 双焦点双视觉）。鼠标悬停优先显示。
+var focused_node: int = -1
 
 ## === 内部 ===================================================================
 
@@ -121,9 +138,30 @@ func set_states(state_map: Dictionary) -> void:
 	queue_redraw()
 
 
+## 注入键盘焦点节点（A3 键盘路径——方向键游标）。[br]
+## [param node_id]: 焦点节点 ID（-1 = 清除焦点）。焦点环由本类绘制
+## （ADR-0031 §4 双焦点双视觉——鼠标悬停优先）。
+func set_focused_node(node_id: int) -> void:
+	if focused_node == node_id:
+		return
+	focused_node = node_id
+	queue_redraw()
+
+
 ## 节点中心坐标（布局：layer 纵向 / idx 横向居中排布）。
 func get_node_position(node_id: int) -> Vector2:
 	return _positions.get(node_id, Vector2.ZERO)
+
+
+## 节点绘制缩放倍率——悬停的可达节点按 [constant HOVER_SCALE_RATIO] 放大，
+## 其余（含已访问/不可达/未悬停）为 1.0。[br]
+## [b]单一来源[/b]：绘制路径 [method _draw_node_stated] 与本方法共用同一判定，
+## 悬停指标可被测试直接断言（AC-5 回归锁定）。
+func get_node_draw_scale(node_id: int) -> float:
+	if node_id == hovered_node and states.has(node_id) \
+			and int(states[node_id]) == NodeStateLogicScript.NodeState.REACHABLE:
+		return HOVER_SCALE_RATIO
+	return 1.0
 
 
 ## 内容包围盒（节点 + 边距）——Viewport 整图适配的计算基准。
@@ -148,16 +186,26 @@ func _gui_input(event: InputEvent) -> void:
 	# 悬停命中检测（AC-10）——纯输入驱动（无 _process 轮询），维护
 	# [member hovered_node] 并触发重绘。
 	if event is InputEventMouseMotion:
-		var new_hover: int = _hit_test_any(event.position)
+		var new_hover: int = hit_test_any(event.position)
 		if new_hover != hovered_node:
 			hovered_node = new_hover
 			queue_redraw()
+			hover_changed.emit(hovered_node)
 
 
-func _mouse_exited() -> void:
+## 悬停离开渲染器——清除悬停态（[b]审查 H2[/b]：Godot 4 的 Control 没有
+## [code]_mouse_exited[/code] 虚方法，原先的实现永不触发，导致 tooltip 与
+## 110% 放大停留不消失）。改为 `_ready` 连接 [signal Control.mouse_exited]。
+func _ready() -> void:
+	if not mouse_exited.is_connected(_on_mouse_exited):
+		mouse_exited.connect(_on_mouse_exited)
+
+
+func _on_mouse_exited() -> void:
 	if hovered_node != -1:
 		hovered_node = -1
 		queue_redraw()
+		hover_changed.emit(-1)
 
 
 ## 绘制全部连线（已访问金色实线 / 未访问暗色虚线）。
@@ -219,11 +267,16 @@ func _draw_node_legacy(node_id: int) -> void:
 				label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
 
 
-## S16-3 六态分支——样式经 [NodeStateLogic.node_state_style] 查询后逐项渲染。
+## S16-3 六态分支——样式经 [NodeStateLogic.node_state_style] 查询后逐项渲染。[br]
+## [b]悬停放大[/b]（AC-5）：悬停的可达节点按 [constant HOVER_SCALE_RATIO] 放大
+## 绘制（图标 + 边框 + 外发光同步放大——单一视觉来源在渲染层）。
 func _draw_node_stated(node_id: int) -> void:
 	var style: Dictionary = NodeStateLogicScript.node_state_style(int(states[node_id]))
 	var pos: Vector2 = get_node_position(node_id)
-	var rect := Rect2(pos.x - NODE_SIZE * 0.5, pos.y - NODE_SIZE * 0.5, NODE_SIZE, NODE_SIZE)
+	# 悬停放大（AC-5）——仅可达态；鼠标悬停优先于键盘焦点（ADR-0031 §4）
+	var scale_factor: float = get_node_draw_scale(node_id)
+	var node_size: float = NODE_SIZE * scale_factor
+	var rect := Rect2(pos.x - node_size * 0.5, pos.y - node_size * 0.5, node_size, node_size)
 	var detail: Dictionary = nodes.get(node_id, {})
 	var type_id: int = int(detail.get("type", 1))
 	var fogged: bool = bool(style.get("fogged", false))
@@ -242,13 +295,13 @@ func _draw_node_stated(node_id: int) -> void:
 
 	# 可达节点脉冲外发光（AC-2）——外圈半透光环（静态近似；脉动动画归手动证据）
 	if str(style.get("glow", "")) == "pulse_blue":
-		draw_circle(pos, NODE_SIZE * 0.5 + 4.0, REACHABLE_GLOW_COLOR)
+		draw_circle(pos, node_size * 0.5 + 4.0, REACHABLE_GLOW_COLOR)
 	if str(style.get("glow", "")) == "gold":
-		draw_circle(pos, NODE_SIZE * 0.5 + 3.0, Color(1.0, 0.84, 0.0, 0.35))
+		draw_circle(pos, node_size * 0.5 + 3.0, Color(1.0, 0.84, 0.0, 0.35))
 	# 渡劫台金色脉冲（AC-11——类型恒常视觉，与当前节点 gold 发光独立叠加；
 	# 精英红边框已由下方 border_is_type 类型主色 #FF4444 覆盖）
 	if type_id == TRIBULATION_TYPE and not fogged:
-		draw_circle(pos, NODE_SIZE * 0.5 + 5.0, TRIBULATION_GLOW_COLOR)
+		draw_circle(pos, node_size * 0.5 + 5.0, TRIBULATION_GLOW_COLOR)
 
 	# 边框：border_is_type 时用类型主色，否则用样式边框色
 	var border_color: Color = style.get("border", NODE_DEFAULT_BORDER)
@@ -271,10 +324,15 @@ func _draw_node_stated(node_id: int) -> void:
 	# 状态标记（玩家/✓/锁/❓——AC-1 逐项一致断言目标）
 	_draw_state_marker(str(style.get("marker", "")), pos, rect)
 
+	# 键盘焦点环（A3——松石青 2px 外环；鼠标悬停优先显示——ADR-0031 §4）
+	if node_id == focused_node and node_id != hovered_node:
+		draw_arc(pos, node_size * 0.5 + 6.0, 0.0, TAU, 32, FOCUS_RING_COLOR, 2.0)
+
 	# 文字标签（缩放联动——50% 隐藏；迷雾不显示类型标签）
+	# 锚点跟随悬停缩放（终审 LOW）——放大时标签仍贴合图标下沿，不出现错位
 	if show_labels and not fogged:
 		var label: String = str(detail.get("label", NodeIconAtlas.get_label(type_id)))
-		draw_string(_label_font(), Vector2(pos.x - NODE_SIZE * 0.5, pos.y + NODE_SIZE * 0.5 + 14.0),
+		draw_string(_label_font(), Vector2(pos.x - node_size * 0.5, pos.y + node_size * 0.5 + 14.0),
 				label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
 
 
@@ -318,16 +376,22 @@ func _tooltip_rect(text: String, anchor: Vector2) -> Rect2:
 
 ## 节点命中检测——[param point]（画布局部坐标）是否落在 [param node_id] 的
 ## 图标矩形内（AC-10 悬停触发判定；仅统计未迷雾节点——迷雾节点悬停也显示
-## 「?」故同样命中）。[br][b]返回[/b]: true 命中。
+## 「?」故同样命中）。[br]
+## [b]命中框与绘制同源[/b]（审查 M1）：矩形按 [method get_node_draw_scale]
+## 缩放——悬停放大的可达节点命中框同步放大，避免「看得见但悬停不到」的边缘
+## 高频振荡。[br][b]返回[/b]: true 命中。
 func hit_test_node(node_id: int, point: Vector2) -> bool:
 	var pos: Vector2 = get_node_position(node_id)
-	var rect := Rect2(pos.x - NODE_SIZE * 0.5, pos.y - NODE_SIZE * 0.5, NODE_SIZE, NODE_SIZE)
+	var size_px: float = NODE_SIZE * get_node_draw_scale(node_id)
+	var rect := Rect2(pos.x - size_px * 0.5, pos.y - size_px * 0.5, size_px, size_px)
 	return rect.has_point(point)
 
 
 ## 命中检测遍历——返回 [param point] 命中的节点 ID（无命中返回 -1）。
-## 逐层展开未显现的层（[member reveal_max_layer]）跳过（未绘制不悬停）。
-func _hit_test_any(point: Vector2) -> int:
+## 逐层展开未显现的层（[member reveal_max_layer]）跳过（未绘制不悬停）。[br]
+## [b]公开入口[/b]：交互层点击命中复用本方法（点中即提交）——单份实现避免
+## 「未绘制仍可点」的可见性不一致（click/hover 同源过滤）。
+func hit_test_any(point: Vector2) -> int:
 	for node_id: int in nodes.keys():
 		if reveal_max_layer >= 0:
 			var layer: int = int(nodes.get(node_id, {}).get("layer", 0))
