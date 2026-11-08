@@ -50,6 +50,15 @@ const CHAPTER_NUMBER_MAP: Dictionary = {
 ## NOTE: 裸 Dictionary——GDScript 4.6 class_name 跨文件解析限制（同 EventSystem.templates）。
 var templates: Dictionary = {}
 
+## 降级标志——模板目录打不开 / 目录为空 / 全部模板校验失败时为 [code]true[/code]。[br]
+## 降级态下 [member templates] 为空、GSM 卡牌校验不启用，游戏仍可启动（不刷红、不崩溃）。
+## 消费方（如身份选择）应读此标志区分「数据未就绪」与「实现缺陷」。
+var is_degraded: bool = false
+
+## 降级原因（中文，可直接进日志）——空字符串表示未降级。[br]
+## 含目录路径与可执行的修复提示，避免只有「无法打开目录」这种无法定位的报错。
+var degraded_reason: String = ""
+
 ## 待加载路径队列——_load_templates_from 填充，_process 消费。
 var _pending_paths: Array[StringName] = []
 
@@ -219,17 +228,28 @@ func create_instance(template_id: StringName) -> CardInstance:
 ##   5. 全部完成后发射 [signal templates_loaded][br]
 ## [br][b]空目录处理[/b]（时序方案 B）：检测到 0 pending 时直接发射信号，
 ## 不调用 [method set_process]，避免空帧调度。[br]
+## [br][b]降级处理[/b]（DEBT-CBT-018-5）：目录打不开或目录内没有模板时，
+## 置 [member is_degraded] + [member degraded_reason] 并 [method @GlobalScope.push_warning]
+## 输出可定位的中文提示（不再 push_error 刷红）——空模板集下游戏仍可启动，
+## 只是角色卡数值不可用。[br]
 ## [br][param path]: 模板目录路径（可注入——测试接缝）。
 func _load_templates_from(path: StringName) -> void:
 	templates.clear()
 	_pending_paths.clear()
+	is_degraded = false
+	degraded_reason = ""
 
 	var path_str: String = String(path)
 	var dir := DirAccess.open(path_str)
 	if dir == null:
-		push_error("CardSystem: 无法打开模板目录 '%s'" % path_str)
-		# DirAccess 失败也走统一收尾——_on_all_templates_loaded 会调 enable_validation(空 templates)
-		# 并由 GSM 决定是否启用校验（空 templates 会 push_error 不启用）。统一两条失败路径行为。
+		var open_error: int = DirAccess.get_open_error()
+		is_degraded = true
+		degraded_reason = ("模板目录不存在或不可读 '%s'（错误码 %d）——已降级为空模板集；"
+				+ "请确认目录存在且内含 CardTemplate 的 .tres 文件，否则角色卡 HP/ATK 将读到 0") \
+				% [path_str, open_error]
+		push_warning("CardSystem: " + degraded_reason)
+		# 两条失败路径统一走 _on_all_templates_loaded——空 templates 下不再申请
+		# GSM 校验（避免再多一条无信息的红字），只发射 templates_loaded(0)。
 		_on_all_templates_loaded()
 		return
 
@@ -246,6 +266,10 @@ func _load_templates_from(path: StringName) -> void:
 
 	if _pending_paths.is_empty():
 		# 空目录——时序方案 B：直接发射信号，不启用 _process
+		is_degraded = true
+		degraded_reason = ("模板目录 '%s' 内没有 .tres 模板——已降级为空模板集；"
+				+ "角色卡 HP/ATK 将读到 0（数据未就绪，非实现缺陷）") % path_str
+		push_warning("CardSystem: " + degraded_reason)
 		_on_all_templates_loaded()
 		return
 
@@ -254,12 +278,20 @@ func _load_templates_from(path: StringName) -> void:
 
 ## 全部模板加载完成后的统一收尾——启用 GSM 校验 + 发射 templates_loaded 信号。[br]
 ## [br]由 [method _process]（加载完成）和 [method _load_templates_from]（空目录/DirAccess 失败）调用。[br]
+## [br][b]空模板集降级[/b]（DEBT-CBT-018-5）：[member templates] 为空时不调用
+## [method GameStateManager.enable_validation]——GSM 对空库会 push_error，而空库的
+## 原因已由 [member degraded_reason] 的 warning 指明，不必再刷一条无信息的红字。
+## 此时仅发射 [signal templates_loaded]（count=0），启动流程继续。[br]
 ## [br][b]AC-006 偏差实现[/b]：主动调用 [method GameStateManager.enable_validation]，
-## 而非让 GSM 监听 [signal templates_loaded]——符合 Core→Foundation 依赖方向（Foundation 原则 #3）。[br]
-## [br]GSM.enable_validation 对空 templates 会 push_error 不启用校验——这是预期行为：
-## 空模板目录意味着游戏无法正常初始化，应尽早暴露问题。
+## 而非让 GSM 监听 [signal templates_loaded]——符合 Core→Foundation 依赖方向（Foundation 原则 #3）。
 func _on_all_templates_loaded() -> void:
-	GameStateManager.enable_validation(templates)
+	if templates.is_empty():
+		if not is_degraded:
+			is_degraded = true
+			degraded_reason = "模板注册表为空——已降级为空模板集"
+			push_warning("CardSystem: " + degraded_reason)
+	else:
+		GameStateManager.enable_validation(templates)
 	templates_loaded.emit(templates.size())
 
 

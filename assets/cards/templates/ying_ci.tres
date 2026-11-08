@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"ying_ci"
+name = "影刺"
+type = 1
+rarity = 1
+cost = 1
+description = "绑定后角色攻击+1（苏剑鸣本命+2）。"
+flavor_text = "剑出无光，刺落无影。"
+effect_type = &"buff"
+effect_value = 1
+native_owner = &"su_jian_ming"

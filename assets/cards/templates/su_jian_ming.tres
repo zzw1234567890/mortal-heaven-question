@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"su_jian_ming"
+name = "苏剑鸣"
+type = 0
+rarity = 3
+cost = 1
+faction_tags = Array[StringName]([&"zhengdao", &"qixuanmen"])
+description = "炼气期角色卡。出手速度+1（优先行动）。"
+flavor_text = "与林渊一同入门的好友，天赋异禀、武艺过人。"
+illustration_path = "res://assets/cards/illustrations/character/char_su_jianming_realm1.png"
+base_hp = 7
+base_attack = 4
+innate_skill = &"first_strike"

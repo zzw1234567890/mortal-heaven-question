@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"lin_yuan"
+name = "林渊"
+type = 0
+rarity = 2
+cost = 1
+faction_tags = Array[StringName]([&"zhengdao", &"qixuanmen"])
+description = "炼气期角色卡。每回合自动回复1点生命。"
+flavor_text = "青云剑宗外门弟子，资质平庸但心志坚韧，擅长稳扎稳打、步步为营的战术。"
+illustration_path = "res://assets/cards/illustrations/character/char_lin_yuan_realm1.png"
+base_hp = 10
+base_attack = 2
+innate_skill = &"auto_heal_1"

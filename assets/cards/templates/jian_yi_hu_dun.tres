@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"jian_yi_hu_dun"
+name = "简易护盾"
+type = 5
+rarity = 1
+cost = 1
+description = "本回合防御+2。"
+flavor_text = "一层薄薄的灵气罩，聊胜于无。"
+duration_turns = 1
+target_type = &"self"

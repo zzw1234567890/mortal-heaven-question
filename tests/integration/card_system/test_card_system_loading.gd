@@ -224,6 +224,12 @@ func test_ac006_empty_directory_emits_zero() -> void:
 
 	assert_true(not received.is_empty(), "空目录应直接发射 templates_loaded")
 	assert_eq(received[0] if not received.is_empty() else -1, 0, "空目录的 count 应为 0")
+	# DEBT-CBT-018-5：空目录属于「数据未就绪」，降级为 warning（可定位）+ 降级标志，
+	# 不再是红字错误。
+	assert_true(cs.is_degraded, "空目录应进入降级态")
+	assert_true(cs.degraded_reason.contains(FIXTURE_DIR), "降级原因应包含目录路径")
+	assert_push_warning_count(1, "空目录应 push_warning 1 次（可定位）")
+	assert_push_error_count(0, "空目录不应 push_error（降级而非崩溃）")
 
 
 # ============================================================================
@@ -362,7 +368,7 @@ func test_ac011_templates_loaded_signal_signature() -> void:
 
 
 # ============================================================================
-# AC-012：DirAccess 打开失败——push_error + 发射 templates_loaded(0)
+# AC-012：DirAccess 打开失败——降级为空模板集（warning + templates_loaded(0)）
 # ============================================================================
 
 func test_ac012_dir_access_failure_emits_zero() -> void:
@@ -373,7 +379,13 @@ func test_ac012_dir_access_failure_emits_zero() -> void:
 
 	cs._load_templates_from(&"res://tests/fixtures/nonexistent/")
 
-	assert_push_error_count(1, "DirAccess 失败应 push_error 1 次")
+	# DEBT-CBT-018-5：目录打不开不再 push_error 刷红——改为可定位的中文 warning + 降级标志，
+	# 空模板集下启动流程继续（不再连带 GSM「模板数据库为空」的第二条红字）。
+	assert_push_warning_count(1, "DirAccess 失败应 push_warning 1 次（可定位）")
+	assert_push_error_count(0, "DirAccess 失败不应 push_error（降级而非崩溃）")
+	assert_true(cs.is_degraded, "应进入降级态")
+	assert_true(cs.degraded_reason.contains("res://tests/fixtures/nonexistent/"),
+			"降级原因应包含出错的目录路径（可定位）")
 	assert_true(not received.is_empty(), "DirAccess 失败仍应发射 templates_loaded")
 	assert_eq(received[0] if not received.is_empty() else -1, 0, "count 应为 0")
 	assert_eq(cs.templates.size(), 0, "templates 应为空")
