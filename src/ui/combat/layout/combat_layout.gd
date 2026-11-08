@@ -22,6 +22,12 @@ extends Control
 
 ## 备战面板脚本（story 007——全屏覆盖层，默认隐藏）。
 const DeployPanelScript := preload("res://src/ui/combat/deploy/deploy_panel.gd")
+## 结算/撤退/渡劫警示宿主脚本（story 008——全屏覆盖层，默认隐藏）。
+const SettlementHostScript := preload("res://src/ui/combat/settlement/settlement_host.gd")
+## 撤退规则纯函数（story 008——撤退按钮渲染态判定与文案）。
+const RetreatRulesScript := preload("res://src/ui/combat/shared/retreat_rules.gd")
+## 撤退按钮文案（GDD §10「撤退按钮始终在战斗中可点击」）。
+const TEXT_RETREAT_BUTTON: String = "撤退"
 
 ## 顶部条高度（px）→ anchor 百分比（60/1080）。
 const TOPBAR_HEIGHT_RATIO: float = 60.0 / 1080.0
@@ -88,6 +94,13 @@ var hand_area: HandArea = null
 ## 备战面板（story 007——战斗开始前的部署界面；默认隐藏，由场景挂载侧
 ## 经 [method show_deploy_panel] 打开）。
 var deploy_panel: DeployPanel = null
+
+## 结算/撤退/渡劫警示宿主（story 008——默认隐藏，由战斗结束/撤退按钮/
+## 渡劫进战前三个入口打开）。
+var settlement_host: Node = null
+
+## 撤退按钮（story 008——右上角常驻，渲染态始终可点；点击开撤退确认弹窗）。
+var retreat_button: Button = null
 
 
 ## 注入音频管理器（战斗场景挂载时由 SceneManager.get_audio_manager() 传入）。
@@ -239,6 +252,17 @@ func _build_layout() -> void:
 	retreat_button_slot.anchor_right = 1.0 - 12.0 / 1920.0
 	retreat_button_slot.anchor_top = 60.0 / 1080.0 + 8.0 / 1080.0
 	retreat_button_slot.anchor_bottom = 60.0 / 1080.0 + 8.0 / 1080.0 + 48.0 / 1080.0
+	# 撤退按钮本体（story 008——渲染态始终可点；点击流转由场景挂载侧接线）
+	retreat_button = Button.new()
+	retreat_button.name = "RetreatButton"
+	retreat_button.text = TEXT_RETREAT_BUTTON
+	retreat_button.custom_minimum_size = Vector2(48, 48)
+	retreat_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# 渲染态常驻可点（GDD §10）——disabled 恒 false，锁栈仲裁归 interaction
+	retreat_button.disabled = not RetreatRulesScript.retreat_button_always_enabled()
+	retreat_button_slot.add_child(retreat_button)
+	# 点击转发到结算宿主（未注入依赖前宿主只开空确认弹窗——无副作用）
+	retreat_button.pressed.connect(open_retreat_dialog)
 	# 备战面板（story 007——全屏覆盖层，默认隐藏；数据/信号接线由场景挂载侧注入）
 	deploy_panel = DeployPanelScript.new()
 	deploy_panel.name = "DeployPanel"
@@ -250,6 +274,12 @@ func _build_layout() -> void:
 	deploy_panel.offset_top = 80.0
 	deploy_panel.visible = false
 	add_child(deploy_panel)
+	# 结算/撤退/渡劫警示宿主（story 008——全屏覆盖层，默认隐藏；信号接线
+	# 由场景挂载侧经 SettlementHost.setup 注入）
+	settlement_host = SettlementHostScript.new()
+	settlement_host.name = "SettlementHost"
+	settlement_host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(settlement_host)
 
 
 ## 打开备战面板（数据与信号接线由场景挂载侧在调用前经 [method DeployPanel.setup] 完成）。[br]
@@ -275,6 +305,36 @@ func show_deploy_panel(p_max_deploy: int, p_realm_id: int, p_battle_title: Strin
 func hide_deploy_panel() -> void:
 	if deploy_panel != null:
 		deploy_panel.visible = false
+
+
+## 注入结算宿主依赖（story 008——战斗系统/卡组系统/渡劫标识；
+## 由场景挂载侧在战斗场景装配时调用）。[br]
+## [param p_combat_system]: 战斗系统（[code]battle_ended[/code] /
+## [code]retreat_requested[/code] 信号源）。[br]
+## [param p_deck_system]: 卡组系统（卡组满判定取数）。[br]
+## [param p_is_tribulation]: 是否渡劫战（撤退变体与战前警示的开关）。
+func setup_settlement(p_combat_system: Node, p_deck_system: Node = null,
+		p_is_tribulation: bool = false) -> void:
+	if settlement_host == null:
+		push_warning("CombatLayout.setup_settlement: 结算宿主未装配——"
+				+ "战斗结束/撤退面板将不可用")
+		return
+	settlement_host.setup(p_combat_system, p_deck_system, p_is_tribulation)
+
+
+## 渡劫战前警示（AC-8——备战界面之上弹出）。[br]
+## [br][b]返回[/b]: 是否真的弹出了弹窗（非渡劫战或已确认过时为 false）。
+func show_pre_battle_warning() -> bool:
+	if settlement_host == null:
+		push_warning("CombatLayout.show_pre_battle_warning: 结算宿主未装配")
+		return false
+	return settlement_host.show_pre_battle_warning()
+
+
+## 打开撤退确认弹窗（AC-6/AC-7——撤退按钮点击或战斗系统撤退请求触发）。
+func open_retreat_dialog() -> void:
+	if settlement_host != null:
+		settlement_host.request_retreat()
 
 
 ## 区域容器工厂（Control——内容后续 story 填充）。

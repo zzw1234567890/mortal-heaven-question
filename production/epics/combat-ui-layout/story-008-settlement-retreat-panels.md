@@ -1,12 +1,12 @@
 # Story 008: 结算与撤退面板框架（视觉与状态判定）
 
 > **Epic**: 战斗 UI——静态布局与角色状态卡
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI（Logic 内核）
-> **Estimate**: [待 sprint 排期填写]
+> **Estimate**: 2.0d（sprint-17 排期）
 > **Manifest Version**: 2026-09-07
-> **Last Updated**: [由 /dev-story 设置]
+> **Last Updated**: 2026-11-08
 
 ## Context
 
@@ -31,16 +31,16 @@
 
 *From GDD，scoped to this story:*
 
-- [ ] 胜利面板：战利品三选一网格（卡牌正面/灵石图标+数值/消耗品），均匀等宽网格+垂直居中
-- [ ] 战利品展示 0.5s 后才变为可点击状态（防误触——先看清再选择）
-- [ ] 点击战利品高亮选中（非立即确认）——渲染态；[确认选择] 按钮未选中时灰色不可点
-- [ ] 卡组已满时战利品中卡牌选项灰色标注「卡组已满」不可选中
-- [ ] 战败面板：损失摘要（修为损失 50%/阵亡角色列表/绑定卡失去提示）+ 确认返回按钮
-- [ ] 撤退确认面板（普通变体）：撤退后果说明（保留非绑定物品/阵亡角色绑定卡失去）+ 确认/继续战斗按钮
-- [ ] 撤退确认面板（渡劫变体）：红色边框+「畏劫而退，修为散尽」+ 损失 80% 修为+失去渡劫机会警示
-- [ ] 渡劫战前 warning：备战界面弹出「天劫在前，退路将断。确认进战？」+ 确认进战/返回按钮
-- [ ] 撤退按钮（右上角常驻，story 001 位）的启用渲染态——战斗中始终可点（交互流转归 interaction）
-- [ ] 结算面板不自动关闭（需手动确认——GDD 调优参数「无穷」）
+- [x] 胜利面板：战利品三选一网格（卡牌正面/灵石图标+数值/消耗品），均匀等宽网格+垂直居中
+- [x] 战利品展示 0.5s 后才变为可点击状态（防误触——先看清再选择）
+- [x] 点击战利品高亮选中（非立即确认）——渲染态；[确认选择] 按钮未选中时灰色不可点
+- [x] 卡组已满时战利品中卡牌选项灰色标注「卡组已满」不可选中
+- [x] 战败面板：损失摘要（修为损失 50%/阵亡角色列表/绑定卡失去提示）+ 确认返回按钮
+- [x] 撤退确认面板（普通变体）：撤退后果说明（保留非绑定物品/阵亡角色绑定卡失去）+ 确认/继续战斗按钮
+- [x] 撤退确认面板（渡劫变体）：红色边框+「畏劫而退，修为散尽」+ 损失 80% 修为+失去渡劫机会警示
+- [x] 渡劫战前 warning：备战界面弹出「天劫在前，退路将断。确认进战？」+ 确认进战/返回按钮
+- [x] 撤退按钮（右上角常驻，story 001 位）的启用渲染态——战斗中始终可点（交互流转归 interaction）
+- [x] 结算面板不自动关闭（需手动确认——GDD 调优参数「无穷」）
 
 ---
 
@@ -104,7 +104,17 @@
 - Integration: `tests/integration/combat_ui/test_loot_delay_clickable.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/settlement-retreat-evidence.md` + sign-off（五场景截图）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created and passing
+
+| 证据 | 路径 | 结果 |
+|---|---|---|
+| 单元（Logic 内核，47 例） | `tests/unit/combat_ui/test_settlement_rules.gd` | 47/47 通过 |
+| 集成（0.5s 延迟可点 + 键盘可达 + 宿主接线，48 例，BLOCKING） | `tests/integration/combat_ui/test_loot_delay_clickable.gd` | 48/48 通过 |
+| UI 五场景走查 + 签收（ADVISORY） | `production/qa/evidence/settlement-retreat-evidence.md` | 文档已创建；§2 十项待 QA 走查签收 |
+| 走查宿主 | `tests/manual/settlement_panel_debug.tscn` | 可 F6 运行（按键 1~6/0/T/M） |
+
+- combat_ui 单元 **152/152**（11 脚本 427 asserts）、集成 **210/210**（14 脚本 566 asserts）。
+- 全量基线：单元 **2433 tests / 2432 passing / 1 pending**（存量 `test_migration_chain`）/ 1 orphan（存量）；集成 **1004/1004 passing**（60 脚本 3847 asserts）。较 S17-3 基线（单元 2430 / 集成 956）集成净增 48 例，零回归。
 
 ---
 
@@ -112,3 +122,19 @@
 
 - Depends on: Story 001（骨架与撤退按钮位）、Story 003（全灭信号）
 - Unlocks: interaction epic（确认流转消费本 story 框架）
+
+---
+
+## Completion Notes
+**Completed**: 2026-11-08
+**Criteria**: 10/10 通过（AC-1~AC-10 全部由自动化覆盖；AC-1/AC-5/AC-6/AC-7/AC-8 的视觉可辨识性与动画手感另需 §2 十项 D3D12 走查，按项目口径记为 ADVISORY）
+**Deviations**:
+- ADVISORY：战利品选项只透传不补足到「三选一」——`SettlementHost._victory_options()` 按 `rewards` 实际数量排布，补足逻辑归战斗/资源系统（Out of Scope）。登记 DEBT-CUI-008-3。
+- ADVISORY：`combat_layout.gd` 370 行超 300 行软上限（本 story 新增约 57 行装配）——结算面板本身已拆为 9 个文件（最大 321 行，为注释密度高的内核——有效代码约 140 行）。登记 DEBT-CUI-008-2（与 DEBT-CUI-007-2 合并处理）。
+- ADVISORY：中文文案硬编码在两个内核（同 S16/S17 各 story 豁免口径）。登记 DEBT-CUI-008-1。
+- ADVISORY：`reduce_motion` 需宿主显式 `set_reduce_motion()` 下发，尚无全局偏好读取入口。登记 DEBT-CUI-008-4。
+- ADVISORY：战利品「卡牌正面 / 灵石图标」按 GDD §9 线框用文字标记承载（标题+副标题+角标），未绘制卡面美术与图标——项目当前无对应图标资产，绘制资产归美术管线；文字口径已逐字对齐线框，语义完整。登记 DEBT-CUI-008-5。
+**Test Evidence**: Logic：`tests/unit/combat_ui/test_settlement_rules.gd`（47 例，BLOCKING 通过）+ `tests/integration/combat_ui/test_loot_delay_clickable.gd`（48 例，BLOCKING 通过）；UI：`production/qa/evidence/settlement-retreat-evidence.md`（§2 十项待 QA 走查）+ `tests/manual/settlement_panel_debug.tscn` 走查宿主。
+**Code Review**: full 模式双关卡已执行并完成整改。
+- **LP-CODE-REVIEW → CONCERNS**（12 项建议）。已整改 9 项：响应式字号收口到 `SettlementFrame.apply_font`（原先三面板各自 `add_theme_font_size_override`，违反 story 001「共享纯函数唯一落地处」强制条款）；`_connect_signals` 换源前断开旧源 + `NOTIFICATION_PREDELETE` 断开（防一次战斗开两次面板）；`reduce_motion` 在面板构建后统一继承（原先被默认值吞掉）；空战利品提示兜底 `victory_hint_text`（原先对空网格显示「点击战利品选中」）；宿主映射 `consumables` 字段；`combat_layout` 两处静默 return 补 `push_warning`（对齐 007 先例）；删除 `KIND_PRE_BATTLE_WARNING` 死常量与 `rebuild_loot_cards` 死参数；修正 `combat_layout.gd` 注释错位。**未整改 3 项已转技术债/后续**：`combat_layout.gd` 面板挂载拆分（DEBT-CUI-008-2）、`Rules.loot_clickable` 消费口径（本次已改为内核裁决，见下）、战利品美术资产（DEBT-CUI-008-5）。
+- **QL-TEST-COVERAGE → INADEQUATE（阻塞 2 项）**。已全部闭环：①「等宽网格」原先只重算内核值自证——改为 `await process_frame` 后断言三卡真实 `size.x` 相等且等于内核对宽、且三卡宽+两列间隔恰好铺满内容宽；②「不自动关闭」原先只断言延迟到点后仍打开——补 `test_panel_holds_only_the_loot_delay_timer`（结构性证明面板只持有这一个 Timer）与 `test_delay_timer_started_on_show_and_stopped_on_close`（计时器真接线，避免手工 `emit` 掩盖漏 `start()`）。另按同一口径补齐：垂直居中几何进内核 `loot_card_content_top`（原先 UI 内散写无法断言）、渡劫红框改为读回真实 `StyleBoxFlat.border_color`（原先只断言内核常量）、键盘可达（`FOCUS_ALL` + 焦点环 + Enter 经焦点通道，原先前一版自绘卡对键盘完全不可达）、灰显卡 `get_selected_index() == -1` + 真实 `InputEventMouseButton` 双路径断言。

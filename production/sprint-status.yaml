@@ -51,11 +51,11 @@ stories:
     name: "combat-ui-layout 008 结算/撤退面板"
     file: "production/epics/combat-ui-layout/story-008-settlement-retreat-panels.md"
     priority: must-have
-    status: backlog
+    status: done
     owner: "ui-programmer"
     estimate_days: 2.0
-    blocker: "17-2"
-    completed: ""
+    blocker: ""
+    completed: "2026-11-08"
 
   - id: "17-5"
     name: "combat-ui-interaction 001 输入锁基座"
