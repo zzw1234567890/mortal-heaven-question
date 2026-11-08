@@ -46,9 +46,20 @@ class SceneManagerStub extends Node:
 		return true
 
 
+## 桩布阵系统——记录 setup_field 调用（DEBT-CBT-018-1：开战前必须落位）。
+class DeploymentStub extends Node:
+	var setups: Array = []
+	var accepted: bool = true
+
+	func setup_field(character_ids: Array, _layout: Dictionary = {}) -> bool:
+		setups.append(character_ids.duplicate())
+		return accepted
+
+
 var scene: Control = null
 var sm: SceneManagerStub = null
 var combat: CombatStub = null
+var deployment: DeploymentStub = null
 
 
 func before_each() -> void:
@@ -56,9 +67,12 @@ func before_each() -> void:
 	add_child_autofree(sm)
 	combat = CombatStub.new()
 	add_child_autofree(combat)
+	deployment = DeploymentStub.new()
+	add_child_autofree(deployment)
 	scene = _instantiate(CombatScenePath)
 	scene.set("scene_manager", sm)
 	scene.set("combat_system", combat)
+	scene.set("deployment_system", deployment)
 	scene.set("reduce_motion_override", true)  # 进场动画直跳终态（确定性）
 	add_child_autofree(scene)
 
@@ -67,6 +81,7 @@ func after_each() -> void:
 	scene = null
 	sm = null
 	combat = null
+	deployment = null
 
 
 ## 实例化场景（不立即进树——先注入桩依赖再 add_child）。
@@ -116,8 +131,18 @@ func test_deploy_confirmed_starts_battle_once_with_ids() -> void:
 	assert_false((deploy as Control).visible, "确认后备战面板应隐藏")
 
 
+## DEBT-CBT-018-1：开战前须把所选角色写入阵位——否则 Phase 6 END 的
+## 「己方全灭」判据读不到「阵位曾有人」，阵亡永远判不出战败。
+func test_deploy_confirmed_setups_field_before_battle_start() -> void:
+	# Act
+	var deploy: Variant = (scene.get("combat_root") as Control).get("deploy_panel")
+	deploy.emit_signal("confirm_requested", [101, 202])
+	# Assert
+	assert_eq(deployment.setups.size(), 1, "确认出战应布阵一次")
+	assert_eq(deployment.setups[0], [101, 202], "布阵名册应与开战名册一致")
+
+
 func test_deploy_confirmed_is_idempotent_while_active() -> void:
-	# Arrange: 已开战
 	var deploy: Variant = (scene.get("combat_root") as Control).get("deploy_panel")
 	deploy.emit_signal("confirm_requested", [101])
 	combat.last_config = {}
@@ -180,6 +205,7 @@ func test_tribulation_scene_marks_is_tribulation() -> void:
 	var trib: Control = _instantiate(TribulationScenePath)
 	trib.set("scene_manager", sm)
 	trib.set("combat_system", combat)
+	trib.set("deployment_system", deployment)
 	trib.set("reduce_motion_override", true)
 	add_child_autofree(trib)
 	# Assert: 结算宿主按渡劫变体装配（红框 80% 撤退 + 战前警示）
@@ -194,6 +220,7 @@ func test_tribulation_deploy_confirms_falls_back_to_plain_battle() -> void:
 	var trib: Control = _instantiate(TribulationScenePath)
 	trib.set("scene_manager", sm)
 	trib.set("combat_system", combat)
+	trib.set("deployment_system", deployment)
 	trib.set("reduce_motion_override", true)
 	add_child_autofree(trib)
 	var deploy: Variant = (trib.get("combat_root") as Control).get("deploy_panel")

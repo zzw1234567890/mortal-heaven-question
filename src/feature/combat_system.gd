@@ -139,6 +139,12 @@ var _phase_manager: RefCounted = null
 ## 战斗开始/结束接线子模块（Sprint 18 补链——名册快照 / 费用激活 / END 判定）。
 var _battle_wiring: RefCounted = null
 
+## 本场敌我角色运行时状态（HP / 存活）——伤害结算的唯一落库目标（Sprint 18 / DEBT-CBT-018-1）。
+var _roster_state: RefCounted = null
+
+## 伤害落库 + 阵亡处理子模块（攻击结算 / 出牌效果结算共用）。
+var _damage_settlement: RefCounted = null
+
 ## 本场战斗的敌方阵容快照（battle_start 时从 AISystem 取；用于胜负判定）。[br]
 ## [br][b]为什么快照而非现读[/b]：现读 AISystem 的阵容会读进上一场战斗的残留
 ## （测试串场即误判胜利）；快照空 = 本场无敌方数据 → 永远不判胜利。
@@ -256,6 +262,10 @@ func battle_start(config: Dictionary) -> void:
 	# Sprint 18：记录本场名册快照（END 阶段胜负判定的输入之一）
 	_capture_battle_rosters(config)
 
+	# Sprint 18 / DEBT-CBT-018-1：种子敌我 HP 状态 + 订阅自身 character_died（阵亡清位）
+	_seed_roster_state(config)
+	_connect_death_cleanup()
+
 	# Sprint 18：费用系统激活——境界费用上限由 RealmSystem 现读，战斗中锁定
 	_init_cost_for_battle()
 
@@ -290,6 +300,9 @@ func battle_end(result: int) -> void:
 
 	# Sprint 18：费用系统清理（未开始/已清理时自身为幂等 no-op）
 	_clear_cost_for_battle()
+
+	# Sprint 18 / DEBT-CBT-018-1：本场 HP 状态表退场（下一场重新种子）
+	_get_roster_state().call(&"clear")
 
 	# 结算奖励/损失
 	var rewards: Dictionary = _settle_result(result)
@@ -371,6 +384,32 @@ func _update_field_engaged(field: Array) -> void:
 ## Phase 6 判定的结局收尾——先清标志再 [method battle_end]（防递归）。委托子模块。
 func _finish_pending_battle_end() -> void:
 	_get_battle_wiring().finish_pending_battle_end()
+
+
+# === HP 落库 + 阵亡清位（Sprint 18 / DEBT-CBT-018-1）===============================
+
+## 种子敌我 HP 状态表——我方阵位（模板 base_hp 回退）+ 敌方阵容快照。[br]
+## [br][param config] 可带 [code]player_stats: {character_id: {current_hp, max_hp}}[/code]
+## 覆盖模板值（interaction epic 的 battle_start 扩展契约；缺省走模板）。
+func _seed_roster_state(config: Dictionary) -> void:
+	var stats: Variant = config.get("player_stats", {})
+	_get_roster_state().call(&"seed", _read_player_field(),
+			stats if stats is Dictionary else {},
+			_battle_enemy_roster, _get_card_system())
+
+
+## 订阅自身 character_died——阵亡清位（幂等连接）。委托子模块。[br]
+## [br][b]为什么在战斗侧订阅自己的信号[/b]：character_died 是「谁死了」的事实广播，
+## 而「把阵位清空」是战斗编排的处置职责（ADR-0008 §架构原则 #2 信号不承载逻辑）。
+## CombatUI / BindingManager / DeploymentSystem 是同一信号的另外三类消费者。
+func _connect_death_cleanup() -> void:
+	_get_damage_settlement().connect_death_cleanup()
+
+
+## 伤害落库结果读取——战斗 UI 的 hp_reader_cb 契约（[code]{current, max}[/code]）。[br]
+## [br]未知角色返回 0/0（UI 侧 apply_hp 已有 max=0 除零守卫）。
+func get_character_hp(character_id: int) -> Dictionary:
+	return _get_roster_state().call(&"get_hp", character_id)
 
 
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]
@@ -867,11 +906,23 @@ func set_hand(hand: Array) -> void:
 ## [br]遍历 _attack_queue，对每条攻击记录调用 calculate_damage 计算伤害，[br]
 ## 发射 attack_resolved 信号（Cat 2b 具名字典格式——ADR-0007）。[br]
 ## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def, attacker_realm, defender_realm, target_hp}[/code][br]
-## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。
+## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。[br]
+## [br]Sprint 18 / DEBT-CBT-018-1：结算结果交 [code]combat_damage_settlement.gd[/code]
+## 回写防御方 HP，归零者经 [signal character_died] 驱动阵亡清位。
 func _resolve_attack_queue() -> void:
 	# Sprint 18：结算前采样阵位「曾有人」——阵亡清位发生在结算内
 	_update_field_engaged(_read_player_field())
-	_get_damage_calculator().resolve_attack_queue()
+	# Sprint 18 / DEBT-CBT-018-1：结算后逐条落库 HP（combat_damage_settlement.gd），
+	# 归零者发射 character_died → 战斗侧清位 → Phase 6 END 判负
+	var settled: Array = _get_damage_calculator().resolve_attack_queue()
+	_settle_attack_damage(settled)
+
+
+## 攻击结算落库——逐条把伤害写回防御方状态（委托子模块）。
+func _settle_attack_damage(settled: Array) -> void:
+	for pair: Variant in settled:
+		if pair is Dictionary:
+			_get_damage_settlement().settle_attack(pair["entry"], pair["payload"])
 
 
 # === 伤害计算（AC-008~012）=======================================================
@@ -1002,6 +1053,20 @@ func _get_battle_wiring() -> RefCounted:
 	if _battle_wiring == null:
 		_battle_wiring = preload("res://src/feature/combat/combat_battle_wiring.gd").new(self)
 	return _battle_wiring
+
+
+## 获取敌我角色运行时状态子模块（Sprint 18 / DEBT-CBT-018-1——HP 落库）。
+func _get_roster_state() -> RefCounted:
+	if _roster_state == null:
+		_roster_state = preload("res://src/feature/combat/combat_roster_state.gd").new()
+	return _roster_state
+
+
+## 获取伤害落库 + 阵亡处理子模块（Sprint 18 / DEBT-CBT-018-1）。
+func _get_damage_settlement() -> RefCounted:
+	if _damage_settlement == null:
+		_damage_settlement = preload("res://src/feature/combat/combat_damage_settlement.gd").new(self)
+	return _damage_settlement
 
 
 # === 查询 API ===================================================================

@@ -19,9 +19,14 @@ func _init(parent: Node = null) -> void:
 ## 攻击队列结算——Phase 4 ATTACK_RESOLUTION 入口。[br]
 ## [br]遍历 _attack_queue，对每条攻击记录调用 calculate_damage 计算伤害，[br]
 ## 发射 attack_resolved 信号（Cat 2b 具名字典格式——ADR-0007）。[br]
-## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def, attacker_realm, defender_realm, target_hp}[/code][br]
-## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。
-func resolve_attack_queue() -> void:
+## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def,
+## attacker_realm, defender_realm, target_hp}[/code][br]
+## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。[br]
+## [br][b]返回[/b]（Sprint 18 / DEBT-CBT-018-1）：本次结算的攻击条目与载荷配对列表
+## [code][{entry, payload}][/code]，供父节点交 [code]combat_damage_settlement.gd[/code]
+## 回写 HP——本模块只算伤害不持有角色状态（与 [method calculate_damage] 的纯函数口径一致）。
+func resolve_attack_queue() -> Array:
+	var settled: Array = []
 	var queue: Array = _parent.get("_attack_queue")
 	for entry in queue:
 		if not (entry is Dictionary):
@@ -47,6 +52,8 @@ func resolve_attack_queue() -> void:
 			"is_kill": is_kill,
 		}
 		_parent.call("_emit_safe", &"attack_resolved", [payload])
+		settled.append({"entry": entry, "payload": payload})
+	return settled
 
 
 ## 计算最终伤害——`max(1, ATK - DEF) × realm_penalty`（AC-008/009）。[br]

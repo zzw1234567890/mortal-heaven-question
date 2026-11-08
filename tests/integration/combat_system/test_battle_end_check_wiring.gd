@@ -52,9 +52,22 @@ func after_each() -> void:
 
 ## 从境界表读期望费用上限（不硬编码——RealmSystem 是唯一真理来源）。
 func _expected_cap(realm: int) -> int:
-	return int(RealmSystemScript.realm_table[realm]["cost_per_turn"])## 推进到 END 阶段（PREPARATION → … → END，共 6 次推进）。
+	return int(RealmSystemScript.realm_table[realm]["cost_per_turn"])
+
+
+## 推进到 END 阶段（PREPARATION → … → END，共 6 次推进）。
 func _advance_to_end() -> void:
 	for i: int in range(6):
+		cs.call("advance_phase")
+
+
+## 推进到 END（按当前阶段计算步数——出牌自动推进后阶段已前移）。[br]
+## 战斗已结束时提前退出（battle_end 会把 _is_active 置 false）。
+func _advance_to_end_from_current() -> void:
+	while bool(cs.call("is_battle_active")) and int(cs.call("get_current_phase")) != 6:
+		if not bool(cs.call("advance_phase")):
+			break
+	if bool(cs.call("is_battle_active")) and int(cs.call("get_current_phase")) == 6:
 		cs.call("advance_phase")
 
 
@@ -123,16 +136,34 @@ func test_end_all_enemies_dead_ends_battle_with_victory() -> void:
 
 
 func test_end_all_allies_dead_ends_battle_with_defeat() -> void:
-	# Arrange——我方上场后阵亡清位（本场阵位「曾有人」）
+	# Arrange——我方上场 + 打牌击杀（DEBT-CBT-018-1 端到端：不再手工 remove_character）
 	assert_true(_deploy_character(101), "前置：角色上场成功")
-	cs.call("battle_start", {"enemy_roster": [{"is_alive": true}], "character_ids": [101]})
-	DeploymentSystem.remove_character(101)
-	_release_ids.clear()
+	cs.call("battle_start", {
+		"enemy_roster": [{"is_alive": true}],
+		"character_ids": [101],
+		"player_stats": {101: {"current_hp": 6, "max_hp": 6}},
+	})
+	assert_true(DeploymentSystem.get_character_slot(101) != -1, "前置：角色在阵位上")
+	# 推进到 PLAY，注入一张 0 费「斩杀自己」的卡（效果结算打空当前 HP）
+	cs.call("set_card_instances", {7: {"card_instance_id": 7, "cost": 0, "template_id": "test_card"}})
+	cs.call("set_hand", [{"card_instance_id": 7, "cost": 0, "template_id": "test_card"}])
+	cs.call("advance_phase")  # PREPARATION → DRAW
+	cs.call("advance_phase")  # DRAW → PLAY
+	cs.set("resolve_cb", Callable(func(_card, _targets) -> Array:
+		return [{"target_id": 101, "damage": 6, "side": 0, "binding_card_ids": []}]))
+	var deaths: Array = []
+	cs.connect("character_died", func(char_id: int, side: int, _ids: Array) -> void:
+		deaths.append({"id": char_id, "side": side}))
 	var sig: Dictionary = {"result": -1}
 	cs.connect("battle_ended", func(result: int, _rewards: Dictionary) -> void:
 		sig["result"] = result)
-	# Act
-	_advance_to_end()
+	# Act——打牌击杀 → 自动清位 → END 判负
+	assert_true(cs.call("play_card", 7, []), "出牌成功")
+	assert_eq(deaths.size(), 1, "击杀应发射一次 character_died")
+	assert_eq(int(deaths[0]["side"]), 0, "我方 side=0")
+	assert_true(DeploymentSystem.get_character_slot(101) == -1, "阵亡后阵位应被自动清空")
+	_release_ids.clear()  # 已清位
+	_advance_to_end_from_current()
 	# Assert
 	assert_false(cs.call("is_battle_active"), "己方全灭后战斗应结束")
 	assert_eq(int(sig["result"]), CS_SCRIPT.CombatResult.DEFEAT, "结局应为 DEFEAT")

@@ -40,6 +40,7 @@ const TEXT_BATTLE_TITLE: String = "⚔ 遭遇战"
 var combat_system: Node = null
 var deck_system: Node = null
 var scene_manager: Node = null
+var deployment_system: Node = null
 
 ## 战场根实例（[method _ready] 挂载）。
 var combat_root: Control = null
@@ -96,7 +97,8 @@ func _wire_deployment() -> void:
 	if deploy == null:
 		return
 	deploy.call(&"setup", _autoload(&"GameStateManager"), _autoload(&"CardSystem"),
-			_autoload(&"DeploymentSystem"), _autoload(&"BindingManager"))
+			deployment_system if deployment_system != null else _autoload(&"DeploymentSystem"),
+			_autoload(&"BindingManager"))
 	deploy.connect(&"confirm_requested", _on_deploy_confirmed)
 	deploy.connect(&"back_requested", _on_deploy_back)
 	combat_root.call(&"show_deploy_panel", _max_deploy(), _realm_id(),
@@ -128,7 +130,10 @@ func _deploy_title() -> String:
 ## 开战入口（[b]子类覆写点[/b]：渡劫场景改走 TribulationSystem 委托——
 ## 其状态机需在 battle_start 前进入 IN_COMBAT，否则结算不会被渡劫系统消费）。[br]
 ## [br]默认实现只保证「有阵容 → 战斗开始」的最小闭环；config 扩展契约见
-## combat-ui-interaction story 006。
+## combat-ui-interaction story 006。[br]
+## [br][b]阵位落地[/b]：先把所选角色写入 `DeploymentSystem.setup_field()`——
+## Phase 6 END 的「己方全灭」判据读的就是阵位，不先布阵会让「阵位从未有人」
+## 被读成「信息不足」，阵亡永远判不出战败（combat_end_check.gd 的信息不足原则）。
 func _start_battle(character_ids: Array) -> void:
 	var cs: Node = _combat()
 	if cs == null or not cs.has_method(&"battle_start"):
@@ -136,11 +141,24 @@ func _start_battle(character_ids: Array) -> void:
 		return
 	if cs.has_method(&"is_battle_active") and bool(cs.call(&"is_battle_active")):
 		return  # 已开战——重复确认守卫
+	_setup_field(character_ids)
 	cs.call(&"battle_start", {
 		"character_ids": character_ids.duplicate(),
 		"layout": [],
 		"is_tribulation": is_tribulation,
 	})
+
+
+## 布阵——经 DeploymentSystem.setup_field 落位（失败不阻断开战：无阵位时
+## 胜负判定走「信息不足则不判」，但战斗本身仍可进行）。
+func _setup_field(character_ids: Array) -> void:
+	var ds: Node = deployment_system
+	if ds == null:
+		ds = _autoload(&"DeploymentSystem")
+	if ds == null or not ds.has_method(&"setup_field"):
+		return
+	if not bool(ds.call(&"setup_field", character_ids.duplicate(), {})):
+		push_warning("CombatScene: 布阵失败（角色不可用或超出境界上限）——战斗继续，阵位为空")
 
 
 ## 备战返回——回探索（音频矩阵 COMBAT_TO_EXPLORE 行）。

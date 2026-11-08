@@ -153,19 +153,17 @@ func _resolve_effects(card: Variant, targets: Array) -> Array:
 	return []
 
 
-## 阵亡检查——遍历结算结果，处理 HP ≤ 0 的角色。[br]
-## [br][b]桩实现[/b]——Story 004 接线 character_died 信号发射。[br]
-## [br]当前策略：遍历 results 检查 is_kill 字段，发射 character_died 信号。
+## 阵亡检查——遍历结算结果，落库 HP 并处理阵亡（Sprint 18 / DEBT-CBT-018-1）。[br]
+## [br][b]此前为桩[/b]：只读结果项的 [code]is_kill[/code] 直接发信号，不改角色 HP——
+## 生产路径下「打牌击杀」不会让阵位变空，END 判负不可达。[br]
+## [br][b]现在[/b]：交 [code]combat_damage_settlement.gd[/code] 落库
+## （[code]damage[/code] 字段为伤害，缺省读 [code]value[/code]，负值为治疗），
+## HP 归零才发 [code]character_died[/code]；结果项未带可信 HP 时回退其
+## [code]is_kill[/code]（信息不足原则——同 [code]combat_end_check.gd[/code]）。[br]
+## [br]信号后由 CombatSystem 自己的 [code]_on_character_died[/code] 调
+## [code]DeploymentSystem.remove_character()[/code] 清位。
 func _check_and_process_deaths(results: Array) -> void:
-	for result in results:
-		if result is Dictionary and result.get("is_kill", false):
-			var char_id: int = int(result.get("target_id", -1))
-			if char_id < 0:
-				push_warning("CombatSystem: _check_and_process_deaths skipping result with invalid target_id")
-				continue
-			var side: int = int(result.get("side", 0))
-			var binding_ids: Array = result.get("binding_card_ids", [])
-			_parent.call("_emit_safe", &"character_died", [char_id, side, binding_ids])
+	_parent.call("_get_damage_settlement").settle_effect(results)
 
 
 ## 从手牌移除已打出的卡牌。
