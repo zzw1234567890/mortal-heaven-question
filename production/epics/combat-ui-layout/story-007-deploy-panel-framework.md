@@ -109,7 +109,7 @@
 - Logic 内核: `tests/unit/combat_ui/test_deploy_selection_state.gd` + `test_formation_slot_layout.gd` — must exist and pass（BLOCKING）
 - UI: `production/qa/evidence/deploy-panel-evidence.md` + sign-off（五境界截图）
 
-**Status**: [x] Created — 单元 40 例（26 + 14）+ 集成 35 例（28 + 7 宿主接线），combat_ui 单元 88/88、集成 143/143 全绿
+**Status**: [x] Created — 单元 57 例（27 + 14 + 16）+ 集成 54 例（28 + 7 宿主接线 + 19 取数/替换/悬停），combat_ui 单元 105/105、集成 162/162 全绿
 **Manual debug host**: `tests/manual/deploy_panel_debug.tscn`（F6 运行，按键 1-5 切境界 / D 阵亡场景 / R 重置）
 
 ---
@@ -126,10 +126,10 @@
 **Completed**: 2026-11-07
 **Criteria**: 7/7 通过（AC-1/AC-2 的视觉通道归 QA-17-2 D3D12 走查，与 17-1 同口径）
 **Test Evidence**:
-- Logic 内核（BLOCKING）: `tests/unit/combat_ui/test_deploy_selection_state.gd`（26 例）+ `test_formation_slot_layout.gd`（14 例）
-- UI: `tests/integration/combat_ui/test_deploy_panel.gd`（28 例）+ `test_deploy_panel_host.gd`（7 例宿主接线）
-- 计数: combat_ui 单元 88/88、集成 143/143 全绿；全量 **3241 tests / 3240 passing / 1 pending（存量） / 3 orphans（存量）**，较 17-1 收尾基线 3166 净增 75 例，零回归
-- 证据文档: `production/qa/evidence/deploy-panel-evidence.md`（§2 八项视觉走查待 QA-17-2 签收）
+- Logic 内核（BLOCKING）: `tests/unit/combat_ui/test_deploy_selection_state.gd`（27 例）+ `test_formation_slot_layout.gd`（14 例）+ `test_deploy_roster_reader.gd`（16 例——生产取数链路）
+- UI: `tests/integration/combat_ui/test_deploy_panel.gd`（28 例）+ `test_deploy_panel_host.gd`（7 例宿主接线）+ `test_deploy_panel_sources.gd`（19 例——setup 订阅/load_roster 成功路径/替换弹窗/跨系统 ID 契约/悬停并集）
+- 计数: combat_ui 单元 105/105、集成 162/162 全绿；全量 **3277 tests / 3276 passing / 1 pending（存量） / 3 orphans（存量）**，较 17-1 收尾基线 3166 净增 111 例，零回归
+- 证据文档: `production/qa/evidence/deploy-panel-evidence.md`（§1b QL 补测表 + §2 八项视觉走查待 QA-17-2 签收）
 - Debug 宿主: `tests/manual/deploy_panel_debug.tscn`
 **Code Review**: LP-CODE-REVIEW = CONCERNS（0 BLOCKING / 6 HIGH / 7 MEDIUM / 3 LOW），已全部处理：
 - H1 未注入依赖静默空面板 → `push_warning` + `has_sources()` + 宿主测试锁定告警次数
@@ -147,6 +147,14 @@
 - LOW14 `max_deploy <= 0` 提示语义 → 「上场人数上限未初始化」
 - LOW15 非容器子节点尺寸 → `size = custom_minimum_size`
 - LOW16 `draw.connect` vs `_draw()` → 登记 DEBT-CUI-007-3（同目录两种风格均有先例）
+**QA Coverage**: QL-TEST-COVERAGE = GAPS → 8 项缺口全补测：
+- G1 `DeployRosterReader` 读取链路零覆盖 → 新增 `test_deploy_roster_reader.gd`（16 例，桩依赖，不触碰 Autoload）
+- G2 `setup()` 阵亡/复活订阅零覆盖（M10「改了但没测」）→ 4 例（含重复 setup 以模板查询次数锁定不重复订阅）
+- G3 `load_roster()`/`refresh_roster()` 成功路径零覆盖（H2 单次取数从未被断言）→ 5 例
+- G4 跨系统 ID 域契约 → 2 例用**真实 DeploymentSystem** 验证 `mark_unavailable`/`revive_character` 与读取器同域
+- G5 `remaining_hint` 未初始化上限分支 → 1 例
+- G6/G7 替换弹窗打开环节、默认被替换者、守卫与回退分支 → 5 例
+- G8 悬停自身排除与多人并集 → 2 例
 **Deviations**:
 - ADVISORY（已登记技债 DEBT-CUI-007-1）：面向玩家文案中文硬编码（项目尚无本地化系统，同 S16/S17 豁免口径）
 - ADVISORY（已登记技债 DEBT-CUI-007-2）：`deploy_panel.gd` 364 行 / `combat_layout.gd` 310 行超 300 行软上限（有效代码约 224 / 202 行，渐进超限）
@@ -160,8 +168,9 @@
 - `src/ui/combat/deploy/deploy_roster_reader.gd`（93 行——GSM→CardSystem→部署/绑定读取链路）
 - `src/ui/combat/deploy/deploy_character_card.gd`（212 行——缩略卡自绘）
 - `src/ui/combat/deploy/deploy_formation_preview.gd`（147 行——阵位预览自绘）
-- `tests/unit/combat_ui/test_deploy_selection_state.gd`、`test_formation_slot_layout.gd`
-- `tests/integration/combat_ui/test_deploy_panel.gd`、`test_deploy_panel_host.gd`
+- `tests/unit/combat_ui/test_deploy_selection_state.gd`、`test_formation_slot_layout.gd`、`test_deploy_roster_reader.gd`
+- `tests/integration/combat_ui/test_deploy_panel.gd`、`test_deploy_panel_host.gd`、`test_deploy_panel_sources.gd`
+- `tests/integration/combat_ui/mocks/mock_deploy_sources.gd`
 - `tests/manual/deploy_panel_debug.gd` + `.tscn`
 - `production/qa/evidence/deploy-panel-evidence.md`
 

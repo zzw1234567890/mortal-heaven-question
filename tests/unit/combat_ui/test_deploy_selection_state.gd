@@ -136,6 +136,14 @@ func test_remaining_hint_full_shows_full_state() -> void:
 	assert_true(hint.contains("3/3"), "满员提示应包含 3/3")
 
 
+func test_remaining_hint_uninitialized_limit_is_neutral() -> void:
+	# Act / Assert（审查 LOW14）：上限未初始化（0 或负值）时不冒充「还可以选择 0 人」
+	assert_eq(Rules.remaining_hint(0, 0), "上场人数上限未初始化",
+			"上限为 0 时应提示未初始化")
+	assert_eq(Rules.remaining_hint(2, -1), "上场人数上限未初始化",
+			"上限为负值时应提示未初始化")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 协同信息共享标签（AC-7）
 # ═══════════════════════════════════════════════════════════════════════════════

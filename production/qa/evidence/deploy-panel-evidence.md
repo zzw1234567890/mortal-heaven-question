@@ -3,7 +3,7 @@
 > **日期**：2026-11-07
 > **Story**：combat-ui-layout 007（备战面板：视觉框架与状态判定）
 > **类型**：UI（Logic 内核）
-> **自动化证据**：`tests/unit/combat_ui/test_deploy_selection_state.gd`（26 例）+ `test_formation_slot_layout.gd`（14 例）+ `tests/integration/combat_ui/test_deploy_panel.gd`（28 例）+ `test_deploy_panel_host.gd`（7 例）——combat_ui 单元 88/88 + 集成 143/143 全绿
+> **自动化证据**：`tests/unit/combat_ui/test_deploy_selection_state.gd`（27 例）+ `test_formation_slot_layout.gd`（14 例）+ `test_deploy_roster_reader.gd`（16 例）+ `tests/integration/combat_ui/test_deploy_panel.gd`（28 例）+ `test_deploy_panel_host.gd`（7 例）+ `test_deploy_panel_sources.gd`（19 例）——combat_ui 单元 105/105 + 集成 162/162 全绿
 > **本文档覆盖**：4 态视觉可辨识性、五境界阵位布局截图、确认按钮灰态三项**真实渲染走查**——判定逻辑由 BLOCKING 单元测试覆盖（见 §1）
 
 ---
@@ -18,7 +18,28 @@
 | AC-4 | 境界→阵位映射（数据驱动 / slots ≥ max_deploy / 未知境界报错） | 自动化（BLOCKING） | `test_formation_slot_layout.gd` 全部（五境界逐项 + 不变量 + 三例未知境界；不变量读真实 `FRONT_CAPACITY_BY_MAX_DEPLOY`——审查 H4） |
 | AC-5 | 「还可以选择X人」+ 确认按钮 ≥1 才可点 | 自动化 | `test_hint_updates_with_selection_count`、`test_hint_shows_full_state_when_max_reached`、`test_confirm_button_disabled_with_zero_selection`、`test_apply_roster_shrinks_selection_when_limit_drops`（审查 H3）+ §2 表 3 |
 | AC-6 | 阵位预览随选择实时更新（信号驱动） | 自动化 | `test_preview_layout_follows_realm`、`test_preview_updates_when_selection_changes`、`test_preview_fills_front_before_back`、`test_preview_clears_when_deselecting_all`、`test_panel_selection_updates_preview_in_scene`（宿主内实时更新） |
-| AC-7 | 悬停显示协同信息概览 | 自动化（共享标签纯函数 + 真实 `mouse_entered`/`mouse_exited` 信号路径） | `test_shared_faction_tags_*`（5 例）、`test_hover_shows_shared_faction_tags`、`test_hover_without_synergy_shows_no_synergy_text`、`test_hover_exit_hides_tooltip`（审查 M12 改走真实信号） |
+| AC-7 | 悬停显示协同信息概览 | 自动化（共享标签纯函数 + 真实 `mouse_entered`/`mouse_exited` 信号路径 + 自身排除/多人并集） | `test_shared_faction_tags_*`（5 例）、`test_hover_shows_shared_faction_tags`、`test_hover_without_synergy_shows_no_synergy_text`、`test_hover_exit_hides_tooltip`（审查 M12 改走真实信号）、`test_hover_on_selected_self_shows_no_synergy`、`test_hover_unions_shared_tags_across_multiple_selected`（QL 缺口 8） |
+
+---
+
+## 1b. QL-TEST-COVERAGE 补测（2026-11-07）
+
+QA lead 判定 **GAPS**，主要缺口是「生产取数链路与修复后接线零覆盖」。补齐如下：
+
+| 缺口 | 缺口内容 | 补齐方式 | 测试位置 |
+|---|---|---|---|
+| G1 | `DeployRosterReader` 读取链路零覆盖（BLOCKING 建议） | 16 例桩依赖单测：字段逐项映射、空位/非正 ID/模板解析失败跳过、6 位截断、`faction_tags` 副本语义、Dictionary 与对象两种 deck 承载、四类依赖缺失退化 | `tests/unit/combat_ui/test_deploy_roster_reader.gd` |
+| G2 | `setup()` 的阵亡/复活订阅零覆盖（审查 M10「改了但没测」） | 4 例：信号触发刷新、隐藏时不刷新、重复 setup 不重复订阅（以模板查询次数锁定）、复活恢复可选中 | `test_deploy_panel_sources.gd` |
+| G3 | `load_roster()` / `refresh_roster()` 成功路径零覆盖（H2 单次取数从未被断言） | 5 例：端到端读 6 人、模板字段链路、阵亡标记、刷新复用当前上限/境界、无依赖返回 0 | `test_deploy_panel_sources.gd` |
+| G4 | 跨系统 ID 域无契约锁定（阵亡判定可能静默恒 false） | 2 例用**真实 DeploymentSystem** 做契约验证：`mark_unavailable(reader 输出 ID)` 后 `is_dead=true`、`revive_character` 后回 false | `test_deploy_panel_sources.gd` |
+| G5 | `remaining_hint` 的 `max_deploy <= 0` 分支零覆盖（LOW14 修复） | 1 例断言 0 与负值均返回未初始化文案 | `test_deploy_selection_state.gd` |
+| G6 | 替换弹窗「打开」环节与默认被替换者零覆盖 | 3 例：满员点选转入替换且不改阵容、GDD 文案、省略目标取首位、非已选 ID 回落 | `test_deploy_panel_sources.gd` |
+| G7 | `_on_replace_confirmed` 守卫与回退分支零覆盖 | 2 例：无待确认时无信号不改阵容、目标失效时载荷第二参数为实际被替换者 | `test_deploy_panel_sources.gd` |
+| G8 | 悬停自身排除与多人并集零覆盖 | 2 例：悬停自身显示暂无协同、三人并集标签聚合并排除无交集标签 | `test_deploy_panel_sources.gd` |
+
+补测后计数：单元 **105/105**（+17）、集成 **162/162**（+19）；全量 **3277 tests / 3276 passing / 1 pending（存量） / 3 orphans（存量）**，零回归。
+
+**遗留假设（G4 的边界）**：契约测试验证了「deck.slots 的 ID 同时可用于 DeploymentSystem 的阵亡键」这一数值同域假设，但 `mark_unavailable` 目前在 `src/` 内尚无生产调用点（仅测试调用）——真实战斗流程接入时仍需 interaction/combat epic 侧验证一次端到端。
 
 ---
 
@@ -91,6 +112,6 @@
 | 角色 | 签收 |
 |------|:----:|
 | ui-programmer（实现） | [x] 已签收 |
-| lead-programmer（LP-CODE-REVIEW） | [ ] 待审查 |
-| qa-lead（QL-TEST-COVERAGE） | [ ] 待审查 |
+| lead-programmer（LP-CODE-REVIEW） | [x] CONCERNS → 6 HIGH / 7 MEDIUM / 3 LOW 已全处理；放行 |
+| qa-lead（QL-TEST-COVERAGE） | [x] GAPS → 8 项缺口全补测（读取链路 16 例 + 接线/替换/悬停 19 例 + 未初始化提示 1 例）；放行 |
 | qa-lead（QA-17-2 D3D12 视觉走查） | [ ] 待走查签收（§2 表 8 项） |
