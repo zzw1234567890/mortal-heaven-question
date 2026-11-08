@@ -222,3 +222,70 @@ func test_character_hp_reader_contract() -> void:
 	assert_true(hp.has("current") and hp.has("max"), "应提供 current/max 两键")
 	assert_eq(int(hp["current"]), 7, "current=7")
 	assert_eq(int(hp["max"]), 9, "max=9")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# character_damaged 广播（Sprint 18 表现层——伤害飘字/HP 条的增量入口）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 攻击结算落库后广播一次增量——只带伤害值，不带 HP 终值（ADR-0008）。
+func test_attack_resolution_emits_character_damaged_payload() -> void:
+	# Arrange——敌方 10 HP 吃 3 点伤害
+	var enemy := EnemyBattleState.new()
+	enemy.current_hp = 10
+	enemy.max_hp = 10
+	enemy.is_alive = true
+	cs.call("battle_start", {"enemy_roster": [enemy], "character_ids": []})
+	cs.call("set_attack_queue", [{
+		"attacker_id": 1, "target_id": 100000,
+		"attacker_atk": 5, "target_def": 2,
+		"attacker_realm": 1, "defender_realm": 1, "target_hp": 10,
+	}])
+	var payloads: Array = []
+	cs.connect("character_damaged", func(data: Dictionary) -> void:
+		payloads.append(data.duplicate(true)))
+	# Act
+	cs.call("_resolve_attack_queue")
+	# Assert
+	assert_eq(payloads.size(), 1, "一次伤害广播一次 character_damaged")
+	var payload: Dictionary = payloads[0]
+	assert_eq(int(payload["character_id"]), 100000, "载荷带目标 ID")
+	assert_eq(int(payload["side"]), 1, "载荷带阵营（敌 side=1）")
+	assert_eq(int(payload["damage"]), 3, "载荷只带本次增量 3")
+	assert_false(bool(payload["is_kill"]), "未致死 is_kill=false")
+	assert_false(payload.has("current_hp"), "载荷不带 HP 终值（消费方现读）")
+
+
+## 出牌效果伤害与攻击结算走同一个广播出口（表现层无需分辨伤害来源）。
+func test_play_card_damage_emits_character_damaged() -> void:
+	# Arrange——敌方须有可信 HP（否则落库跳过、不广播）
+	cs.call("battle_start", {"enemy_roster": [
+		{"current_hp": 20, "max_hp": 20, "is_alive": true}], "character_ids": []})
+	_setup_hand(4)
+	cs.set("resolve_cb", Callable(func(_card, _targets) -> Array:
+		return [{"target_id": 100000, "damage": 6, "side": 1}]))
+	var payloads: Array = []
+	cs.connect("character_damaged", func(data: Dictionary) -> void:
+		payloads.append(data))
+	# Act
+	cs.call("play_card", 4, [])
+	# Assert
+	assert_eq(payloads.size(), 1, "出牌伤害同样广播一次")
+	assert_eq(int(payloads[0]["damage"]), 6, "增量=出牌效果伤害 6")
+
+
+## 无可信 HP 的目标不广播（信息不足——UI 不该为未知角色飘字）。
+func test_unknown_target_does_not_emit_character_damaged() -> void:
+	# Arrange
+	cs.call("battle_start", {"enemy_roster": [{"is_alive": true}], "character_ids": []})
+	_setup_hand(5)
+	cs.set("resolve_cb", Callable(func(_card, _targets) -> Array:
+		return [{"target_id": 888, "damage": 5, "side": 1}]))
+	var payloads: Array = []
+	cs.connect("character_damaged", func(data: Dictionary) -> void:
+		payloads.append(data))
+	# Act
+	cs.call("play_card", 5, [])
+	# Assert
+	assert_eq(payloads.size(), 0, "无 HP 数据的目标不广播增量")
+

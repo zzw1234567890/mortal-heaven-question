@@ -56,6 +56,7 @@ func _ready() -> void:
 	_wire_audio()
 	_wire_panels()
 	_wire_deployment()
+	_wire_feedback()
 	combat_root.call(&"play_entrance", _read_reduce_motion())
 
 
@@ -111,6 +112,25 @@ func _wire_deployment() -> void:
 		host.connect(&"defeat_confirmed", _on_defeat_confirmed)
 
 
+## 战斗表现层接线（Sprint 18 / DEBT-CBT-018-1 残留闭环）。[br]
+## 把 [code]CombatFeedbackCoordinator[/code] 从「只有测试在用」变成生产组件：
+## 信号源接 CombatSystem（伤害/阵亡/战斗结束）+ DeploymentSystem（待命切换），
+## HP 终值走 [code]Callable(CombatSystem, "get_character_hp")[/code]——UI 不缓存 HP。[br]
+## [br][b]降级[/b]：战斗系统不可用时静默跳过（反馈编排器保持未接线状态，
+## 场景仍可运行——不把「缺数据源」变成崩溃）。
+func _wire_feedback() -> void:
+	var cs: Node = _combat()
+	if cs == null:
+		return
+	var reader: Callable = Callable()
+	if cs.has_method(&"get_character_hp"):
+		reader = Callable(cs, &"get_character_hp")
+	combat_root.call(&"setup_feedback", cs,
+			deployment_system if deployment_system != null else _autoload(&"DeploymentSystem"),
+			reader, _autoload(&"CardSystem"), _autoload(&"BindingManager"),
+			_read_reduce_motion())
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 出口（唯一导航入口 = SceneManager.request_scene_change）
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -147,6 +167,9 @@ func _start_battle(character_ids: Array) -> void:
 		"layout": [],
 		"is_tribulation": is_tribulation,
 	})
+	# 开战后再建卡：敌方名册快照与 HP 种子都由 battle_start 定格，
+	# 卡片首帧即拿到真实 HP/ATK（先建卡会读到 0/0）。
+	combat_root.call(&"build_battle_roster", character_ids.duplicate())
 
 
 ## 布阵——经 DeploymentSystem.setup_field 落位（失败不阻断开战：无阵位时

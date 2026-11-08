@@ -458,7 +458,9 @@ func test_ac010_no_self_data_signal_for_hp() -> void:
 func test_ac010_only_cat2b_signals_declared() -> void:
 	# 确认 CombatSystem 的自定义信号都是 Cat 2b 通知信号，无数据信号重复
 	# 过滤掉 Node 内置信号（tree_entered 等），只检查脚本声明的信号
-	var expected: Array = ["phase_changed", "battle_started", "battle_ended", "attack_resolved", "character_died", "retreat_requested"]
+	# Sprint 18：新增 character_damaged（伤害增量通知——不带 HP 终值，
+	# 消费者持 get_character_hp() 读取契约现读，不构成数据信号）
+	var expected: Array = ["phase_changed", "battle_started", "battle_ended", "attack_resolved", "character_died", "retreat_requested", "character_damaged"]
 	var builtin: Array = ["tree_entered", "tree_exiting", "tree_exited", "child_entered_tree", "child_exiting_tree", "child_order_changed", "replacing_by", "editor_description_changed", "editor_state_changed", "script_changed", "property_list_changed", "ready", "renamed"]
 	var signals: Array = cs.get_signal_list()
 	for s in signals:

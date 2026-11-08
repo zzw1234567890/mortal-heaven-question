@@ -26,6 +26,10 @@ const DeployPanelScript := preload("res://src/ui/combat/deploy/deploy_panel.gd")
 const SettlementHostScript := preload("res://src/ui/combat/settlement/settlement_host.gd")
 ## 撤退规则纯函数（story 008——撤退按钮渲染态判定与文案）。
 const RetreatRulesScript := preload("res://src/ui/combat/shared/retreat_rules.gd")
+## 反馈编排器（story 003——伤害飘字 / HP 条 / 阵亡淡出的生产装配点）。
+const FeedbackScript := preload("res://src/ui/combat/feedback/combat_feedback_coordinator.gd")
+## 角色卡装配台（Sprint 18——把敌我名册变成战场上的角色卡）。
+const ActorStageScript := preload("res://src/ui/combat/layout/combat_actor_stage.gd")
 ## 撤退按钮文案（GDD §10「撤退按钮始终在战斗中可点击」）。
 const TEXT_RETREAT_BUTTON: String = "撤退"
 
@@ -98,6 +102,16 @@ var deploy_panel: DeployPanel = null
 ## 结算/撤退/渡劫警示宿主（story 008——默认隐藏，由战斗结束/撤退按钮/
 ## 渡劫进战前三个入口打开）。
 var settlement_host: Node = null
+
+## 反馈编排器（story 003——伤害飘字/HP 条合并刷新/阵亡淡出；生产实例化点）。
+## 由场景挂载侧经 [method setup_feedback] 注入信号源与 hp_reader_cb；
+## 未注入时不出反馈（不报错——UI 骨架可独立测试）。
+var feedback: CombatFeedbackCoordinator = null
+
+## 角色卡装配台（Sprint 18——把敌我名册变成战场角色卡并注册进 [member feedback]）。
+## [b]类型为 Node[/b]：新脚本的全局 class_name 依赖导入缓存，用 Node + 鸭子类型
+## 调用可避免「首次导入前解析失败」的次序问题（同 CombatScene 对组件的处理）。
+var actor_stage: Node = null
 
 ## 撤退按钮（story 008——右上角常驻，渲染态始终可点；点击开撤退确认弹窗）。
 var retreat_button: Button = null
@@ -263,6 +277,18 @@ func _build_layout() -> void:
 	retreat_button_slot.add_child(retreat_button)
 	# 点击转发到结算宿主（未注入依赖前宿主只开空确认弹窗——无副作用）
 	retreat_button.pressed.connect(open_retreat_dialog)
+	# 反馈编排器（story 003——生产实例化点；全屏透明层，飘字池挂在其下）。
+	# [b]层级[/b]：手牌区之上、备战/结算覆盖层之下——飘字盖住角色卡但不遮面板。
+	feedback = FeedbackScript.new()
+	feedback.name = "CombatFeedback"
+	feedback.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	feedback.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(feedback)
+	# 角色卡装配台（Sprint 18——敌我名册 → 战场角色卡 → 注册进反馈编排器）
+	actor_stage = ActorStageScript.new()
+	actor_stage.name = "ActorStage"
+	add_child(actor_stage)
+	actor_stage.call(&"set_containers", ally_area, enemy_area)
 	# 备战面板（story 007——全屏覆盖层，默认隐藏；数据/信号接线由场景挂载侧注入）
 	deploy_panel = DeployPanelScript.new()
 	deploy_panel.name = "DeployPanel"
@@ -329,6 +355,50 @@ func show_pre_battle_warning() -> bool:
 		push_warning("CombatLayout.show_pre_battle_warning: 结算宿主未装配")
 		return false
 	return settlement_host.show_pre_battle_warning()
+
+
+## 装配反馈编排器（伤害飘字 / HP 条 / 阵亡淡出的生产接线）。[br]
+## [param p_combat_system] 信号源——[code]character_damaged[/code] /
+## [code]character_died[/code] / [code]battle_ended[/code]（CombatSystem）。[br]
+## [param p_deployment_system] 信号源——[code]standby_cleared[/code] /
+## [code]character_deployed[/code]（DeploymentSystem，可空）。[br]
+## [param p_hp_reader] HP 终值读取 Callable——[code]func(character_id) ->
+## {current, max}[/code]（生产传 [code]Callable(CombatSystem, "get_character_hp")[/code]）。[br]
+## [param p_card_system] 卡牌系统（角色卡初始 ATK/HP 模板回退，可空）。[br]
+## [param p_binding_manager] 绑定管理器（图标数预留接缝，可空）。[br]
+## [param p_reduce_motion] 减少动态（进场时读到的设置值——飘字/阵亡动画的
+## 静态替代开关）。[br]
+## [br][b]副作用[/b]：把信号源接进 [member feedback]，并把角色卡装配台
+## [member actor_stage] 与反馈编排器绑定——此后 [method build_battle_roster]
+## 建的卡会自动注册。
+func setup_feedback(p_combat_system: Node, p_deployment_system: Node,
+		p_hp_reader: Callable, p_card_system: Node = null,
+		p_binding_manager: Node = null, p_reduce_motion: bool = false) -> void:
+	if feedback == null:
+		push_warning("CombatLayout.setup_feedback: 反馈编排器未装配")
+		return
+	feedback.setup([p_combat_system, p_deployment_system], null, p_hp_reader,
+			p_reduce_motion)
+	if actor_stage != null:
+		actor_stage.call(&"setup", p_combat_system, p_deployment_system,
+				p_card_system, p_binding_manager)
+		actor_stage.call(&"bind_coordinator", feedback)
+
+
+## 按开战名册构建战场角色卡（开战入口调用）。[br]
+## [param p_player_ids] 开战配置里的我方角色 ID（空 → 回退读 DeploymentSystem 阵位）。[br]
+## [br][b]为什么在开战后调用[/b]：敌方名册快照由 [code]battle_start[/code] 定格，
+## HP 也由它种子——先开战再建卡，卡片首帧就拿到真实 HP/ATK（不是「0/0 等刷新」）。
+func build_battle_roster(p_player_ids: Array = []) -> void:
+	if actor_stage == null:
+		return
+	actor_stage.call(&"build_roster", p_player_ids)
+
+
+## 清空战场角色卡（战斗结束 / 场景退场——防悬空注册与残留）。
+func clear_battle_roster() -> void:
+	if actor_stage != null:
+		actor_stage.call(&"clear_roster")
 
 
 ## 打开撤退确认弹窗（AC-6/AC-7——撤退按钮点击或战斗系统撤退请求触发）。

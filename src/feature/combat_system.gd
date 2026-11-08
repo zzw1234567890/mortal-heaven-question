@@ -58,6 +58,19 @@ signal battle_ended(result: int, rewards: Dictionary)
 ## 载荷: [code]{attacker_id, target_id, damage, is_kill}[/code] 具名字典（ADR-0007 >3 参数规则）。
 signal attack_resolved(attack_data: Dictionary)
 
+## 伤害/治疗落库后广播（Cat 2b）——攻击结算与出牌效果两条来源共用。[br]
+## 载荷: [code]{character_id, side, damage, is_kill}[/code] 具名字典
+## （ADR-0007 >3 参数规则；[code]damage[/code] 为本次增量，负值 = 治疗）。[br]
+## [br][b]与 attack_resolved 的分工[/b]：[code]attack_resolved[/code] 只覆盖
+## Phase 4 的攻击队列（攻击动画/命中音效的消费者）；出牌效果造成的伤害不经过它。
+## 本信号是「某角色刚受到多少伤害」的统一通知，UI 血条/飘字据此渲染。[br]
+## [br][b]不携带 HP 终值[/b]（ADR-0008 §信号合规：CombatSystem 不自设 HP 数据信号）：
+## 消费者持 [code]get_character_hp()[/code] 读取契约，需要终值时自行现读——
+## HP 所有权始终在战斗侧，UI 不复制。[br]
+## [br][b]不广播未知角色[/b]：没有可信 HP（未种子 / 模板缺失）时不发射，
+## 与 [code]combat_end_check.gd[/code] 的「信息不足则不判」同源。
+signal character_damaged(damage_data: Dictionary)
+
 ## 角色 HP ≤ 0 时发射（Cat 2b）。载荷: (character_id: int, side: int, binding_card_ids: Array)。
 signal character_died(character_id: int, side: int, binding_card_ids: Array)
 
@@ -410,6 +423,13 @@ func _connect_death_cleanup() -> void:
 ## [br]未知角色返回 0/0（UI 侧 apply_hp 已有 max=0 除零守卫）。
 func get_character_hp(character_id: int) -> Dictionary:
 	return _get_roster_state().call(&"get_hp", character_id)
+
+
+## 本场敌方名册快照（只读）。[br]
+## [br][b]为什么暴露快照而非 AISystem 现读[/b]：战斗 UI 建敌方角色卡要跟 END 判定
+## 看同一份数据——跨回合现读 AISystem 可能已换阵容（下一场 / 测试串场）。
+func get_battle_enemy_roster() -> Array:
+	return _battle_enemy_roster
 
 
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]

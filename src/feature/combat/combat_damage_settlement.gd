@@ -120,9 +120,26 @@ func _apply(character_id: int, damage: int, side_hint: int,
 	var died: bool = bool(outcome["died"]) if bool(outcome["known"]) else fallback_kill
 	outcome["side"] = side
 	outcome["character_id"] = character_id
+	# HP 终值广播（UI 血条/伤害飘字的统一入口——出牌效果与攻击结算共用）。
+	# 未知角色不广播、不臆造 HP（信息不足原则）。
+	if bool(outcome.get("known", false)) and effective_damage != 0:
+		_emit_damaged(character_id, side, effective_damage, died)
 	if died:
 		_emit_death(character_id, side, binding_ids)
 	return outcome
+
+
+## 发射 character_damaged——只广播落库成功（[code]known[/code]）的伤害增量。[br]
+## [br][b]为什么不带 HP 终值[/b]：ADR-0008 §信号合规禁止 CombatSystem 自设 HP
+## 数据信号——消费者持 [code]get_character_hp()[/code] 读取契约现读，HP 所有权
+## 始终在战斗侧，UI 不复制。
+func _emit_damaged(character_id: int, side: int, damage: int, is_kill: bool) -> void:
+	_parent.call("_emit_safe", &"character_damaged", [{
+		"character_id": character_id,
+		"side": side,
+		"damage": damage,
+		"is_kill": is_kill,
+	}])
 
 
 ## 发射 character_died——同一角色只发一次（状态表已保证 died 幂等）。[br]

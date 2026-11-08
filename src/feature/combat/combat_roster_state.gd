@@ -31,6 +31,26 @@ const ENEMY_ID_STRIDE: int = 10000
 var _states: Dictionary = {}
 
 
+## 敌方角色 ID 派生——[b]单一来源[/b]：开战种子与战斗 UI 建卡必须落在同一键上，
+## 否则 UI 读到的永远是 0/0。[br]
+## [param entry] 阵容条目（自带 character_id 时优先——测试/预配置阵容可显式指定）。[br]
+## [param index] 阵容下标（无显式 ID 时按约定派生）。
+static func enemy_id_of(entry: Variant, index: int) -> int:
+	var explicit: int = _entry_int_static(entry, "character_id", -1)
+	return explicit if explicit >= 0 else ENEMY_ID_BASE + index * ENEMY_ID_STRIDE
+
+
+## 敌方条目的前后排判定——条目自带阵位信息时以其为准，缺省视为前排
+## （敌方阵容快照通常不带阵位，UI 侧统一摆前排，不做无依据的臆测）。
+static func enemy_is_front(entry: Variant) -> bool:
+	var raw: Variant = _entry_raw_static(entry, "is_front_row")
+	if raw == null:
+		raw = _entry_raw_static(entry, "is_front")
+	if raw is bool:
+		return raw
+	return true
+
+
 ## 清空全部状态——开战重种子与战斗结束共用。
 func clear() -> void:
 	_states.clear()
@@ -58,9 +78,7 @@ func seed_enemy_roster(roster: Array) -> void:
 		var entry: Variant = roster[idx]
 		if entry == null:
 			continue
-		var character_id: int = _entry_int(entry, "character_id", -1)
-		if character_id < 0:
-			character_id = ENEMY_ID_BASE + idx * ENEMY_ID_STRIDE
+		var character_id: int = enemy_id_of(entry, idx)
 		var max_hp: int = _entry_int(entry, "max_hp", 0)
 		var hp: int = _entry_int(entry, "current_hp", max_hp)
 		var known: bool = max_hp > 0
@@ -205,9 +223,23 @@ func _read_template_max_hp(card_system: Node, character_id: int) -> int:
 
 ## 条目整数字段读取——兼容 Dictionary 与 Object（EnemyBattleState）。
 func _entry_int(entry: Variant, key: String, fallback: int) -> int:
+	return _entry_int_static(entry, key, fallback)
+
+
+## 条目整数字段读取的静态变体（[method enemy_id_of] 等无实例入口复用）。
+static func _entry_int_static(entry: Variant, key: String, fallback: int) -> int:
 	if entry is Dictionary:
 		return int((entry as Dictionary).get(key, fallback))
 	if entry is Object and (entry as Object).has_method(&"get"):
 		var raw: Variant = (entry as Object).get(key)
 		return int(raw) if raw != null else fallback
 	return fallback
+
+
+## 条目任意字段读取——读不到时返回 null（区别于「读到 0」）。
+static func _entry_raw_static(entry: Variant, key: String) -> Variant:
+	if entry is Dictionary:
+		return (entry as Dictionary).get(key)
+	if entry is Object and (entry as Object).has_method(&"get"):
+		return (entry as Object).get(key)
+	return null

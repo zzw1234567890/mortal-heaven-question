@@ -17,6 +17,7 @@ class CombatStub extends Node:
 	var last_config: Dictionary = {}
 	var retreat_calls: int = 0
 	var active: bool = false
+	var hp_store: Dictionary = {}
 
 	func battle_start(config: Dictionary) -> void:
 		last_config = config.duplicate(true)
@@ -28,6 +29,14 @@ class CombatStub extends Node:
 	func confirm_retreat() -> void:
 		retreat_calls += 1
 		active = false
+
+	## 反馈协调器的 hp_reader_cb 契约（生产为 CombatSystem.get_character_hp）。
+	func get_character_hp(character_id: int) -> Dictionary:
+		return hp_store.get(character_id, {"current": 0, "max": 0})
+
+	## 敌方名册快照（角色卡装配台建卡用）。
+	func get_battle_enemy_roster() -> Array:
+		return []
 
 
 ## 桩场景管理器——记录导航请求；`audio` 恒为 null（不创建真实音频节点池）。
@@ -140,6 +149,48 @@ func test_deploy_confirmed_setups_field_before_battle_start() -> void:
 	# Assert
 	assert_eq(deployment.setups.size(), 1, "确认出战应布阵一次")
 	assert_eq(deployment.setups[0], [101, 202], "布阵名册应与开战名册一致")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 表现层接线（DEBT-CBT-018-1 残留：反馈协调器此前无生产实例化点）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_combat_scene_mounts_feedback_coordinator() -> void:
+	var root: Control = scene.get("combat_root") as Control
+	assert_not_null(root.get("feedback"), "战斗根应实例化 CombatFeedbackCoordinator")
+	assert_not_null(root.get("actor_stage"), "战斗根应实例化角色卡装配台")
+
+
+## 生产接线：hp_reader_cb 必须指向战斗系统的读取契约（UI 不缓存 HP）。
+func test_feedback_hp_reader_bound_to_combat_system() -> void:
+	# Arrange
+	var root: Control = scene.get("combat_root") as Control
+	var feedback: Control = root.get("feedback") as Control
+	assert_true(feedback.hp_reader_cb.is_valid(), "hp_reader_cb 应已注入")
+	# Act——战斗系统换上真实 HP 后经回调读取
+	combat.hp_store = {101: {"current": 42, "max": 60}}
+	var hp: Dictionary = feedback.hp_reader_cb.call(101)
+	# Assert
+	assert_eq(int(hp["current"]), 42, "hp_reader_cb 应直达 CombatSystem.get_character_hp")
+	assert_eq(int(hp["max"]), 60, "max 同源读取")
+
+
+## 确认出战后按名册建卡并注册进编排器——HP 条/飘字/阵亡动效才有对象可作用于。
+func test_deploy_confirmed_builds_roster_cards() -> void:
+	# Arrange
+	combat.hp_store = {101: {"current": 50, "max": 50}, 202: {"current": 30, "max": 30}}
+	var root: Control = scene.get("combat_root") as Control
+	var stage: Node = root.get("actor_stage") as Node
+	var feedback: Control = root.get("feedback") as Control
+	# Act
+	var deploy: Variant = root.get("deploy_panel")
+	deploy.emit_signal("confirm_requested", [101, 202])
+	# Assert
+	assert_eq(stage.call(&"card_count"), 2, "两名上场角色应各建一张卡")
+	assert_eq(feedback._cards.size(), 2, "建好的卡应注册进反馈编排器")
+	var card: Control = stage.call(&"get_card", 101)
+	assert_not_null(card, "角色 101 应有卡")
+	assert_eq(card.current_hp, 50, "卡片初始 HP 应读战斗系统种子值")
 
 
 func test_deploy_confirmed_is_idempotent_while_active() -> void:
