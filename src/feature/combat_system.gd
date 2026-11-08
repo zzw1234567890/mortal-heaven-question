@@ -136,6 +136,28 @@ var _card_resolver: RefCounted = null
 ## 阶段管理子模块——惰性初始化（Sprint 9 Story 8 拆分）。
 var _phase_manager: RefCounted = null
 
+## 战斗开始/结束接线子模块（Sprint 18 补链——名册快照 / 费用激活 / END 判定）。
+var _battle_wiring: RefCounted = null
+
+## 本场战斗的敌方阵容快照（battle_start 时从 AISystem 取；用于胜负判定）。[br]
+## [br][b]为什么快照而非现读[/b]：现读 AISystem 的阵容会读进上一场战斗的残留
+## （测试串场即误判胜利）；快照空 = 本场无敌方数据 → 永远不判胜利。
+var _battle_enemy_roster: Array = []
+
+## 本场战斗上场名册（battle_start 的 config.character_ids；无则取阵位快照）。
+var _battle_player_roster: Array = []
+
+## 我方阵位「曾有人」标志——只有战斗期间见过占用阵位，才允许判战败。[br]
+## [br]防止「DeploymentSystem 从未被布置」被读成「己方全灭」。
+var _field_engaged: bool = false
+
+## Phase 6 END 判定出的战斗结果（0 = 未结束）。[br]
+## [br][b]为何延后执行[/b]：判定发生在 _enter_phase(END) 内部，此时 advance_phase
+## 的阶段簿记（_phase / GSM 镜像 / phase_changed 信号）尚未完成——若立即
+## battle_end() 会把已结束的战斗再写一次阶段。改为「END 入口判定 + advance_phase
+## 簿记后收尾」，保证 7 阶段序列完整走完再退出（ADR-0008 §Phase 6）。
+var _pending_battle_result: int = 0
+
 
 # === 生命周期 ====================================================================
 
@@ -167,6 +189,9 @@ func _ready() -> void:
 func set_battle_active(active: bool, turn: int = 1) -> void:
 	var was_active: bool = _is_active
 	_is_active = active
+	# END 判定结果只在单场战斗内有意义——桩式开关一并清掉（防上一场的结局
+	# 被下一场 advance_phase 的收尾逻辑捡起来误执行）
+	_pending_battle_result = 0
 	if active:
 		_turn = turn
 		_phase = CombatPhase.PREPARATION
@@ -197,16 +222,18 @@ func set_scene_change(enabled: bool) -> void:
 
 # === 战斗生命周期（Story 002）====================================================
 
-## 战斗开始——初始化 battle.* 域 + 备战阶段 + 快照 + 输入锁 + 开始回合。[br]
-## [br][param config] 战斗配置 [code]{enemy_deck_id, tribulation_level, is_tribulation}[/code]。
+## 战斗开始——初始化 battle.* 域 + 费用系统 + 备战阶段 + 快照 + 输入锁 + 开始回合。[br]
+## [br][param config] 战斗配置 [code]{character_ids, enemy_roster, is_tribulation}[/code]。
 ## [br]流程（ADR-0008 §生命周期）：[br]
 ##   1. 重复调用守卫——已有活跃战斗时 push_warning + return[br]
 ##   2. GSM._set_battle_active(true) 创建 battle 域[br]
 ##   3. 初始化内部状态（_phase=PREPARATION, _turn=1, _is_active=true）[br]
-##   4. SaveLoad.create_battle_snapshot(GSM.serialize()) 创建快照[br]
-##   5. InputManager.push_lock(ANIMATION) 推入输入锁[br]
-##   6. _emit_safe("battle_started", [config]) 发射 Cat 2b 信号[br]
-##   7. _enter_phase(PREPARATION) 启动第一回合
+##   4. 记录本场敌我名册快照（END 阶段胜负判定用）[br]
+##   5. [b]CostSystem.init_for_battle(境界费用上限)[/b]——费用系统激活[br]
+##   6. SaveLoad.create_battle_snapshot(GSM.serialize()) 创建快照[br]
+##   7. InputManager.push_lock(ANIMATION) 推入输入锁[br]
+##   8. _emit_safe("battle_started", [config]) 发射 Cat 2b 信号[br]
+##   9. _enter_phase(PREPARATION) 启动第一回合
 func battle_start(config: Dictionary) -> void:
 	# AC-001：重复调用守卫
 	if _is_active:
@@ -224,6 +251,13 @@ func battle_start(config: Dictionary) -> void:
 	_player_confirmed_attack_skip = false
 	_phase_timer_exceeded = false
 	_attack_queue.clear()
+	_pending_battle_result = 0
+
+	# Sprint 18：记录本场名册快照（END 阶段胜负判定的输入之一）
+	_capture_battle_rosters(config)
+
+	# Sprint 18：费用系统激活——境界费用上限由 RealmSystem 现读，战斗中锁定
+	_init_cost_for_battle()
 
 	# AC-004：创建战斗快照
 	_create_battle_snapshot()
@@ -251,7 +285,11 @@ func battle_end(result: int) -> void:
 	# AC-011：入口防御清理
 	_attack_queue.clear()
 	_is_active = false
+	_pending_battle_result = 0
 	_clear_animation_lock()
+
+	# Sprint 18：费用系统清理（未开始/已清理时自身为幂等 no-op）
+	_clear_cost_for_battle()
 
 	# 结算奖励/损失
 	var rewards: Dictionary = _settle_result(result)
@@ -287,6 +325,52 @@ func retreat() -> void:
 ## [br]调用 battle_end(RETREAT) 执行 50% 保留结算。
 func confirm_retreat() -> void:
 	battle_end(CombatResult.RETREAT)
+
+
+# === 战斗结束判定（Sprint 18——Phase 6 END 真实现）===============================
+# 实现全部在 combat_battle_wiring.gd 子模块（名册快照 / 费用激活 / END 判定 /
+# 结局收尾）；父节点只保留薄委托，供 phase_manager 与自身调用。
+
+## 记录本场敌我名册快照——委托子模块（[method battle_start] 调用）。
+func _capture_battle_rosters(config: Dictionary) -> void:
+	_get_battle_wiring().capture_rosters(config)
+
+
+## 费用系统激活——[code]CostSystem.init_for_battle(境界费用上限)[/code]。委托子模块。
+func _init_cost_for_battle() -> void:
+	_get_battle_wiring().init_cost_for_battle()
+
+
+## 费用系统清理——战斗结束。委托子模块。
+func _clear_cost_for_battle() -> void:
+	_get_battle_wiring().clear_cost_for_battle()
+
+
+## Phase 6 END 战斗结束检查——[b]返回 true 表示本场已判定结束[/b]。委托子模块。[br]
+## [br]只记录 [member _pending_battle_result]，由 [method advance_phase] 在阶段簿记
+## 与信号完成后收尾（ADR-0008 §Phase 6 顺序）。
+func _check_battle_end() -> bool:
+	return _get_battle_wiring().check_battle_end()
+
+
+## 战斗费用上限——RealmSystem 的 [code]cost_per_turn[/code]。委托子模块（测试接缝）。
+func _read_cost_cap() -> int:
+	return _get_battle_wiring().read_cost_cap()
+
+
+## 读取 DeploymentSystem 阵位快照。委托子模块。
+func _read_player_field() -> Array:
+	return _get_battle_wiring().read_player_field()
+
+
+## 累积「我方阵位曾有人」标志。委托子模块。
+func _update_field_engaged(field: Array) -> void:
+	_get_battle_wiring().update_field_engaged(field)
+
+
+## Phase 6 判定的结局收尾——先清标志再 [method battle_end]（防递归）。委托子模块。
+func _finish_pending_battle_end() -> void:
+	_get_battle_wiring().finish_pending_battle_end()
 
 
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]
@@ -453,12 +537,18 @@ func advance_phase() -> bool:
 	_gsm_set_battle_phase(next)
 
 	# AC-005：END→PREPARATION 回绕时递增回合
-	if next == CombatPhase.PREPARATION and old_phase == CombatPhase.END:
+	# （Sprint 18：已判定结束的战斗不开启下一回合——回合数停在结束的那一回合）
+	if next == CombatPhase.PREPARATION and old_phase == CombatPhase.END \
+			and _pending_battle_result == 0:
 		_turn += 1
 		_gsm_increment_battle_turn()
 
 	# AC-002：Cat 2b 信号——通过 _emit_signal_safe 路由（ADR-0007）
 	_emit_safe(&"phase_changed", [old_phase, next, _turn])
+
+	# Sprint 18：Phase 6 END 判定出的结局收尾（簿记 + 信号完成后才退出，
+	# 保证 7 阶段序列与 phase_changed 不被 battle_end 截断——ADR-0008 §Phase 6）
+	_finish_pending_battle_end()
 
 	return true
 
@@ -779,6 +869,8 @@ func set_hand(hand: Array) -> void:
 ## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def, attacker_realm, defender_realm, target_hp}[/code][br]
 ## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。
 func _resolve_attack_queue() -> void:
+	# Sprint 18：结算前采样阵位「曾有人」——阵亡清位发生在结算内
+	_update_field_engaged(_read_player_field())
 	_get_damage_calculator().resolve_attack_queue()
 
 
@@ -903,6 +995,13 @@ func _get_phase_manager() -> RefCounted:
 	if _phase_manager == null:
 		_phase_manager = preload("res://src/feature/combat/combat_phase_manager.gd").new(self)
 	return _phase_manager
+
+
+## 获取战斗接线子模块实例（Sprint 18——名册快照 / 费用激活 / END 判定）。
+func _get_battle_wiring() -> RefCounted:
+	if _battle_wiring == null:
+		_battle_wiring = preload("res://src/feature/combat/combat_battle_wiring.gd").new(self)
+	return _battle_wiring
 
 
 # === 查询 API ===================================================================

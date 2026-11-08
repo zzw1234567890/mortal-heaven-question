@@ -31,6 +31,10 @@ extends Control
 ## 变换豁免（ADR-0031 §3 零轮询）。[member animate] 为 reduce-motion 预留接线点
 ##（设置系统 Story 003 入库后接入——先例 [member NotificationToastArea.animate]）。
 ## [br][br][b]零轮询[/b]：无 [code]_process()[/code]。
+## [br][br][b]启动承载者[/b]（gate-check 2026-11-08 §B1）：主菜单是 [code]run/main_scene[/code]，
+## 由它在 [method _ready] 经 [HudBootstrap] 把全局 HUD 挂进
+## [code]SceneManager.PersistentLayer[/code]——此后所有转场 HUD 常驻，主菜单本体结构不变。
+## 「只在当前主场景时挂载」的守卫见 [method _mount_global_hud]。
 ##
 ## @experimental
 ## 来源: ADR-0031、design/gdd/main-menu-system.md、design/ux/main-menu.md、
@@ -75,6 +79,11 @@ const SLScript := preload("res://src/foundation/save_load_system.gd")
 ## KeybindStore 脚本常量——启动按键加载（Story 004：键位持久化加载，
 ## GDD 边界澄清「重启不失效」）。
 const KeybindStoreScript := preload("res://src/ui/main_menu/keybind_store.gd")
+## HudBootstrap 脚本常量——全局 HUD 的生产挂载入口（gate-check §B1）。
+## 主菜单是进程启动后的第一个场景（[code]run/main_scene[/code]），因此由它担任
+## 「启动承载者」：HUD 经 [code]SceneManager.register_persistent()[/code] 挂入
+## PersistentLayer 后跨场景常驻，主菜单本体结构不变（ADR-0031 §1.2）。
+const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -115,6 +124,7 @@ func _ready() -> void:
 	_load_keybinds()
 	_refresh_save_state()
 	_connect_save_signals()
+	_mount_global_hud_if_boot_scene()
 	if animate:
 		_play_intro()
 	# 初始焦点：继续游戏优先（UX 规范场景 2「零摩擦中转站」），
@@ -127,6 +137,40 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if _intro_tween != null and _intro_tween.is_valid():
 		_intro_tween.kill()
+
+## === 全局 HUD 生产挂载（gate-check 2026-11-08 §B1）=============================
+
+## 仅在「本节点就是运行中的主场景」时挂载全局 HUD。[br]
+## [br][b]为什么延后一帧[/b]：场景切换时 [code]current_scene[/code] 要到整个装载流程
+## 结束才落定，[code]_ready[/code] 内读取可能还是旧值；[method Node.call_deferred]
+## 在空闲帧执行，读到的一定是最终值。[br]
+## [br][b]为什么要这道守卫[/b]：集成测试把 MainMenu.tscn 当普通节点 add_child，
+## 此时 [code]current_scene[/code] 不是它——不挂载，避免测试进程里凭空多出一个
+## 常驻 HUD（它订阅全局 ESC 信号与转场信号）。生产路径（[code]run/main_scene[/code]，
+## 含读档/转场回到主菜单）守卫恒真。
+func _mount_global_hud_if_boot_scene() -> void:
+	if not is_inside_tree():
+		return
+	call_deferred(&"_mount_global_hud")
+
+## 守卫实现——[b]测试可直接调用 [method _mount_global_hud]（守卫）/ [method _mount_hud]（无守卫）[/b]。
+## [br][b]current_scene 为 null 时放行[/b]：场景切换的中间态（旧场景已释放、新场景
+## 尚未登记）不该被误判成「不是主场景」而漏挂；此时本节点必然就是刚装载的主菜单。
+func _mount_global_hud() -> void:
+	if not is_inside_tree():
+		return
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	var current: Node = tree.current_scene
+	if current != null and current != self:
+		return
+	_mount_hud()
+
+## 挂载全局 HUD（幂等——重复进入主菜单复用同一实例）。[br]
+## [br][b]返回[/b]：已挂载的 HUD；SceneManager 不可用/不支持时 null（静默降级）。
+func _mount_hud() -> CanvasLayer:
+	return HudBootstrapScript.mount(_get_scene_manager())
 
 ## === 按键绑定启动加载（Story 004）==============================================
 

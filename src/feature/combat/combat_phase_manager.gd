@@ -91,7 +91,12 @@ func enter_phase(phase: int) -> void:
 			_reset_cost_for_turn()
 			# 2. DeploymentSystem.clear_standby_state
 			_clear_standby_state()
-			# 3. 战斗结束检查（Story 8-5 接线）
+			# 3. 战斗结束检查（Sprint 18：真实现——敌我全灭判定，GDD §9）
+			#    判定命中即停在此阶段：advance_phase 簿记后由父节点收尾 battle_end，
+			#    不再调度下一回合（否则已结束的战斗会先绕回 PREPARATION）。
+			if _check_battle_end():
+				return
+			# 4. 未结束 → 调度下一回合
 			_schedule_auto_advance()
 
 
@@ -145,6 +150,15 @@ func _clear_standby_state() -> void:
 	var ds = _get_deployment_system()
 	if ds != null and ds.has_method("clear_standby_state"):
 		ds.clear_standby_state()
+
+
+## 战斗结束检查——委托父节点（判定内核 + 名册快照都归 CombatSystem）。
+## [br][b]返回[/b]: true 表示本场已判定结束（父节点已记录待收尾结果）。
+## [br]父节点缺该方法时返回 false（守卫——不静默吞掉回合推进）。
+func _check_battle_end() -> bool:
+	if _parent == null or not _parent.has_method("_check_battle_end"):
+		return false
+	return bool(_parent.call("_check_battle_end"))
 
 
 ## 执行 AI 回合——通过 AISystem Autoload。[br]

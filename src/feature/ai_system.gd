@@ -246,6 +246,14 @@ func set_enemy_roster(roster: Array) -> void:
 	_enemy_roster = roster
 
 
+## 读取当前敌方阵容（只读查询——CombatSystem 开战快照用，Sprint 18）。[br]
+## [br]返回内部数组本身（不拷贝）：调用方需要独立副本时自行 duplicate()。[br]
+## [br]先前全库只有写入端 [method set_enemy_roster]，END 阶段胜负判定拿不到敌方
+## 名册，只能反射读私有字段——补齐对称的只读入口。
+func get_enemy_roster() -> Array:
+	return _enemy_roster
+
+
 ## 设置当前回合数。
 func set_current_turn(turn: int) -> void:
 	_current_turn = turn
