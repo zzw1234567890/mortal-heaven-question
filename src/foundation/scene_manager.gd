@@ -181,6 +181,10 @@ func _ready() -> void:
 	# AudioManager 启动实例化（audio Story 001——零新增 Autoload，
 	# ADR-0031 §1.2：音频节点池经 PersistentLayer 挂载）
 	_get_audio_manager()
+	# SCENE_PATHS 启动自检（R3 硬化）：注册路径指向不存在的 .tscn 时，
+	# [method request_scene_change] 的 ID 校验依然通过，失败被推迟到 Phase 3
+	# 的 change_scene_to_file → 静默回退 MAIN_MENU。启动即 push_error 暴露。
+	verify_scene_paths()
 
 ## === 依赖注入方法 ==============================================================
 
@@ -310,6 +314,24 @@ func get_current_scene_id() -> int:
 ## 是否正在转场中。
 func is_transitioning() -> bool:
 	return _transitioning
+
+
+## 校验 [constant SCENE_PATHS] 的每条注册路径都有真实资源文件（R3 硬化）。[br]
+## [br][b]为什么需要[/b]：[method request_scene_change] 只校验 ID 是否在字典中，
+## 路径指向缺失文件时校验通过、Phase 3 的 [code]change_scene_to_file[/code] 才失败，
+## 并被降级成「静默回退 MAIN_MENU」——玩家点的按钮看起来没反应。
+## 启动自检把这类缺口暴露在 [method _ready] 的 push_error 里。[br]
+## [br][b]返回[/b]：缺失路径数组（空 = 全部存在；测试断言用）。
+## [param paths]: 待校验路径表（缺省为 [constant SCENE_PATHS]——测试可传入假表）。
+func verify_scene_paths(paths: Dictionary = SCENE_PATHS) -> Array:
+	var missing: Array = []
+	for scene_id: int in paths.keys():
+		var path: String = str(paths[scene_id])
+		if not ResourceLoader.exists(path):
+			missing.append(path)
+			push_error("SceneManager: SCENE_PATHS[%d] 指向不存在的场景文件：%s"
+					% [scene_id, path])
+	return missing
 
 
 ## === 信号发射包装 ==============================================================
