@@ -866,13 +866,16 @@ func get_hand() -> Array:
 ##   4. 目标验证——_validate_targets(card, targets) → false 则 return false（不扣费）[br]
 ##   5. 扣费——CostSystem.spend(cost)（直接调用——需要保证）[br]
 ##   6. 效果结算——_resolve_effects(card, targets) 返回结果列表[br]
-##   7. 阵亡检查——_check_and_process_deaths()[br]
+##   7. 阵亡检查——_check_and_process_deaths()（击杀触发条目在此结算治疗）[br]
 ##   8. 自动推进判定——hand_empty && !can_afford_any → advance_phase()[br]
 ## [br][param card_instance_id] 卡牌实例 ID。[br]
 ## [br][param target_indices] 目标索引列表。[br]
+## [br][param caster_id] 施法者角色 ID（可选）——[code]trigger="kill"[/code] 条目的治疗落点；
+## 缺省 -1 时由子模块从结果项 / 卡牌数据取，仍取不到则击杀条目不结算
+## （信息不足不臆造——见 [code]combat_damage_settlement.gd[/code]）。[br]
 ## [br][b]返回[/b]: true 出牌成功，false 被拒绝。
-func play_card(card_instance_id: int, target_indices: Array) -> bool:
-	return _get_card_resolver().play_card(card_instance_id, target_indices)
+func play_card(card_instance_id: int, target_indices: Array, caster_id: int = -1) -> bool:
+	return _get_card_resolver().play_card(card_instance_id, target_indices, caster_id)
 
 
 ## 获取卡牌实例——委托给 _card_resolver 子模块。

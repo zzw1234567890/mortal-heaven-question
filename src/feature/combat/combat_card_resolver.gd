@@ -29,7 +29,7 @@ func _init(parent: Node = null) -> void:
 ## [br][param card_instance_id] 卡牌实例 ID。[br]
 ## [br][param target_indices] 目标索引列表。[br]
 ## [br][b]返回[/b]: true 出牌成功，false 被拒绝。
-func play_card(card_instance_id: int, target_indices: Array) -> bool:
+func play_card(card_instance_id: int, target_indices: Array, caster_id: int = -1) -> bool:
 	# AC-001：阶段守卫
 	if _parent.get("_phase") != _parent.CombatPhase.PLAY:
 		push_warning("CombatSystem: play_card() called outside PLAY phase (current=%d)" % _parent.get("_phase"))
@@ -60,8 +60,8 @@ func play_card(card_instance_id: int, target_indices: Array) -> bool:
 	# AC-005：效果结算（直接调用——需要结果列表）
 	var results = _resolve_effects(card, targets)
 
-	# AC-006：阵亡检查
-	_check_and_process_deaths(results)
+	# AC-006：阵亡检查（带出牌卡与施法者上下文——击杀类条目要据此落库治疗）
+	_check_and_process_deaths(results, card, caster_id)
 
 	# 从手牌移除已打出的卡牌
 	_remove_card_from_hand(card_instance_id)
@@ -160,10 +160,48 @@ func _resolve_effects(card: Variant, targets: Array) -> Array:
 ## （[code]damage[/code] 字段为伤害，缺省读 [code]value[/code]，负值为治疗），
 ## HP 归零才发 [code]character_died[/code]；结果项未带可信 HP 时回退其
 ## [code]is_kill[/code]（信息不足原则——同 [code]combat_end_check.gd[/code]）。[br]
+## [br][b]击杀触发的上下文补全[/b]（DEBT-CBT-018-10 执行端）：落库侧判断「本次是否击杀」后
+## 需要拿「哪张卡 / 谁打的」才能结算 [code]trigger="kill"[/code] 条目，故此处把打出卡
+## 补进结果项（[code]card_data[/code]，卡牌字典另透传 [code]card_id[/code] /
+## [code]template_id[/code] / [code]caster_id[/code]）——[b]只补缺失的键[/b]，
+## 已有值（CardEffectEngine 自带）优先。补不出上下文的条目按「不触发」处理，不臆造。[br]
 ## [br]信号后由 CombatSystem 自己的 [code]_on_character_died[/code] 调
 ## [code]DeploymentSystem.remove_character()[/code] 清位。
-func _check_and_process_deaths(results: Array) -> void:
-	_parent.call("_get_damage_settlement").settle_effect(results)
+## [br][param caster_id] 施法者角色 ID（可选）——击杀触发治疗落库的对象；
+## 缺省 -1 时只用结果项 / 卡牌自带的 [code]caster_id[/code]，
+## 都取不到则击杀条目不结算（信息不足不臆造施法者）。
+func _check_and_process_deaths(results: Array, card: Variant = null,
+		caster_id: int = -1) -> void:
+	_parent.call("_get_damage_settlement").settle_effect(
+			_with_card_context(results, card, caster_id))
+
+
+## 给结果项补上打出卡的上下文（原地不改入参——返回浅拷贝列表）。[br]
+## [br]卡牌为 Resource（CardTemplate）时写 [code]card_data[/code]；为 Dictionary
+## （测试桩 / CardEffectEngine 的宽松载荷）时按存在的键透传，由落库侧自行查模板。
+func _with_card_context(results: Array, card: Variant, caster_id: int) -> Array:
+	var enriched: Array = []
+	for result: Variant in results:
+		if not (result is Dictionary):
+			enriched.append(result)
+			continue
+		var item: Dictionary = (result as Dictionary).duplicate()
+		if card is Object:
+			_fill_missing(item, "card_data", card)
+		elif card is Dictionary:
+			for key: String in ["card_id", "template_id", "caster_id", "attacker_id"]:
+				_fill_missing(item, key, (card as Dictionary).get(key, null))
+		if caster_id >= 0:
+			_fill_missing(item, "caster_id", caster_id)
+		enriched.append(item)
+	return enriched
+
+
+## 只在键缺失（或为 null）时写入——已有值优先，不覆盖上游给的口径。
+func _fill_missing(target: Dictionary, key: String, value: Variant) -> void:
+	if value == null or target.has(key):
+		return
+	target[key] = value
 
 
 ## 从手牌移除已打出的卡牌。

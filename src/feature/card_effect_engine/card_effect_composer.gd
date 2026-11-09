@@ -72,10 +72,13 @@ static func effects_of(card_data: Variant) -> Array:
 ## [br][param snapshot] 不可变快照。[br]
 ## [br][param trigger] 参与汇总的触发时机——默认 [constant EffectEntry.TRIGGER_ON_PLAY]；
 ## 传 [constant EffectEntry.TRIGGER_KILL] 取击杀类条目。[br]
+## [br][param extra_context] 调用方补充的卡片级上下文（如绑定侧传入的
+## [code]is_native[/code]）——[b]覆盖[/b] [method context_of] 推导出的同名键。[br]
 ## [br][b]返回[/b]: 汇总后的 [EffectEvaluation]（无条目参与时为空评估）。
 func combine(card_data: Variant, target_id: int, snapshot: RefCounted,
-		trigger: StringName = EffectEntryScript.TRIGGER_ON_PLAY) -> RefCounted:
-	return combine_detailed(card_data, target_id, snapshot, trigger)["evaluation"]
+		trigger: StringName = EffectEntryScript.TRIGGER_ON_PLAY,
+		extra_context: Dictionary = {}) -> RefCounted:
+	return combine_detailed(card_data, target_id, snapshot, trigger, extra_context)["evaluation"]
 
 
 ## 同 [method combine]，连同明细一起返回（诊断 / 测试 / 后续触发链消费）。[br]
@@ -84,11 +87,14 @@ func combine(card_data: Variant, target_id: int, snapshot: RefCounted,
 ##   · [code]unevaluable_count[/code]: 其中评估不出的条数（未知 / 留空类型）；[br]
 ##   · [code]skipped_count[/code]: 触发时机不匹配、未参与的条数。
 func combine_detailed(card_data: Variant, target_id: int, snapshot: RefCounted,
-		trigger: StringName = EffectEntryScript.TRIGGER_ON_PLAY) -> Dictionary:
+		trigger: StringName = EffectEntryScript.TRIGGER_ON_PLAY,
+		extra_context: Dictionary = {}) -> Dictionary:
 	var details: Array = []
 	var skipped: int = 0
 	var unevaluable: int = 0
 	var context: Dictionary = context_of(card_data)
+	for key: Variant in extra_context:
+		context[key] = extra_context[key]
 	for entry: Variant in effects_of(card_data):
 		if not bool(entry.call("matches_trigger", trigger)):
 			skipped += 1

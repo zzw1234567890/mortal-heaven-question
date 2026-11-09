@@ -10,6 +10,11 @@ extends RefCounted
 ## 本模块不直接操作阵位（信号用于通知，逻辑走编排——ADR-0008 §架构原则 #2）。[br]
 ## [br][b]两条伤害源[/b]：[method settle_attack]（Phase 4 攻击结算）与
 ## [method settle_effect]（出牌效果结算），共用 [method _apply] 落库逻辑。[br]
+## [br][b]击杀触发[/b]（DEBT-CBT-018-10 执行端）：出牌结算中目标[b]由存活转为阵亡[/b]时，
+## 转交 [code]combat_kill_trigger.gd[/code] 回调一次
+## [method CardEffectEvaluator.evaluate_effects]（[code]TRIGGER_KILL[/code]），
+## 治疗经 [method apply_heal] 以[b]负伤害[/b]落库——复用 [method _apply]，
+## 不另开写 HP 的路径。同一目标只触发一次（阵亡转换 + 目标去重双保险）。[br]
 ## [br][b]信息不足时不落库[/b]：角色没有可信 HP（未种子 / 模板读不到）时，
 ## 回退到调用方载荷里的 [code]is_kill[/code]——与 [code]combat_end_check.gd[/code]
 ## 的「读不到数据不判死」原则同源。[br]
@@ -22,8 +27,15 @@ const SIDE_ENEMY: int = 1
 ## 未知阵营哨兵（调用方未声明 side 时）。
 const SIDE_UNKNOWN: int = -1
 
+## 击杀触发子模块路径——延迟 [code]load[/code]：该模块取效果评估器，而本模块被它反向
+## 引用（治疗经 [method apply_heal] 落库），[code]preload[/code] 会构成解析期循环依赖。
+const KILL_TRIGGER_PATH: String = "res://src/feature/combat/combat_kill_trigger.gd"
+
 ## 父节点引用——CombatSystem 实例。
 var _parent: Node = null
+
+## 击杀触发子模块——惰性创建（DEBT-CBT-018-10 执行端）。
+var _kill_trigger: RefCounted = null
 
 
 ## 构造——传入父节点引用。
@@ -49,10 +61,16 @@ func settle_attack(entry: Dictionary, payload: Dictionary) -> Dictionary:
 
 ## 出牌效果结算（play_card）——遍历 CardEffectEngine.resolve 返回的结果项。[br]
 ## [br][b]结果项字段[/b]（宽松兼容 stub）：[code]{target_id, damage | value, is_kill,
-## side, binding_card_ids}[/code]；[code]damage[/code] 缺省时读 [code]value[/code]。[br]
+## side, binding_card_ids, card_data, caster_id}[/code]；[code]damage[/code] 缺省时读
+## [code]value[/code]。[br]
+## [br][b]击杀触发[/b]：某目标由存活转为阵亡时，用该结果项的 [code]card_data[/code]（打出卡的
+## 模板 / 效果数据）与 [code]caster_id[/code]（施法者角色 ID）回调一次击杀触发效果。
+## 同一目标只触发一次（[code]kill_triggered[/code] 去重）；未带 [code]card_data[/code] 的
+## 旧桩结果不触发（信息不足不臆造）。[br]
 ## [b]返回[/b]: 落库结果列表（跳过无效 target_id 的项）。
 func settle_effect(results: Array) -> Array:
 	var outcomes: Array = []
+	var kill_triggered: Dictionary = {}
 	for result: Variant in results:
 		if not (result is Dictionary):
 			continue
@@ -65,11 +83,50 @@ func settle_effect(results: Array) -> Array:
 		var binding_ids: Array = item.get("binding_card_ids", [])
 		if not (binding_ids is Array):
 			binding_ids = []
-		outcomes.append(_apply(character_id, damage,
+		var outcome: Dictionary = _apply(character_id, damage,
 				int(item.get("side", SIDE_UNKNOWN)),
-				bool(item.get("is_kill", false)), binding_ids))
+				bool(item.get("is_kill", false)), binding_ids)
+		outcomes.append(outcome)
+		if bool(outcome.get("died", false)) and not kill_triggered.has(character_id):
+			kill_triggered[character_id] = true
+			trigger_kill(item, character_id)
 	return outcomes
 
+
+# === 击杀触发（DEBT-CBT-018-10 执行端）============================================
+
+## 击杀触发——转交 [CombatKillTrigger] 用打出卡的 [code]trigger="kill"[/code] 条目
+## 结算一次（当前唯一形态：血杀掌击杀后回复 2 HP）。[br]
+## [br][b]为什么独立成模块[/b]：本文件已达单文件软上限（coding-standards 300 行），
+## 且击杀触发只依赖「卡牌数据 + 施法者 ID + 落库入口」三件事，拆出后父节点只留薄委托
+## （同 combat_card_resolver / combat_battle_wiring 先例）。[br]
+## [br][param item] 出牌效果结果项（含 [code]card_data[/code] / [code]caster_id[/code]）。[br]
+## [param victim_id] 被击杀的目标角色 ID（当前不参与取数，留给条目级目标解析；见
+## [code]combat_kill_trigger.gd[/code]）。[br]
+## [b]返回[/b]: 治疗落库结果（无击杀类条目 / 信息不足时为空 Dictionary）。
+func trigger_kill(item: Dictionary, victim_id: int) -> Dictionary:
+	return _get_kill_trigger().call(&"trigger", item, victim_id)
+
+
+## 治疗落库——[b]负伤害[/b]是落库侧对治疗的既有表示（与 UI 的 damage 符号约定同源），
+## 故击杀回血复用 [method _apply]：唯一写 HP 的实现仍是
+## [code]combat_roster_state.apply_damage[/code]（含上限夹取与阵亡幂等），
+## 不新开第二条写 [code]current_hp[/code] 的路径。[br]
+## [br][param character_id] 被治疗的角色 ID（击杀回血为施法者）。[br]
+## [param amount] 治疗量（正数；内部取负后落库）。[br]
+## [b]返回[/b]: 落库结果（见 [method _apply]）。
+func apply_heal(character_id: int, amount: int) -> Dictionary:
+	return _apply(character_id, -maxi(amount, 0), SIDE_UNKNOWN, false, [])
+
+
+## 惰性获取击杀触发子模块。
+func _get_kill_trigger() -> RefCounted:
+	if _kill_trigger == null:
+		_kill_trigger = load(KILL_TRIGGER_PATH).new(_parent)
+	return _kill_trigger
+
+
+# === 站位清位处置（阵亡处置）======================================================
 
 ## 站位清位（阵亡处置）——[method connect_death_cleanup] 在开战时订阅父节点的
 ## [code]character_died[/code]，本方法做实际清位：我方角色移出阵位
@@ -120,6 +177,7 @@ func _apply(character_id: int, damage: int, side_hint: int,
 		effective_damage = int(info.get("current_hp", 0))
 	var outcome: Dictionary = state.call(&"apply_damage", character_id, effective_damage)
 	var died: bool = bool(outcome["died"]) if bool(outcome["known"]) else fallback_kill
+	outcome["damage"] = effective_damage
 	outcome["side"] = side
 	outcome["character_id"] = character_id
 	# HP 终值广播（UI 血条/伤害飘字的统一入口——出牌效果与攻击结算共用）。

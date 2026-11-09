@@ -69,10 +69,13 @@ func get_composer() -> RefCounted:
 ##     [method evaluate_effect] [b]完全一致[/b]（旧卡零迁移）。[br]
 ## [br][param trigger] 参与汇总的触发时机——默认「打出即生效」；
 ## 击杀类条目（[code]trigger="kill"[/code]）需显式传入才计入。[br]
+## [br][param extra_context] 调用方补充的卡片级上下文（覆盖推导出的同名键）——
+## 绑定侧用它传入 [code]is_native[/code]（本命字段在 [BindingRecord] 上，不在模板里）。[br]
 ## [br][b]返回[/b]: 汇总后的 [EffectEvaluation]。
 func evaluate_effects(card_data: Variant, target_id: int, snapshot: GameStateSnapshot,
-		trigger: StringName = EffectEntryScript.TRIGGER_ON_PLAY) -> EffectEvaluation:
-	return get_composer().combine(card_data, target_id, snapshot, trigger)
+		trigger: StringName = EffectEntryScript.TRIGGER_ON_PLAY,
+		extra_context: Dictionary = {}) -> EffectEvaluation:
+	return get_composer().combine(card_data, target_id, snapshot, trigger, extra_context)
 
 
 # === 核心评估 =====================================================================
