@@ -11,4 +11,7 @@ rarity = 3
 cost = 2
 description = "绑定后本角色视为满足任何阵法的阵营条件（云素心本命→同时视为2人）。"
 flavor_text = "万象归一，一典藏尽天下阵图。"
+effect_type = &"formation_attune"
+effect_value = 1
+native_effect_value = 2
 native_owner = &"yun_su_xin"

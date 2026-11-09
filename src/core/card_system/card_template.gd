@@ -96,7 +96,23 @@ enum Rarity {
 @export var effect_type: StringName = &""
 
 ## 效果数值。
+## [br][b]单位随 [member effect_type] 变化[/b]（DEBT-CBT-018-8）：[code]damage[/code]/[code]heal[/code]/
+## [code]buff[/code]/[code]debuff[/code]/[code]damage_bonus[/code]/[code]heal_bonus[/code] 为绝对点数；
+## [code]damage_reduce[/code] 为减伤百分比整数（10 = -10%，上限 60）；
+## [code]damage_multiplier[/code] 为伤害倍率百分比整数（150 = ×1.5）。
 @export var effect_value: int = 0
+
+## 触发概率——0 表示未声明（必定触发），取值 (0,1) 为概率，1 表示必定触发。[br]
+## 用于「攻击有 30% 概率附加混乱」这类条件效果（DEBT-CBT-018-8）。
+@export_range(0.0, 1.0, 0.01) var trigger_chance: float = 0.0
+
+## 本命触发概率——本命匹配时覆盖 [member trigger_chance]；0 表示未声明（沿用全局本命乘数规则）。[br]
+## 概率不是线性乘数（30%→50% 并非 ×1.5），故单独存放，由效果评估器按 [code]is_native[/code] 选取。
+@export_range(0.0, 1.0, 0.01) var native_trigger_chance: float = 0.0
+
+## 本命效果数值——本命匹配时覆盖 [member effect_value]；0 表示未声明（沿用绑定乘数规则）。[br]
+## 用于「减伤 10% → 15%」这类非线性本命加成（×1.5 会把 15% 算成 22.5%）。
+@export var native_effect_value: int = 0
 
 ## 本命角色 card_id 前缀——匹配时触发本命加成 ×1.5。
 @export var native_owner: StringName = &""

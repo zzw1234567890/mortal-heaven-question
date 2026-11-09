@@ -58,6 +58,11 @@ func get_max_hp(character_id: int) -> int:
 	return _characters.get(character_id, {}).get("max_hp", 0)
 
 
+## 获取某角色的当前攻击力（不存在返回 0）。
+func get_atk(character_id: int) -> int:
+	return _characters.get(character_id, {}).get("atk", 0)
+
+
 ## 获取某角色的预计算绑定乘数（不存在返回 1.0）。
 func get_binding_multiplier(character_id: int) -> float:
 	return _characters.get(character_id, {}).get("binding_multiplier", 1.0)

@@ -952,9 +952,12 @@ func _settle_attack_damage(settled: Array) -> void:
 ## [br][param target_def] 目标防御力。[br]
 ## [br][param attacker_realm] 攻击者境界等级。[br]
 ## [br][param defender_realm] 防御者境界等级。[br]
-## [br][b]返回[/b]: [code]{actual_damage, realm_penalty, final_damage}[/code] Dictionary。
-func calculate_damage(attacker_atk: int, target_def: int, attacker_realm: int, defender_realm: int) -> Dictionary:
-	return _get_damage_calculator().calculate_damage(attacker_atk, target_def, attacker_realm, defender_realm)
+## [br][param damage_reduction_pcts] 防御方百分比减伤列表（DEBT-CBT-018-8，缺省无减伤）。[br]
+## [br][b]返回[/b]: [code]{actual_damage, realm_penalty, final_damage, damage_reduction_multiplier}[/code] Dictionary。
+func calculate_damage(attacker_atk: int, target_def: int, attacker_realm: int, defender_realm: int,
+		damage_reduction_pcts: Array = []) -> Dictionary:
+	return _get_damage_calculator().calculate_damage(
+		attacker_atk, target_def, attacker_realm, defender_realm, damage_reduction_pcts)
 
 
 ## 获取境界压制系数——委托给 _damage_calculator 子模块。

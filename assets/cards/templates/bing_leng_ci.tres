@@ -11,4 +11,6 @@ rarity = 1
 cost = 1
 description = "造成攻击力×1.0的伤害，目标下回合攻击-1（减速）。"
 flavor_text = "一棱入骨，寒随血走。"
+effect_type = &"damage_multiplier"
+effect_value = 100
 target_type = &"single_enemy"

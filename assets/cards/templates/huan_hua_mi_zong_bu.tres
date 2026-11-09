@@ -11,4 +11,7 @@ rarity = 2
 cost = 2
 description = "绑定后角色受到伤害降低15%（汐音本命→受到伤害降低20%）。"
 flavor_text = "花影重重，踏之无痕。"
+effect_type = &"damage_reduce"
+effect_value = 15
+native_effect_value = 20
 native_owner = &"xi_yin"

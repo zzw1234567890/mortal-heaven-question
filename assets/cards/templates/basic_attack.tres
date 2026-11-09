@@ -11,4 +11,6 @@ rarity = 1
 cost = 0
 description = "造成攻击力×1.0的伤害。"
 flavor_text = "最朴素的一击，也是所有杀招的起点。"
+effect_type = &"damage_multiplier"
+effect_value = 100
 target_type = &"single_enemy"

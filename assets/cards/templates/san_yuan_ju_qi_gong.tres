@@ -11,4 +11,7 @@ rarity = 2
 cost = 2
 description = "绑定后每次使用丹药卡额外回复1点生命（方灵素本命→额外回复2点）。"
 flavor_text = "三气归元，丹入腹而生津。"
+effect_type = &"heal_bonus"
+effect_value = 1
+native_effect_value = 2
 native_owner = &"fang_ling_su"

@@ -2,8 +2,8 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: Sprint 14（Day-2）
-Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交 S14-9；下一个入口 S14-7 audio 001 / S14-2 main-menu 001 / S14-5 009a
+Feature: Sprint 18（表现层接真实数据）
+Task: DEBT-CBT-018-8 已闭环（效果词表补 5 类 + 14 张模板回填 + 减伤乘算接线）；下一步 combat-ui-interaction 出牌链路
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -574,3 +574,143 @@ Task: S14-1 CI 已推送观察——残余 3 非确定失败登记 TD-014 移交
 - LOW 修复：PLAY_PHASE 常量（去魔法数 2）/ _reset_jump_scale（非消耗路径 scale 复位）/ has_jump_anim_active+has_temp_fade_active 探针（替代直访私有成员）/ 测试注释修正
 - Deviations（ADVISORY，非遗留阻塞）：①光粒消散粒子本体归 009b（本 story 仅数字跳动+淡出）；②本地化豁免（LABEL_TEXT/[+N临时]/≡牌库:N 硬编码）；③GDD §129 vs §716 主数字显示矛盾待 game-designer 协调
 - Next: S16-7 combat-ui-layout 006 手牌弧形渲染（should-have，未阻塞）
+
+## Session Extract — /dev-story + /code-review + /story-done combat-ui-layout 006（2026-11-02）
+- Verdict: COMPLETE WITH NOTES（8/8 AC 通过；code-review 四路并行，1 BLOCKING + 2 HIGH 全闭环）
+- Story: production/epics/combat-ui-layout/story-006-hand-arc-rendering.md — 手牌弧形渲染与静态状态
+- 文件: src/ui/combat/shared/hand_arc_rules.gd（新增——hand_card_position/card_overlap_offset/hand_card_z_index 三纯函数）+ src/ui/combat/layout/hand_card.gd + hand_area.gd + enemy_hand_back.gd（新增）；combat_layout.gd（挂载 HandArea）
+- 测试: test_hand_card_position.gd 11 例 + test_card_overlap_offset.gd 7 例 + test_hand_card_z_index.gd 7 例（单元）+ test_hand_area.gd 12 例（集成）+ mock_hand_signals.gd——全量 3104/3103 + 1 pending 存量，零回归
+- Required 修复（code-review 1 BLOCKING + 2 HIGH 全闭环）：①≤7 张几何偏离 GDD §1→改回半径法圆弧（radius×sin / radius×(1-cos) 微笑弧，仅 >7 张走间距优先）；②快照刷新闭环断裂→on_hand_changed 消费 hand_changed 载荷驱动 apply_hand；③4 Label 违背 R-02 §3 合批→draw_string 单 _draw 合批 + EnemyHandBack 未设 size→锚定 0.5/0.12H + size 随卡背数同步
+- LOW 修复：Array 类型标注 / 深拷贝（duplicate(true) 不污染调用方）/ _draw_tween 独立句柄 kill（避免与重排并发写同一卡）/ reduce_motion 溢出提示不残留 / 窄屏响应式卡宽测试补齐（AC-4 唯一期望锁定）
+- Deviations（ADVISORY，非遗留阻塞）：①卡面美术 stub（插画归资产管线）；②满 10 溢出飞弃牌堆动画实体归 feedback 层（本 story 只落提示 2s 淡出）；③card_drawn/card_overflow/hand_changed 三信号 CombatSystem 尚无发射点（mock 契约锁定，stub 先行）；④本地化豁免（无手牌/溢出提示/类型标签 6 词硬编码）
+- Next: S16-8/16-9 为 nice-to-have（audio 005 暂停静音 + hud 008 静音图标 + main-menu 005 语言切换）——冲刺 should 层已全部关闭，进入冲刺收尾流程
+
+<!-- QA RUN: 2026-11-02 | Sprint: sprint-16 | Verdict: APPROVED WITH CONDITIONS | Report: production/qa/qa-signoff-sprint-16-2026-11-02.md -->
+
+<!-- QA-PLAN：2026-11-02 | System：sprint-17 | Plan written：production/qa/qa-plan-sprint-17-2026-11-02.md -->
+
+## Session Extract — /story-done 2026-11-07
+- Verdict: COMPLETE WITH NOTES
+- Story: production/epics/exploration-ui/story-005-node-move-interaction.md — 节点移动交互流与教程覆盖
+- AC: 9/9 通过；AC-1 迷雾/AC-5 悬停 110%/AC-6 翻转三项视觉通道归 QA-17-1 D3D12 走查
+- 测试: 集成 43 例 + 单元 12 例全绿；全量 3166 tests / 3165 passing / 1 pending 存量 / 3 orphans 存量，零回归
+- 关卡: LP-CODE-REVIEW = CONCERNS（teardown 状态复位已修 + `_is_reachable_node` 契约守卫已修）；QL-TEST-COVERAGE = GAPS → 6 项关键缺口已补测
+- 新增文件: src/ui/exploration/{node_move_interactor,node_move_animator,node_move_overlays,node_keyboard_navigator,node_tutorial_overlay}.gd；tests/integration/exploration_ui/{test_node_move_interaction.gd,mocks/mock_exploration_system.gd}；tests/unit/exploration_ui/{test_node_keyboard_navigator,test_node_move_overlays}.gd；production/qa/evidence/node-move-interaction-evidence.md
+- 修改文件: src/ui/exploration/{node_graph_renderer,node_graph_screen}.gd；production/epics/exploration-ui/story-005-node-move-interaction.md；production/sprint-status.yaml；docs/tech-debt-register.md
+- Tech debt logged: 4 项（DEBT-EUI-005-1~4：reason 错误码化 / 合并双份快照 / 动画参数外置 / 抖动断言）
+- Next recommended: 17-2 combat-ui-layout 007 部署面板框架（must-have, 2.0d）
+
+## Session Extract — /story-done exploration-ui 005（2026-11-07）
+- Verdict: COMPLETE WITH NOTES（9/9 AC 通过；QL GAPS 6 项缺口全补测、LP CONCERNS 3 项 H 全修）
+- Story: production/epics/exploration-ui/story-005-node-move-interaction.md — 节点移动交互流与教程覆盖
+- 关卡闭环: LP-CODE-REVIEW CONCERNS → H1(HUD toast 接线→技债 DEBT-EUI-005-6) / H2(_mouse_exited 非虚方法→改连 mouse_exited 信号+2 测试) / H3(屏幕层到达信号暴露+7 例转发测试)；M1 命中框与悬停放大同源、M4 缓冲保留设备类型均已修
+- 新增测试: tests/integration/exploration_ui/test_node_graph_screen_forwarding.gd（7 例：三条到达转发 + toast 转发 + 键盘焦点转发 + 换图清焦点）
+- 最终计数: exploration_ui 集成 68/68 + 单元 53/53；全量 3166 tests / 3165 passing / 1 pending 存量 / 3 orphans 存量，零回归
+- Tech debt logged: 6 项（DEBT-EUI-005-1~6：reason 错误码化 / 合并双份快照 / 动画参数外置 / 抖动断言已闭环 / interactor 拆分 / HUD toast 延后接线）
+- 待办: QA-17-1 D3D12 视觉走查（证据文档 §2 十项）
+- Next recommended: 17-2 combat-ui-layout 007 部署面板框架（must-have, 2.0d）
+
+## Session Extract — /story-done combat-ui-layout 007（2026-11-07）
+- Verdict: COMPLETE WITH NOTES（7/7 AC 通过；AC-1/AC-2 视觉通道归 QA-17-2 D3D12 走查）
+- Story: production/epics/combat-ui-layout/story-007-deploy-panel-framework.md — 备战面板（视觉框架与状态判定）
+- 关卡闭环: LP-CODE-REVIEW CONCERNS（0 阻塞 / 6 HIGH / 7 MEDIUM / 3 LOW）→ H1~H6 全修（push_warning 暴露未注入 / load_roster 单次取数 / 上限收缩 / 单测读真实部署常量 / 替换指定位 / 宿主接线 7 例）、M7~M13 全修、LOW14~16 处理（LOW16 登记技债）
+- 测试: combat_ui 单元 88/88 + 集成 143/143；全量 3241 tests / 3240 passing / 1 pending 存量 / 3 orphans 存量，较 17-1 基线净增 75 例，零回归
+- Tech debt logged: 3 项（DEBT-CUI-007-1 文案本地化 / -2 双文件超 300 行 / -3 自绘入口风格并存）
+- 待办: QA-17-1 D3D12 视觉走查（10 项）+ QA-17-2 备战面板走查（证据文档 §2 八项）
+- Next recommended: 17-3 exploration-ui 006 节点交互弹窗（must-have, 1.5d）
+
+## Session Extract — /story-done exploration-ui 006（2026-11-08）
+- Verdict: COMPLETE WITH NOTES（11/11 AC 通过；AC-11 的 A8 帧率抽查按 PR-SPRINT C2 裁决归 QA-17-4 ADVISORY）
+- Story: production/epics/exploration-ui/story-006-node-interaction-popups.md — 节点交互弹窗（五类+分发表）
+- 实现: 新增 4 文件（node_interaction_rules 纯函数内核 / node_interaction_popup 弹窗单体 / node_popup_blur_mask 背景模糊 / node_interaction_popup_host 宿主）+ 修改 node_graph_screen（挂载+双路径快照下发+键盘冻结）+ tests/manual/node_popup_debug.tscn 走查宿主
+- 自查修复 4 项: close_popup 幂等守卫（改 _open_kind）/ 冻结幂等 _frozen / node_moved 后 apply_snapshot 重下发（战斗弹窗锚定）/ 遮罩抽为组件
+- 测试: 单元 28 + 集成 30 + 屏幕层装配 7（新增）；exploration_ui 单元 81/81 + 集成 105/105；全量 单元 2386(1 pending 存量) + 集成 956/956（59 脚本），零回归
+- Tech debt logged: 5 项（DEBT-EUI-006-1 宿主 373 行拆分 / -2 Feature 层缺 use_action_spring+rest_at_node / -3 文案本地化 / -4 AP 指示器未订阅 spring_used / -5 弹窗固定尺寸）
+- 同时提交 17-1 遗留文件（commit 3b0d901：node_move_* / node_keyboard_navigator / node_tutorial_overlay / renderer 悬停焦点 / story-005 关闭 + 证据）
+- 待办: QA-17-1 D3D12 视觉走查（10 项）+ QA-17-2 备战面板（8 项）+ QA-17-4 弹窗与 A8 帧率（8 项）
+- Next recommended: 17-4 combat-ui-layout 008 结算/撤退面板（must-have, 2.0d）
+
+## Session Extract — /story-done combat-ui-layout 008（2026-11-08）
+- Verdict: COMPLETE WITH NOTES（10/10 AC 通过；五场景视觉走查归 ADVISORY 待 QA 签收）
+- Story: production/epics/combat-ui-layout/story-008-settlement-retreat-panels.md — 结算与撤退面板框架
+- 实现: 新增 10 文件（settlement_rules / retreat_rules 双内核 + settlement_frame / settlement_fade / settlement_panel_view / loot_option_card 共享构件 + settlement_panel / retreat_dialog / tribulation_warning_dialog 三面板 + settlement_host 宿主）+ 修改 combat_layout.gd（撤退按钮 + 宿主装配）+ 走查宿主 tests/manual/settlement_panel_debug.*
+- 自查修复: 5 项（panel_fits_within_viewport 入内核 / defeat_title 补 / confirm_button.disabled 取反 3 处 / 灰显卡可选中补 option_clickable 守卫 / 孤儿节点改 add_child_autofree）
+- 重构: settlement_panel.gd 395→300 行（抽出 View 构建器 + Fade 开合）；三个面板共用 SettlementFade，retreat_dialog 207→189、tribulation_warning 187→169
+- 测试: 单元 44 + 集成 31（新增）；combat_ui 单元 149/149 + 集成 193/193；全量 单元 2430(1 pending 存量)/2429 + 集成 987/987（60 脚本），零回归
+- Tech debt logged: 4 项（DEBT-CUI-008-1 本地化 / -2 combat_layout 366 行 / -3 战利品不补足三选一 / -4 reduce_motion 无全局入口）
+- 待办: QA-17-1 D3D12 视觉走查（10 项）+ QA-17-2 备战面板（8 项）+ QA-17-4 弹窗与 A8 帧率（8 项）+ 本次结算面板五场景走查（10 项）
+- Next recommended: 冲刺收尾（must-have 4/4 完成）→ /smoke-check sprint → /team-qa sprint → /retrospective → /gate-check
+
+## Session Extract — 场景补链（Sprint 18 前置，2026-11-08）
+- 任务: 补齐 SCENE_PATHS 注册但缺资产的 8 条场景（gate-check 2026-11-08 §B1），让核心循环转场走通
+- 新增: combat_scene.gd/.tscn（薄容器挂 CombatRoot + 音频/顶部条/底部条/手牌区 bind_signals + 备战 setup/confirm/back + 结算宿主 retreat/defeat 出口）、tribulation_scene.gd/.tscn（combat_scene 子类，is_tribulation + TribulationSystem 委托 + 降级开战）、src/ui/shared/placeholder_scene.gd（共用占位实现）+ 6 个占位 .tscn（deck_editing / shop / event_panel / result_screen / defeat_screen / cultivation）
+- 硬化: scene_manager.gd 新增 verify_scene_paths()，_ready 启动自检 12 条路径 ResourceLoader.exists()
+- 测试: 新增 test_scene_paths_exist（4）/ test_combat_scene_wiring（11）/ test_placeholder_scenes（4）；全量 3456 tests / 3455 passing / 1 pending 存量 / 3 orphans 存量，零回归（S17 基线 3437）
+- 已知缺口（未修，登记待裁）: CombatSystem.battle_start 未调 CostSystem.init_for_battle()；END 阶段战斗结束检查仍是桩（需外部 battle_end）；HUD 仍无生产挂载点
+- Next recommended: HUD register_persistent 启动挂载（B1 剩余一半）+ interaction 001/003/005 出牌链路
+
+## Session Extract — Sprint 18 补链第二批（2026-11-08）
+- 任务: 三项核心缺口——① HUD 生产挂载点 ② `CombatSystem.battle_start` 调 `CostSystem.init_for_battle` ③ `combat_phase_manager` END 阶段战斗结束检查由桩改真实现
+- 新增: `src/ui/hud/hud_bootstrap.gd`（`mount()` 幂等挂载 + `is_mounted()` + 失败静默降级）；`src/feature/combat/combat_end_check.gd`（胜负判定纯函数内核，含「信息不足则不判」原则）；`src/feature/combat/combat_battle_wiring.gd`（名册快照 / 费用激活 / END 判定 / 结局收尾，196 行）
+- 修改: `main_menu.gd`（`_ready` → `_mount_global_hud_if_boot_scene`，延后一帧 + `current_scene == self`（null 放行）守卫；367 行）；`combat_system.gd`（battle_start 加 `_capture_battle_rosters` + `_init_cost_for_battle`；battle_end 加 `_clear_cost_for_battle`；`set_battle_active` 清 `_pending_battle_result`；`advance_phase` 末尾 `_finish_pending_battle_end`；END→PREP 回合递增在已判结束时跳过；1072 行）；`combat_phase_manager.gd`（PHASE_END 第 3 步改真判定并提前 return 不再调度下一回合）；`ai_system.gd`（新增只读 `get_enemy_roster()`——此前只有写入端）
+- 测试: 新增 `test_combat_end_check.gd`（11）/ `test_battle_end_check_wiring.gd`（8——真实 Cost/Realm/Deployment Autoload 参与）/ `test_hud_bootstrap.gd`（6）；全量 **3481 tests / 3480 passing / 1 pending 存量 / 3 orphans 存量**（S18 基线 3456 → 净增 25），零回归
+- 真机验证: `--headless --quit-after 180` 启动主场景，日志可见 `hud_bootstrap.gd:44 mount` ← `main_menu.gd:173 _mount_hud` ← `168 _mount_global_hud`，HUD 已挂入 PersistentLayer（境界条/通知等子组件随之 setup）
+- Tech debt: DEBT-EUI-005-6 挂载侧闭环（toast 消费方接线仍待 exploration-ui）；新增 DEBT-CBT-018-1（战斗内无人调 `DeploymentSystem.remove_character` → 生产路径 DEFEAT 分支实际不可达）、DEBT-CBT-018-2（combat_system.gd 1072 行）；DEBT-MM-004 的 main_menu 行数刷新为 367
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路（接上「阵亡→清位→判负」闭环，见 DEBT-CBT-018-1）
+
+## Session Extract — DEBT-CBT-018-1 闭环（2026-11-08）
+- 任务: 打通「打牌击杀 → 自动清位 → END 判负」生产链路
+- 新增: `src/feature/combat/combat_roster_state.gd`（213 行——敌我 HP/存活状态表；敌方回写 `EnemyBattleState` 对象 / 阵容 Dictionary，我方以模板 `base_hp` 或 `battle_start.player_stats` 种子；未知 HP 标 `known=false` 不臆造死亡）；`src/feature/combat/combat_damage_settlement.gd`（173 行——攻击结算与出牌效果共用落库；HP 归零且此前存活才发 `character_died`，无 HP 数据回退载荷 `is_kill`；阵营推断 状态表 > 载荷 side > DeploymentSystem 阵位）
+- 修改: `combat_damage_calculator.resolve_attack_queue()` 返回 `[{entry, payload}]`；`combat_system._resolve_attack_queue` 逐条落库（`_settle_attack_damage`）+ 新增 `_seed_roster_state` / `_connect_death_cleanup` / `_on_character_died`（side=0 → `DeploymentSystem.remove_character`）/ `get_character_hp`；`battle_start` 支持 `player_stats`；`battle_end` 清状态表；`combat_card_resolver._check_and_process_deaths` 改走落库（不再是 raw is_kill 透传）；`combat_scene._start_battle` 先 `_setup_field` 再 `battle_start`（阵位从未有人会让 END 读成「信息不足」，判不出负），并新增可注入 `deployment_system` 字段
+- 测试: `test_battle_end_check_wiring.gd::test_end_all_allies_dead_ends_battle_with_defeat` 改为端到端（打牌击杀 → 自动清位 → END 判负）；新增 `test_damage_settlement_wiring.gd`（8 例）；`test_combat_scene_wiring.gd` 加 `DeploymentStub` + `test_deploy_confirmed_setups_field_before_battle_start`（1 例，隔离真实 DeploymentSystem 防跨测试污染）。全量 **3490 tests / 3489 passing / 1 pending 存量 / 3 orphans 存量**（S18 基线 3481 → 净增 9），零回归
+- Tech debt: DEBT-CBT-018-1 已闭环；新增残留项（战斗 UI 无 `CombatFeedbackCoordinator` 生产实例化点，HP 条/阵亡动画未消费真实 HP；我方 HP 尚无跨战斗持久化）；DEBT-CBT-018-2 行数刷新为 1137
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路（HP 已可落库，接 UI 交互层）+ DEBT-CBT-018-1 残留的反馈协调器装配
+
+## Session Extract — 战斗表现层接真实数据（Sprint 18，2026-11-08）
+- 任务: `CombatFeedbackCoordinator`（伤害飘字 / HP 条 / 阵亡淡出，含 `hp_reader_cb`）此前无任何生产实例化点——协调器卡表永远为空，HP 落库只停在数据层
+- 新增: `src/ui/combat/layout/combat_actor_reader.gd`（169 行——名册/HP/ATK 单一读取链路，RefCounted，依赖全可空）；`src/ui/combat/layout/combat_actor_stage.gd`（262 行——敌我名册 → `CharacterStatusCard` → 注册进协调器；前排贴中线/后排靠外沿，按卡实际宽度行内居中；阵亡摘索引 + 空位框归协调器；`clear_roster` 先注销再 `remove_child + queue_free` 防上一场残影）
+- 修改: `combat_system.gd`（新增 Cat 2b 信号 `character_damaged`——载荷 `{character_id, side, damage, is_kill}`，只带增量不带 HP 终值以守住 ADR-0008「无 HP 数据信号」；新增 `get_battle_enemy_roster()` 只读快照；1157 行）；`combat_damage_settlement.gd`（落库后广播 `character_damaged`，攻击结算与出牌效果共用一条出口；190 行）；`combat_roster_state.gd`（抽出静态 `enemy_id_of`/`enemy_is_front`，种子与建卡落在同一个键上；245 行）；`combat_feedback_coordinator.gd`（有 `character_damaged` 只订阅它、否则回退 `attack_resolved`——同一次攻击两条信号都在发，同订会让飘字重影；300 行整）；`combat_layout.gd`（实例化 `CombatFeedback`（层序：手牌区之上、备战/结算之下）与 `ActorStage`；新增 `setup_feedback` / `build_battle_roster` / `clear_battle_roster`；440 行）；`combat_scene.gd`（`_ready → _wire_feedback` 注入信号源与 `Callable(CombatSystem, "get_character_hp")`；`_start_battle` 在 `battle_start` 之后建卡——HP 与敌方快照已种子，卡片首帧即真实数值；283 行）
+- 测试: 新增 `tests/integration/combat_ui/test_actor_stage.gd`（13 例：建卡 3+2 / 注册 / 初始数值读系统 / 前后排位置 / 阵亡空位框 / 清场注销 / 重开不残留 / 伤害终值 70 / 敌方伤害 / 无卡忽略 / 零轮询 / 敌方 ID 约定 / 双信号去重）；`test_combat_scene_wiring.gd` 补 `CombatStub` 的 HP 契约 + 3 例（协调器与装配台挂载 / `hp_reader_cb` 直达战斗系统返回 42·60 / 确认出战建卡并注册）；`test_damage_settlement_wiring.gd` 补 3 例（`character_damaged` 载荷含 character_id·side·增量且不带 HP 终值 / 出牌伤害同出口 / 未知目标不广播）；`test_phase_transition_signals.gd` 的 Cat 2b 白名单加 `character_damaged`
+- 全量: **3509 tests / 3508 passing / 1 pending 存量 / 3 orphans 存量**（S18 基线 3490 → 净增 19），零回归；combat_ui + scene_manager 焦点跑 293/293
+- 真机冒烟: 用一次性脚本驱动 `CombatScene`（真实 Autoload）——`feedback=true actor_stage=true hp_reader_valid=true`；`confirm_requested([101,102])` 后 `cards=2 registered=2 battle_active=true`；我方 `get_character_hp(101)` 返回 `{current:0,max:0}`——根因是 `res://assets/cards/templates/` 目录不存在（`git ls-files assets/cards` 只有立绘），模板回退 `base_hp=0` → `known=false`。表现层链路本身正确，缺的是卡牌模板数据资产（已登记 DEBT-CBT-018-5）
+- Tech debt: DEBT-CBT-018-1 残留项已闭环（含新增文件与测试说明）；新增 DEBT-CBT-018-3（我方 HP 无跨战斗持久化——每场都从 `base_hp` 满血开始）、DEBT-CBT-018-4（ATK 只读基础值、绑定图标数未接 `BindingManager`）、DEBT-CBT-018-5（卡牌模板目录为空 → 我方卡显示 HP 0/0）；DEBT-CBT-018-2 刷新为 1157 行、DEBT-CUI-008-2 刷新为 440 行
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路（HP 已有落库 + 有 UI 消费端，接交互层即可打通「点击出牌 → 飘字 → 阵亡」全链）
+
+## Session Extract — DEBT-CBT-018-5 闭环：卡牌模板资产落地（2026-11-09）
+- 任务: 修实机「角色卡 HP 0/0 ATK 0」——根因是 `res://assets/cards/templates/` 目录根本不存在，`CardSystem` 开目录失败后模板集为空，`CombatRosterState` 模板回退 `base_hp` 读到 0 → `known=false` → `get_character_hp` 返回 0/0
+- 新增资产: `assets/cards/templates/` 7 张 `.tres`——角色 `lin_yuan`（HP10/ATK2，`auto_heal_1`，正道+青云门，蓝）／`su_jian_ming`（HP7/ATK4，`first_strike`，紫）；功法 `ku_mu_feng_chun_jue`（heal 1，本命 lin_yuan）／`yan_yun_bu`（本命 lin_yuan）／`ying_ci`（buff 1，本命 su_jian_ming）；符箓 `basic_attack`（0 费，single_enemy）／`jian_yi_hu_dun`（1 费，self，duration 1）。字段严格按 `CardTemplate` 的 @export；数值取 `design/gdd/identity-selection-system.md` §①；插画路径指向已有立绘
+- 修改: `src/core/card_system/card_system.gd`（386 行）新增 `is_degraded`/`degraded_reason`；`DirAccess` 失败与空目录两条路径改为**可定位中文 `push_warning`**（含目录路径 + 修复提示），不再 `push_error` 刷红；`_on_all_templates_loaded` 在空模板集时**跳过** `GSM.enable_validation`（消除「模板数据库为空」第二条红字），仅发 `templates_loaded(0)`
+- 修改: `tests/integration/card_system/test_card_system_loading.gd` 两例改为断言降级契约（warning 1 次 / error 0 次 / `is_degraded` / `degraded_reason` 含路径）
+- 新增测试: `tests/integration/card_system/test_template_assets.gd`（202 行，6 例）——真实目录不降级且 ≥3 模板 / 逐张字段自洽（类型·稀有度·费用·角色 HP·ATK·effect_type↔effect_value）/ 角色数值与 GDD 一致 / 身份①开局卡组全覆盖（从 `identity_templates.gd` 推导）/ `CombatRosterState.seed_player_field` 读成 10/10 且 `known=true` / `CombatActorReader` 读出 7/4。`before_all/after_all` 快照并还原 GSM 校验态（Autoload 单例跨文件存活）
+- 全量: **3515 tests / 3514 passing / 1 pending 存量 / 3 orphans 存量**，exit 0，零回归（S18 基线 3509 → 净增 6）
+- 真机验证: 一次性脚本（真实 Autoload）确认 `pending=7 → 0`，`templates=7`、`degraded=false`、`reason=''`
+- Tech debt: DEBT-CBT-018-5 已闭环；新增 DEBT-CBT-018-6（其余 5 个身份 30 个 card_id 仍无模板）、DEBT-CBT-018-7（`base_hp` 在两份 GDD 间冲突：identity-selection 10/2·7/4 vs card-system-design 2/2·1/3，需策划裁决）、DEBT-CBT-018-8（`yan_yun_bu` 百分比减伤无对应效果类别故 `effect_type` 留空；`basic_attack` 的 GDD 类型「普通」在 `CardType` 无枚举，暂取 `TALISMAN`）
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路（模板数值已真、HP 可落库且有 UI 消费端）；或先补其余 5 身份模板（DEBT-CBT-018-6）
+
+## Session Extract — DEBT-CBT-018-6 闭环：6 身份卡牌模板补齐（2026-11-09）
+- 任务: 补 `assets/cards/templates/` 其余 5 个身份的 30 张模板（身份① 7 张已于 DEBT-CBT-018-5 落地，总计 37）
+- 数值唯一真理来源: `design/gdd/identity-selection-system.md` §①~§⑥「初始角色」表 + 「初始卡牌详情」表；`card-system-design.md` 的冲突只登记不采用（DEBT-CBT-018-7 扩记到 4 张冲突 + 6 张缺失条目）
+- 新增资产（30 张 `.tres`）:
+  - ② 血海殿遗孤: 角色 `yin_ruo_han` 9/3（魔道+血海殿）、`tu_ye` 8/4；功法 `wan_hun_fan`（2费·蓝·control_confuse，本命 tu_ye）、`you_ying_bu`（2费·蓝·effect_type 留空，本命 yin_ruo_han）；符箓 `sha_qi_zhan`（1费·白·single_enemy）、`xue_sha_zhang`（1费·白·single_enemy）
+  - ③ 碎星群岛散修: `xi_yin` 9/3、`mu_yao` 8/3（中立·碎星群岛）；`huan_hua_mi_zong_bu`（减伤→留空）、`yin_po_ning_hun_shu`（召唤→留空）；`jian_bo_zhan`（1费·白）、`xun_bao_fu`（1费·蓝·draw_select_top3）
+  - ④ 玄冰宫弟子: `ling_shuang_yue` 10/3、`jiang_xue` 9/2（正道+玄冰宫）；`han_yu_lun_hui_gong`（heal 1）、`shuang_po_jian_jue`（control_freeze）；`bing_leng_ci`、`jin_zhong_fu`（各 1费·白）
+  - ⑤ 丹霞谷弟子: `fang_ling_su` 9/3、`shi_yan` 10/2（正道+丹霞谷）；`san_yuan_ju_qi_gong`（留空）、`dan_xia_jian_qi`（1费·蓝）；丹药 `zhu_ji_dan`（PILL·蓝·heal 3）、`pei_yuan_dan`（PILL·白·heal 3）
+  - ⑥ 阵道双杰: `mu_xing_he` 9/3、`yun_su_xin` 8/2（中立·碎星群岛）；`wan_xiang_zhen_dian`（紫·留空）、`qi_xing_kun_long_zhen`（蓝·control_immobilize）、`yin_yang_shou_yu_zhen`（FORMATION·白·required_count 2 + aura buff_def_1）、`jin_qian_biao`（0费·白）
+- 改写测试: `tests/integration/card_system/test_template_assets.gd`（300 行，9 例）——模板数 ≥37 且未降级 / 逐张字段自洽（角色卡阵营标签非空、effect_type↔effect_value 成对）/ 角色阵营标签必须在 `FactionSystem.FACTION_LIBRARY` 注册 / 12 张角色卡 HP·ATK 与 GDD 对齐 / 25 张非角色卡 type·rarity·cost 对齐 / 6 身份开局卡组逐身份全覆盖（从 `identity_templates.gd` 推导）/ 12 名角色 `CombatRosterState` + `CombatActorReader` 端到端读真实数值 / `basic_attack` 锁 TALISMAN(5) / 两张百分比减伤卡锁 `effect_type` 留空
+- 全量: **3518 tests / 3517 passing / 1 pending 存量 / 3 orphans 存量**，exit 0，零回归（3515 → 净增 3）
+- 真机冒烟（一次性脚本，真实 Autoload）: `templates=37 degraded=false`；6 身份 42 条卡组引用 `missing=[]`；`yin_ruo_han` 9/9、`tu_ye` 8/8、`mu_xing_he` 9/9、`yun_su_xin` 8/8 均 `known=true`
+- Tech debt: DEBT-CBT-018-6 已闭环；DEBT-CBT-018-7 扩记（冲突 4 张 + card-system-design 缺 6 张条目）；DEBT-CBT-018-8 补记（另有 4 张效果词表缺口同样留空）；新增 DEBT-CBT-018-9（10 张角色卡无立绘）、DEBT-CBT-018-10（攻击系数/概率/副效果无字段承载）
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路（6 身份模板全部可读，HP 落库与 UI 消费端已通）
+
+## Session Extract — DEBT-CBT-018-8 闭环：卡牌效果词表缺口（2026-11-09）
+- 任务：`card_effect_evaluator._category_for` 只有 8 个前缀，14 张模板的 effect_type 无处安放（2 张减伤、3 张留空、7 张攻击倍率、2 张概率控制）
+- 新增类别（编号追加在 UNEVALUABLE 之后，前 9 个不变）：`DAMAGE_REDUCE` / `DAMAGE_MULTIPLIER` / `DAMAGE_BONUS` / `HEAL_BONUS` / `FORMATION_ATTUNE`
+- 关键设计：① `damage_reduce` 只写 `damage_reduction_pct`/`damage_reduction_multiplier`，**绝不写 stat_changes**（与 buff 的 ATK 增量严格区分）；② `_category_for` 改为「具体前缀先于泛前缀」（damage_reduce 不被 damage 吞、heal_bonus 不被 heal 吞、中文「受到伤害降低」先于「伤害」）；③ 未知/留空 → UNEVALUABLE + 空评估，不静默当 buff
+- `combine_damage_reduction(pcts)` 静态方法：GDD combat-system.md §公式 乘算叠加、封顶 60%、保底解析
+- `combat_damage_calculator.calculate_damage()` 末尾追加 `damage_reduction_pcts` 参数（默认空 → 4 参旧调用点行为不变）；`resolve_attack_queue` 读队列条目同名键
+- `CardTemplate` 新增 3 个 @export：`trigger_chance` / `native_trigger_chance` / `native_effect_value`——本命加成非线性（10%→15%、30%→50%），不走 ×1.5；评估器在 `is_native=true` 时取本命值原值并跳过绑定倍率
+- 模板回填 14 张：`yan_yun_bu`(10/15) `huan_hua_mi_zong_bu`(15/20) `you_ying_bu`(1/2) `san_yuan_ju_qi_gong`(1/2) `wan_xiang_zhen_dian`(1/2) `basic_attack`(100) `sha_qi_zhan`(150) `xue_sha_zhang`(100) `jian_bo_zhan`(120) `dan_xia_jian_qi`(140) `jin_qian_biao`(80) `bing_leng_ci`(100) `wan_hun_fan`(0.3/0.5) `shuang_po_jian_jue`(0.25/0.4)
+- 测试：新增 `tests/unit/card_effect_engine/test_effect_vocabulary.gd`（22 例，解析/分发/边界/未知/概率/本命）、`tests/integration/card_system/test_template_effect_vocabulary.gd`（5 例资产层锁定）；扩 `test_card_template.gd`（3 新字段）、`test_play_card_target_resolution.gd`（3 例减伤公式）、`test_damage_settlement_wiring.gd`（1 例队列减伤）；`test_template_assets.gd` 移除已闭环的「留空」断言
+- 全量：**3548 tests / 3547 passing / 1 pending 存量 / 3 orphans 存量**，exit 0，零回归（3518 → 净增 29）
+- Tech debt：DEBT-CBT-018-8 已闭环；DEBT-CBT-018-10 部分解决（倍率与概率已建模，副效果仍缺）；`basic_attack` 的「普通」类型仍待 ADR
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路（词表已能表达减伤/倍率，可出真实数值）

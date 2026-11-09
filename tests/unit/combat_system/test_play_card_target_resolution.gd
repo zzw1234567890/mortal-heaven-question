@@ -413,6 +413,33 @@ func test_calculate_damage_final_min_1_with_penalty() -> void:
 
 
 # ============================================================================
+# DEBT-CBT-018-8：百分比减伤在 DEF 结算后乘算（GDD combat-system.md §公式）
+# ============================================================================
+
+func test_damage_reduction_applied_after_def_and_penalty() -> void:
+	# ATK=10 DEF=0 同境界 → 10；再乘减伤 10% → floor(10×0.9)=9
+	var result: Dictionary = cs.call("calculate_damage", 10, 0, 1, 1, [10])
+	assert_eq(result["final_damage"], 9, "10 × 0.9 = 9")
+	assert_almost_eq(result["damage_reduction_multiplier"], 0.9, 0.0001)
+
+
+func test_damage_reduction_stacks_multiplicatively_with_cap() -> void:
+	# 10% + 15% → 0.9×0.85=0.765 → floor(20×0.765)=15
+	var result: Dictionary = cs.call("calculate_damage", 20, 0, 1, 1, [10, 15])
+	assert_eq(result["final_damage"], 15, "20 × 0.765 = 15.3 → floor 15")
+	# 叠加到 60% 上限 → floor(20×0.4)=8
+	var capped: Dictionary = cs.call("calculate_damage", 20, 0, 1, 1, [50, 50, 50])
+	assert_eq(capped["final_damage"], 8, "超限封顶 60% → 20 × 0.4 = 8")
+	assert_almost_eq(capped["damage_reduction_multiplier"], 0.4, 0.0001)
+
+
+func test_damage_reduction_keeps_min_one_damage() -> void:
+	# 1 点伤害再减 60% → floor(0.4)=0 → 保底 1（GDD §公式 1：最低 1）
+	var result: Dictionary = cs.call("calculate_damage", 1, 0, 1, 1, [60])
+	assert_eq(result["final_damage"], 1, "减伤后仍保底 1 点伤害")
+
+
+# ============================================================================
 # 综合：完整出牌流程
 # ============================================================================
 

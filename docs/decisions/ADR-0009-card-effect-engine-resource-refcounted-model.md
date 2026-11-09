@@ -284,6 +284,10 @@ simulate_chain(card_id, target_id, snapshot, max_depth=10) → ChainPreview:
 
 get_effect_categories(card_id) → Array[EffectCategory]:
   # 效果类型标签：DAMAGE, HEAL, BUFF, DEBUFF, CONTROL, DRAW, BIND, FORMATION, UNEVALUABLE
+  # 追加（DEBT-CBT-018-8，前 9 个编号不变）：DAMAGE_REDUCE, DAMAGE_MULTIPLIER,
+  #   DAMAGE_BONUS, HEAL_BONUS, FORMATION_ATTUNE
+  # DAMAGE_REDUCE（受到伤害降低 X%）与 BUFF（面板 ATK 增量）严格区分——减伤不写 stat_changes
+  # 未知/留空 effect_type 一律 UNEVALUABLE（绝不静默降级成 buff）
   # UNEVALUABLE = 依赖隐藏信息的效果（如偷牌）——AI 使用模板 base_weight 作后备
 
 性能预算：

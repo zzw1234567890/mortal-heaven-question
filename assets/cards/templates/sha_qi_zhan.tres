@@ -11,4 +11,6 @@ rarity = 1
 cost = 1
 description = "造成攻击力×1.5的伤害。"
 flavor_text = "斩出的不是剑，是煞。"
+effect_type = &"damage_multiplier"
+effect_value = 150
 target_type = &"single_enemy"

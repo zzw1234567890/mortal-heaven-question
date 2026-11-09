@@ -13,4 +13,6 @@ description = "绑定后角色攻击有30%概率附加「混乱」1回合（屠�
 flavor_text = "幡上鬼哭，一魂一恨。"
 effect_type = &"control_confuse"
 effect_value = 1
+trigger_chance = 0.3
+native_trigger_chance = 0.5
 native_owner = &"tu_ye"

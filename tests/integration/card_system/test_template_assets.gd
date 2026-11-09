@@ -270,12 +270,13 @@ func test_roster_state_seeds_every_identity_character_from_real_template() -> vo
 			"UI 侧读到的 ATK 应为模板真实值（%s）" % id)
 
 
-# ---- 6. 已知效果词表缺口（DEBT-CBT-018-8）——锁定当前取值，避免被静默「修正」 ----
+# ---- 6. 类型枚举缺口（DEBT-CBT-018-8）——锁定当前取值，避免被静默「修正」 ----
 
 func test_basic_attack_stays_talisman_pending_adr() -> void:
 	# GDD 把基础攻击的类型写作「普通」，CardTemplate.CardType 的 6 个枚举无对应项。
 	# 取 TALISMAN(5)（一次性·目标敌方单体，语义最近）——若未来 ADR 追加「普通」枚举，
 	# 本断言与 EXPECTED_CARD_FIELDS 一并更新即可。
+	# 效果词表相关的回填断言在 test_template_effect_vocabulary.gd。
 	var tpl: CardTemplateClass = cs.get_template(&"basic_attack")
 	assert_not_null(tpl, "应存在 basic_attack 模板")
 	if tpl == null:
@@ -283,18 +284,3 @@ func test_basic_attack_stays_talisman_pending_adr() -> void:
 	assert_eq(tpl.type, CardTemplateClass.CardType.TALISMAN,
 		"basic_attack 暂取 TALISMAN(5)——GDD「普通」类型待 ADR 追加（DEBT-CBT-018-8）")
 	assert_eq(tpl.target_type, &"single_enemy", "基础攻击应指向敌方单体")
-
-
-func test_damage_reduction_cards_leave_effect_type_empty() -> void:
-	# 「受到伤害降低X%」在 card_effect_evaluator._category_for 的词表里没有对应前缀；
-	# 硬套 buff 会算成 ATK 增益。故留空（评估落 UNEVALUABLE），待 card-effect-engine
-	# 补 damage_reduce 类别（DEBT-CBT-018-8）。
-	for id: StringName in [&"yan_yun_bu", &"huan_hua_mi_zong_bu"]:
-		var tpl: CardTemplateClass = cs.get_template(id)
-		assert_not_null(tpl, "应存在 %s 模板" % id)
-		if tpl == null:
-			continue
-		assert_eq(String(tpl.effect_type), "",
-			"%s 是百分比减伤，effect_type 应留空（套现有前缀会算错，见 DEBT-CBT-018-8）" % id)
-		assert_true(tpl.description.contains("受到伤害降低"),
-			"%s 的描述应保留 GDD 的百分比减伤口径" % id)

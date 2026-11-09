@@ -11,4 +11,7 @@ rarity = 2
 cost = 1
 description = "绑定后角色受到伤害降低10%（林渊本命降低15%）。"
 flavor_text = "身随烟走，影落云间。"
+effect_type = &"damage_reduce"
+effect_value = 10
+native_effect_value = 15
 native_owner = &"lin_yuan"

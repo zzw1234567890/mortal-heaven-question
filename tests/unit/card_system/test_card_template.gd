@@ -18,6 +18,7 @@ const CHARACTER_FIELDS: Array[String] = [
 const TECHNIQUE_ARTIFACT_FIELDS: Array[String] = [
 	"effect_type", "effect_value", "native_owner", "stack_limit",
 	"stack_multiplier", "trigger_condition", "cooldown",
+	"trigger_chance", "native_trigger_chance", "native_effect_value",
 ]
 const FORMATION_FIELDS: Array[String] = [
 	"faction_requirement", "required_count", "aura_effect",
@@ -31,6 +32,7 @@ const ALL_EXPORT_FIELDS: Array[String] = [
 	"base_hp", "base_attack", "innate_skill", "technique_slots", "artifact_slots",
 	"effect_type", "effect_value", "native_owner", "stack_limit",
 	"stack_multiplier", "trigger_condition", "cooldown",
+	"trigger_chance", "native_trigger_chance", "native_effect_value",
 	"faction_requirement", "required_count", "aura_effect",
 	"duration_turns", "target_type", "base_fail_chance",
 ]
@@ -206,6 +208,10 @@ func test_technique_artifact_fields_default_values() -> void:
 	assert_eq(tpl.stack_multiplier, 1.5, "默认 stack_multiplier 应为 1.5")
 	assert_eq(tpl.trigger_condition, &"", "默认 trigger_condition 应为空 StringName")
 	assert_eq(tpl.cooldown, 0, "默认 cooldown 应为 0")
+	# DEBT-CBT-018-8：概率与非线性本命值——0 表示未声明
+	assert_eq(tpl.trigger_chance, 0.0, "默认 trigger_chance 应为 0.0（未声明 = 必定触发）")
+	assert_eq(tpl.native_trigger_chance, 0.0, "默认 native_trigger_chance 应为 0.0")
+	assert_eq(tpl.native_effect_value, 0, "默认 native_effect_value 应为 0（未声明本命覆盖）")
 
 
 # ============================================================================
@@ -271,11 +277,11 @@ func test_all_export_fields_have_editor_usage() -> void:
 
 
 func test_no_extra_export_fields() -> void:
-	## 声明的 @export 字段数量应与预期一致（27 个）。
+	## 声明的 @export 字段数量应与预期一致（30 个）。
 	## 对齐 AC-004 Edge cases「确认无多余 @export 共有字段」。
 	## 注：不反向枚举所有 @export 字段——Godot Resource 内置 @export 属性
 	## （resource_path/resource_name/script/resource_local_to_scene 等）随引擎版本变化，
-	## 硬编码排除清单会脆弱。改为断言声明字段总数 == 27，间接覆盖「无多余」。
+	## 硬编码排除清单会脆弱。改为断言声明字段总数 == ALL_EXPORT_FIELDS.size()，间接覆盖「无多余」。
 	var tpl := CardTemplateClass.new()
 	var props: Dictionary = _get_property_dict(tpl)
 	var user_export_count: int = 0

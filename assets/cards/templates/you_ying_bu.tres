@@ -11,4 +11,7 @@ rarity = 2
 cost = 2
 description = "绑定后角色每回合首次攻击伤害+1（殷若寒本命→+2）。"
 flavor_text = "身入幽影，步不留形。"
+effect_type = &"damage_bonus"
+effect_value = 1
+native_effect_value = 2
 native_owner = &"yin_ruo_han"

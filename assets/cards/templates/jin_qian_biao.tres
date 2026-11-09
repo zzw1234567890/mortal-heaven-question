@@ -11,4 +11,6 @@ rarity = 1
 cost = 0
 description = "造成攻击力×0.8的伤害，获得1灵石。"
 flavor_text = "镖出钱响，穷人的慈悲。"
+effect_type = &"damage_multiplier"
+effect_value = 80
 target_type = &"single_enemy"

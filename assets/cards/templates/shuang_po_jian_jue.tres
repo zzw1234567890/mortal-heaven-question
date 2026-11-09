@@ -13,4 +13,6 @@ description = "绑定后角色攻击有25%概率冰冻目标1回合（姜雪本�
 flavor_text = "剑未至，霜先凝。"
 effect_type = &"control_freeze"
 effect_value = 1
+trigger_chance = 0.25
+native_trigger_chance = 0.4
 native_owner = &"jiang_xue"

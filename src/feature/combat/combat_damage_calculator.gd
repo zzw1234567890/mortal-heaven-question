@@ -20,7 +20,8 @@ func _init(parent: Node = null) -> void:
 ## [br]遍历 _attack_queue，对每条攻击记录调用 calculate_damage 计算伤害，[br]
 ## 发射 attack_resolved 信号（Cat 2b 具名字典格式——ADR-0007）。[br]
 ## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def,
-## attacker_realm, defender_realm, target_hp}[/code][br]
+## attacker_realm, defender_realm, target_hp}[/code]，可选 [code]damage_reduction_pcts[/code]
+## （防御方百分比减伤列表，DEBT-CBT-018-8；缺省 = 无减伤）。[br]
 ## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。[br]
 ## [br][b]返回[/b]（Sprint 18 / DEBT-CBT-018-1）：本次结算的攻击条目与载荷配对列表
 ## [code][{entry, payload}][/code]，供父节点交 [code]combat_damage_settlement.gd[/code]
@@ -40,7 +41,9 @@ func resolve_attack_queue() -> Array:
 		var def: int = int(entry.get("target_def", 0))
 		var atk_realm: int = int(entry.get("attacker_realm", 1))
 		var def_realm: int = int(entry.get("defender_realm", 1))
-		var dmg_result: Dictionary = calculate_damage(atk, def, atk_realm, def_realm)
+		# DEBT-CBT-018-8：防御方百分比减伤（缺省空 = 无减伤，旧队列格式不受影响）
+		var reduction_pcts: Array = entry.get("damage_reduction_pcts", [])
+		var dmg_result: Dictionary = calculate_damage(atk, def, atk_realm, def_realm, reduction_pcts)
 		# Sprint 8 Story 005：is_kill 从目标 HP 派生
 		var target_hp: int = int(entry.get("target_hp", 0))
 		var is_kill: bool = target_hp > 0 and dmg_result["final_damage"] >= target_hp
@@ -61,22 +64,31 @@ func resolve_attack_queue() -> Array:
 ## [br][param target_def] 目标防御力。[br]
 ## [br][param attacker_realm] 攻击者境界等级。[br]
 ## [br][param defender_realm] 防御者境界等级。[br]
-## [br][b]返回[/b]: [code]{actual_damage, realm_penalty, final_damage}[/code] Dictionary。[br]
+## [br][b]返回[/b]: [code]{actual_damage, realm_penalty, final_damage, damage_reduction_multiplier}[/code]
+## Dictionary（[code]damage_reduction_multiplier[/code] 为 DEBT-CBT-018-8 新增，见下）。[br]
 ## [br][b]方向性约定[/b]：GDD §3 规定压制仅影响玩家→敌方的伤害。本函数作为纯函数
 ## 不校验调用方向——方向性由调用方保证（玩家攻击时玩家为 attacker）。
-func calculate_damage(attacker_atk: int, target_def: int, attacker_realm: int, defender_realm: int) -> Dictionary:
+## [br][param damage_reduction_pcts] 防御方各来源的百分比减伤（如 [code][10, 15][/code]）——
+## GDD combat-system.md §公式：DEF 结算[b]之后[/b]乘算叠加，上限 60%（[method CardEffectEvaluator.combine_damage_reduction]）。[br]
+## [br][b]重载兼容[/b]：本参数追加在末尾且默认空——既有 4 参调用点（GDD 公式 1/2 的纯函数测试）行为不变。
+func calculate_damage(attacker_atk: int, target_def: int, attacker_realm: int, defender_realm: int,
+		damage_reduction_pcts: Array = []) -> Dictionary:
 	# AC-008：actual_damage = max(1, ATK - DEF)
 	var actual_damage: int = maxi(1, attacker_atk - target_def)
 	# AC-009~012：realm_penalty 来自 RealmSystem.realm_penalty
 	var penalty: float = _get_realm_penalty(attacker_realm, defender_realm)
 	# AC-009：final_damage = floor(actual_damage × realm_penalty)
 	var final_damage: int = floori(float(actual_damage) * penalty)
+	# DEBT-CBT-018-8：百分比减伤在 DEF 结算后乘算（GDD combat-system.md §公式）
+	var reduction: Dictionary = CardEffectEvaluator.combine_damage_reduction(damage_reduction_pcts)
+	final_damage = floori(float(final_damage) * float(reduction["multiplier"]))
 	# 最低保底 1 点伤害
 	final_damage = maxi(1, final_damage)
 	return {
 		"actual_damage": actual_damage,
 		"realm_penalty": penalty,
 		"final_damage": final_damage,
+		"damage_reduction_multiplier": reduction["multiplier"],
 	}
 
 

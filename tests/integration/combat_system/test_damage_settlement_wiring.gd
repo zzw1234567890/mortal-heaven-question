@@ -93,6 +93,26 @@ func test_attack_resolution_writes_back_enemy_hp() -> void:
 	assert_true(enemy.is_alive, "未归零仍存活")
 
 
+## DEBT-CBT-018-8：队列条目带防御方百分比减伤时，落库的伤害按乘算扣减（GDD §公式）。
+func test_attack_resolution_applies_damage_reduction_from_queue() -> void:
+	# Arrange——ATK 10 / DEF 0 → 10；防御方减伤 10% → floor(10×0.9)=9
+	var enemy := EnemyBattleState.new()
+	enemy.current_hp = 10
+	enemy.max_hp = 10
+	enemy.is_alive = true
+	cs.call("battle_start", {"enemy_roster": [enemy], "character_ids": []})
+	cs.call("set_attack_queue", [{
+		"attacker_id": 1, "target_id": 100000,
+		"attacker_atk": 10, "target_def": 0,
+		"attacker_realm": 1, "defender_realm": 1, "target_hp": 10,
+		"damage_reduction_pcts": [10],
+	}])
+	# Act
+	cs.call("_resolve_attack_queue")
+	# Assert——10-9=1
+	assert_eq(enemy.current_hp, 1, "减伤 10% 后应扣 9 点（10 → 1）")
+
+
 func test_attack_resolution_marks_enemy_dead_once() -> void:
 	# Arrange——HP 3，一击致死
 	var enemy := EnemyBattleState.new()
