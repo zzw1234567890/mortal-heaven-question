@@ -122,3 +122,52 @@ func test_pool_reduce_motion_fade_only() -> void:
 		"reduce_motion 飘字无位移")
 	assert_true(label.modulate.a < 1.0 and label.modulate.a > 0.0,
 		"reduce_motion 飘字应纯淡出")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 减伤提示（DEBT-CBT-018-8 表现层闭环——颜色 + 「减」角标双通道）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_reduced_damage_floater_amber_with_marker() -> void:
+	# Act —— 减伤伤害 8
+	pool.spawn(Vector2.ZERO, 8, PoolScript.FloaterKind.DAMAGE, true)
+	var label: Label = pool.get_child(0) as Label
+	# Then: 文本带「减」角标 + 琥珀色（与纯红伤害区分）
+	assert_eq(label.text, "-8 减", "减伤伤害飘字应带「减」角标")
+	assert_eq(label.get_theme_color("font_color"), PoolScript.REDUCED_DAMAGE_COLOR,
+		"减伤伤害飘字应为琥珀色")
+	assert_ne(PoolScript.REDUCED_DAMAGE_COLOR, PoolScript.DAMAGE_COLOR,
+		"减伤色必须与普通伤害色不同（可辨识）")
+
+
+func test_unreduced_damage_floater_keeps_red_without_marker() -> void:
+	# Act —— 无减伤（默认参数路径）
+	pool.spawn(Vector2.ZERO, 10, PoolScript.FloaterKind.DAMAGE)
+	var label: Label = pool.get_child(0) as Label
+	# Then: 旧行为不变
+	assert_eq(label.text, "-10", "无减伤飘字不应出现角标")
+	assert_eq(label.get_theme_color("font_color"), PoolScript.DAMAGE_COLOR,
+		"无减伤飘字应保持红色")
+
+
+func test_heal_floater_ignores_reduced_flag() -> void:
+	# Act —— 治疗即使带减伤标志也不应加角标（减伤只对伤害有意义）
+	pool.spawn(Vector2.ZERO, 12, PoolScript.FloaterKind.HEAL, true)
+	var label: Label = pool.get_child(0) as Label
+	# Then: 文本/颜色仍为治疗样式
+	assert_eq(label.text, "+12", "治疗飘字不应带「减」角标")
+	assert_eq(label.get_theme_color("font_color"), PoolScript.HEAL_COLOR,
+		"治疗飘字应保持绿色")
+
+
+func test_floater_label_reuse_rewrites_style() -> void:
+	# Arrange —— 先发普通伤害（红），再让同一 Label 复用为减伤伤害
+	pool.spawn(Vector2.ZERO, 10, PoolScript.FloaterKind.DAMAGE)
+	var label: Label = pool.get_child(0) as Label
+	# Act —— 池耗尽前手动驱动第二次发射到同一索引（池内位置复用）
+	pool._release(0)
+	pool.spawn(Vector2.ZERO, 7, PoolScript.FloaterKind.DAMAGE, true)
+	# Then: 样式被完整重写，不残留上一次的红色/无角标
+	assert_eq(label.text, "-7 减", "复用后文本应重写为减伤样式")
+	assert_eq(label.get_theme_color("font_color"), PoolScript.REDUCED_DAMAGE_COLOR,
+		"复用后颜色应重写为琥珀色")

@@ -43,7 +43,8 @@ func settle_attack(entry: Dictionary, payload: Dictionary) -> Dictionary:
 		int(payload.get("damage", 0)),
 		SIDE_UNKNOWN,
 		bool(payload.get("is_kill", false)),
-		[])
+		[],
+		bool(payload.get("damage_reduced", false)))
 
 
 ## 出牌效果结算（play_card）——遍历 CardEffectEngine.resolve 返回的结果项。[br]
@@ -105,9 +106,10 @@ func connect_death_cleanup() -> void:
 ## [param side_hint] 调用方声明的阵营（[constant SIDE_UNKNOWN] = 由状态表/阵位推断）。[br]
 ## [param fallback_kill] 状态未知时的阵亡判据（载荷 is_kill）。[br]
 ## [param binding_ids] 载荷自带的绑定卡列表（空则现查 BindingManager）。[br]
+## [param reduced] 本次伤害是否被百分比减伤（攻击结算透传；出牌效果缺省 false）。[br]
 ## [br][b]返回[/b]: [code]{known, died, side, current_hp, max_hp, character_id}[/code]。
 func _apply(character_id: int, damage: int, side_hint: int,
-		fallback_kill: bool, binding_ids: Array) -> Dictionary:
+		fallback_kill: bool, binding_ids: Array, reduced: bool = false) -> Dictionary:
 	var state: RefCounted = _roster_state()
 	var info: Dictionary = state.call(&"read_hp", character_id)
 	var side: int = _resolve_side(state, character_id, side_hint, info)
@@ -123,22 +125,28 @@ func _apply(character_id: int, damage: int, side_hint: int,
 	# HP 终值广播（UI 血条/伤害飘字的统一入口——出牌效果与攻击结算共用）。
 	# 未知角色不广播、不臆造 HP（信息不足原则）。
 	if bool(outcome.get("known", false)) and effective_damage != 0:
-		_emit_damaged(character_id, side, effective_damage, died)
+		_emit_damaged(character_id, side, effective_damage, died, reduced)
 	if died:
 		_emit_death(character_id, side, binding_ids)
 	return outcome
 
 
 ## 发射 character_damaged——只广播落库成功（[code]known[/code]）的伤害增量。[br]
+## [br][b]damage 是落库后的实际增量[/b]（治疗为负），不是减伤前的原始伤害——
+## 表现层据此飘字，玩家看到的数字与 HP 条减少量一致。[br]
 ## [br][b]为什么不带 HP 终值[/b]：ADR-0008 §信号合规禁止 CombatSystem 自设 HP
 ## 数据信号——消费者持 [code]get_character_hp()[/code] 读取契约现读，HP 所有权
-## 始终在战斗侧，UI 不复制。
-func _emit_damaged(character_id: int, side: int, damage: int, is_kill: bool) -> void:
+## 始终在战斗侧，UI 不复制。[br]
+## [br][b]damage_reduced[/b]：本次增量是否被百分比减伤（降低表现层「减」角标；
+## 只影响提示，不改变数值来源）。
+func _emit_damaged(character_id: int, side: int, damage: int, is_kill: bool,
+		reduced: bool = false) -> void:
 	_parent.call("_emit_safe", &"character_damaged", [{
 		"character_id": character_id,
 		"side": side,
 		"damage": damage,
 		"is_kill": is_kill,
+		"damage_reduced": reduced,
 	}])
 
 

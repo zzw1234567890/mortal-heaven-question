@@ -34,12 +34,17 @@ func read_hp(character_id: int) -> Dictionary:
 	return _hp_store.get(character_id, {"current": 0, "max": 0})
 
 
-## 发射一次攻击结算（测试便捷入口——payload 同 combat_system 契约）。
+## 发射一次攻击结算（测试便捷入口——payload 同 combat_system 契约）。[br]
+## [param reduced] 是否被减伤（决定飘字是否带「减」角标）。[br]
+## [b]本 mock 不带 character_damaged[/b]：协调器因此走 attack_resolved 兼容路径，
+## 既有用例（HP 合并/飘字池/阵亡）语义不变；character_damaged 路径由
+## test_damage_reduction_floater.gd 的专用桩覆盖。
 func emit_attack(target_id: int, damage: int, is_kill: bool = false,
-		attacker_id: int = 1) -> void:
+		attacker_id: int = 1, reduced: bool = false) -> void:
 	attack_resolved.emit({
 		"attacker_id": attacker_id,
 		"target_id": target_id,
 		"damage": damage,
 		"is_kill": is_kill,
+		"damage_reduced": reduced,
 	})

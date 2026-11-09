@@ -48,11 +48,14 @@ func resolve_attack_queue() -> Array:
 		var target_hp: int = int(entry.get("target_hp", 0))
 		var is_kill: bool = target_hp > 0 and dmg_result["final_damage"] >= target_hp
 		# AC-005：attack_resolved 使用具名字典格式（ADR-0007 >3 参数规则）
+		# damage_reduced：本次伤害是否被百分比减伤（false = 无减伤）——
+		# 由 calculate_damage 的乘算系数派生，表现层据此给飘字「减」角标
 		var payload: Dictionary = {
 			"attacker_id": attacker_id,
 			"target_id": target_id,
 			"damage": dmg_result["final_damage"],
 			"is_kill": is_kill,
+			"damage_reduced": float(dmg_result["damage_reduction_multiplier"]) < 1.0,
 		}
 		_parent.call("_emit_safe", &"attack_resolved", [payload])
 		settled.append({"entry": entry, "payload": payload})

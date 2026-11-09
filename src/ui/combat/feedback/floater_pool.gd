@@ -31,6 +31,10 @@ const DAMAGE_FALL_PX: float = 40.0
 const HEAL_RISE_PX: float = -40.0
 ## 伤害飘字颜色（红——GDD 动画表）。
 const DAMAGE_COLOR: Color = Color(0.85, 0.25, 0.22)
+## 减伤后伤害飘字颜色（琥珀——与纯红伤害区分；GDD §HP条与视觉反馈）。
+const REDUCED_DAMAGE_COLOR: Color = Color(0.93, 0.66, 0.24)
+## 减伤角标（纯文字后缀——不引入美术资源，复用同一 Label）。
+const REDUCED_MARKER: String = " 减"
 ## 治疗飘字颜色（绿——GDD 动画表）。
 const HEAL_COLOR: Color = Color(0.22, 0.72, 0.30)
 ## 飘字基准字号（pt——与角色卡 ATK 数字同基准）。
@@ -92,18 +96,27 @@ func free_count() -> int:
 ## [param global_spawn_pos]: 飘字起始位置（目标角色卡中心，**全局坐标**——
 ## 池可在任意非原点容器下，本方法内部换算为本池局部坐标）。[br]
 ## [param value]: 显示数值（伤害正值/治疗正值——符号由种类决定颜色与方向）。[br]
-## [param kind]: [enum FloaterKind] 伤害/治疗。
-func spawn(global_spawn_pos: Vector2, value: int, kind: int) -> void:
+## [param kind]: [enum FloaterKind] 伤害/治疗。[br]
+## [param reduced]: 该次伤害是否被减伤（true → 琥珀色 + 「减」角标；仅伤害有意义）。[br]
+## [br][b]为什么显示实际扣血[/b]：调用方传入的是落库后的增量（[code]character_damaged[/code]
+## 载荷），不是减伤前的原始伤害——玩家看到的数字必须与 HP 条实际减少量一致。[br]
+## [br][b]可辨识提示（不新增美术资源）[/b]：同一 Label 的颜色 + 文字后缀双通道，
+## 色盲玩家也能靠「减」字读出减伤已生效。[br]
+## [b]重入清理[/b]：Label 来自池，上一次可能是普通伤害（红）——每次发射都重写
+## 颜色与文本，不依赖默认样式。
+func spawn(global_spawn_pos: Vector2, value: int, kind: int,
+		reduced: bool = false) -> void:
 	var index: int = _acquire_index()
 	var label: Label = _pool[index]
 	# 文本格式：伤害带负号（-25），治疗带加号（+25）——与 GDD「红色数字/绿色数字」
-	# 语义一致（颜色+符号双重编码，色盲可区分）
+	# 语义一致（颜色+符号双重编码，色盲可区分）；减伤的伤害再缀「减」角标
 	var text: String = ("-%d" % value) if kind == FloaterKind.DAMAGE \
 			else ("+%d" % value)
+	if reduced and kind == FloaterKind.DAMAGE:
+		text += REDUCED_MARKER
 	label.text = text
 	label.add_theme_font_size_override("font_size", FLOAT_FONT_SIZE)
-	label.add_theme_color_override("font_color",
-		DAMAGE_COLOR if kind == FloaterKind.DAMAGE else HEAL_COLOR)
+	label.add_theme_color_override("font_color", _color_of(kind, reduced))
 	# 全局坐标 → 本池局部坐标（池可在非原点容器下——H-1 坐标空间修正）
 	label.position = global_spawn_pos - global_position
 	label.modulate.a = 1.0
@@ -119,6 +132,12 @@ func _release(index: int) -> void:
 
 
 ## === 内部 ====================================================================
+
+## 飘字颜色——种类 + 减伤标志的确定映射（治疗永不标减伤）。
+func _color_of(kind: int, reduced: bool) -> Color:
+	if kind == FloaterKind.HEAL:
+		return HEAL_COLOR
+	return REDUCED_DAMAGE_COLOR if reduced else DAMAGE_COLOR
 
 ## 获取可用池索引——优先空闲位；耗尽时回收占用时间戳最早者。
 func _acquire_index() -> int:

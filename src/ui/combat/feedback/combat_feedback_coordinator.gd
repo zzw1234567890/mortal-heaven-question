@@ -11,17 +11,17 @@ extends Control
 ##     阵亡动画，转发结算信号 [code]battle_result_forwarded[/code]（面板归 008）[br]
 ##   - AC-4：[code]character_died[/code] → 阵亡 0.5s 淡出 → 移除卡 → 空位虚线框；
 ##     伤害 → 飘字（池化）[br]
-## [b]零状态所有权[/b]（ADR-0031 §2）：入队增量与触发器表为瞬态视觉状态
-## （§2.1 豁免——待合并的 UI 编排中间态）；游戏数据（HP/角色状态）所有权在
-## 战斗/上场系统——终值每结算帧从注入的快照 Callable 读取，不缓存。[br]
-## [b]零轮询[/b]：无 [code]_process()[/code]——信号驱动 + 帧边界
-## [code]call_deferred[/code]（合并结算用的单帧延迟，非循环轮询）+
-## 一次性 Tween。[br]
-## [b]依赖注入[/b]：信号源经 [method setup] 注入（测试可接 mock——参照
-## realm_bar.setup + _connect_once 防重先例）；HP 终值经
-## [code]hp_reader_cb[/code] Callable 注入（零状态所有权——不复制 HP）。[br]
-## [b]伤害入口优先级[/b]：信号源带 [code]character_damaged[/code] 时只订阅它（覆盖攻击
-## 结算与出牌两条来源）；同一次攻击两条信号都会发，同订会让飘字重影。缺省回退旧信号。
+## [b]飘字 = 实际扣血[/b]：载荷 [code]damage[/code] 已是落库后的增量（攻击结算为减伤后的
+## [code]final_damage[/code]），本编排器不还原原始伤害；[code]damage_reduced[/code] 为真
+## 时给飘字「减」角标 + 琥珀色。[br]
+## [b]零状态所有权[/b]（ADR-0031 §2）：入队增量为瞬态视觉状态（§2.1 豁免——待合并的
+## UI 编排中间态）；游戏数据（HP/角色状态）所有权在战斗/上场系统——终值每结算帧从
+## 注入的快照 Callable 读取，不缓存。[br]
+## [b]零轮询[/b]：无 [code]_process()[/code]——信号驱动 + 帧边界 [code]call_deferred[/code]
+## （合并结算的单帧延迟）+ 一次性 Tween；[b]依赖注入[/b]：信号源经 [method setup] 注入
+## （参照 realm_bar.setup + _connect_once 防重先例），HP 终值经 [code]hp_reader_cb[/code]。[br]
+## [b]伤害入口优先级[/b]：信号源带 [code]character_damaged[/code] 时只订阅它（覆盖攻击结算
+## 与出牌两条来源）；同一次攻击两条信号都会发，同订会让飘字重影。缺省回退旧信号。
 ##
 ## @experimental
 ## 来源: ADR-0031、design/gdd/combat-ui-system.md §HP条与视觉反馈 AC/
@@ -118,27 +118,33 @@ func _connect_once(source: Node, signal_name: StringName, handler: Callable) -> 
 
 ## === AC-1：伤害/治疗入队合并 ===================================================
 
-## character_damaged 处理器——载荷 {character_id, side, damage, is_kill}
-## （战斗侧落库后统一通知；攻击结算与出牌效果两条来源都到这里）。
+## character_damaged 处理器——载荷 {character_id, side, damage, is_kill, damage_reduced}
+## （战斗侧落库后统一通知；攻击结算与出牌效果两条来源都到这里）。[br]
+## [code]damage[/code] 已是减伤后的实际扣血——飘字不改写、不还原。
 func _on_character_damaged(damage_data: Dictionary) -> void:
 	_enqueue_damage(int(damage_data.get("character_id", -1)),
 		int(damage_data.get("damage", 0)),
-		bool(damage_data.get("is_kill", false)))
+		bool(damage_data.get("is_kill", false)),
+		bool(damage_data.get("damage_reduced", false)))
 
 
-## attack_resolved 信号处理器——载荷 {attacker_id, target_id, damage, is_kill}。[br]
+## attack_resolved 信号处理器——载荷 {attacker_id, target_id, damage, is_kill, damage_reduced}。[br]
 ## [b]兼容路径[/b]：信号源带 character_damaged 时不会走这里（见 [method _subscribe]）。
+## 该信号的 [code]damage[/code] 同为减伤后的最终伤害（见 [method CombatSystem.calculate_damage]）。
 func _on_attack_resolved(attack_data: Dictionary) -> void:
 	_enqueue_damage(int(attack_data.get("target_id", -1)),
 		int(attack_data.get("damage", 0)),
-		bool(attack_data.get("is_kill", false)))
+		bool(attack_data.get("is_kill", false)),
+		bool(attack_data.get("damage_reduced", false)))
 
 
 ## 伤害入队 + 飘字——增量入队（同帧同目标合并），飘字立即发射
 ## （飘字不入队——每条伤害的反馈独立）。[br]
 ## 治疗语义：damage 字段为负（CardEffectEngine 治疗 resolve 结果）。
-## 载荷不含治疗标志——以 damage 符号判定种类（飘字方向/颜色）。
-func _enqueue_damage(target_id: int, delta: int, is_kill: bool) -> void:
+## 载荷不含治疗标志——以 damage 符号判定种类（飘字方向/颜色）。[br]
+## [param reduced]: 该次伤害是否被减伤（只影响飘字样式：琥珀色 + 「减」角标）。
+func _enqueue_damage(target_id: int, delta: int, is_kill: bool,
+		reduced: bool = false) -> void:
 	if target_id < 0 or delta == 0:
 		return
 	var entry: Dictionary = _pending_deltas.get_or_add(target_id,
@@ -147,7 +153,7 @@ func _enqueue_damage(target_id: int, delta: int, is_kill: bool) -> void:
 	if is_kill:
 		entry["pending_death"] = true
 	_pending_deltas[target_id] = entry
-	# 飘字（伤害红下落/治疗绿上浮——池化复用）
+	# 飘字（伤害红下落/治疗绿上浮——池化复用；显示值为实际扣血，非原始伤害）
 	if floater_pool != null:
 		var card: Control = _cards.get(target_id)
 		if card != null:
@@ -157,7 +163,8 @@ func _enqueue_damage(target_id: int, delta: int, is_kill: bool) -> void:
 					+ card.size * card.scale * 0.5
 			floater_pool.spawn(origin, absi(delta),
 				FloaterPool.FloaterKind.HEAL if delta < 0 \
-					else FloaterPool.FloaterKind.DAMAGE)
+					else FloaterPool.FloaterKind.DAMAGE,
+				reduced)
 	_schedule_flush()
 
 

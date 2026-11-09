@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 减伤链路已接通（绑定 damage_reduce → 攻击队列 damage_reduction_pcts → 乘算封顶）；下一步 combat-ui-interaction 出牌链路
+Task: 减伤链路玩家可见（飘字显示实际扣血 + 「减」角标）；下一步 combat-ui-interaction 出牌链路
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -752,4 +752,22 @@ Task: 减伤链路已接通（绑定 damage_reduce → 攻击队列 damage_reduc
 - 全量：**3572 tests / 3571 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3563 → 净增 9）
 - Tech debt：DEBT-CBT-018-8 追加「口径收口（2026-11-09）」条目
 - 已知边界：`compute_effective_value()` 仍由调用方显式传 `stack_multiplier`（无符号表，未改）；`get_accumulated_bonus()` 走 `stat_bonus_cb` 回调，不经模板系数（非本次范围）
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路
+
+## Session Extract — 减伤飘字「玩家可见」（2026-11-09）
+- 任务：把 attack 队列的减伤链路打通到表现层——飘字此前显示的是「减伤前原始伤害」口径，玩家看不出减伤生效
+- 先读后写（呈现链路）：`CombatSystem._resolve_attack_queue` → `combat_attack_coverage.annotate_queue`（写 `damage_reduction_pcts`）→ `combat_damage_calculator.resolve_attack_queue`（算 `final_damage`，发 `attack_resolved`）→ `combat_damage_settlement.settle_attack`（落库 → 发 `character_damaged`）→ `CombatFeedbackCoordinator._enqueue_damage`（飘字 + 结算帧 `apply_hp`）→ `FloaterPool.spawn`
+- 结论：**HP 条一直是对的**（结算帧从 `hp_reader_cb` 读终值），**飘字数值也是落库后的实际增量**（`character_damaged.damage`）。缺的是「这条伤害被减过」的标志——两个信号载荷都没有减伤信息，表现层无法区分
+- 改动（全部向后兼容的**新增键/参数**）：
+  - `combat_damage_calculator`：`attack_resolved` 载荷新增 `damage_reduced`（由 `damage_reduction_multiplier < 1.0` 派生，不另算数值、不新增公式）
+  - `combat_damage_settlement`：`settle_attack` 透传 → `_apply(..., reduced)` → `_emit_damaged` → `character_damaged` 载荷新增 `damage_reduced`（出牌效果路径缺省 false）
+  - `combat_feedback_coordinator`：两个伤害入口把 `damage_reduced` 透传给 `_enqueue_damage(..., reduced)` → `floater_pool.spawn(..., reduced)`
+  - `floater_pool.spawn` 新增第 4 参数 `reduced: bool = false`——减伤伤害：琥珀色 `REDUCED_DAMAGE_COLOR (0.93,0.66,0.24)` + 纯文字后缀 `REDUCED_MARKER " 减"`（双通道，色盲可读）；治疗忽略该标志；每次发射重写颜色/文本（池复用不残留）
+  - 不新增美术资源（同一 Label）
+- GDD：`design/gdd/combat-ui-system.md` §HP条与视觉反馈 补一条 AC（减伤飘字显示实际扣血 + 琥珀色「减」角标；无减伤保持红色无角标）
+- 测试：新增 `tests/integration/combat_ui/test_damage_reduction_floater.gd`（3 例，真实 CombatSystem + 真实 BindingManager 绑 15% 减伤卡走全链路）：减伤 15% → 载荷 `damage=8`（非 10）且 `damage_reduced=true` → 飘字 `-8 减` 琥珀色；结算帧后 HP 20→12 与飘字一致；无减伤保持 `-10` 红色无角标
+- 测试：`test_floater_pool.gd` 扩 4 例（琥珀+角标 / 无减伤旧样式 / 治疗忽略减伤标志 / Label 复用重写样式）；`mock_combat_signals.emit_attack` 增 `reduced` 参数（mock 仍不带 `character_damaged`，既有用例走 attack_resolved 兼容路径不变）
+- 全量：**3579 tests / 3578 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3572 → 净增 7）
+- Tech debt：DEBT-CBT-018-8 追加「表现层闭环（2026-11-09，玩家可见）」条目
+- 已知边界：出牌效果走 `settle_effect`，`CardEffectEngine.resolve` 不返回减伤标志 → 技能伤害因绑定减伤而降低时，数值正确但飘字不带「减」角标（登记在 tech debt）；`damage_reduced` 不影响任何数值，旧消费者忽略即可
 - Next recommended: combat-ui-interaction 001/003/005 出牌链路

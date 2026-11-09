@@ -55,12 +55,19 @@ signal battle_started(config: Dictionary)
 signal battle_ended(result: int, rewards: Dictionary)
 
 ## 单次攻击结算完毕后发射（Cat 2b）。[br]
-## 载荷: [code]{attacker_id, target_id, damage, is_kill}[/code] 具名字典（ADR-0007 >3 参数规则）。
+## 载荷: [code]{attacker_id, target_id, damage, is_kill, damage_reduced}[/code]
+## 具名字典（ADR-0007 >3 参数规则）。[br]
+## [br][code]damage[/code] 为[b]减伤后[/b]的最终伤害（[method calculate_damage] 的
+## [code]final_damage[/code]）；[code]damage_reduced[/code] 表示该值是否已乘过
+## 百分比减伤系数（false = 无减伤来源），供表现层给飘字「减」角标。
 signal attack_resolved(attack_data: Dictionary)
 
 ## 伤害/治疗落库后广播（Cat 2b）——攻击结算与出牌效果两条来源共用。[br]
-## 载荷: [code]{character_id, side, damage, is_kill}[/code] 具名字典
+## 载荷: [code]{character_id, side, damage, is_kill, damage_reduced}[/code] 具名字典
 ## （ADR-0007 >3 参数规则；[code]damage[/code] 为本次增量，负值 = 治疗）。[br]
+## [br][b]damage 是实际扣血[/b]：落库后的增量（攻击结算为减伤后的
+## [code]final_damage[/code]），表现层飘字直接用它——玩家看到的数字与 HP 条
+## 实际减少量一致，不是减伤前的原始伤害。[br]
 ## [br][b]与 attack_resolved 的分工[/b]：[code]attack_resolved[/code] 只覆盖
 ## Phase 4 的攻击队列（攻击动画/命中音效的消费者）；出牌效果造成的伤害不经过它。
 ## 本信号是「某角色刚受到多少伤害」的统一通知，UI 血条/飘字据此渲染。[br]
