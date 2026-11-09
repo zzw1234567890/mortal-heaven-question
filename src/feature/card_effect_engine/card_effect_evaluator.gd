@@ -40,6 +40,40 @@ enum EffectCategory {
 ## 百分比减伤上限——GDD combat-system.md §公式「伤害减免叠加采用乘算，上限60%」。
 const DAMAGE_REDUCTION_CAP_PCT: float = 60.0
 
+## 多条效果汇总器——「取列表 → 逐条评估 → 汇总」的落地（DEBT-CBT-018-10）。[br]
+## 单向依赖：[b]本类 preload 汇总器[/b]（汇总器反向用运行时 [code]load[/code] 取本类，
+## 避免解析期循环依赖）。
+const ComposerScript: GDScript = preload("res://src/feature/card_effect_engine/card_effect_composer.gd")
+
+## 效果条目资源类型——[method evaluate_effects] 的触发时机默认值取自它。
+const EffectEntryScript: GDScript = preload("res://src/core/card_system/effect_entry.gd")
+
+## 惰性创建的多效果汇总器实例。
+var _composer: RefCounted = null
+
+
+# === 多效果入口（DEBT-CBT-018-10）=================================================
+
+## 取本评估器的多效果汇总器（AI 干跑与出牌结算共用同一实例）。
+func get_composer() -> RefCounted:
+	if _composer == null:
+		_composer = ComposerScript.new(self)
+	return _composer
+
+
+## 评估一张卡的[b]多条[/b]效果并汇总。[br]
+## [br][b]与 [method evaluate_effect] 的关系[/b]：[br]
+##   · [code]effects[/code] 非空 → 逐条评估后汇总（线性字段累加、减伤走
+##     [method combine_damage_reduction]、倍率取最强一条）；[br]
+##   · [code]effects[/code] 为空 → 合成一条旧扁平效果，结果与直接调
+##     [method evaluate_effect] [b]完全一致[/b]（旧卡零迁移）。[br]
+## [br][param trigger] 参与汇总的触发时机——默认「打出即生效」；
+## 击杀类条目（[code]trigger="kill"[/code]）需显式传入才计入。[br]
+## [br][b]返回[/b]: 汇总后的 [EffectEvaluation]。
+func evaluate_effects(card_data: Variant, target_id: int, snapshot: GameStateSnapshot,
+		trigger: StringName = EffectEntryScript.TRIGGER_ON_PLAY) -> EffectEvaluation:
+	return get_composer().combine(card_data, target_id, snapshot, trigger)
+
 
 # === 核心评估 =====================================================================
 
@@ -134,9 +168,11 @@ static func combine_damage_reduction(pcts: Array) -> Dictionary:
 ## 模拟打出此卡后的完整触发链。[br]
 ## [br]本 Story 简化：无触发链（[code]chain[/code] 仅含根效果，[code]would_overflow=false[/code]）。
 ## 触发链模拟（复用 Story 003 深度 10 语义）在 CardEffectEngine 接线后由后续 story 补充。[br]
+## [br][b]多效果卡[/b]：根效果改用 [method evaluate_effects] 的汇总（打出即生效的各条合计），
+## 单效果卡与旧行为一致。[br]
 ## [br][b]返回[/b]: [code]Dictionary[/code]——[code]{chain: [{step, source, effect, probability}], would_overflow: bool}[/code]。
 func simulate_chain(card_data: Variant, target_id: int, snapshot: GameStateSnapshot, max_depth: int = 10) -> Dictionary:
-	var outcome: EffectEvaluation = evaluate_effect(card_data, target_id, snapshot)
+	var outcome: EffectEvaluation = evaluate_effects(card_data, target_id, snapshot)
 	var source: StringName = _stringname_field(card_data, "card_id")
 	var chain: Array = [{
 		"step": 1,
@@ -147,11 +183,26 @@ func simulate_chain(card_data: Variant, target_id: int, snapshot: GameStateSnaps
 	return {"chain": chain, "would_overflow": false}
 
 
+## 归类[b]单条[/b]效果数据（词表的公开入口——多效果模块据此逐条归类，不重复解析）。[br]
+## [br][param card_data] 单条效果数据（[code]{effect_type, ...}[/code] / CardTemplate / [EffectEntry]）。[br]
+## [br][b]返回[/b]: [code]EffectCategory[/code]（未知 / 留空 → [constant EffectCategory.UNEVALUABLE]）。
+func category_of(card_data: Variant) -> EffectCategory:
+	return _category_for(card_data)
+
+
 ## 获取效果类型标签。[br]
+## [br][b]多效果卡[/b]（[member CardTemplate.effects] 非空）与单效果卡一律返回
+## [b]列表内每一条[/b]的标签——旧卡恰好一条（扁平字段合成），旧调用点行为不变。
+## 未知/留空类型的条目也会出现在列表里（标签为 [constant EffectCategory.UNEVALUABLE]），
+## 便于调用方同时看到「有几条没建模」。[br]
 ## [br][param card_data] 卡牌效果数据。[br]
 ## [br][b]返回[/b]: [code]Array[EffectCategory][/code]。
 func get_effect_categories(card_data: Variant) -> Array:
-	return [_category_for(card_data)]
+	var categories: Array = []
+	var context: Dictionary = ComposerScript.context_of(card_data)
+	for entry: Variant in ComposerScript.effects_of(card_data):
+		categories.append(_category_for(entry.call("to_card_data", context)))
+	return categories
 
 
 # === 内部 =========================================================================

@@ -197,6 +197,7 @@
 | `faction_tags` | StringName[] | 阵营标签，最多3个 |
 | `description` | String | 规则描述文本（从效果数据自动生成——参见 card-effect-engine.md） |
 | `flavor_text` | String | 背景叙述文本（世界观层） |
+| `effects` | EffectEntry[] | 效果列表——一张卡可挂多条异质效果（见下方「多效果承载」） |
 
 **CardInstance（实例）附加字段：**
 
@@ -222,6 +223,27 @@
 | **阵法卡** | `faction_requirement`, `required_count`, `aura_effect`, `activation_condition` |
 | **丹药卡** | `effect_type`, `effect_value`, `duration_turns`, `stack_limit`(3) |
 | **符箓卡** | `effect_type`, `effect_value`, `target_type`, `base_fail_chance` |
+
+**多效果承载（2026-11-09，DEBT-CBT-018-10）**
+
+上表的 `effect_type` + `effect_value` 是**单效果**写法（一卡一效果），无法表达「造成伤害 + 击杀后回血」这类组合。因此 `CardTemplate` 增加 `effects: Array[EffectEntry]`：
+
+| EffectEntry 字段 | 类型 | 说明 |
+|------|------|------|
+| `effect_type` | StringName | 效果类型，与上表同一套词表（未知/留空一律 `UNEVALUABLE`，不静默当增益） |
+| `value` | Integer | 主数值，单位随 `effect_type`（点数 / 百分比整数 / 倍率百分比整数） |
+| `native_value` | Integer | 本命覆盖值；0 = 未声明（非线性加成不走 ×1.5） |
+| `trigger_chance` / `native_trigger_chance` | Float | 触发概率与本命覆盖；0 = 必定触发 |
+| `duration_turns` | Integer | 持续回合数；0 = 即时 |
+| `target` | StringName | 目标类型（`single_enemy` / `self` …） |
+| `trigger` | StringName | 触发时机：空 = 打出即生效；`kill` = 击杀后触发 |
+
+规则：
+
+1. **`effects` 为空 → 用扁平字段合成一条效果**——旧卡零迁移，行为不变；
+2. **`effects` 非空 → 以列表为准**，扁平效果字段被忽略（不叠加、不合并）；
+3. 评估时**逐条评估后汇总**：伤害/治疗/属性增量/状态按条累加；百分比减伤交 `combine_damage_reduction` 乘算并封顶 60%；多条伤害倍率只取最强一条（叠乘规则未定义，不臆造）；
+4. **击杀类条目（`trigger = kill`）不计入打出结算**——干跑不知道击杀是否真的发生。
 
 #### 2. 卡组构建规则
 

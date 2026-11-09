@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 减伤链路玩家可见（飘字显示实际扣血 + 「减」角标）；下一步 combat-ui-interaction 出牌链路
+Task: DEBT-CBT-018-10 第一阶段（一卡多效果）已完成；下一步出牌链路执行端 / combat-ui-interaction 出牌链路
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -771,3 +771,21 @@ Task: 减伤链路玩家可见（飘字显示实际扣血 + 「减」角标）�
 - Tech debt：DEBT-CBT-018-8 追加「表现层闭环（2026-11-09，玩家可见）」条目
 - 已知边界：出牌效果走 `settle_effect`，`CardEffectEngine.resolve` 不返回减伤标志 → 技能伤害因绑定减伤而降低时，数值正确但飘字不带「减」角标（登记在 tech debt）；`damage_reduced` 不影响任何数值，旧消费者忽略即可
 - Next recommended: combat-ui-interaction 001/003/005 出牌链路
+
+## Session Extract — DEBT-CBT-018-10 第一阶段：一卡多效果（2026-11-09）
+- 任务：让一张卡能挂多条异质效果——先弄清「一卡一效果」的扁平结构，再落 `EffectEntry` + `CardTemplate.effects`，保持旧卡零迁移
+- 先读后写（扁平结构现状）：`CardTemplate` 的 `effect_type`/`effect_value`/`native_effect_value`/`trigger_chance`/`native_trigger_chance`/`duration_turns`/`target_type` 是一套**互斥语义**的扁平字段（数值单位随 `effect_type` 变）；`CardEffectEvaluator.evaluate_effect()` 只读这一组，一次调用只产出一个 `EffectEvaluation`。副效果（血杀掌击杀回血、剑波斩抽牌……）只能写在 `description` 里
+- 新增 `src/core/card_system/effect_entry.gd`（135 行，`class_name EffectEntry extends Resource`）：`effect_type` / `value` / `native_value` / `trigger_chance` / `native_trigger_chance` / `duration_turns` / `target` / `trigger`（空 = 打出即生效，`kill` = 击杀触发）；`from_card()` 从旧扁平结构合成一条（兼容 CardTemplate 与 Dictionary），`to_card_data()` 展开成评估器可读字典（同时给 `value` 与 `effect_value` 两套键）
+- `CardTemplate` 新增 `effects: Array[EffectEntry] = []`（168 行）。**空 = 未迁移 → 用扁平字段合成一条；非空 = 以列表为准，扁平字段忽略**——不一次性迁移 37 张
+- 新增 `src/feature/card_effect_engine/card_effect_composer.gd`（219 行）：`effects_of()` 取列表 / `combine()` 汇总 / `combine_detailed()` 带明细（`unevaluable_count` / `skipped_count`）。汇总口径：伤害·治疗·属性增量·状态·加成类逐条累加；**减伤交 `combine_damage_reduction`（唯一公式），单来源短路保留原值**（0.9 这类浮点不可精确表示，旧卡必须逐位一致）；**多条伤害倍率取最强一条**（叠乘规则 GDD 未定义，不臆造）
+- `CardEffectEvaluator`（317 行）：新增 `evaluate_effects()` / `get_composer()` / `category_of()`；`get_effect_categories()` 改为**逐条**返回标签；`simulate_chain()` 根效果改用汇总值。preload 方向单向（评估器 → 汇总器），汇总器反向用运行时 `load` 避免解析期循环依赖
+- **触发时机分离**：`trigger="kill"` 的条目默认不进打出结算（干跑不知道击杀会不会发生，混入等于凭空多给一次治疗），需显式传 `trigger` 才参与
+- **未知类型不污染**：单条落 `UNEVALUABLE` 时零贡献、其余照常，`unevaluable_count` 如实上报；不静默当 buff 的既有约定不变
+- 示范卡迁移：`assets/cards/templates/xue_sha_zhang.tres`（血杀掌）→ 两条效果（`damage_multiplier` 100 `single_enemy` 打出即生效 + `heal` 2 `trigger=kill` `self`），**扁平效果字段一并清空**（留旧值会让「哪份是真源」永远吵不清）。数值 = GDD §②「造成ATK×1.0伤害，击杀后回复2HP」
+- GDD：`design/gdd/card-system.md` §CardTemplate 共有字段表补 `effects` 行 + 新增「多效果承载」小节（EffectEntry 字段表 + 四条规则）
+- 测试：新增 `tests/unit/card_effect_engine/test_multi_effect_composition.gd`（23 例）+ `tests/integration/card_system/test_multi_effect_templates.gd`（6 例）；`test_card_template.gd` 的 `ALL_EXPORT_FIELDS`/`COMMON_FIELDS` 加 `effects`（31 个）并把 `test_no_bare_arrays` 放宽为「StringName 或 Object 类型化数组」；`test_template_effect_vocabulary.gd` 移除已迁移的 `xue_sha_zhang`
+- 全量：**3608 tests / 3607 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3579 → 净增 29）
+- Tech debt：DEBT-CBT-018-10 追加「第一阶段已落地」条目
+- **已知边界（下一批迁移前必须先处理）**：`binding_damage_reduction.gd::_card_data()` 直接读模板扁平字段后调 `evaluate_effect`——把减伤类绑定卡（`yan_yun_bu` / `huan_hua_mi_zong_bu`）迁到 `effects` 并清空扁平字段会让该路径**静默读出 0% 减伤**（不报错，玩家侧表现为减伤消失）。须先改为经 `evaluate_effects()` 取汇总值，且「叠层放大作用在汇总 pct 还是逐条」属设计口径需策划确认。`test_only_demonstration_card_is_migrated` 是绊线（迁移任何新卡即红）
+- 另一处边界：`CombatSystem` 出牌结算尚未消费 `trigger="kill"` 条目——击杀回血目前**可评估不可执行**
+- Next recommended: 出牌链路执行端（`damage_multiplier`/`heal` 落库）→ 再迁其余 36 张；或 combat-ui-interaction 001/003/005

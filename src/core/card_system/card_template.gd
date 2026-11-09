@@ -69,6 +69,15 @@ enum Rarity {
 ## 插画资源路径。空字符串表示暂无插画——运行时使用类型默认占位图。
 @export var illustration_path: String = ""
 
+## 效果列表——一张卡可挂多条异质效果（DEBT-CBT-018-10）。[br]
+## [br][b]空数组 = 未迁移[/b]：此时由 [code]CardEffectComposer.effects_of()[/code]
+## 用下面的扁平字段（[member effect_type] / [member effect_value] / …）合成一条效果，
+## 旧卡行为逐字节不变。[br]
+## [br][b]非空 = 以列表为准[/b]：扁平字段被忽略（不叠加、不合并），避免两处数值打架。
+## [br][br]例：[code]xue_sha_zhang[/code] 迁为两条——[code]damage_multiplier 100[/code]
+## （打出即生效）+ [code]heal 2 trigger=kill[/code]（击杀后回血）。
+@export var effects: Array[EffectEntry] = []
+
 
 # === 角色卡专属字段 ===============================================================
 
@@ -90,6 +99,9 @@ enum Rarity {
 
 
 # === 功法/法宝卡专属字段 ==========================================================
+#
+# 注意：以下扁平效果字段在 [member effects] 非空时[b]被忽略[/b]（以效果列表为准）。
+# 新卡一律写 [member effects]；旧卡迁移时保留旧字段即可（迁移期两处并存）。
 
 @export_group("功法/法宝卡专属")
 ## 效果类型——引用 card-effect-engine 的效果类型。

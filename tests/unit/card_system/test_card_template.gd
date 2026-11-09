@@ -11,6 +11,7 @@ const CardTemplateClass := preload("res://src/core/card_system/card_template.gd"
 const COMMON_FIELDS: Array[String] = [
 	"card_id", "name", "type", "rarity", "cost",
 	"faction_tags", "description", "flavor_text", "illustration_path",
+	"effects",
 ]
 const CHARACTER_FIELDS: Array[String] = [
 	"base_hp", "base_attack", "innate_skill", "technique_slots", "artifact_slots",
@@ -29,6 +30,7 @@ const PILL_TALISMAN_FIELDS: Array[String] = [
 const ALL_EXPORT_FIELDS: Array[String] = [
 	"card_id", "name", "type", "rarity", "cost",
 	"faction_tags", "description", "flavor_text", "illustration_path",
+	"effects",
 	"base_hp", "base_attack", "innate_skill", "technique_slots", "artifact_slots",
 	"effect_type", "effect_value", "native_owner", "stack_limit",
 	"stack_multiplier", "trigger_condition", "cooldown",
@@ -146,6 +148,7 @@ func test_common_fields_default_values() -> void:
 	assert_eq(tpl.description, "")
 	assert_eq(tpl.flavor_text, "")
 	assert_eq(tpl.illustration_path, "")
+	assert_eq(tpl.effects.size(), 0, "默认 effects 应为空数组（空 = 未迁移，走旧扁平字段合成）")
 
 
 func test_faction_tags_is_typed_array() -> void:
@@ -277,7 +280,7 @@ func test_all_export_fields_have_editor_usage() -> void:
 
 
 func test_no_extra_export_fields() -> void:
-	## 声明的 @export 字段数量应与预期一致（30 个）。
+	## 声明的 @export 字段数量应与预期一致（31 个——含 effects）。
 	## 对齐 AC-004 Edge cases「确认无多余 @export 共有字段」。
 	## 注：不反向枚举所有 @export 字段——Godot Resource 内置 @export 属性
 	## （resource_path/resource_name/script/resource_local_to_scene 等）随引擎版本变化，
@@ -311,19 +314,22 @@ func test_no_nil_type_fields() -> void:
 
 func test_no_bare_arrays() -> void:
 	## 所有数组字段必须为类型化数组（hint_string 非空），禁止裸 Array
-	## Godot 4.6：类型化数组 Array[StringName] 的 hint_string 形如 "21:"（21=TYPE_STRING_NAME）
+	## Godot 4.6：类型化数组 Array[StringName] 的 hint_string 形如 "21:"（21=TYPE_STRING_NAME），
+	## Array[EffectEntry] 形如 "24/17:EffectEntry"（24=TYPE_OBJECT，17=PROPERTY_HINT_RESOURCE_TYPE，
+	## 后跟脚本类名）——先取冒号前的类型 ID 部分判定。
 	## 裸 Array 的 hint_string 为空——以此区分。
-	## faction_tags 是唯一的数组字段——验证其为 Array[StringName]
 	var tpl := CardTemplateClass.new()
 	var props: Dictionary = _get_property_dict(tpl)
-	var expected_prefix: String = str(TYPE_STRING_NAME) + ":"
+	var allowed_prefixes: Array[String] = [str(TYPE_STRING_NAME), str(TYPE_OBJECT)]
 	for field_name in ALL_EXPORT_FIELDS:
 		var prop: Dictionary = props[field_name]
 		if prop["type"] == TYPE_ARRAY:
 			assert_ne(prop["hint_string"], "",
 					"数组字段 %s 的 hint_string 不应为空（禁止裸 Array）" % field_name)
-			assert_true(prop["hint_string"].begins_with(expected_prefix),
-					"数组字段 %s 应为 Array[StringName]（hint_string 应以 '%s' 开头，实际: '%s'）" % [field_name, expected_prefix, prop["hint_string"]])
+			var type_prefix: String = String(prop["hint_string"]).split(":")[0].split("/")[0]
+			assert_true(allowed_prefixes.has(type_prefix),
+					"数组字段 %s 应为 Array[StringName] 或 Array[EffectEntry]（实际 hint: '%s'）"
+					% [field_name, prop["hint_string"]])
 
 
 # ============================================================================

@@ -99,10 +99,12 @@ func test_previously_blank_effect_types_backfilled() -> void:
 
 # ---- 3. 攻击类符箓 ----
 
-## 攻击类符箓 → [code]damage_multiplier[/code]，[code]effect_value[/code] 为倍率百分比整数。
+## 攻击类符箓 → [code]damage_multiplier[/code]，[code]effect_value[/code] 为倍率百分比整数。[br]
+## [br][b]血杀掌已迁到 [code]effects[/code] 列表[/b]（DEBT-CBT-018-10 示范卡），不在此列——
+## 它的两条效果由 [code]test_multi_effect_templates.gd[/code] 锁定。
 func test_attack_talismans_use_damage_multiplier() -> void:
 	var expected: Dictionary = {
-		&"basic_attack": 100, &"sha_qi_zhan": 150, &"xue_sha_zhang": 100,
+		&"basic_attack": 100, &"sha_qi_zhan": 150,
 		&"jian_bo_zhan": 120, &"dan_xia_jian_qi": 140, &"jin_qian_biao": 80,
 		&"bing_leng_ci": 100,
 	}
