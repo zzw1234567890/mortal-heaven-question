@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"jin_qian_biao"
+name = "金钱镖"
+type = 5
+rarity = 1
+cost = 0
+description = "造成攻击力×0.8的伤害，获得1灵石。"
+flavor_text = "镖出钱响，穷人的慈悲。"
+target_type = &"single_enemy"

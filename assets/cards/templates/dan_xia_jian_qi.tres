@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"dan_xia_jian_qi"
+name = "丹霞剑气"
+type = 5
+rarity = 2
+cost = 1
+description = "造成攻击力×1.4的伤害，抽1张牌。"
+flavor_text = "丹火淬剑，剑气带赤。"
+target_type = &"single_enemy"

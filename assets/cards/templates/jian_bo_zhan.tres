@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"jian_bo_zhan"
+name = "剑波斩"
+type = 5
+rarity = 1
+cost = 1
+description = "造成攻击力×1.2的伤害，抽1张牌。"
+flavor_text = "剑出如波，一层推一层。"
+target_type = &"single_enemy"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"you_ying_bu"
+name = "幽影步"
+type = 1
+rarity = 2
+cost = 2
+description = "绑定后角色每回合首次攻击伤害+1（殷若寒本命→+2）。"
+flavor_text = "身入幽影，步不留形。"
+native_owner = &"yin_ruo_han"

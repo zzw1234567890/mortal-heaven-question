@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"zhu_ji_dan"
+name = "筑基丹"
+type = 4
+rarity = 2
+cost = 1
+description = "回复3点生命，本回合防御+1。"
+flavor_text = "一丹筑基，脚下方稳。"
+effect_type = &"heal"
+effect_value = 3
+duration_turns = 1
+target_type = &"self"

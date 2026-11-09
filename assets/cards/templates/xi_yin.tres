@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"xi_yin"
+name = "汐音"
+type = 0
+rarity = 2
+cost = 1
+faction_tags = Array[StringName]([&"suixing_islands"])
+description = "炼气期角色卡。首张使用的卡牌费用-1（每局1次）。"
+flavor_text = "碎星群岛散修，浪花之影——像碎星的天气，下一刻便换一副面孔。"
+base_hp = 9
+base_attack = 3
+innate_skill = &"first_card_cost_down_1"

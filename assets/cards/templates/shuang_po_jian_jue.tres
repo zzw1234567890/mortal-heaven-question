@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"shuang_po_jian_jue"
+name = "霜魄剑诀"
+type = 1
+rarity = 2
+cost = 2
+description = "绑定后角色攻击有25%概率冰冻目标1回合（姜雪本命→40%）。"
+flavor_text = "剑未至，霜先凝。"
+effect_type = &"control_freeze"
+effect_value = 1
+native_owner = &"jiang_xue"

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"yin_ruo_han"
+name = "殷若寒"
+type = 0
+rarity = 2
+cost = 1
+faction_tags = Array[StringName]([&"modao", &"xuehai_temple"])
+description = "炼气期角色卡。击杀敌方后获得1层「杀意」（每层攻击+1，最多3层）。"
+flavor_text = "血海殿遗孤，暗处的刀刃——她的安静比咆哮更可怕。"
+base_hp = 9
+base_attack = 3
+innate_skill = &"kill_rage_stack"

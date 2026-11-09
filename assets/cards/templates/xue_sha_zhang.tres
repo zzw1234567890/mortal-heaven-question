@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"xue_sha_zhang"
+name = "血杀掌"
+type = 5
+rarity = 1
+cost = 1
+description = "造成攻击力×1.0的伤害，击杀目标后回复2点生命。"
+flavor_text = "掌落见血，血即是命。"
+target_type = &"single_enemy"

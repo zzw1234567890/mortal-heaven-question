@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"jiang_xue"
+name = "姜雪"
+type = 0
+rarity = 1
+cost = 1
+faction_tags = Array[StringName]([&"zhengdao", &"xuanbing_palace"])
+description = "炼气期角色卡。每3回合一次冰系强化攻击（伤害+1，冰冻目标1回合）。"
+flavor_text = "玄冰宫弟子，霜华之刃——她的冰剑会碎裂，也会重新凝结。"
+base_hp = 9
+base_attack = 2
+innate_skill = &"frost_strike_every_3"

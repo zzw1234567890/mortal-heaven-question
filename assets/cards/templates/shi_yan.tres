@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"shi_yan"
+name = "石岩"
+type = 0
+rarity = 2
+cost = 1
+faction_tags = Array[StringName]([&"zhengdao", &"dangxia_valley"])
+description = "炼气期角色卡。受到治疗时额外+1点生命。"
+flavor_text = "丹霞谷收留的外来者，大地之躯——他的身体比任何炼丹炉都更能说明火候。"
+base_hp = 10
+base_attack = 2
+innate_skill = &"heal_taken_plus_1"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"san_yuan_ju_qi_gong"
+name = "三元聚气功"
+type = 1
+rarity = 2
+cost = 2
+description = "绑定后每次使用丹药卡额外回复1点生命（方灵素本命→额外回复2点）。"
+flavor_text = "三气归元，丹入腹而生津。"
+native_owner = &"fang_ling_su"

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"yin_yang_shou_yu_zhen"
+name = "阴阳守御阵"
+type = 3
+rarity = 1
+cost = 1
+description = "需2名角色在场→激活期间全体友方防御+1（慕星河在场时激活条件-1）。"
+flavor_text = "阴阳相济，守而不攻。"
+required_count = 2
+aura_effect = &"buff_def_1"

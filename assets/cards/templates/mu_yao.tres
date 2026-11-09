@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"mu_yao"
+name = "沐瑶"
+type = 0
+rarity = 2
+cost = 1
+faction_tags = Array[StringName]([&"suixing_islands"])
+description = "炼气期角色卡。每回合首次弃牌时抽1张牌。"
+flavor_text = "碎星群岛散修，潮汐之灵——宽大的衣袍像借来的，眼里全是好奇。"
+base_hp = 8
+base_attack = 3
+innate_skill = &"discard_draw_1"

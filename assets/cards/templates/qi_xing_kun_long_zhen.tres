@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"qi_xing_kun_long_zhen"
+name = "七星困龙阵"
+type = 1
+rarity = 2
+cost = 2
+description = "绑定后每3回合触发一次——困住一个敌方1回合（无法行动）（慕星河本命→每2回合触发）。"
+flavor_text = "七星列位，龙亦难出。"
+effect_type = &"control_immobilize"
+effect_value = 1
+native_owner = &"mu_xing_he"

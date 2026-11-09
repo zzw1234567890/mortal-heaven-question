@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"wan_xiang_zhen_dian"
+name = "万象阵典"
+type = 1
+rarity = 3
+cost = 2
+description = "绑定后本角色视为满足任何阵法的阵营条件（云素心本命→同时视为2人）。"
+flavor_text = "万象归一，一典藏尽天下阵图。"
+native_owner = &"yun_su_xin"

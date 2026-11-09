@@ -1,33 +1,85 @@
 extends GutTest
-## DEBT-CBT-018-5 验收测试：真实卡牌模板资产（[code]assets/cards/templates/[/code]）。[br]
-## [br][b]背景[/b]：此前模板目录不存在 → CardSystem 降级为空模板集 →
-## [code]CombatRosterState[/code] 读不到 [code]base_hp[/code] 标记 [code]known=false[/code] →
-## 战斗 UI 角色卡显示「HP 0/0 ATK 0」。本文件锁住三件事：[br]
-##   1. 真实目录能加载出模板，且未进降级态（目录/字段坏了会先在这里红）；[br]
-##   2. 每张模板字段自洽（类型/稀有度/费用；角色卡 HP·ATK 为正；[br]
+## 卡牌模板资产验收测试：真实模板目录（[code]assets/cards/templates/[/code]）对全部 6 个身份可用。[br]
+## [br][b]背景[/b]：DEBT-CBT-018-5 修复「模板目录不存在 → 角色卡 HP 0/0」时只落了身份①的 7 张；
+## DEBT-CBT-018-6 补齐其余 5 个身份的 30 张（模板总数 37）。本文件锁住四件事：[br]
+##   1. 真实目录能加载出全部模板，且未进降级态（目录/字段坏了会先在这里红）；[br]
+##   2. 逐张字段自洽（类型/稀有度/费用；角色卡 HP·ATK 为正、阵营标签已注册；[br]
 ##      [code]effect_type[/code] 非空时 [code]effect_value[/code] 必为正）；[br]
-##   3. 身份①开局卡组引用的 [code]card_id[/code] 全部有模板，且角色卡
-##      [code]base_hp[/code] 能经 [code]CombatRosterState[/code] /
+##   3. [b]六个身份[/b]的开局卡组引用的 [code]card_id[/code] 全部有模板（逐身份断言，不硬编码清单
+##      ——从 [code]identity_templates.gd[/code] 推导，身份表改了这里自动跟随）；[br]
+##   4. 角色卡数值与 GDD 一致，且能经 [code]CombatRosterState[/code] /
 ##      [code]CombatActorReader[/code] 读成真实数值（不再是 0/0）。[br]
-## [br][b]数值来源[/b]：[code]design/gdd/identity-selection-system.md[/code]
-## §① 青云剑宗·外门弟子（林渊 10/2、苏剑鸣 7/4）。[br]
-## [br][b]为何用独立实例而非 Autoload[/b]：其它测试会对 [code]/root/CardSystem[/code]
-## 的 [code]templates[/code]/[code]field_characters[/code] 注入夹具，共用实例会互相污染。[br]
-## NOTE: 本文件走真实磁盘加载，属集成测试——不依赖任何注入模板。
+## [br][b]数值唯一真理来源[/b]：[code]design/gdd/identity-selection-system.md[/code] §①~§⑥ 的
+## 「初始角色」表与「初始卡牌详情」表。`card-system-design.md` 与之冲突，按 DEBT-CBT-018-7 只登记不采用。[br]
+## [br]用独立实例而非 Autoload——其它测试会对 [code]/root/CardSystem[/code] 注入夹具，共用会互相污染。
 
 const CS_SCRIPT: GDScript = preload("res://src/core/card_system/card_system.gd")
 const CardTemplateClass: GDScript = preload("res://src/core/card_system/card_template.gd")
 const IdentityTemplates: GDScript = preload("res://src/feature/identity/identity_templates.gd")
 const RosterState: GDScript = preload("res://src/feature/combat/combat_roster_state.gd")
 const ActorReader: GDScript = preload("res://src/ui/combat/layout/combat_actor_reader.gd")
+## 阵营注册表——角色卡的 faction_tags 必须是已注册标签（拼错会让阵法/流派判定静默失效）。
+const FactionSystemScript: GDScript = preload("res://src/core/faction_system.gd")
 
-## 身份①（青云剑宗·外门弟子）——身份表单一真理来源（ADR-0022）。
-const IDENTITY_ONE: StringName = &"azure_sword_disciple"
-
-## 身份①两名角色的期望数值——GDD identity-selection-system.md §①（HP/ATK）。
+## 全部 12 名初始角色的 HP/ATK——GDD identity-selection-system.md §①~§⑥「初始角色」表逐字抄录。
 const EXPECTED_CHARACTER_STATS: Dictionary = {
+	# ① 青云剑宗·外门弟子
 	&"lin_yuan": {"hp": 10, "attack": 2},
 	&"su_jian_ming": {"hp": 7, "attack": 4},
+	# ② 血海殿遗孤
+	&"yin_ruo_han": {"hp": 9, "attack": 3},
+	&"tu_ye": {"hp": 8, "attack": 4},
+	# ③ 碎星群岛散修
+	&"xi_yin": {"hp": 9, "attack": 3},
+	&"mu_yao": {"hp": 8, "attack": 3},
+	# ④ 玄冰宫弟子
+	&"ling_shuang_yue": {"hp": 10, "attack": 3},
+	&"jiang_xue": {"hp": 9, "attack": 2},
+	# ⑤ 丹霞谷弟子
+	&"fang_ling_su": {"hp": 9, "attack": 3},
+	&"shi_yan": {"hp": 10, "attack": 2},
+	# ⑥ 阵道双杰
+	&"mu_xing_he": {"hp": 9, "attack": 3},
+	&"yun_su_xin": {"hp": 8, "attack": 2},
+}
+
+## 全部 25 张非角色卡牌的 类型/稀有度/费用——GDD 各身份「初始卡牌详情」表的
+## 「类型·稀有度·费用」列。类型取 CardTemplate.CardType 枚举（0..5），
+## 稀有度取 Rarity（白=1 蓝=2 紫=3）。角色卡数值见 EXPECTED_CHARACTER_STATS。
+## [br]注：[code]basic_attack[/code] 的 GDD 类型是「普通」——CardType 无此枚举，
+## 暂取 TALISMAN(5)，待 ADR 追加（DEBT-CBT-018-8）。
+const EXPECTED_CARD_FIELDS: Dictionary = {
+	# ① 青云剑宗·外门弟子
+	&"ku_mu_feng_chun_jue": {"type": 1, "rarity": 2, "cost": 1},
+	&"yan_yun_bu": {"type": 1, "rarity": 2, "cost": 1},
+	&"ying_ci": {"type": 1, "rarity": 1, "cost": 1},
+	&"basic_attack": {"type": 5, "rarity": 1, "cost": 0},
+	&"jian_yi_hu_dun": {"type": 5, "rarity": 1, "cost": 1},
+	# ② 血海殿遗孤
+	&"wan_hun_fan": {"type": 1, "rarity": 2, "cost": 2},
+	&"you_ying_bu": {"type": 1, "rarity": 2, "cost": 2},
+	&"sha_qi_zhan": {"type": 5, "rarity": 1, "cost": 1},
+	&"xue_sha_zhang": {"type": 5, "rarity": 1, "cost": 1},
+	# ③ 碎星群岛散修
+	&"huan_hua_mi_zong_bu": {"type": 1, "rarity": 2, "cost": 2},
+	&"yin_po_ning_hun_shu": {"type": 1, "rarity": 2, "cost": 2},
+	&"jian_bo_zhan": {"type": 5, "rarity": 1, "cost": 1},
+	&"xun_bao_fu": {"type": 5, "rarity": 2, "cost": 1},
+	# ④ 玄冰宫弟子
+	&"han_yu_lun_hui_gong": {"type": 1, "rarity": 2, "cost": 2},
+	&"shuang_po_jian_jue": {"type": 1, "rarity": 2, "cost": 2},
+	&"bing_leng_ci": {"type": 5, "rarity": 1, "cost": 1},
+	&"jin_zhong_fu": {"type": 5, "rarity": 1, "cost": 1},
+	# ⑤ 丹霞谷弟子
+	&"san_yuan_ju_qi_gong": {"type": 1, "rarity": 2, "cost": 2},
+	&"dan_xia_jian_qi": {"type": 5, "rarity": 2, "cost": 1},
+	&"zhu_ji_dan": {"type": 4, "rarity": 2, "cost": 1},
+	&"pei_yuan_dan": {"type": 4, "rarity": 1, "cost": 1},
+	# ⑥ 阵道双杰
+	&"wan_xiang_zhen_dian": {"type": 1, "rarity": 3, "cost": 2},
+	&"qi_xing_kun_long_zhen": {"type": 1, "rarity": 2, "cost": 2},
+	&"yin_yang_shou_yu_zhen": {"type": 3, "rarity": 1, "cost": 1},
+	&"jin_qian_biao": {"type": 5, "rarity": 1, "cost": 0},
 }
 
 ## 卡牌类型合法区间（CardTemplate.CardType：CHARACTER=0 … TALISMAN=5）。
@@ -85,26 +137,23 @@ func _drive_loading_to_completion() -> void:
 		"真实模板应在 3 轮 × 100 帧内加载完成（失败即实现/资产问题）")
 
 
-# ============================================================================
-# 1. 真实目录可加载、不降级
-# ============================================================================
+# ---- 1. 真实目录可加载、不降级 ----
 
 func test_real_template_directory_loads_without_degrading() -> void:
 	assert_false(cs.is_degraded, "真实模板目录不应降级（原因：%s）" % cs.degraded_reason)
 	assert_eq(cs.degraded_reason, "", "未降级时 degraded_reason 应为空")
-	assert_true(cs.templates.size() >= 3,
-		"至少 3 张模板（实际 %d）——身份①需要 2 张角色 + 若干功法/符箓" % cs.templates.size())
-	assert_true(cs.templates.has(&"lin_yuan"), "应加载出角色模板 lin_yuan")
-	assert_true(cs.templates.has(&"su_jian_ming"), "应加载出角色模板 su_jian_ming")
+	var expected_total: int = EXPECTED_CARD_FIELDS.size() + EXPECTED_CHARACTER_STATS.size()
+	# 只用 ≥（不锁死总数）——卡库按 GDD 还要扩到 215 张，精确计数会在每次加卡时误红；
+	# 「该有的有没有」由下面两条逐张断言保证。
+	assert_true(cs.templates.size() >= expected_total,
+		"模板数应 ≥ %d（6 身份开局卡组并集），实际 %d" % [expected_total, cs.templates.size()])
 
 
-# ============================================================================
-# 2. 字段自洽
-# ============================================================================
+# ---- 2. 字段自洽 ----
 
 func test_all_loaded_templates_have_valid_fields() -> void:
 	var ids: Array = cs.templates.keys()
-	assert_true(ids.size() >= 3, "至少要有一组可用模板才能校验字段")
+	assert_true(ids.size() > 0, "至少要有一组可用模板才能校验字段")
 	for id: StringName in ids:
 		var tpl: CardTemplateClass = cs.templates[id]
 		assert_eq(tpl.card_id, id, "注册键应与 card_id 一致（%s）" % id)
@@ -118,6 +167,8 @@ func test_all_loaded_templates_have_valid_fields() -> void:
 			assert_true(tpl.base_hp > 0,
 				"%s 是角色卡，base_hp 应 > 0（为 0 会让战斗内 HP 读成 0/0）" % id)
 			assert_true(tpl.base_attack > 0, "%s 是角色卡，base_attack 应 > 0" % id)
+			assert_true(tpl.faction_tags.size() > 0,
+				"%s 是角色卡，应有至少 1 个阵营标签（阵法/流派判定依赖）" % id)
 		elif not String(tpl.effect_type).is_empty():
 			# effect_type 与 effect_value 是一对——有类型无数值 = 播了等于没播。
 			assert_true(tpl.effect_value > 0,
@@ -125,7 +176,22 @@ func test_all_loaded_templates_have_valid_fields() -> void:
 				% [id, tpl.effect_type, tpl.effect_value])
 
 
-func test_character_templates_match_identity_one_stats() -> void:
+## 角色卡阵营标签必须已注册在 FactionSystem.FACTION_LIBRARY——拼错（如 xuehaidian vs
+## xuehai_temple）不会崩，只会让阵法阵营条件与流派判定静默失灵，故在资产层锁死。
+func test_character_faction_tags_are_registered() -> void:
+	var library: Dictionary = FactionSystemScript.FACTION_LIBRARY
+	for id: StringName in EXPECTED_CHARACTER_STATS.keys():
+		var tpl: CardTemplateClass = cs.get_template(id)
+		if tpl == null:
+			continue
+		for tag: StringName in tpl.faction_tags:
+			assert_true(library.has(tag),
+				"%s 的阵营标签 '%s' 未在 FactionSystem.FACTION_LIBRARY 注册" % [id, tag])
+
+
+# ---- 3. 数值与 GDD 一致（角色 12 张 + 非角色 25 张） ----
+
+func test_character_templates_match_gdd_stats() -> void:
 	for id: StringName in EXPECTED_CHARACTER_STATS.keys():
 		var tpl: CardTemplateClass = cs.get_template(id)
 		assert_not_null(tpl, "应存在角色卡模板 %s" % id)
@@ -133,70 +199,102 @@ func test_character_templates_match_identity_one_stats() -> void:
 			continue
 		assert_eq(tpl.type, CardTemplateClass.CardType.CHARACTER, "%s 应为角色卡" % id)
 		assert_eq(tpl.base_hp, int(EXPECTED_CHARACTER_STATS[id]["hp"]),
-			"%s 的 base_hp 应与 GDD 一致" % id)
+			"%s 的 base_hp 应与 GDD identity-selection 一致" % id)
 		assert_eq(tpl.base_attack, int(EXPECTED_CHARACTER_STATS[id]["attack"]),
-			"%s 的 base_attack 应与 GDD 一致" % id)
+			"%s 的 base_attack 应与 GDD identity-selection 一致" % id)
 
 
-# ============================================================================
-# 3. 身份①开局卡组全覆盖
-# ============================================================================
+func test_card_templates_match_gdd_fields() -> void:
+	for id: StringName in EXPECTED_CARD_FIELDS.keys():
+		var tpl: CardTemplateClass = cs.get_template(id)
+		assert_not_null(tpl, "应存在卡牌模板 %s" % id)
+		if tpl == null:
+			continue
+		var exp: Dictionary = EXPECTED_CARD_FIELDS[id]
+		assert_eq(tpl.type, int(exp["type"]), "%s 的 type 应与 GDD 一致" % id)
+		assert_eq(tpl.rarity, int(exp["rarity"]), "%s 的 rarity 应与 GDD 一致" % id)
+		assert_eq(tpl.cost, int(exp["cost"]), "%s 的 cost 应与 GDD 一致" % id)
 
-func test_identity_one_initial_deck_has_all_templates() -> void:
-	var missing: Array = []
-	for id: StringName in _identity_one_card_ids():
-		if not cs.templates.has(id):
-			missing.append(id)
-	assert_eq(missing, [], "身份①开局卡组引用的 card_id 应全部有模板（缺失：%s）" % str(missing))
+
+# ---- 4. 六个身份开局卡组全覆盖（逐身份断言） ----
+
+func test_all_six_identities_initial_deck_has_all_templates() -> void:
+	var identities: Dictionary = IdentityTemplates.IDENTITY_TEMPLATES
+	assert_eq(identities.size(), 6, "应有 6 个身份模板（否则本用例覆盖不全）")
+	for identity_id: StringName in identities.keys():
+		var missing: Array = []
+		var card_ids: Array = _identity_card_ids(identities[identity_id])
+		assert_true(card_ids.size() > 0, "身份 '%s' 应有开局卡组（否则本用例空转）" % identity_id)
+		for id: StringName in card_ids:
+			if not cs.templates.has(id):
+				missing.append(id)
+		assert_eq(missing, [], "身份 '%s' 开局卡组引用的 card_id 应全部有模板（缺失：%s）"
+			% [identity_id, str(missing)])
 
 
-## 从身份表推导身份①的开局卡组 card_id（卡组 + 角色位）——不硬编码清单，
-## 身份表改了这里自动跟随。
-func _identity_one_card_ids() -> Array:
+## 从身份表推导某身份的开局卡组 card_id（卡组 + 角色位）——不硬编码清单。
+func _identity_card_ids(tpl: Dictionary) -> Array:
 	var ids: Array = []
-	var tpl: Dictionary = IdentityTemplates.IDENTITY_TEMPLATES[IDENTITY_ONE]
 	var deck: Dictionary = tpl["initial_deck"]
 	for entry: Dictionary in deck["cards"]:
 		ids.append(StringName(entry["card_id"]))
 	for entry: Dictionary in deck["character_slots"]:
 		ids.append(StringName(entry["card_id"]))
-	assert_true(ids.size() > 0, "身份①应有开局卡组（否则本用例空转）")
 	return ids
 
 
-# ============================================================================
-# 4. 角色 base_hp 不再为 0——模板 → 落库 → 读取契约 端到端
-# ============================================================================
+# ---- 5. 模板 → 落库 → 读取契约 端到端（全部 12 名初始角色） ----
 
-func test_roster_state_seeds_player_hp_from_real_template() -> void:
-	var inst: CardInstance = cs.create_instance(&"lin_yuan")
-	assert_not_null(inst, "create_instance 应返回实例")
-	if inst == null:
+func test_roster_state_seeds_every_identity_character_from_real_template() -> void:
+	for id: StringName in EXPECTED_CHARACTER_STATS.keys():
+		var inst: CardInstance = cs.create_instance(id)
+		assert_not_null(inst, "create_instance 应返回实例（%s）" % id)
+		if inst == null:
+			continue
+		cs.field_characters.append(inst)  # 模拟 DeploymentSystem 上场
+		var roster = RosterState.new()
+		roster.seed_player_field([{"character_id": inst.card_instance_id, "is_front": true}], {}, cs)
+
+		var expected_hp: int = int(EXPECTED_CHARACTER_STATS[id]["hp"])
+		assert_true(roster.is_known(inst.card_instance_id),
+			"%s 的 HP 应为已知——模板缺失时 known=false，这正是「HP 0/0」的根因" % id)
+		assert_eq(roster.get_hp(inst.card_instance_id),
+			{"current": expected_hp, "max": expected_hp}, "%s 落库后应读到模板 base_hp" % id)
+
+		var reader = ActorReader.new()
+		reader.setup(null, null, cs)  # 只测模板回退路径——不接战斗/部署系统
+		assert_eq(reader.base_hp(inst.card_instance_id), expected_hp,
+			"UI 侧读到的 HP 应为模板真实值（%s）" % id)
+		assert_eq(reader.attack(inst.card_instance_id),
+			int(EXPECTED_CHARACTER_STATS[id]["attack"]),
+			"UI 侧读到的 ATK 应为模板真实值（%s）" % id)
+
+
+# ---- 6. 已知效果词表缺口（DEBT-CBT-018-8）——锁定当前取值，避免被静默「修正」 ----
+
+func test_basic_attack_stays_talisman_pending_adr() -> void:
+	# GDD 把基础攻击的类型写作「普通」，CardTemplate.CardType 的 6 个枚举无对应项。
+	# 取 TALISMAN(5)（一次性·目标敌方单体，语义最近）——若未来 ADR 追加「普通」枚举，
+	# 本断言与 EXPECTED_CARD_FIELDS 一并更新即可。
+	var tpl: CardTemplateClass = cs.get_template(&"basic_attack")
+	assert_not_null(tpl, "应存在 basic_attack 模板")
+	if tpl == null:
 		return
-	cs.field_characters.append(inst)  # 模拟 DeploymentSystem 上场
-
-	var roster = RosterState.new()
-	roster.seed_player_field([{"character_id": inst.card_instance_id, "is_front": true}], {}, cs)
-
-	var expected_hp: int = int(EXPECTED_CHARACTER_STATS[&"lin_yuan"]["hp"])
-	assert_true(roster.is_known(inst.card_instance_id),
-		"角色 HP 应为已知——模板缺失时 known=false，这正是「HP 0/0」的根因")
-	assert_eq(roster.get_hp(inst.card_instance_id),
-		{"current": expected_hp, "max": expected_hp}, "落库后应读到模板 base_hp")
+	assert_eq(tpl.type, CardTemplateClass.CardType.TALISMAN,
+		"basic_attack 暂取 TALISMAN(5)——GDD「普通」类型待 ADR 追加（DEBT-CBT-018-8）")
+	assert_eq(tpl.target_type, &"single_enemy", "基础攻击应指向敌方单体")
 
 
-func test_actor_reader_reads_real_template_stats() -> void:
-	var inst: CardInstance = cs.create_instance(&"su_jian_ming")
-	assert_not_null(inst, "create_instance 应返回实例")
-	if inst == null:
-		return
-	cs.field_characters.append(inst)
-
-	var reader = ActorReader.new()
-	reader.setup(null, null, cs)  # 只测模板回退路径——不接战斗/部署系统
-	assert_eq(reader.base_hp(inst.card_instance_id),
-		int(EXPECTED_CHARACTER_STATS[&"su_jian_ming"]["hp"]),
-		"UI 侧读到的 HP 应为模板真实值（不再是 0）")
-	assert_eq(reader.attack(inst.card_instance_id),
-		int(EXPECTED_CHARACTER_STATS[&"su_jian_ming"]["attack"]),
-		"UI 侧读到的 ATK 应为模板真实值（不再是 0）")
+func test_damage_reduction_cards_leave_effect_type_empty() -> void:
+	# 「受到伤害降低X%」在 card_effect_evaluator._category_for 的词表里没有对应前缀；
+	# 硬套 buff 会算成 ATK 增益。故留空（评估落 UNEVALUABLE），待 card-effect-engine
+	# 补 damage_reduce 类别（DEBT-CBT-018-8）。
+	for id: StringName in [&"yan_yun_bu", &"huan_hua_mi_zong_bu"]:
+		var tpl: CardTemplateClass = cs.get_template(id)
+		assert_not_null(tpl, "应存在 %s 模板" % id)
+		if tpl == null:
+			continue
+		assert_eq(String(tpl.effect_type), "",
+			"%s 是百分比减伤，effect_type 应留空（套现有前缀会算错，见 DEBT-CBT-018-8）" % id)
+		assert_true(tpl.description.contains("受到伤害降低"),
+			"%s 的描述应保留 GDD 的百分比减伤口径" % id)

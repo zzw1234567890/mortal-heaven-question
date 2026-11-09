@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"ling_shuang_yue"
+name = "凌霜月"
+type = 0
+rarity = 2
+cost = 1
+faction_tags = Array[StringName]([&"zhengdao", &"xuanbing_palace"])
+description = "炼气期角色卡。首次受到伤害减半（每局1次）。"
+flavor_text = "玄冰宫弟子，冰魄之韧——她是一座堡垒，姿态对称、衣袍硬朗。"
+base_hp = 10
+base_attack = 3
+innate_skill = &"first_hit_halved"

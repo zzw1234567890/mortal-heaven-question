@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"yin_po_ning_hun_shu"
+name = "阴魄凝魂术"
+type = 1
+rarity = 2
+cost = 2
+description = "绑定后角色击杀敌方时召唤1个2点生命的灵体协助战斗（沐瑶本命→召唤3点生命灵体）。"
+flavor_text = "魂未散尽，魄自成兵。"
+native_owner = &"mu_yao"

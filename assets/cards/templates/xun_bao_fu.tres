@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"xun_bao_fu"
+name = "寻宝符"
+type = 5
+rarity = 2
+cost = 1
+description = "查看牌库顶3张牌，选1张入手牌。"
+flavor_text = "散修的眼力，就是活着的本钱。"
+effect_type = &"draw_select_top3"
+effect_value = 1
+target_type = &"self"

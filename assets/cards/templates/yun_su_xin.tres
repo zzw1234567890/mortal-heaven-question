@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"yun_su_xin"
+name = "云素心"
+type = 0
+rarity = 1
+cost = 1
+faction_tags = Array[StringName]([&"suixing_islands"])
+description = "炼气期角色卡。阵法卡费用-1（最低1费）。"
+flavor_text = "阵道双杰，阵道之风——她的全部存在浓缩在那支符笔上。"
+base_hp = 8
+base_attack = 2
+innate_skill = &"formation_cost_down_1"

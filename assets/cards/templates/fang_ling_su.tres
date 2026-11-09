@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"fang_ling_su"
+name = "方灵素"
+type = 0
+rarity = 2
+cost = 1
+faction_tags = Array[StringName]([&"zhengdao", &"dangxia_valley"])
+description = "炼气期角色卡。使用丹药卡时效果额外+10%。"
+flavor_text = "丹霞谷弟子，炉火之心——她的力量在于「她兜里还有一颗丹」。"
+base_hp = 9
+base_attack = 3
+innate_skill = &"pill_effect_plus_10pct"

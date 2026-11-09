@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"jin_zhong_fu"
+name = "金钟符"
+type = 5
+rarity = 1
+cost = 1
+description = "本回合防御+3。"
+flavor_text = "金钟罩体，护的是一口真气。"
+duration_turns = 1
+target_type = &"self"
