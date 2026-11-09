@@ -10,6 +10,9 @@ extends RefCounted
 ## 父节点引用——CombatSystem Autoload 实例。
 var _parent: Node = null
 
+## 「打出即生效」效果执行端子模块——惰性创建（DEBT-CBT-018-10 执行端）。
+var _on_play_effects: RefCounted = null
+
 
 ## 构造——传入父节点引用。
 func _init(parent: Node = null) -> void:
@@ -24,10 +27,14 @@ func _init(parent: Node = null) -> void:
 ##   4. 目标验证——_validate_targets(card, targets) → false 则 return false（不扣费）[br]
 ##   5. 扣费——CostSystem.spend(cost)（直接调用——需要保证）[br]
 ##   6. 效果结算——_resolve_effects(card, targets) 返回结果列表[br]
-##   7. 阵亡检查——_check_and_process_deaths()[br]
+##   6b. 打出即生效效果——_collect_on_play_effects()（倍率伤害并入同一批落库、
+##      target=self 的治疗在伤害落库后落施法者——DEBT-CBT-018-10 执行端）[br]
+##   7. 阵亡检查——_check_and_process_deaths()（击杀触发条目在此结算治疗）[br]
 ##   8. 自动推进判定——hand_empty && !can_afford_any → advance_phase()[br]
 ## [br][param card_instance_id] 卡牌实例 ID。[br]
 ## [br][param target_indices] 目标索引列表。[br]
+## [br][param caster_id] 施法者角色 ID——倍率伤害的 ATK 取数对象与打出治疗 /
+## 击杀回血的落点；缺省 -1 时两者都不结算（不猜「谁出的牌」）。[br]
 ## [br][b]返回[/b]: true 出牌成功，false 被拒绝。
 func play_card(card_instance_id: int, target_indices: Array, caster_id: int = -1) -> bool:
 	# AC-001：阶段守卫
@@ -60,8 +67,18 @@ func play_card(card_instance_id: int, target_indices: Array, caster_id: int = -1
 	# AC-005：效果结算（直接调用——需要结果列表）
 	var results = _resolve_effects(card, targets)
 
+	# DEBT-CBT-018-10 执行端：打出即生效的伤害/治疗（CardEffectEngine.resolve 尚未实现，
+	# 倍率伤害与 heal 此前只在评估层算出、从未落库）。伤害结果项并入同一批统一落库
+	# （上下文补全由 _check_and_process_deaths 统一做）；治疗在伤害落库之后才执行，
+	# 保证「先掉血、后回血」的广播顺序。
+	var on_play: Dictionary = _collect_on_play_effects(card, targets, caster_id)
+	results.append_array(on_play.get("damage_results", []))
+
 	# AC-006：阵亡检查（带出牌卡与施法者上下文——击杀类条目要据此落库治疗）
 	_check_and_process_deaths(results, card, caster_id)
+
+	# 本条卡自己的回复（target="self" 的 heal 条目）——阵亡/击杀回血之后。
+	_get_on_play_effects().call(&"apply_heals", on_play.get("heals", []))
 
 	# 从手牌移除已打出的卡牌
 	_remove_card_from_hand(card_instance_id)
@@ -174,6 +191,25 @@ func _check_and_process_deaths(results: Array, card: Variant = null,
 		caster_id: int = -1) -> void:
 	_parent.call("_get_damage_settlement").settle_effect(
 			_with_card_context(results, card, caster_id))
+
+
+## 收集本节「打出即生效」的伤害/治疗（DEBT-CBT-018-10 执行端）。[br]
+## [br][b]为什么在这里接[/b]：效果结算走 [code]CardEffectEngine.resolve[/code]，但该
+## Autoload 上没有这个方法（回退返回空数组）——[code]damage_multiplier[/code] 与
+## [code]heal[/code] 只在评估层算过、从未落库。本方法经 [code]combat_on_play_effects.gd[/code]
+## 补齐执行端，[b]只收集不落库[/b]：伤害并入数组统一交落库链路，治疗等伤害落库后再执行。[br]
+## [br][b]在扣费之后、阵亡检查之前[/b]：顺序与 ADR-0008 §出牌结算流程一致——被拒绝的
+## 出牌（阶段/费用/目标校验不过）不会落任何伤害或治疗。[br]
+## [br]无倍率无治疗的卡（含只给 [code]template_id[/code] 的测试桩）返回空，行为逐位不变。
+func _collect_on_play_effects(card: Variant, targets: Array, caster_id: int) -> Dictionary:
+	return _get_on_play_effects().call(&"collect", card, targets, caster_id)
+
+
+## 惰性获取「打出即生效」执行端子模块（DEBT-CBT-018-10 执行端）。
+func _get_on_play_effects() -> RefCounted:
+	if _on_play_effects == null:
+		_on_play_effects = preload("res://src/feature/combat/combat_on_play_effects.gd").new(_parent)
+	return _on_play_effects
 
 
 ## 给结果项补上打出卡的上下文（原地不改入参——返回浅拷贝列表）。[br]

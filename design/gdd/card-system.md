@@ -245,6 +245,23 @@
 3. 评估时**逐条评估后汇总**：伤害/治疗/属性增量/状态按条累加；百分比减伤交 `combine_damage_reduction` 乘算并封顶 60%；多条伤害倍率只取最强一条（叠乘规则未定义，不臆造）；
 4. **击杀类条目（`trigger = kill`）不计入打出结算**——干跑不知道击杀是否真的发生。
 
+**执行端（2026-11-09，DEBT-CBT-018-10 第二阶段）**
+
+上面四条是**评估口径**；出牌时真正落库由 `src/feature/combat/combat_on_play_effects.gd` 执行（此前 `damage_multiplier`/`heal` 只在评估层算出、`play_card` 结算链里无人消费）：
+
+| 条目 | 打出时发生什么 |
+|------|----------------|
+| `damage` / `damage_multiplier`（非 `self`） | 对目标列表逐个结算：`damage_multiplier` 的伤害 = `floori(施法者ATK × 倍率)`，并入出牌效果的统一落库链路 |
+| `damage` / `damage_multiplier`（`target = self`） | **整条跳过**——GDD 无「自伤」模型，也不把伤害打到调用方给的目标上 |
+| `heal`（`target = self`） | 打出时立即回施法者，经 `apply_heal` 落库，上限由 `combat_roster_state.apply_damage` 夹取 |
+| `heal`（其他/留空 target） | 跳过——把治疗写进敌方是错的；留空的「每回合回复」类功法/法宝卡不在出牌瞬间回血 |
+| `trigger = kill` | 不在本步结算，由 `combat_kill_trigger.gd` 在目标真正阵亡时触发 |
+| 增益 / 控制 / 抽牌 / 阵法等 | 尚无执行端，跳过（不折算成其他效果） |
+
+- **攻击力取数**：施法者的 `base_attack`（我方模板）/ `EnemyBattleState.attack`（敌方）/ `battle_start` 的 `player_stats.atk` 覆盖，三处汇于 `CombatRosterState`；取不到时不落伤害（**不拿防御方 ATK 顶替**）。
+- **施法者未知不结算**：`play_card(..., caster_id)` 缺省 `-1` 时，倍率伤害与打出治疗都不发生（不猜「谁出的牌」，与击杀触发同口径）。
+- **未声明效果字段的卡**（旧桩 / 无 `effects` 且无 `effect_type`）零贡献——行为与执行端上线前逐位一致。
+
 #### 2. 卡组构建规则
 
 - 卡组容量由境界决定（炼气20→筑基25→金丹30→元婴35→化神40），不含角色卡。详见 `deck-editing-system.md`（卡组规则权威来源）和 `realm-system.md` §2。

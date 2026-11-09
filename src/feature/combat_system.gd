@@ -866,6 +866,8 @@ func get_hand() -> Array:
 ##   4. 目标验证——_validate_targets(card, targets) → false 则 return false（不扣费）[br]
 ##   5. 扣费——CostSystem.spend(cost)（直接调用——需要保证）[br]
 ##   6. 效果结算——_resolve_effects(card, targets) 返回结果列表[br]
+##   6b. 打出即生效效果——倍率伤害（ATK × 倍率）并入同一批落库、
+##      target=self 的治疗在伤害落库后落施法者（DEBT-CBT-018-10 执行端）[br]
 ##   7. 阵亡检查——_check_and_process_deaths()（击杀触发条目在此结算治疗）[br]
 ##   8. 自动推进判定——hand_empty && !can_afford_any → advance_phase()[br]
 ## [br][param card_instance_id] 卡牌实例 ID。[br]

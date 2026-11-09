@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: DEBT-CBT-018-10 第一阶段（一卡多效果）已完成；下一步出牌链路执行端 / combat-ui-interaction 出牌链路
+Task: DEBT-CBT-018-10 第三阶段（出牌执行端：倍率伤害 + 治疗落库）已完成；下一步 UI 出牌链路传入 caster_id / combat-ui-interaction 出牌链路
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -771,6 +771,27 @@ Task: DEBT-CBT-018-10 第一阶段（一卡多效果）已完成；下一步出�
 - Tech debt：DEBT-CBT-018-8 追加「表现层闭环（2026-11-09，玩家可见）」条目
 - 已知边界：出牌效果走 `settle_effect`，`CardEffectEngine.resolve` 不返回减伤标志 → 技能伤害因绑定减伤而降低时，数值正确但飘字不带「减」角标（登记在 tech debt）；`damage_reduced` 不影响任何数值，旧消费者忽略即可
 - Next recommended: combat-ui-interaction 001/003/005 出牌链路
+
+## Session Extract — DEBT-CBT-018-10 第三阶段：出牌执行端（倍率伤害 + 治疗落库）（2026-11-09）
+- 任务：`damage_multiplier` 与 `heal` 只在评估层算出数值，`play_card` 结算时并未真正按倍率算伤害、也没把 heal 落库
+- 先读后写（缺在哪一步）：`combat_card_resolver.play_card` 第 6 步 `_resolve_effects` 走 `CardEffectEngine.resolve`——**该 Autoload 上没有这个方法**（`CombatSystem._ready()` 注入的 `resolve_cb = Callable(cee, "resolve")` 无效），回退返回空数组 → 效果项从不产生 → 倍率伤害从未落库、出牌治疗只有击杀触发那条支路（`combat_kill_trigger.gd`）会落。评估层（`CardEffectEvaluator` 的 `DAMAGE_MULTIPLIER` 与 `heal` 分支）本身是正确的，缺的是执行端
+- 新增 `src/feature/combat/combat_on_play_effects.gd`（244 行，守 300 行软上限）
+  - `collect(card, targets, caster_id)`：经 `CardEffectComposer.effects_of` 取条目 → 按 `matches_trigger(TRIGGER_ON_PLAY)` 过滤（击杀条目仍由 `combat_kill_trigger.gd` 按事实触发）→ 逐条交评估器出数值 → 返回 `{damage_results, heals}`，**只收集不落库**
+  - `apply_heals(heals)`：调 `CombatDamageSettlement.apply_heal`（治疗在落库侧就是负伤害）
+  - 两段式（先伤害后治疗）：伤害并入 `play_card` 已有的统一落库链路 `settle_effect`，治疗在伤害落库**之后**才执行 → `character_damaged` 广播顺序「先掉血、后回血」，与击杀触发一致
+  - **没有新开写 HP 的路径**——唯一写 `current_hp` 的实现仍是 `combat_roster_state.apply_damage`
+- 攻击力取数：`combat_roster_state.gd` 状态字典新增 `atk` 键 + `get_atk()`，`read_hp()` 一并返回 `atk`；`seed_enemy_roster` 读 `attack`、`seed_player_field` 读注入的 `atk`/`attack`，缺省回退模板 `base_attack`（`_read_template_max_hp` 改名 `_read_template_field`）。三处 ATK 来源（敌方 `EnemyBattleState.attack` / 我方模板 `base_attack` / `battle_start` 的 `player_stats.atk`）汇于此，作为 `attacker_atk` 传给评估器
+  - **信息不足不臆造**：ATK ≤ 0 时不写 `attacker_atk` 键，让评估器回退快照——而快照里**只有施法者带 ATK、目标条目一律不给**（若给目标也填 ATK，评估器会把防御方的 ATK 当成本次攻击力，凭空造出伤害）→ 回退值 0、伤害 0、不落库
+- 目标裁定（防误伤）：`target=self` 的伤害**整条跳过**（GDD 无自伤模型，既不臆造自伤规则，也绝不把伤害打到调用方给的目标上）；`target=self` **与未声明 target** 的治疗一律落施法者（旧扁平卡如 `pei_yuan_dan` 只写 `target_type`，`han_yu_lun_hui_gong` / `ku_mu_feng_chun_jue` 连 target 都没写——漏认会让真实资产的治疗静默失效）；显式指向他人（`single_ally`）的治疗跳过并告警（无模型，不写错对象）
+- 伤害结果项**不写 `card_data`**：由 `play_card` 的 `_with_card_context` 统一补成「打出的那张卡」——击杀触发要按整张卡取 `trigger="kill"` 条目，若此处塞进单条效果数据，击杀回血会被评成 0（静默失效）
+- `combat_card_resolver.gd`（245 行）：`play_card` 在第 6 步后插入 6b（`_collect_on_play_effects` → 伤害并入 `results`）→ 第 7 步阵亡检查 → 再 `apply_heals`；新增 `_collect_on_play_effects()` / `_get_on_play_effects()`（惰性 `preload(...).new(_parent)`）；`play_card` 的 `caster_id` 文档补「倍率伤害的 ATK 取数对象与打出治疗/击杀回血的落点，缺省 -1 时两者都不结算」
+- `combat_system.gd`：流程注释补 6b
+- GDD：`design/gdd/card-system.md` §多效果承载 补「执行端」小节（逐条目行为表 + ATK 取数 + 施法者未知不结算 + 未建模类别跳过）
+- 测试：新增 `tests/integration/combat_system/test_on_play_effects.gd`（14 例）：150% 倍率 ATK3 → 4（floori，20→16）/ 100% 即等于 ATK / 广播增量与落库一致（`character_damaged` 载荷 damage=4）/ 施法者 ATK 未知时不落伤害且不拿敌方 ATK（4）顶替 / self 治疗 8+3 → 10 夹上限 + 负增量广播 / 满血治疗 HP 不变 / 未声明 target 的治疗落施法者 / `single_ally` 治疗跳过 / self 伤害不误伤敌方也不自伤 / 同卡 self 治疗与非 self 伤害分流 / 无效果卡行为逐位不变（双方 HP 不动、零广播）/ 无 `caster_id` 不结算 / 真实资产 `pei_yuan_dan` 回血 / 真实资产 `han_yu_lun_hui_gong` 未声明目标仍落施法者 / 真实资产 `xue_sha_zhang` 未击杀时击杀回血不提前落库
+- 全量：**3641 tests / 3640 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3626 → 净增 15）
+- Tech debt：DEBT-CBT-018-10 追加「第三阶段已落地」
+- **已知边界**：① `play_card` 的 `caster_id` 仍要靠 UI 出牌链路接线传入，缺省 -1 时倍率伤害与治疗都不结算（不猜「谁出的牌」）——真实对局接线前这几类效果只在测试里生效；② 出牌伤害走 `settle_effect`，`damage_reduced` 缺省 false → 技能伤害因绑定减伤而降低时数值正确但飘字不带「减」角标（同 DEBT-CBT-018-8）；③ 治疗载荷带的是**申请治疗量**的取负（上限夹取在 `apply_damage` 里做），满血时申请 3 点仍广播 -3 而实际 HP 不变——接线 UI 飘字时需改为按实际增量广播或由表现层读 HP 差值；④ 增益/控制/抽牌/阵法等未建模类别一律跳过（不静默降级）
+- Next recommended: UI 出牌链路把场上施法者 ID 传进 `play_card`（否则前三条只在测试里成立）；或 combat-ui-interaction 001/003/005
 
 ## Session Extract — DEBT-CBT-018-10 第一阶段：一卡多效果（2026-11-09）
 - 任务：让一张卡能挂多条异质效果——先弄清「一卡一效果」的扁平结构，再落 `EffectEntry` + `CardTemplate.effects`，保持旧卡零迁移

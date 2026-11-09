@@ -26,7 +26,7 @@ const ENEMY_ID_BASE: int = 100000
 ## 敌方角色 ID 步长（每实例一段，避免同模板多实例 ID 冲突）。
 const ENEMY_ID_STRIDE: int = 10000
 
-## 状态表——[code]{character_id: {side, current_hp, max_hp, is_alive, known, ref}}[/code]。
+## 状态表——[code]{character_id: {side, current_hp, max_hp, atk, is_alive, known, ref}}[/code]。
 ## [code]ref[/code] 为外部持有者（敌方阵容条目）；我方条目为 null（本表即真理来源）。
 var _states: Dictionary = {}
 
@@ -83,10 +83,13 @@ func seed_enemy_roster(roster: Array) -> void:
 		var hp: int = _entry_int(entry, "current_hp", max_hp)
 		var known: bool = max_hp > 0
 		_states[character_id] = _make_state(SIDE_ENEMY, hp, max_hp,
+				_entry_int(entry, "attack", 0),
 				bool(_entry_int(entry, "is_alive", 1)) and (hp > 0 or not known), known, entry)
 
 
-## 种子我方阵位——HP 来源优先级：注入 stats > 卡牌模板 base_hp > 未知。[br]
+## 种子我方阵位——HP/ATK 来源优先级：注入 stats > 卡牌模板基础值 > 未知。[br]
+## [br][param stats] 可带 [code]atk[/code] / [code]attack[/code]（任选其一）作为攻击力覆盖；
+## 缺省回退模板 [code]base_attack[/code]（与战斗 UI 的 ATK 取数同源）。[br]
 func seed_player_field(field: Array, stats: Dictionary,
 		card_system: Node = null) -> void:
 	for entry: Variant in field:
@@ -96,15 +99,20 @@ func seed_player_field(field: Array, stats: Dictionary,
 		var injected: Variant = stats.get(character_id, {})
 		var max_hp: int = 0
 		var hp: int = 0
+		var atk: int = 0
 		if injected is Dictionary and not (injected as Dictionary).is_empty():
 			max_hp = int((injected as Dictionary).get("max_hp", 0))
 			hp = int((injected as Dictionary).get("current_hp",
 					(injected as Dictionary).get("hp", max_hp)))
+			atk = int((injected as Dictionary).get("atk",
+					(injected as Dictionary).get("attack", 0)))
 		else:
-			max_hp = _read_template_max_hp(card_system, character_id)
+			max_hp = _read_template_field(card_system, character_id, "base_hp")
 			hp = max_hp
+		if atk <= 0:
+			atk = _read_template_field(card_system, character_id, "base_attack")
 		var known: bool = max_hp > 0 or hp > 0
-		_states[character_id] = _make_state(SIDE_PLAYER, hp, max_hp,
+		_states[character_id] = _make_state(SIDE_PLAYER, hp, max_hp, atk,
 				hp > 0 or not known, known, null)
 
 
@@ -130,20 +138,28 @@ func get_hp(character_id: int) -> Dictionary:
 	return {"current": int(state["current_hp"]), "max": int(state["max_hp"])}
 
 
-## 结算侧的读入口——[code]{known, side, current_hp, max_hp, is_alive}[/code]；
+## 结算侧的读入口——[code]{known, side, current_hp, max_hp, atk, is_alive}[/code]；
 ## 未知角色返回 [code]known=false[/code]（值全零，调用方不得据此判死）。
 func read_hp(character_id: int) -> Dictionary:
 	var state: Variant = _states.get(character_id)
 	if not (state is Dictionary):
-		return {"known": false, "side": SIDE_PLAYER, "current_hp": 0, "max_hp": 0, "is_alive": true}
+		return {"known": false, "side": SIDE_PLAYER, "current_hp": 0, "max_hp": 0, "atk": 0, "is_alive": true}
 	var st: Dictionary = state
 	return {
 		"known": bool(st["known"]),
 		"side": int(st["side"]),
 		"current_hp": int(st["current_hp"]),
 		"max_hp": int(st["max_hp"]),
+		"atk": int(st.get("atk", 0)),
 		"is_alive": bool(st["is_alive"]),
 	}
+
+
+## 攻击力读取——出牌伤害倍率的取数入口（[code]ATK × 倍率[/code] 的 ATK）。[br]
+## 未知角色返回 0（调用方据此判定「拿不到攻击力」，不臆造伤害）。
+func get_atk(character_id: int) -> int:
+	var state: Dictionary = _states.get(character_id, {})
+	return int(state.get("atk", 0)) if not state.is_empty() else 0
 
 
 ## 状态只读副本（调试/断言用）。
@@ -186,12 +202,13 @@ func apply_damage(character_id: int, damage: int) -> Dictionary:
 
 # === 内部 ========================================================================
 
-func _make_state(side: int, hp: int, max_hp: int, is_alive: bool, known: bool,
-		ref: Variant) -> Dictionary:
+func _make_state(side: int, hp: int, max_hp: int, atk: int, is_alive: bool,
+		known: bool, ref: Variant) -> Dictionary:
 	return {
 		"side": side,
 		"current_hp": maxi(hp, 0),
 		"max_hp": maxi(max_hp, 0),
+		"atk": maxi(atk, 0),
 		"is_alive": is_alive,
 		"known": known,
 		"ref": ref,
@@ -210,14 +227,15 @@ func _write_back(st: Dictionary, hp: int, alive: bool) -> void:
 		(ref as Dictionary)["is_alive"] = alive
 
 
-## 卡牌模板 HP 回退——CardSystem/模板不可用时返回 0（= 未知）。
-func _read_template_max_hp(card_system: Node, character_id: int) -> int:
+## 卡牌模板字段回退——CardSystem/模板不可用时返回 0（= 未知）。[br]
+## [br][param key] 模板字段名（[code]base_hp[/code] / [code]base_attack[/code]）。
+func _read_template_field(card_system: Node, character_id: int, key: String) -> int:
 	if card_system == null or not card_system.has_method(&"get_template_by_instance_id"):
 		return 0
 	var template: Variant = card_system.call(&"get_template_by_instance_id", character_id)
 	if template == null:
 		return 0
-	var raw: Variant = template.get("base_hp")
+	var raw: Variant = template.get(key)
 	return maxi(int(raw), 0) if raw != null else 0
 
 
