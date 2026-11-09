@@ -513,7 +513,10 @@ func get_accumulated_bonus(character_id: int, stat_name: String) -> float:
 
 ## 汇总角色全部生效绑定的[b]百分比减伤[/b]（DEBT-CBT-018-8 残留闭环）。[br]
 ## [br]来源：绑定卡中 [code]effect_type[/code] 归入减伤类的模板（含本命非线性值），
-## 逐条取「受到伤害降低」的百分比；乘算叠加与 60% 封顶由
+## 逐条取「受到伤害降低」的百分比，[b]并按同名叠层放大[/b]——
+## [code]贡献 = pct × stack_multiplier^(stack_count-1)[/code]（GDD §10「受到伤害降低」
+## 属可叠加放大类；系数取模板 [member CardTemplate.stack_multiplier]，默认 1.5）。[br]
+## 基础乘算叠加与 60% 封顶仍由
 ## [method CardEffectEvaluator.combine_damage_reduction] 统一负责——本方法只收集来源。[br]
 ## [br]战斗 Attack 阶段用它写入攻击队列条目的 [code]damage_reduction_pcts[/code]。[br]
 ## [br][param character_id] 目标角色 ID。[br]

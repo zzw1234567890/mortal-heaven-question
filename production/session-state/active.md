@@ -728,3 +728,15 @@ Task: 减伤链路已接通（绑定 damage_reduce → 攻击队列 damage_reduc
 - Tech debt：DEBT-CBT-018-8 补记「链路闭环（减伤接线）」；`basic_attack` 的「普通」类型仍待 ADR；副效果（DEBT-CBT-018-10）仍只写在 description
 - 已知边界（未建模，非本次范围）：敌方绑定经 `AISystem.register_preconfigured_bindings` 已能落 `BindingManager`，故敌方减伤同样会被汇总；玩家侧「谁在场上」的判定在绑定系统内无角色位查询，按 `character_id` 直接取绑定（与 `combat_damage_settlement` 的 binding 查询同口径）
 - Next recommended: combat-ui-interaction 001/003/005 出牌链路（减伤已能真实影响数值）
+
+## Session Extract — 同名叠层放大减伤（2026-11-09，策划裁定）
+- 任务：把「同名叠层放大减伤」落地——单条记录贡献 = `pct × stack_multiplier^(stack_count-1)`，多来源仍走 `combine_damage_reduction` 乘算 + 60% 封顶
+- 先读后写：`design/gdd/binding-system.md` §10「非数值效果的叠加行为」表原只有免疫/概率/持续回合/条件触发/抽牌五类，减伤无处归类；§3 同名叠加公式已给 `stack_multiplier: 1.2-2.0，默认 1.5`（§调优参数同值）→ **统一叠加因子取 1.5，未新造系数**（任务前提「若 GDD 没给就用 1.5」不成立，GDD 已有取值）
+- GDD 补一行：§10 表新增首行「百分比效果（受到伤害降低等）——可叠加放大类」，与那五类并列，注明放大先于多来源乘算；并加「判定口径」引用块解释归类依据
+- 代码：`binding_damage_reduction.gd`（104 → 128 行）新增 `DEFAULT_STACK_MULTIPLIER = 1.5` 常量 + `_stack_factor(record, template)`——系数读模板 `CardTemplate.stack_multiplier`，模板未声明（≤0）回退常量；`stack_count ≤ 1` 直接返回 1.0（不做 pow）；`_reduction_pct_of` 在基础 pct > 0 时才乘放大系数（0 仍被过滤，不产生 0 值来源）。`BindingManager.get_damage_reduction_pcts` 文档同步
+- **未另写公式**：只改单条来源数值，乘算与封顶仍只有 `combine_damage_reduction` 一处
+- 测试：新增 `tests/integration/combat_system/test_damage_reduction_stack_amplify.gd`（223 行 / 7 例）——1 层 10%（1.5^0）/ 2 层 15%（1.5^1）/ 3 层 22.5%（1.5^2）各为单条贡献；2 层→15% 与另一张 15% 乘算 0.85×0.85=0.7225 → 20→13；3 层 30%→67.5% + 15% 仍封顶 60% → 20→16；另有 2 层/3 层放大值经攻击队列落到伤害的 2 例
+- 全量：**3563 tests / 3562 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3556 → 净增 7）
+- Tech debt：DEBT-CBT-018-8 追加「叠层放大闭环」条目，含「GDD 原表无减伤分类 → 本轮补齐」的变更原因与 `get_binding_context()` 仍用常量 1.5 的口径不一致风险登记
+- 已知边界：`get_binding_context()` 的 `stack_multiplier` 仍是「延后接 CardSystem」的临时常量（未改，非本次范围）；本命减伤仍取 `native_effect_value` 原值，叠层放大在其之上乘算（GDD §10「叠加乘法与本命乘法独立」）
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路

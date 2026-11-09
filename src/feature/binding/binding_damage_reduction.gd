@@ -15,10 +15,17 @@ extends RefCounted
 ## 该绑定不贡献任何数值——不填默认值、不当 0% 之外的近似值。全部来源都取不到时
 ## 返回空数组，由调用方按「无减伤」处理。[br]
 ## [br][b]参与条件[/b]：跳过暂挂绑定（[member BindingRecord.is_suspended]——角色离场期
-## 减伤不应生效）；一条 [code]BindingRecord[/code] 贡献一份（同名叠层共享一个绑定位，
-## 不按 [member BindingRecord.stack_count] 重复计数——GDD §同名卡叠加规则未定义
-## 「受到伤害降低」的叠层放大，按布局不臆造）。[br]
-## [br]来源: GDD combat-system.md §公式、GDD binding-system.md §10、DEBT-CBT-018-8。
+## 减伤不应生效）。[br]
+## [br][b]同名叠层放大[/b]：一条 [code]BindingRecord[/code] 贡献一份，但按叠层放大——
+## [code]贡献 = pct × stack_multiplier^(stack_count-1)[/code]，与数值类叠加公式同口径
+## （GDD §10：「受到伤害降低」归入[b]可叠加放大类[/b]，与免疫/概率/持续回合等五类并列；
+## §3 叠加公式给出 stack_multiplier）。[code]stack_multiplier[/code] 读模板字段
+## [member CardTemplate.stack_multiplier]（默认 1.5），模板未声明时回退
+## [constant DEFAULT_STACK_MULTIPLIER]。例：10% 卡叠 2 层 → 15%，叠 3 层 → 22.5%。[br]
+## [br]来源: GDD combat-system.md §公式、GDD binding-system.md §10 / §3、DEBT-CBT-018-8。
+
+## 同名叠加默认系数——GDD §3「stack_multiplier: 1.2-2.0，默认 1.5」。
+const DEFAULT_STACK_MULTIPLIER: float = 1.5
 
 ## 效果评估器——单卡减伤百分比与词表对齐的唯一入口。
 const EvaluatorScript: GDScript = preload("res://src/feature/card_effect_engine/card_effect_evaluator.gd")
@@ -57,7 +64,8 @@ func collect(character_id: int) -> Array:
 	return pcts
 
 
-## 单条绑定的减伤百分比——模板取不到或评估为 0 时返回 0.0（调用方跳过）。
+## 单条绑定的减伤百分比——基础 pct 经同名叠层放大：
+## [code]pct × stack_multiplier^(stack_count-1)[/code]。模板取不到或评估为 0 时返回 0.0（调用方跳过）。
 func _reduction_pct_of(record: Object) -> float:
 	var template: Variant = _read_template(record.get("card_template_id"))
 	if template == null:
@@ -65,7 +73,23 @@ func _reduction_pct_of(record: Object) -> float:
 	var eval: RefCounted = _get_evaluator().evaluate_effect(
 		_card_data(record, template), int(record.get("bound_character_id")),
 		SnapshotScript.new())
-	return float(eval.get("damage_reduction_pct"))
+	var base_pct: float = float(eval.get("damage_reduction_pct"))
+	if base_pct <= 0.0:
+		return 0.0
+	return base_pct * _stack_factor(record, template)
+
+
+## 同名叠层放大系数——[code]stack_multiplier^(stack_count-1)[/code]（stack_count=1 → 1.0）。
+## [br][b]系数来源[/b]：模板 [member CardTemplate.stack_multiplier]（GDD §3 可配置项）；
+## 模板未声明（≤0）时回退 [constant DEFAULT_STACK_MULTIPLIER]。stack_count 缺省按 1 层。
+func _stack_factor(record: Object, template: Object) -> float:
+	var count: int = int(record.get("stack_count"))
+	if count <= 1:
+		return 1.0
+	var multiplier: float = float(template.get("stack_multiplier"))
+	if multiplier <= 0.0:
+		multiplier = DEFAULT_STACK_MULTIPLIER
+	return pow(multiplier, count - 1)
 
 
 ## 构造评估输入——只放效果词表与减伤相关的四个字段（含本命覆盖）。
