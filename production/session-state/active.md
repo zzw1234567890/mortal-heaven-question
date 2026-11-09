@@ -740,3 +740,16 @@ Task: 减伤链路已接通（绑定 damage_reduce → 攻击队列 damage_reduc
 - Tech debt：DEBT-CBT-018-8 追加「叠层放大闭环」条目，含「GDD 原表无减伤分类 → 本轮补齐」的变更原因与 `get_binding_context()` 仍用常量 1.5 的口径不一致风险登记
 - 已知边界：`get_binding_context()` 的 `stack_multiplier` 仍是「延后接 CardSystem」的临时常量（未改，非本次范围）；本命减伤仍取 `native_effect_value` 原值，叠层放大在其之上乘算（GDD §10「叠加乘法与本命乘法独立」）
 - Next recommended: combat-ui-interaction 001/003/005 出牌链路
+
+## Session Extract — get_binding_context 叠层系数口径收口（2026-11-09）
+- 任务：`BindingManager.get_binding_context()` 里 `stack_multiplier` 仍硬编码 `DEFAULT_STACK_MULTIPLIER`（注释「延后接 CardSystem」），与上一轮减伤路径「读模板 `CardTemplate.stack_multiplier`」形成两套口径
+- ADR-0013 对照：§同名叠加乘法公式 要求「multiplier = native × stack_multiplier^(count-1)，CardEffectEngine 查询预计算值，不在引擎中重复计算」；§变量表 `stack_multiplier` 来源明确为 `CardTemplate.stack_multiplier（可配置）` → 硬编码属实现债，非设计意图
+- 方案：新增 `src/feature/binding/binding_stack_factor.gd`（69 行）作为**唯一取数实现**——`read_template(id)`（CardSystem 缺失/ID 空/模板缺失 → null）、`multiplier_of(template)`（null/无字段/≤0 → 1.5）、`stack_factor(count, template)`（count≤1 直接 1.0，不做 pow）+ 常量 `DEFAULT_STACK_MULTIPLIER = 1.5`
+- `binding_manager.gd`（725 → 732 行）：`get_binding_context()` 改调 `StackFactor.read_template(record.card_template_id)` + `StackFactor.stack_factor()`；`DEFAULT_STACK_MULTIPLIER` 保留为 `StackFactor.DEFAULT_STACK_MULTIPLIER` 的**别名**（向后兼容既有引用，不再承载取数逻辑）；函数文档同步（去掉「延后」措辞）
+- `binding_damage_reduction.gd`（128 → 96 行）：删除本地 `DEFAULT_STACK_MULTIPLIER` / `_stack_factor` / `_read_template` / `_autoload`，改调同一模块——**两条路径共用一处实现**，模板存在性判定仍留在减伤路径（模板缺失 → 不贡献来源）
+- 向后兼容：现有模板资产未声明 `stack_multiplier` → 走默认 1.5，`test_serialize_snapshot_effect_integration` 的 AC-009 用例（1.5×1.5^1=2.25 等）数值不变
+- 测试：新增 `tests/integration/binding_system/test_binding_context_stack_multiplier.gd`（223 行 / 9 例）——模板 ×2.0 叠 2/3 层上下文与减伤路径同系数（2.0 / 4.0 对 20% / 40%）、×1.2 叠 3 层同系数 1.44（14.4%）、模板缺失上下文回退 2.25 而减伤返回空（不臆造）、字段为 0 视为未声明、默认 1.5 向后兼容、单层不放大、本命叠层只共用叠层系数（本命基数口径差异为既有设计）
+- 全量：**3572 tests / 3571 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3563 → 净增 9）
+- Tech debt：DEBT-CBT-018-8 追加「口径收口（2026-11-09）」条目
+- 已知边界：`compute_effective_value()` 仍由调用方显式传 `stack_multiplier`（无符号表，未改）；`get_accumulated_bonus()` 走 `stat_bonus_cb` 回调，不经模板系数（非本次范围）
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路

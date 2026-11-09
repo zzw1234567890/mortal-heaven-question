@@ -213,8 +213,13 @@ func get_binding(binding_id: int) -> BindingRecord:
 ## 本命加成乘数——[code]native_owner[/code] 匹配且本命位空闲时锁定 1.5（ADR-0013 §本命绑定判定算法）。
 const NATIVE_MULTIPLIER: float = 1.5
 
-## 默认叠加乘数——GDD 默认值 1.5（延后接 CardSystem 后由模板提供）。
-const DEFAULT_STACK_MULTIPLIER: float = 1.5
+## 同名叠层放大系数取数模块——与减伤路径（[BindingDamageReduction]）的[b]唯一共用口径[/b]：
+## 模板 [member CardTemplate.stack_multiplier] → 缺失回退 1.5。
+const StackFactor := preload("res://src/feature/binding/binding_stack_factor.gd")
+
+## 默认叠加乘数——GDD §3「默认 1.5」。仅作为 [constant StackFactor] 的公开别名保留
+## （向后兼容既有引用），取数逻辑不在本文件重复实现。
+const DEFAULT_STACK_MULTIPLIER: float = StackFactor.DEFAULT_STACK_MULTIPLIER
 
 ## 默认绑定位上限——RealmSystem 槽位数据缺失时的保守回退（炼气基准 1，防止越界分配）。
 const DEFAULT_SLOT_LIMIT: int = 1
@@ -673,8 +678,9 @@ func write_snapshot_to_gsm() -> void:
 ## 查询单条绑定的预计算乘积上下文（AC-009）。[br]
 ## [code]multiplier = native_multiplier × stack_multiplier^(stack_count-1)[/code]——
 ## CardEffectEngine 结算时查询此值，不在引擎中重复计算。[br]
-## [b]stack_multiplier 延后[/b]：本 Story 无 CardSystem 模板查询（[code]cardTemplate.stack_multiplier[/code]），
-## 暂用默认 1.5（GDD 默认值），Story 004 接 CardSystem 后由调用方传入或注入。[br]
+## [b]stack_multiplier 取数[/b]：真实读卡牌模板 [member CardTemplate.stack_multiplier]
+## （GDD §3 可配置项），模板取不到 / 未声明 / 值 ≤ 0 时回退默认 1.5——
+## 与减伤路径共用 [BindingStackFactor]，[b]只有一处取数实现[/b]（DEBT-CBT-018-8 口径收口）。[br]
 ## [br][param card_instance_id] 卡牌实例 ID。[br]
 ## [br][b]返回[/b]: [code]{native_multiplier, stack_count, multiplier}[/code]；
 ## 未找到返回空 Dictionary。
@@ -687,8 +693,9 @@ func get_binding_context(card_instance_id: int) -> Dictionary:
 			continue
 		var record: BindingRecord = _bindings[binding_id]
 		if record.stack_slots.has(card_instance_id) or record.card_instance_id == card_instance_id:
-			var stack_mult: float = DEFAULT_STACK_MULTIPLIER  # 延后接 CardSystem
-			var mult: float = record.native_multiplier * pow(stack_mult, record.stack_count - 1)
+			var template: Variant = StackFactor.read_template(record.card_template_id)
+			var stack_factor: float = StackFactor.stack_factor(record.stack_count, template)
+			var mult: float = record.native_multiplier * stack_factor
 			return {"native_multiplier": record.native_multiplier, "stack_count": record.stack_count, "multiplier": mult}
 	return {}
 
