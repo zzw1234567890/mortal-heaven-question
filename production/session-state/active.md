@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: DEBT-CBT-018-10 第三阶段（出牌执行端：倍率伤害 + 治疗落库）已完成；下一步 UI 出牌链路传入 caster_id / combat-ui-interaction 出牌链路
+Task: DEBT-CBT-018-10 第四阶段（UI 施法者接线 + 治疗按实际增量广播）已完成；下一步 combat-ui-interaction 001/003/005 出牌手势本体
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -810,3 +810,32 @@ Task: DEBT-CBT-018-10 第三阶段（出牌执行端：倍率伤害 + 治疗落�
 - **已知边界（下一批迁移前必须先处理）**：`binding_damage_reduction.gd::_card_data()` 直接读模板扁平字段后调 `evaluate_effect`——把减伤类绑定卡（`yan_yun_bu` / `huan_hua_mi_zong_bu`）迁到 `effects` 并清空扁平字段会让该路径**静默读出 0% 减伤**（不报错，玩家侧表现为减伤消失）。须先改为经 `evaluate_effects()` 取汇总值，且「叠层放大作用在汇总 pct 还是逐条」属设计口径需策划确认。`test_only_demonstration_card_is_migrated` 是绊线（迁移任何新卡即红）
 - 另一处边界：`CombatSystem` 出牌结算尚未消费 `trigger="kill"` 条目——击杀回血目前**可评估不可执行**
 - Next recommended: 出牌链路执行端（`damage_multiplier`/`heal` 落库）→ 再迁其余 36 张；或 combat-ui-interaction 001/003/005
+
+## Session Extract — DEBT-CBT-018-10 第四阶段：UI 施法者接线 + 治疗按实际增量广播（2026-11-09）
+- 任务：① 把「谁出的牌」接进生产链路（此前 `play_card` 的 `caster_id` 无人传入，倍率伤害与治疗在真实对局里从不结算）；② 治疗广播改成实际增量（此前带申请量，满血时飘出不存在的回血数字）
+- 先读后写（UI 出牌链路现状）：`combat_system.gd::play_card` → `combat_card_resolver.play_card` → `combat_on_play_effects.collect(card, targets, caster_id)`；UI 侧**没有任何出牌手势实现**（`grep play_card src/ui` 零命中）——`combat_card_resolver` 头注释所说的「由 CombatUI 触发」是计划态，拖拽/点选/数字键全归 combat-ui-interaction epic（0/9 未实现）。`combat_layout.gd` / `combat_actor_stage.gd` 只做建卡与信号接线，**无「当前操作角色」概念**（`character_status_card.gd` 无选中态，`deploy_panel.gd` 的 `selected_ids` 是备战的瞬态选择，不延续到战斗）
+- 施法者裁定（临时口径，按用户指示「用我方阵位第一个存活角色并写明理由」）：
+  - 新增 `src/ui/combat/shared/combat_caster_rules.gd`（54 行，`class_name CombatCasterRules extends RefCounted`，纯函数）：`resolve_caster(field)` 按 slot_index 升序取第一个 `character_id >= 0` 且 `state != DEAD` 的角色；判不出返回 `NO_CASTER = -1`；非字典条目跳过、`state` 缺失视为未阵亡（只有显式 DEAD 才排除）。镜像 `FieldState` 的两个常量值（0 EMPTY / 4 DEAD），不依赖全局单例
+  - 理由（写进代码注释与 GDD）：阵位正是备战确认时 `DeploymentSystem.setup_field()` 写入的那份名册，用它不引入第二份「谁上场了」的真理来源；interaction epic 落地「当前角色」后应改为显式传入，本裁定降级为兜底
+  - 新增 `src/ui/combat/shared/combat_play_bridge.gd`（63 行，`class_name CombatPlayBridge`）：`setup(combat, deployment)` + `play_card(id, targets)` 现读阵位裁定施法者 → `CombatSystem.play_card(id, targets, caster)`；未注入战斗系统返回 false 并告警；目标数组传副本（不改调用方）
+  - 接线：`combat_actor_stage.setup()` 里把同一组数据源注入桥，新增 `play_card()` / `current_caster_id()`；`combat_layout.play_card()` / `current_caster_id()` 转调装配台——交互 epic 落地时直接调 `CombatLayout.play_card()` 即可，不必自己拼 `caster_id`。**没有为出牌单独再造一个「点选」UI**（手势本体归 interaction epic）
+- 治疗广播改为实际增量：
+  - `combat_damage_settlement._apply()` 新增第 7 参 `delta_is_actual: bool = false`：true 时先读 `hp_before`，落库后用 `hp_before - current_hp` 作为广播增量；`outcome["damage"]` 同步为实际值
+  - `apply_heal()` 传 `delta_is_actual = true`
+  - **满血 / 全额溢出 → 选「不广播」而不是「广播 0」**：`character_damaged` 的既有契约是增量事件（零增量无信息量），表现层 `CombatFeedbackCoordinator._enqueue_damage` 本就对 `delta == 0` 早退；广播 0 只会多一次空事件。选型已写进 GDD 与 `apply_heal` 的文档注释
+  - `combat_on_play_effects.apply_heals()` 的返回值也改为实际回血总量（累加 `-outcome.damage`），与广播数字一致
+  - 击杀回血走同一个 `apply_heal` → 自动获得同样的口径（满血击杀不再飘「+2」）
+- GDD：`design/gdd/card-system.md` §执行端 补两条——「施法者从哪来（UI 出牌链路）」与「治疗广播按实际增量」（含满血/部分溢出两个判别例）
+- 测试：新增 `tests/unit/combat_ui/test_combat_caster_rules.gd`（12 例）+ `tests/integration/combat_ui/test_play_bridge_settlement.gd`（8 例）；`test_on_play_effects.gd` 治疗广播断言 -3 → -2、满血用例补零广播
+- 全量：**3662 tests / 3661 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3641 → 净增 21）
+- Tech debt：DEBT-CBT-018-10 追加「第四阶段已落地」
+- **已知边界**：① 施法者口径是临时裁定（阵位第一个存活者），**不是玩家选中的角色**——interaction epic 落地前，多角色阵容里出牌一律记在阵位首位身上；② `CombatLayout.play_card()` 目前只被测试与后续交互层调用，真实对局里还没有手势去触发它；③ 满血治疗**完全无反馈**（资源已消耗、无飘字）——若策划要「无效」提示需另加信号/标志；④ 出牌伤害的 `damage_reduced` 缺省 false（同 DEBT-CBT-018-8 残留）；⑤ 增益/控制/抽牌/阵法等类别仍未建模；⑥ `CombatLayout` 465 行，超 300 行软上限（既有门面，拆分宜单独成故事）
+
+### 自审修复（同日，`/code-review` 后）
+- **H1 真实缺陷**：`_apply` 的 `delta_is_actual` 分支原带 `and outcome.known` 守卫——未知角色时 `delta` 回落到申请量，`apply_heals` 会把「一分血都没回」算进总数（返回值虚高，且与「零广播」对不上）。去掉守卫：未知角色 `read_hp` 与返回的 `current_hp` 都是 0，差值自然为 0。新增 `test_heal_on_unknown_character_reports_zero` 锁死
+- **M1 文档与实现不符**：`resolve_caster` 类文档承诺「按 slot_index 升序」，实现只按数组顺序（`get_field()` 恰好有序，但桩数据/过滤后的快照未必）。改为入口先 `sort_custom` 再扫描（缺 `slot_index` 的条目排末尾），并补 `FIELD_STATE_READY` 镜像常量、`state=EMPTY` 但 id 合法的脏条目跳过
+- **L 系列**：`has_sources()` 语义对齐同层 `DeployPanel`/`SettlementHost`（两份数据源齐备才算 true）；裸 `-1` 收敛到 `CasterRulesScript.NO_CASTER`；参数命名统一 `p_` 前缀；`[method X.y]` 文档交叉引用与「场景挂载侧只持装配台」的事实描述更正
+- 新增 `tests/integration/combat_ui/test_layout_play_card.gd`（3 例）——门面 `CombatLayout.play_card()` / `current_caster_id()` 此前无任何测试（含「装配台缺失」早退分支）
+- 全量：**3670 tests / 3669 passing / 1 pending 存量 / 3 orphans 存量**，零回归
+- 已按审查意见**未采纳**的一项：把实际增量下沉到 `combat_roster_state.apply_damage()` 返回值（加 `delta` 键、消掉 `_apply` 的 `delta_is_actual` 双布尔参数）——方向合理但会改动攻击结算的既有返回契约，超出本次范围，留作后续重构；同理 `combat_layout.gd` 的拆分与出牌伤害 `damage_reduced` 未在本次处理
+- Next recommended: combat-ui-interaction 001/003/005（出牌手势 + 目标选择），落地后把施法者改成玩家选中的角色；或继续迁移其余 36 张扁平卡到 `effects`

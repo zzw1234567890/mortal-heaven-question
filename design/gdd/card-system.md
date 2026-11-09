@@ -260,6 +260,8 @@
 
 - **攻击力取数**：施法者的 `base_attack`（我方模板）/ `EnemyBattleState.attack`（敌方）/ `battle_start` 的 `player_stats.atk` 覆盖，三处汇于 `CombatRosterState`；取不到时不落伤害（**不拿防御方 ATK 顶替**）。
 - **施法者未知不结算**：`play_card(..., caster_id)` 缺省 `-1` 时，倍率伤害与打出治疗都不发生（不猜「谁出的牌」，与击杀触发同口径）。
+- **施法者从哪来（UI 出牌链路）**：`CombatLayout.play_card()` → `CombatActorStage.play_card()` → `CombatPlayBridge`（`src/ui/combat/shared/`）在调用 `CombatSystem.play_card()` 前裁定施法者——**我方阵位第一个已占用且未阵亡的角色**，按 `slot_index` 升序（`combat_caster_rules.gd` 内部排序，不依赖调用方把快照排好）。这是**临时口径**：combat-ui-interaction epic 尚无「当前操作角色」概念，取阵位第一个存活者不引入第二份「谁上场了」的真理来源；该 epic 落地点选/拖拽出牌后应改为显式传入选中角色，裁定降级为兜底。阵位为空或全员阵亡 → 传 `-1`，下游照旧不结算。
+- **治疗广播按实际增量**：`apply_heal` 广播的 `character_damaged.damage` 是**夹取前后 HP 差**的取负（不是申请治疗量的取负）。满血治疗（如 10/10 申请 3 点）或全额溢出时差值为 0 → **不广播**（`character_damaged` 是增量事件，零增量无信息量；表现层本就对 `delta == 0` 早退），避免飘出并不存在的回血数字。部分溢出只广播实际回血量（8/10 申请 3 点 → 广播 -2）。目标角色无可信 HP（`known=false`，未落库）时实际增量同为 0——返回的 `damage` 不虚报申请量。
 - **未声明效果字段的卡**（旧桩 / 无 `effects` 且无 `effect_type`）零贡献——行为与执行端上线前逐位一致。
 
 #### 2. 卡组构建规则

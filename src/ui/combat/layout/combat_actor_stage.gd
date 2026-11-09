@@ -23,6 +23,8 @@ extends Node
 const CardScript := preload("res://src/ui/combat/layout/character_status_card.gd")
 ## 取数入口（名册 / HP / ATK——单一读取链路）。
 const ReaderScript := preload("res://src/ui/combat/layout/combat_actor_reader.gd")
+## UI 出牌桥（DEBT-CBT-018-10 第四阶段——出牌前裁定施法者再转交 CombatSystem）。
+const PlayBridgeScript := preload("res://src/ui/combat/shared/combat_play_bridge.gd")
 
 ## 卡间距（UX 角色区布局细节：16px）。
 const CARD_GAP: float = 16.0
@@ -35,6 +37,8 @@ const FALLBACK_AREA_SIZE: Vector2 = Vector2(1920.0, 340.0)
 var _reader: RefCounted = ReaderScript.new()
 ## 反馈编排器（卡建好后注册——由挂载侧注入）。
 var _coordinator: Control = null
+## UI 出牌桥（出牌时裁定施法者——数据源与 [member _reader] 同一组注入）。
+var _play_bridge: RefCounted = PlayBridgeScript.new()
 
 ## === 容器（CombatLayout 的区域）=============================================
 
@@ -55,7 +59,28 @@ var _cards: Dictionary = {}
 func setup(p_combat: Node, p_deployment: Node, p_card_system: Node = null,
 		_p_binding_manager: Node = null) -> void:
 	_reader.call(&"setup", p_combat, p_deployment, p_card_system)
+	_play_bridge.call(&"setup", p_combat, p_deployment)
 	_connect_death(p_combat)
+
+
+## UI 出牌入口——裁定施法者后转交 [code]CombatSystem.play_card()[/code]。[br]
+## [br][b]为什么从角色卡装配台暴露[/b]：本台已持有战斗系统与部署系统两份数据源
+## （[method setup] 注入），出牌桥所需正好齐备，不必新增一层容器。[br]
+## [br][b]层级关系[/b]：[code]CombatLayout[/code] 是场景挂载侧持有的那个节点
+## （[code]combat_scene.gd[/code] 调的是它的 [code]setup_feedback[/code]），本台是它的
+## 子组件；交互层应调 [code]CombatLayout.play_card()[/code]，本方法只作下层入口。[br]
+## [br][b]施法者口径（临时）[/b]：我方阵位第一个存活角色（见
+## [code]combat_caster_rules.gd[/code]）；interaction epic 落地「当前操作角色」后
+## 应改为显式传入。[br]
+## [br][param p_card_instance_id] 卡牌实例 ID。[param p_target_indices] 目标索引列表。[br]
+## [b]返回[/b]: 出牌是否成功。
+func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
+	return bool(_play_bridge.call(&"play_card", p_card_instance_id, p_target_indices))
+
+
+## 当前裁定出的施法者 ID（测试与后续交互层查询用；判不出为 -1）。
+func current_caster_id() -> int:
+	return int(_play_bridge.call(&"current_caster_id"))
 
 
 ## 指定卡的落地容器（我方区 / 敌方区）。

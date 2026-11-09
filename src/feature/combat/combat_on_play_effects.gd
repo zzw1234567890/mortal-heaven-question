@@ -96,7 +96,10 @@ func collect(card: Variant, targets: Array, caster_id: int) -> Dictionary:
 ## 治疗落库——把 [method collect] 算出的治疗交给
 ## [method CombatDamageSettlement.apply_heal]（治疗在落库侧就是负伤害）。[br]
 ## [br][param heals] [code][{character_id, amount}][/code] 列表（[method collect] 的产出）。[br]
-## [br][b]返回[/b]: 实际落库的治疗总量。
+## [br][b]返回的是实际回血量[/b]：落库结果里的 [code]damage[/code] 已是「夹取前后 HP 差」
+## 的取负（满血 / 全额溢出时为 0），故累加 [code]-damage[/code]——申请 3 点但只回 2 点时
+## 返回 2，与 [code]character_damaged[/code] 广播的数字一致。角色无信 HP（[code]known=false[/code]，
+## 未落库）时计 0——不把没发生过的回血算进总数。
 func apply_heals(heals: Array) -> int:
 	var total: int = 0
 	for raw: Variant in heals:
@@ -107,8 +110,9 @@ func apply_heals(heals: Array) -> int:
 		var character_id: int = int(item.get("character_id", -1))
 		if amount <= 0 or character_id < 0:
 			continue
-		_settlement().call(&"apply_heal", character_id, amount)
-		total += amount
+		var outcome: Dictionary = _settlement().call(&"apply_heal", character_id, amount)
+		if bool(outcome.get("known", false)):
+			total += -int(outcome.get("damage", 0))
 	return total
 
 

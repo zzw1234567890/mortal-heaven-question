@@ -10,6 +10,10 @@ extends RefCounted
 ## 本模块不直接操作阵位（信号用于通知，逻辑走编排——ADR-0008 §架构原则 #2）。[br]
 ## [br][b]两条伤害源[/b]：[method settle_attack]（Phase 4 攻击结算）与
 ## [method settle_effect]（出牌效果结算），共用 [method _apply] 落库逻辑。[br]
+## [br][b]治疗只广播实际增量[/b]（DEBT-CBT-018-10 第四阶段）：[method apply_heal] 走
+## [code]delta_is_actual[/code] 口径——广播的 [code]damage[/code] 是[b]夹取前后 HP 差[/b]，
+## 满血 / 全额溢出时差值为 0 → [b]不广播[/b]（与既有「零增量不广播」同一条规则），
+## 表现层不会飘出并不存在的回血数字。[br]
 ## [br][b]击杀触发[/b]（DEBT-CBT-018-10 执行端）：出牌结算中目标[b]由存活转为阵亡[/b]时，
 ## 转交 [code]combat_kill_trigger.gd[/code] 回调一次
 ## [method CardEffectEvaluator.evaluate_effects]（[code]TRIGGER_KILL[/code]），
@@ -112,11 +116,19 @@ func trigger_kill(item: Dictionary, victim_id: int) -> Dictionary:
 ## 故击杀回血复用 [method _apply]：唯一写 HP 的实现仍是
 ## [code]combat_roster_state.apply_damage[/code]（含上限夹取与阵亡幂等），
 ## 不新开第二条写 [code]current_hp[/code] 的路径。[br]
+## [br][b]广播按实际增量[/b]（DEBT-CBT-018-10 第四阶段）：本方法用
+## [code]delta_is_actual = true[/code] 调 [method _apply]——广播的 [code]damage[/code]
+## 是「夹取前后 HP 差」的取负，而不是申请治疗量的取负。此前满血时申请 3 点仍广播 -3
+## 而实际 HP 不变，表现层会飘出一个不存在的回血数字。[br]
+## [br][b]满血 / 全额溢出 → 不广播[/b]（[method _apply] 的「实际增量为 0 不广播」规则）：
+## 选「不广播」而非「广播 0」——[code]character_damaged[/code] 的既有契约是
+## [b]增量事件[/b]（零增量无信息量），且表现层 [code]CombatFeedbackCoordinator[/code]
+## 对 [code]delta == 0[/code] 本就早退；广播 0 只会多一次空事件、不产生任何可见效果。[br]
 ## [br][param character_id] 被治疗的角色 ID（击杀回血为施法者）。[br]
 ## [param amount] 治疗量（正数；内部取负后落库）。[br]
-## [b]返回[/b]: 落库结果（见 [method _apply]）。
+## [b]返回[/b]: 落库结果（见 [method _apply]）——[code]damage[/code] 为实际回血量。
 func apply_heal(character_id: int, amount: int) -> Dictionary:
-	return _apply(character_id, -maxi(amount, 0), SIDE_UNKNOWN, false, [])
+	return _apply(character_id, -maxi(amount, 0), SIDE_UNKNOWN, false, [], false, true)
 
 
 ## 惰性获取击杀触发子模块。
@@ -164,9 +176,14 @@ func connect_death_cleanup() -> void:
 ## [param fallback_kill] 状态未知时的阵亡判据（载荷 is_kill）。[br]
 ## [param binding_ids] 载荷自带的绑定卡列表（空则现查 BindingManager）。[br]
 ## [param reduced] 本次伤害是否被百分比减伤（攻击结算透传；出牌效果缺省 false）。[br]
-## [br][b]返回[/b]: [code]{known, died, side, current_hp, max_hp, character_id}[/code]。
+## [param delta_is_actual] true = 广播「夹取前后的 HP 差」而非传入的 [param damage]
+## （治疗专用——上限夹取发生在 [code]apply_damage[/code] 内，传入值可能是申请量）。
+## 差值恰为 0 时[b]不广播[/b]（满血治疗 / 全额溢出：没有发生任何 HP 变化，无事件可报）；
+## 未知角色（[code]known=false[/code]，未落库）的差值同样为 0——返回值不虚报申请量。[br]
+## [br][b]返回[/b]: [code]{known, died, side, current_hp, max_hp, character_id, damage}[/code]。
 func _apply(character_id: int, damage: int, side_hint: int,
-		fallback_kill: bool, binding_ids: Array, reduced: bool = false) -> Dictionary:
+		fallback_kill: bool, binding_ids: Array, reduced: bool = false,
+		delta_is_actual: bool = false) -> Dictionary:
 	var state: RefCounted = _roster_state()
 	var info: Dictionary = state.call(&"read_hp", character_id)
 	var side: int = _resolve_side(state, character_id, side_hint, info)
@@ -175,15 +192,25 @@ func _apply(character_id: int, damage: int, side_hint: int,
 	var effective_damage: int = damage
 	if effective_damage == 0 and fallback_kill and bool(info.get("known", false)):
 		effective_damage = int(info.get("current_hp", 0))
+	var hp_before: int = int(info.get("current_hp", 0))
 	var outcome: Dictionary = state.call(&"apply_damage", character_id, effective_damage)
-	var died: bool = bool(outcome["died"]) if bool(outcome["known"]) else fallback_kill
-	outcome["damage"] = effective_damage
+	var settled: bool = bool(outcome.get("known", false))
+	var died: bool = bool(outcome.get("died", false)) if settled else fallback_kill
+	# 实际增量 = 夹取前的 HP − 夹取后的 HP（正数 = 掉血，负数 = 回血）。
+	# 治疗走这条口径时，满血 8+3→8 的差值是 0，广播随之消失。
+	var delta: int = effective_damage
+	if delta_is_actual:
+		# 不按 known 分叉：未知角色根本没有落库写入（apply_damage 直接返回），
+		# read_hp 与返回值的 current_hp 都是 0，差值自然为 0——绝不能把
+		# 「一分血都没回」的申请量当成实际回血返回给调用方。
+		delta = hp_before - int(outcome.get("current_hp", 0))
+	outcome["damage"] = delta
 	outcome["side"] = side
 	outcome["character_id"] = character_id
 	# HP 终值广播（UI 血条/伤害飘字的统一入口——出牌效果与攻击结算共用）。
-	# 未知角色不广播、不臆造 HP（信息不足原则）。
-	if bool(outcome.get("known", false)) and effective_damage != 0:
-		_emit_damaged(character_id, side, effective_damage, died, reduced)
+	# 未知角色不广播、不臆造 HP；实际增量为 0 时不广播（零增量无信息量）。
+	if bool(outcome.get("known", false)) and delta != 0:
+		_emit_damaged(character_id, side, delta, died, reduced)
 	if died:
 		_emit_death(character_id, side, binding_ids)
 	return outcome

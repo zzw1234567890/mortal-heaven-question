@@ -12,7 +12,12 @@ extends Control
 ## Tween（完成即停），HUD 隐藏由 [signal post_transition] 驱动。[br]
 ## [br][b]anchor 百分比响应式[/b]（story 禁止像素硬编码布局）：
 ## 区域位置尺寸按 1920×1080 基准的百分比 anchor 设定，任意 16:9 分辨率
-## 等比缩放（control-manifest「分辨率基准 1920×1080」）。
+## 等比缩放（control-manifest「分辨率基准 1920×1080」）。[br]
+## [br][b]门面已超软上限[/b]（465 行 > coding-standards 的 300 行）：本类是
+## 场景挂载侧唯一持有的节点，因此备战 / 结算 / 反馈 / 装配四组接线都堆在这里。
+## [b]新增能力优先落在下级组件[/b]（如 [CombatActorStage]），本层只加薄转发；
+## 拆分（按上述四组各拆一个装配模块、本层只留区域骨架与场景信号）应单独成一个故事，
+## 不应顺手夹带在功能提交里。[br]
 ##
 ## @experimental
 ## 来源: ADR-0031、design/ux/combat-ui.md §Layout Zones/§Transitions、
@@ -26,6 +31,9 @@ const DeployPanelScript := preload("res://src/ui/combat/deploy/deploy_panel.gd")
 const SettlementHostScript := preload("res://src/ui/combat/settlement/settlement_host.gd")
 ## 撤退规则纯函数（story 008——撤退按钮渲染态判定与文案）。
 const RetreatRulesScript := preload("res://src/ui/combat/shared/retreat_rules.gd")
+## 施法者裁定纯函数（DEBT-CBT-018-10 第四阶段——[code]NO_CASTER[/code] 哨兵的
+## 唯一来源，本层不裸写 -1）。
+const CasterRulesScript := preload("res://src/ui/combat/shared/combat_caster_rules.gd")
 ## 反馈编排器（story 003——伤害飘字 / HP 条 / 阵亡淡出的生产装配点）。
 const FeedbackScript := preload("res://src/ui/combat/feedback/combat_feedback_coordinator.gd")
 ## 角色卡装配台（Sprint 18——把敌我名册变成战场上的角色卡）。
@@ -399,6 +407,28 @@ func build_battle_roster(p_player_ids: Array = []) -> void:
 func clear_battle_roster() -> void:
 	if actor_stage != null:
 		actor_stage.call(&"clear_roster")
+
+
+## UI 出牌请求——裁定施法者后转交 [code]CombatSystem.play_card()[/code]。[br]
+## [br]施法者此前无人传入（缺省 -1 → 倍率伤害与治疗在真实对局里从不结算），
+## 现由装配台经出牌桥按我方阵位现读（口径见 [code]combat_caster_rules.gd[/code]，
+## 是 interaction epic 落地前的临时裁定）。[br]
+## [br][b]接线边界[/b]：拖拽/点选/数字键的出牌手势本体归 combat-ui-interaction epic
+## （0/9 未实现）；它们落地时直接调本方法即可，不必自己拼 [code]caster_id[/code]。
+func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
+	if actor_stage == null:
+		push_warning("CombatLayout.play_card: 角色卡装配台未装配——出牌中止")
+		return false
+	return bool(actor_stage.call(&"play_card", p_card_instance_id, p_target_indices))
+
+
+## 当前裁定出的施法者角色 ID（无阵位 / 全阵亡时为 [constant CasterRulesScript.NO_CASTER]）。[br]
+## [br][b]为什么本层不裸写 -1[/b]：[code]-1 = 不猜[/code] 是跨三层的同一约定，
+## 哨兵只在 [code]combat_caster_rules.gd[/code] 定义一处，这里引用它保持可检索。
+func current_caster_id() -> int:
+	if actor_stage == null:
+		return CasterRulesScript.NO_CASTER
+	return int(actor_stage.call(&"current_caster_id"))
 
 
 ## 打开撤退确认弹窗（AC-6/AC-7——撤退按钮点击或战斗系统撤退请求触发）。

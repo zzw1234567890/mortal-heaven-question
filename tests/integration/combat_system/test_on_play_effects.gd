@@ -5,7 +5,8 @@ extends GutTest
 ## 于是「ATK × 倍率」的伤害从未落库、出牌治疗只有击杀触发那条支路会落。[br]
 ## [br][b]本文件锁定四条语义[/b]：[br]
 ##   1. 倍率伤害按「攻击力 × 倍率」结算并[b]向下取整[/b]（ATK 3 × 150% → 4）；[br]
-##   2. 治疗落在施法者身上，且[b]不超过上限[/b]（8/10 + 3 → 10）；[br]
+##   2. 治疗落在施法者身上，且[b]不超过上限[/b]（8/10 + 3 → 10），广播的是
+##      [b]实际回血量[/b]（-2）而非申请量；满血零增量 → 不广播；[br]
 ##   3. [code]target = self[/code] 的效果[b]只作用于施法者[/b]，绝不误伤目标；[br]
 ##   4. 无倍率无治疗的卡[b]行为逐位不变[/b]（不落库、不广播）。[br]
 ## [br]测试策略（同 test_kill_trigger_settlement.gd）：[code]CS_SCRIPT.new()[/code] 独立实例
@@ -163,7 +164,7 @@ func test_multiplier_without_caster_atk_deals_no_damage() -> void:
 # 2. 治疗：落在施法者、不超上限
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 8/10 + 3 → 10（夹到上限），治疗以负增量广播。
+## 8/10 + 3 → 10（夹到上限），治疗以[b]实际回血量[/b]（2）的取负广播。
 func test_self_heal_lands_on_caster_and_caps_at_max() -> void:
 	# Arrange
 	_start_battle(8, 3)
@@ -177,9 +178,43 @@ func test_self_heal_lands_on_caster_and_caps_at_max() -> void:
 	assert_eq(_caster_hp(), 10, "治疗不超上限：8 + 3 → 10")
 	assert_eq(payloads.size(), 1, "治疗广播一次")
 	assert_eq(int(payloads[0]["character_id"]), CHAR_CASTER, "载荷属于施法者")
-	# 载荷带的是申请治疗量的取负（落库侧的既有口径，与击杀回血同一条路径）；
-	# HP 上限夹取由 combat_roster_state.apply_damage 执行，实际 HP 才是权威值。
-	assert_eq(int(payloads[0]["damage"]), -3, "治疗以负增量广播")
+	# 广播的是夹取前后的 HP 差（10 - 8 = 2），不是申请量 3——
+	# 否则表现层会飘出一个并不存在的回血量。
+	assert_eq(int(payloads[0]["damage"]), -2, "部分溢出只广播实际回血 2")
+
+
+## 满血时治疗不改变 HP，且[b]不广播[/b]（零增量无信息量，不飘不存在的回血数字）。
+func test_heal_at_full_hp_changes_nothing() -> void:
+	# Arrange——施法者满血 10/10
+	_start_battle(10, 3)
+	_setup_card([_entry(&"heal", 3, &"self")])
+	var payloads: Array = []
+	cs.connect("character_damaged", func(data: Dictionary) -> void:
+		payloads.append(data.duplicate(true)))
+	# Act
+	cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER)
+	# Assert
+	assert_eq(_caster_hp(), 10, "满血仍为 10（夹取不越界）")
+	assert_eq(payloads.size(), 0, "满血治疗零增量 → 不广播 character_damaged")
+
+
+## 未知角色（不在战斗状态表）→ 未落库、不广播，且返回的 [code]damage[/code] 为 0。[br]
+## [br][b]为什么锁这条[/b]：「按实际增量」的口径必须对未知角色同样成立——否则
+## 调用方会把「一分血都没回」的申请量当成实际回血算进总数（返回值虚高），
+## 而广播侧又因 [code]known=false[/code] 一条都不发，两边对不上。
+func test_heal_on_unknown_character_reports_zero() -> void:
+	# Arrange——开战但治疗对象不在战斗状态表里
+	_start_battle(8, 3)
+	var payloads: Array = []
+	cs.connect("character_damaged", func(data: Dictionary) -> void:
+		payloads.append(data.duplicate(true)))
+	# Act
+	var outcome: Dictionary = cs.call("_get_damage_settlement").call(
+			"apply_heal", 7699, 3)
+	# Assert
+	assert_false(bool(outcome.get("known", true)), "未知角色未落库")
+	assert_eq(int(outcome["damage"]), 0, "实际回血为 0——不虚报申请量 3")
+	assert_eq(payloads.size(), 0, "未落库 → 零广播")
 
 
 ## 未声明 target 的治疗（旧扁平卡只写 [code]effect_type[/code]）→ 落施法者，不漏结算。
@@ -204,17 +239,6 @@ func test_heal_targeting_ally_is_skipped() -> void:
 	# Assert
 	assert_eq(_caster_hp(), 8, "他人目标的治疗当前无模型 → 不落库")
 	assert_eq(_enemy_hp(), 20, "也不会落到敌方身上")
-
-
-## 满血时治疗不改变 HP（上限夹取的边界）。
-func test_heal_at_full_hp_changes_nothing() -> void:
-	# Arrange——施法者满血 10/10
-	_start_battle(10, 3)
-	_setup_card([_entry(&"heal", 3, &"self")])
-	# Act
-	cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER)
-	# Assert
-	assert_eq(_caster_hp(), 10, "满血仍为 10（夹取不越界）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
