@@ -158,6 +158,9 @@ var _roster_state: RefCounted = null
 ## 伤害落库 + 阵亡处理子模块（攻击结算 / 出牌效果结算共用）。
 var _damage_settlement: RefCounted = null
 
+## 攻击队列减伤覆盖子模块（DEBT-CBT-018-8 残留——Attack 阶段写入防御方减伤来源）。
+var _attack_coverage: RefCounted = null
+
 ## 本场战斗的敌方阵容快照（battle_start 时从 AISystem 取；用于胜负判定）。[br]
 ## [br][b]为什么快照而非现读[/b]：现读 AISystem 的阵容会读进上一场战斗的残留
 ## （测试串场即误判胜利）；快照空 = 本场无敌方数据 → 永远不判胜利。
@@ -926,12 +929,18 @@ func set_hand(hand: Array) -> void:
 ## [br]遍历 _attack_queue，对每条攻击记录调用 calculate_damage 计算伤害，[br]
 ## 发射 attack_resolved 信号（Cat 2b 具名字典格式——ADR-0007）。[br]
 ## [br]攻击队列格式：[code]{attacker_id, target_id, attacker_atk, target_def, attacker_realm, defender_realm, target_hp}[/code][br]
+## 可选 [code]damage_reduction_pcts[/code]（防御方百分比减伤来源，见下）。[br]
 ## [br]Sprint 8 Story 005：is_kill 从目标 HP 派生（final_damage >= target_hp）。[br]
 ## [br]Sprint 18 / DEBT-CBT-018-1：结算结果交 [code]combat_damage_settlement.gd[/code]
-## 回写防御方 HP，归零者经 [signal character_died] 驱动阵亡清位。
+## 回写防御方 HP，归零者经 [signal character_died] 驱动阵亡清位。[br]
+## [br]DEBT-CBT-018-8 残留：结算前先由 [code]combat_attack_coverage.gd[/code] 把各条目
+## 防御方（[code]target_id[/code]）的绑定减伤来源写入 [code]damage_reduction_pcts[/code]
+## ——已有显式值的条目不覆盖；取不到来源时不写该键（缺省即无减伤）。
 func _resolve_attack_queue() -> void:
 	# Sprint 18：结算前采样阵位「曾有人」——阵亡清位发生在结算内
 	_update_field_engaged(_read_player_field())
+	# DEBT-CBT-018-8 残留：Attack 阶段把防御方绑定减伤写入队列条目（显式值不覆盖）
+	_get_attack_coverage().call(&"annotate_queue", _attack_queue)
 	# Sprint 18 / DEBT-CBT-018-1：结算后逐条落库 HP（combat_damage_settlement.gd），
 	# 归零者发射 character_died → 战斗侧清位 → Phase 6 END 判负
 	var settled: Array = _get_damage_calculator().resolve_attack_queue()
@@ -1090,6 +1099,13 @@ func _get_damage_settlement() -> RefCounted:
 	if _damage_settlement == null:
 		_damage_settlement = preload("res://src/feature/combat/combat_damage_settlement.gd").new(self)
 	return _damage_settlement
+
+
+## 获取攻击队列减伤覆盖子模块（DEBT-CBT-018-8 残留——绑定卡减伤写入队列条目）。
+func _get_attack_coverage() -> RefCounted:
+	if _attack_coverage == null:
+		_attack_coverage = preload("res://src/feature/combat/combat_attack_coverage.gd").new(self)
+	return _attack_coverage
 
 
 # === 查询 API ===================================================================

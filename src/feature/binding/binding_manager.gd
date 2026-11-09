@@ -110,6 +110,9 @@ var _card_to_character: Dictionary[int, int] = {}
 ## 槽位操作子模块（Sprint 12 Story 2 拆分）。
 var _slot_ops: RefCounted = null
 
+## 百分比减伤汇总子模块（DEBT-CBT-018-8 残留闭环——绑定卡减伤接入攻击队列）。
+var _damage_reduction: RefCounted = null
+
 
 # === 私有方法：索引原子同步 ======================================================
 
@@ -508,6 +511,18 @@ func get_accumulated_bonus(character_id: int, stat_name: String) -> float:
 	return total
 
 
+## 汇总角色全部生效绑定的[b]百分比减伤[/b]（DEBT-CBT-018-8 残留闭环）。[br]
+## [br]来源：绑定卡中 [code]effect_type[/code] 归入减伤类的模板（含本命非线性值），
+## 逐条取「受到伤害降低」的百分比；乘算叠加与 60% 封顶由
+## [method CardEffectEvaluator.combine_damage_reduction] 统一负责——本方法只收集来源。[br]
+## [br]战斗 Attack 阶段用它写入攻击队列条目的 [code]damage_reduction_pcts[/code]。[br]
+## [br][param character_id] 目标角色 ID。[br]
+## [br][b]返回[/b]: [code]Array[float][/code]——各来源百分比（如 [code][10.0, 15.0][/code]）；
+## 无绑定 / 无减伤卡 / 模板取不到时返回空数组（缺省即无减伤，不臆造数值）。
+func get_damage_reduction_pcts(character_id: int) -> Array:
+	return _get_damage_reduction().collect(character_id)
+
+
 ## 同名叠加乘法公式（AC-009）——[code]effective = base × native × stack_multiplier^(stack_count-1)[/code]，
 ## 结果向下取整。[br]
 ## [br][param base_value] 基础数值。[br]
@@ -527,6 +542,13 @@ func _get_slot_ops() -> RefCounted:
 	if _slot_ops == null:
 		_slot_ops = load("res://src/feature/binding/binding_slot_ops.gd").new(self)
 	return _slot_ops
+
+
+## 惰性获取百分比减伤汇总子模块（DEBT-CBT-018-8 残留闭环）。
+func _get_damage_reduction() -> RefCounted:
+	if _damage_reduction == null:
+		_damage_reduction = load("res://src/feature/binding/binding_damage_reduction.gd").new(self)
+	return _damage_reduction
 
 
 ## 构造 BindingRecord——薄委托到 _slot_ops 子模块（Sprint 12 Story 2 拆分）。

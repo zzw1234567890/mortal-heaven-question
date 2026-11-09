@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: DEBT-CBT-018-8 已闭环（效果词表补 5 类 + 14 张模板回填 + 减伤乘算接线）；下一步 combat-ui-interaction 出牌链路
+Task: 减伤链路已接通（绑定 damage_reduce → 攻击队列 damage_reduction_pcts → 乘算封顶）；下一步 combat-ui-interaction 出牌链路
 <!-- /STATUS -->
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
@@ -714,3 +714,17 @@ Task: DEBT-CBT-018-8 已闭环（效果词表补 5 类 + 14 张模板回填 + �
 - 全量：**3548 tests / 3547 passing / 1 pending 存量 / 3 orphans 存量**，exit 0，零回归（3518 → 净增 29）
 - Tech debt：DEBT-CBT-018-8 已闭环；DEBT-CBT-018-10 部分解决（倍率与概率已建模，副效果仍缺）；`basic_attack` 的「普通」类型仍待 ADR
 - Next recommended: combat-ui-interaction 001/003/005 出牌链路（词表已能表达减伤/倍率，可出真实数值）
+
+## Session Extract — 减伤链路真正接通：绑定减伤 → 攻击队列 → 伤害（2026-11-09）
+- 任务：Attack 阶段把在场角色（防御方）的绑定减伤汇总写进攻击队列条目的 `damage_reduction_pcts`（DEBT-CBT-018-8 的残留闭环）
+- 数据流向确认（先读后写）：队列条目由 `combat_damage_calculator.resolve_attack_queue` 消费（读 `entry.damage_reduction_pcts` → `combine_damage_reduction` → DEF 结算后乘算）；生产端此前只有 `set_attack_queue` 测试桩，无绑定来源 → 减伤字段在真实战斗中恒为空
+- 新增 `src/feature/binding/binding_damage_reduction.gd`（104 行）：遍历 `get_binding_ids_by_character` → 逐条 `evaluate_effect`（复用效果词表，不重复解析 `effect_type`）取 `damage_reduction_pct`；跳过 `is_suspended`；`pct > 0` 才入列；模板查不到/ID 空即不贡献（**不臆造 0% 之外的猜测**）；同名叠层按一条计数（GDD §10 未定义减伤类叠层放大，不臆造）
+- `BindingManager.get_damage_reduction_pcts(character_id) -> Array[float]` 为公开入口（薄委托子模块）
+- 新增 `src/feature/combat/combat_attack_coverage.gd`（60 行）：Attack 阶段遍历队列按 `target_id` 写键；**已有该键的条目原样保留**（UI/测试可显式给定一次性格挡）；无来源不写键也不写空占位
+- `CombatSystem._resolve_attack_queue` 在结算前调 `_get_attack_coverage().annotate_queue(_attack_queue)`（新增 `_attack_coverage` 字段 + getter，遵循既有子模块模式）
+- **未另写公式**：乘算叠加与 60% 封顶仍只有 `CardEffectEvaluator.combine_damage_reduction` 一处
+- 测试：新增 `tests/integration/combat_system/test_damage_reduction_wiring.gd`（253 行 / 8 例）——单角色 10% 生效（20→11）/ 本命取 `native_effect_value=15`（20→12，非 ×1.5 口径）/ 两来源 10%+15% 乘算 0.9×0.85=0.765 → 扣 7（20→13，等效 23.5%）/ 三来源 30% 封顶 60% → 扣 4（20→16）/ 两防御方互不合并 / 无来源不写键且伤害不变（20→10）/ 显式值不被覆盖 / 暂挂绑定不计
+- 全量：**3556 tests / 3555 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3548 → 净增 8）
+- Tech debt：DEBT-CBT-018-8 补记「链路闭环（减伤接线）」；`basic_attack` 的「普通」类型仍待 ADR；副效果（DEBT-CBT-018-10）仍只写在 description
+- 已知边界（未建模，非本次范围）：敌方绑定经 `AISystem.register_preconfigured_bindings` 已能落 `BindingManager`，故敌方减伤同样会被汇总；玩家侧「谁在场上」的判定在绑定系统内无角色位查询，按 `character_id` 直接取绑定（与 `combat_damage_settlement` 的 binding 查询同口径）
+- Next recommended: combat-ui-interaction 001/003/005 出牌链路（减伤已能真实影响数值）
