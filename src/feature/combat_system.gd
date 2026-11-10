@@ -495,6 +495,17 @@ func get_battle_enemy_roster() -> Array:
 	return _battle_enemy_roster
 
 
+## 角色是否存活——出牌目标候选池的存活判定入口。[br]
+## [br][b]为什么 UI 要问这里而不是自己比 HP[/b]：存活的真理来源是战斗状态表
+## （[code]is_alive[/code] 在落库时与 HP 一同写入，[code]known=false[/code] 的角色
+## 另有「不据 HP 判死」的既有裁决）。UI 自己拿 [code]current_hp == 0[/code] 去推，
+## 会在「读不到 HP」时把活着的敌人从候选池里抹掉。[br]
+## [br][b]未知角色返回 true[/b]（同 [method CombatRosterState.is_alive] 口径）——
+## 不因缺数据把角色判死。
+func is_character_alive(character_id: int) -> bool:
+	return bool(_get_roster_state().call(&"is_alive", character_id))
+
+
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]
 ## [br]Sprint 8 Story 005 接线——通过 ResourceSystem / CultivationSystem 派生奖励。[br]
 ## [br][b]返回[/b]: rewards Dictionary。
@@ -931,6 +942,18 @@ func get_hand() -> Array:
 ## [br][b]返回[/b]: true 出牌成功，false 被拒绝。
 func play_card(card_instance_id: int, target_indices: Array, caster_id: int = -1) -> bool:
 	return _get_card_resolver().play_card(card_instance_id, target_indices, caster_id)
+
+
+## 同 [method play_card]，但返回带拒绝原因与中文提示文本的结果字典。[br]
+## [br][b]为什么保留 bool 版本[/b]：AI / 既有调用方只关心成败，改签名会波及一片；
+## 两条入口共用同一份结算实现（[code]CombatCardResolver.play_card_detailed[/code]），
+## 不会漂移。UI 出牌链路走本方法，以便费用不足时给出提示而不是静默失败。[br]
+## [br][b]返回[/b]: [code]{ok, reason, message, context}[/code]——
+## [code]reason[/code] 取 [code]CombatPlayResult[/code] 的常量。
+func play_card_detailed(card_instance_id: int, target_indices: Array,
+		caster_id: int = -1) -> Dictionary:
+	return _get_card_resolver().play_card_detailed(
+			card_instance_id, target_indices, caster_id)
 
 
 ## 获取卡牌实例——委托给 _card_resolver 子模块。

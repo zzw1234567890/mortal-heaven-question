@@ -7,6 +7,9 @@
 extends RefCounted
 
 
+## 出牌结果与拒绝原因（combat-ui-interaction 001——费用不足要有可显示的提示文本）。
+const PlayResult := preload("res://src/feature/combat/combat_play_result.gd")
+
 ## 父节点引用——CombatSystem Autoload 实例。
 var _parent: Node = null
 
@@ -37,29 +40,44 @@ func _init(parent: Node = null) -> void:
 ## 击杀回血的落点；缺省 -1 时两者都不结算（不猜「谁出的牌」）。[br]
 ## [br][b]返回[/b]: true 出牌成功，false 被拒绝。
 func play_card(card_instance_id: int, target_indices: Array, caster_id: int = -1) -> bool:
+	return PlayResult.is_ok(play_card_detailed(card_instance_id, target_indices, caster_id))
+
+
+## 与 [method play_card] 同一流程，但返回[b]带拒绝原因的结果字典[/b]。[br]
+## [br][b]为什么需要[/b]：bool 无法区分「费用不足」与「阶段不对」，UI 只能静默失败
+## （combat-ui-interaction 001 要求费用不足必须有提示文本）。本方法是唯一结算实现，
+## [method play_card] 是它的 bool 视图——两条路径不会漂移。[br]
+## [br][b]返回[/b]：[code]{ok, reason, message, context}[/code]；失败时
+## [code]context[/code] 带判定依据（费用不足含 [code]cost[/code] / [code]current[/code]）。
+func play_card_detailed(card_instance_id: int, target_indices: Array,
+		caster_id: int = -1) -> Dictionary:
 	# AC-001：阶段守卫
 	if _parent.get("_phase") != _parent.CombatPhase.PLAY:
 		push_warning("CombatSystem: play_card() called outside PLAY phase (current=%d)" % _parent.get("_phase"))
-		return false
+		return PlayResult.fail(PlayResult.REASON_WRONG_PHASE,
+				{"phase": int(_parent.get("_phase"))})
 
 	# 卡牌获取
 	var card = _get_card_instance(card_instance_id)
 	if card == null:
 		push_warning("CombatSystem: play_card() card_instance_id=%d not found" % card_instance_id)
-		return false
+		return PlayResult.fail(PlayResult.REASON_CARD_NOT_FOUND,
+				{"card_instance_id": card_instance_id})
 
 	var cost: int = int(_get_card_cost(card))
 
 	# AC-002：费用验证——不通过不扣费不结算
 	if not _can_afford(cost):
 		push_warning("CombatSystem: play_card() cost=%d unaffordable" % cost)
-		return false
+		return PlayResult.fail(PlayResult.REASON_COST_NOT_ENOUGH,
+				{"cost": cost, "current": _current_cost()})
 
 	# AC-003：目标验证——不通过不扣费
 	var targets = _resolve_targets(card, target_indices)
 	if not _validate_targets(card, targets):
 		push_warning("CombatSystem: play_card() target validation failed")
-		return false
+		return PlayResult.fail(PlayResult.REASON_BAD_TARGET,
+				{"targets": targets.duplicate()})
 
 	# AC-004：扣费（直接调用——需要保证）
 	_spend(cost)
@@ -88,7 +106,12 @@ func play_card(card_instance_id: int, target_indices: Array, caster_id: int = -1
 	if hand.is_empty() and not _parent.call("_can_afford_any_card"):
 		_parent.call("advance_phase")
 
-	return true
+	return PlayResult.ok({
+		"card_instance_id": card_instance_id,
+		"cost": cost,
+		"targets": targets.duplicate(),
+		"caster_id": caster_id,
+	})
 
 
 ## 获取卡牌实例——优先注入回调，回退到 CardSystem Autoload，再回退内部缓存。
@@ -136,6 +159,17 @@ func _spend(cost: int) -> void:
 	var cs = _parent.call("_get_cost_system")
 	if cs != null and cs.has_method("spend"):
 		cs.spend(cost)
+
+
+## 当前可用费用——只为「费用不足」的提示文本取数（[b]不参与判定[/b]，
+## 判定唯一入口仍是 [method _can_afford]）。[br]
+## [br]CostSystem 不可用时返回 0——桩环境下 [method _can_afford] 恒真，
+## 这条路径不会被走到。
+func _current_cost() -> int:
+	var cs = _parent.call("_get_cost_system")
+	if cs != null and cs.has_method("get_current_cost"):
+		return int(cs.get_current_cost())
+	return 0
 
 
 ## 目标解析——将 target_indices 转换为目标对象列表。[br]

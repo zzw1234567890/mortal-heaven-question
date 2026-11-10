@@ -49,6 +49,15 @@ const GRAYED_MODULATE: Color = Color(0.55, 0.55, 0.55)
 ## 灵能预览 modulate（60% 饱和度近似——偏灰仍保留色相）。
 const PSYCHIC_MODULATE: Color = Color(0.80, 0.78, 0.74)
 
+## === 选中态视觉（combat-ui-interaction 001——选中抬起）=========================
+
+## 选中抬起偏移（px——卡牌上移，与相邻卡区分）。
+const SELECTED_LIFT: float = 24.0
+## 选中描边色（青白高亮，与稀有度边框可区分）。
+const SELECTED_BORDER_COLOR: Color = Color(0.45, 0.92, 0.95)
+## 选中描边加宽（px——原边框 2.0 之上加粗，双通道：位移 + 描边，不靠单一颜色）。
+const SELECTED_BORDER_EXTRA: float = 2.0
+
 ## 稀有度边框色（CardTemplate.Rarity 1=白 2=蓝 3=紫 4=金 5=暗金——集中定义）。
 const RARITY_BORDER_COLORS: Array[Color] = [
 	Color(0.72, 0.72, 0.72),  # 白
@@ -84,6 +93,8 @@ var card_type: int = 0
 var is_affordable: bool = true
 ## 是否灵能预览（阶段 2 外——true 时 60% 饱和 + 🔒）。
 var is_psychic: bool = false
+## 是否被选中（combat-ui-interaction 001——抬起 + 加粗描边）。
+var is_selected: bool = false
 
 
 func _init() -> void:
@@ -115,6 +126,21 @@ func set_psychic(p_psychic: bool) -> void:
 	_apply()
 
 
+## 设置选中态（combat-ui-interaction 001——抬起 + 青白加粗描边）。[br]
+## [br][b]只管视觉[/b]：选中态的真理来源是 [code]HandSelectionModel[/code]；
+## 本方法由 [code]HandArea[/code] 按其状态逐个写入，「哪些卡该亮」不在组件内判定。
+func set_selected(p_selected: bool) -> void:
+	is_selected = p_selected
+	_apply()
+
+
+## 选中抬起偏移量（px——[HandArea] 排位时叠加到弧形终位）。[br]
+## [br][b]为什么偏移量暴露而非组件自己动[/b]：位置所有权在 [code]HandArea[/code]
+## 的弧形排布（重排动画会重写 position），组件自己动会被下一次排位覆盖。
+func get_lift_offset() -> float:
+	return SELECTED_LIFT if is_selected else 0.0
+
+
 ## 获取当前 modulate（测试断言用——三态视觉可区分）。
 func get_current_modulate() -> Color:
 	return modulate
@@ -123,6 +149,18 @@ func get_current_modulate() -> Color:
 ## 锁标记可见性（测试断言用）。
 func is_lock_visible() -> bool:
 	return is_psychic
+
+
+## 边框色（测试断言用——选中时替换为高亮色）。
+func get_border_color() -> Color:
+	if is_selected:
+		return SELECTED_BORDER_COLOR
+	return RARITY_BORDER_COLORS[clampi(rarity, 1, 5) - 1]
+
+
+## 边框线宽（测试断言用——选中时加粗）。
+func get_border_width() -> float:
+	return BORDER_WIDTH + SELECTED_BORDER_EXTRA if is_selected else BORDER_WIDTH
 
 
 ## 费用数字色（测试断言用——费用不足时红）。
@@ -157,8 +195,8 @@ func _draw() -> void:
 	# 顶部浅色头（近似卡面插画位置——stub 阶段占位）
 	draw_rect(Rect2(0.0, 0.0, CARD_WIDTH, 24.0), CARD_HEAD)
 	# 稀有度边框（描边——索引 clamp 防越界）
-	var border_color: Color = RARITY_BORDER_COLORS[clampi(rarity, 1, 5) - 1]
-	draw_rect(card_rect, border_color, false, BORDER_WIDTH)
+	# 选中：替换边框色 + 加粗（不叠加第二圈——两圈描边在 100px 卡上糊成一团）
+	draw_rect(card_rect, get_border_color(), false, get_border_width())
 	var font: Font = ThemeDB.fallback_font
 	var h: int = _screen_height()
 	# 卡名（顶部左）

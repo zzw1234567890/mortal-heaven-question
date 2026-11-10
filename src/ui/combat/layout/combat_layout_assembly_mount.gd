@@ -18,9 +18,14 @@ const StageScript: GDScript = preload("res://src/ui/combat/layout/combat_actor_s
 ## 施法者裁定纯函数——[code]NO_CASTER[/code] 哨兵的唯一来源（本模块不裸写 -1）。
 const CasterRulesScript: GDScript = preload(
 		"res://src/ui/combat/shared/combat_caster_rules.gd")
+## 出牌交互闭环控制器（选中 → 目标 → 确认）。
+const PlayControllerScript: GDScript = preload(
+		"res://src/ui/combat/shared/combat_play_controller.gd")
 
 ## 宿主布局根（装配台挂在这里）。
 var _layout: Control = null
+## 出牌交互闭环控制器（惰性创建——[method play_controller]）。
+var _play_controller: RefCounted = null
 ## 装配台实例（[method build] 创建）。[b]类型为 Variant[/b]：新脚本的全局 class_name
 ## 依赖导入缓存，鸭子类型调用可避免「首次导入前解析失败」的次序问题。
 var stage: Variant = null
@@ -85,3 +90,32 @@ func current_caster_id() -> int:
 	if stage == null:
 		return CasterRulesScript.NO_CASTER
 	return int(stage.call(&"current_caster_id"))
+
+
+## 出牌交互闭环控制器（选中 → 目标 → 确认 → 反馈）。[br]
+## [br][b]惰性创建 + 单例[/b]：UI 的多处手势（拖拽 / 数字键 / 手柄）必须共用同一个
+## 控制器——各建一个会让「选中的是哪张」出现多份真理来源。[br]
+## [br][b]装配台缺失时返回空的控制器（而非 null）[/b]：交互层不必到处判空；空控制器
+## 的 [code]confirm()[/code] 会走「无桥」路径返回拒绝结果，不崩溃。[br]
+## [br][b]桥数据源现读[/b]：每次调 [method _wire_play_controller] 都重取——装配台
+## 重新 [method setup] 后（换战斗系统）控制器不该继续拿着旧桥。
+func play_controller() -> RefCounted:
+	if _play_controller == null:
+		_play_controller = PlayControllerScript.new()
+	if stage != null:
+		_play_controller.call(&"setup", stage.call(&"get_play_bridge"))
+	return _play_controller
+
+
+## 出牌交互闭环的拒绝结果载体（UI 提示文本的唯一来源）。[br]
+## 门面转发用——交互层只需 [code]controller.confirm().message[/code]。
+func confirm_play() -> Dictionary:
+	return play_controller().call(&"confirm")
+
+
+## 选中一张手牌（走闭环控制器的唯一入口——UI 手势调这个）。[br]
+## [b]返回[/b]: 选中后能否确认（非法时不可确认，见 HandSelectionModel）。
+func select_hand_card(p_card_instance_id: int, p_affordable: bool = true,
+		p_psychic: bool = false) -> bool:
+	return bool(play_controller().call(&"select_card", p_card_instance_id,
+			p_affordable, p_psychic))

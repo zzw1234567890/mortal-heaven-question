@@ -10,19 +10,23 @@ extends Control
 ##   - [method on_card_drawn] 抽牌入场动画（0.3s/张，飞入弧形位）[br]
 ##   - [method on_card_overflow] 满 10 抽牌溢出（提示 2s 淡出）[br]
 ##   - [method on_hand_changed] 手牌变更快照 + 重排动画（0.2s ease-out）[br]
-## [br][b]快照契约[/b]：卡面快照（name/cost/rarity/type）经 [method apply_hand]
-## 重建——生产由 [signal hand_changed] 载荷驱动（[method on_hand_changed] 消费）；
-## 可负担性经 [method apply_affordability] 批量刷新（费用系统驱动）。
+##   - [method apply_selection] 选中态落定（抬起 + 加粗描边）[br]
+## [br][b]快照契约[/b]：卡面快照经 [method apply_hand] 重建——生产由
+## [signal hand_changed] 载荷驱动；可负担性经 [method apply_affordability] 批量刷新
+## （费用系统驱动）；选中态经 [method apply_selection]（交互层驱动）。
 ## [method on_card_drawn] 只做末卡入场动画，不新增快照（新增由 hand_changed 负责）。
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：不访问卡牌系统，数据均为渲染快照。
+## [br][b]零状态所有权[/b]（ADR-0031 §2）：不访问卡牌系统，数据均为渲染快照；
+## [member _selected_id] 是渲染快照，选中态真理来源是 [HandSelectionModel]。
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——纯信号驱动。
 ##
 ## @experimental
 ## 来源: ADR-0031、ADR-0008、design/gdd/combat-ui-system.md §2 手牌区/§边界情况、
-## combat-ui-layout Story 006。
+## combat-ui-layout Story 006、combat-ui-interaction Story 001。
 
 ## 共享纯函数（弧形几何 Logic 内核——禁止内联）。
 const Rules := preload("res://src/ui/combat/shared/hand_arc_rules.gd")
+## 选中态模型（只为取 [code]NO_CARD[/code] 哨兵——本区不持有模型实例）。
+const SelectionModel := preload("res://src/ui/combat/shared/hand_selection_model.gd")
 
 ## === 动画常量（UX Transitions——瞬态视觉 §2.1 豁免）===========================
 
@@ -68,6 +72,9 @@ var enemy_hand_back: EnemyHandBack = null
 var _cards: Array[Dictionary] = []
 ## 当前阶段（-1 = 未初始化）。
 var _phase: int = -1
+## 当前选中的卡实例 ID（[constant SelectionModel.NO_CARD] = 无选中）。
+## 本区只存这一个渲染快照字段——选中态的真理来源是 [HandSelectionModel]。
+var _selected_id: int = SelectionModel.NO_CARD
 ## 减少动态（动画跳过直跳终态）。
 var _reduce_motion: bool = false
 ## 重排 Tween 句柄（重入 kill）。
@@ -175,6 +182,39 @@ func apply_hand_count(count: int) -> void:
 	enemy_hand_back.set_card_back_count(count)
 
 
+## 应用选中态（combat-ui-interaction 001——选中卡抬起 + 加粗描边）。[br]
+## [br][param p_selected_id] 选中的卡实例 ID（无选中传 NO_CARD）；快照需带
+## [code]card_instance_id[/code] 才能匹配（缺失者按未选中渲染）。[br]
+## [b]只重排、不重建[/b]：选中不该让卡牌重新入场（重建会重置 position 动画）。
+func apply_selection(p_selected_id: int = SelectionModel.NO_CARD) -> void:
+	_selected_id = p_selected_id
+	if _cards.is_empty():
+		return
+	_apply_selection_to_cards()
+	_relayout()
+
+
+## 把 [_selected_id] 落到各卡节点（不触发重排——重建路径内部用）。
+func _apply_selection_to_cards() -> void:
+	for card_data: Dictionary in _cards:
+		var node: HandCard = card_data.get("node", null)
+		if not is_instance_valid(node):
+			continue
+		node.set_selected(_selected_id >= 0
+				and int(card_data.get("card_instance_id", -1)) == _selected_id)
+
+
+## 手牌里现存的卡实例 ID 列表（[code]HandSelectionModel.sync_hand[/code] 的入参）；
+## 缺 [code]card_instance_id[/code] 的条目跳过——无 ID 无从与选中比对。
+func get_card_instance_ids() -> Array:
+	var ids: Array = []
+	for card_data: Dictionary in _cards:
+		var card_id: int = int(card_data.get("card_instance_id", -1))
+		if card_id >= 0:
+			ids.append(card_id)
+	return ids
+
+
 ## 获取手牌卡数量（测试断言用）。
 func get_card_count() -> int:
 	return _cards.size()
@@ -264,6 +304,13 @@ func _to_top_left(pos: Dictionary, node: Control) -> Vector2:
 	return Vector2(pos["x"] - node.size.x * 0.5, pos["y"])
 
 
+## 叠加选中抬起偏移（选中卡上移；偏移量由组件声明，位置所有权仍在本区）。[br]
+## [br][b]为什么叠加而非覆盖[/b]：弧形终位是「未选中的基准位」，抬起是相对它的
+## 增量——取消选中时自然回到基准位，不需要另存一份原始坐标。
+func _lifted(base_pos: Vector2, node: HandCard) -> Vector2:
+	return base_pos - Vector2(0.0, node.get_lift_offset())
+
+
 ## 重建卡片节点（与 _cards 快照同步——复用既有节点避免闪烁）。
 func _rebuild_cards() -> void:
 	while card_parent.get_child_count() > _cards.size():
@@ -282,6 +329,9 @@ func _rebuild_cards() -> void:
 				int(data.get("rarity", 1)), int(data.get("type", 0)))
 		node.set_affordable(bool(data.get("affordable", true)))
 		node.set_psychic(_phase != PLAY_PHASE)
+	# 选中态在重建后重放——否则任何一次 hand_changed 都会让「选中的卡」视觉丢失，
+	# 而模型侧仍以为它选着（幽灵选中）。
+	_apply_selection_to_cards()
 
 
 ## 弧形重排（0.2s ease-out 动画；reduce_motion 直跳终态）。
@@ -310,7 +360,8 @@ func _relayout() -> void:
 		node.rotation = target["rotation"]
 		node.z_index = Rules.hand_card_z_index(i, _cards.size())
 		_rearrange_tween.tween_property(node, "position",
-				_to_top_left(target, node), REARRANGE_ANIM_SEC).set_ease(Tween.EASE_OUT)
+				_lifted(_to_top_left(target, node), node),
+				REARRANGE_ANIM_SEC).set_ease(Tween.EASE_OUT)
 
 
 ## 弧形终位直设（reduce_motion 路径 + 测试断言基准）。
@@ -321,7 +372,7 @@ func _apply_positions() -> void:
 			continue
 		var pos: Dictionary = Rules.hand_card_position(i, _cards.size(),
 				size.x, size.y)
-		node.position = _to_top_left(pos, node)
+		node.position = _lifted(_to_top_left(pos, node), node)
 		node.rotation = pos["rotation"]
 		node.z_index = Rules.hand_card_z_index(i, _cards.size())
 

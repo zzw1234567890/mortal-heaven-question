@@ -78,9 +78,33 @@ func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
 	return bool(_play_bridge.call(&"play_card", p_card_instance_id, p_target_indices))
 
 
+## 同上，但带上拒绝原因与提示文本（交互层显示提示用）。[br]
+## [br]目标为空 → 走默认策略（首个存活敌人）；详见
+## [code]CombatPlayBridge.play_card_detailed[/code]。
+func play_card_detailed(p_card_instance_id: int,
+		p_target_indices: Array) -> Dictionary:
+	return _play_bridge.call(&"play_card_detailed", p_card_instance_id,
+			p_target_indices)
+
+
+## 解析目标列表而不出牌——UI 在「选中态 → 确认」之间可先问一次合法性。
+func resolve_targets(p_explicit: Array) -> Dictionary:
+	return _play_bridge.call(&"resolve_targets", p_explicit)
+
+
+## 敌方候选池（顺序即 UI 建卡顺序——默认目标与高亮都用它）。
+func enemy_candidates() -> Array:
+	return _play_bridge.call(&"enemy_candidates")
+
+
 ## 当前裁定出的施法者 ID（测试与后续交互层查询用；判不出为 -1）。
 func current_caster_id() -> int:
 	return int(_play_bridge.call(&"current_caster_id"))
+
+
+## 出牌桥实例（出牌交互控制器要注入它——本台是桥的唯一持有者）。
+func get_play_bridge() -> RefCounted:
+	return _play_bridge
 
 
 ## 指定卡的落地容器（我方区 / 敌方区）。

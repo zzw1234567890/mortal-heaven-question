@@ -238,6 +238,32 @@ func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
 	return bool(_assembly.call(&"play_card", p_card_instance_id, p_target_indices))
 
 
+## 同上，但返回带拒绝原因的字典（交互层据此显示「灵力不足」等提示）。[br]
+## [br][param p_target_indices] 为空 → 默认打首个存活敌人（interaction 001 的
+## 默认策略）；显式给出则以其为准（只保留存活者）。[br]
+## [b]返回[/b]: [code]{ok, reason, message, context}[/code]。
+func play_card_detailed(p_card_instance_id: int,
+		p_target_indices: Array) -> Dictionary:
+	if _assembly == null:
+		return {"ok": false, "reason": &"no_combat", "message": "战斗系统未就绪",
+			"context": {}}
+	return _assembly.call(&"play_card_detailed", p_card_instance_id, p_target_indices)
+
+
+## 解析目标列表（不出牌）——UI 高亮 / 选中态合法性查询用。
+func resolve_targets(p_explicit: Array) -> Dictionary:
+	if _assembly == null:
+		return {"targets": [], "source": 0, "reason": &"unresolved"}
+	return _assembly.call(&"resolve_targets", p_explicit)
+
+
+## 敌方候选池（顺序即建卡顺序——默认目标与目标高亮共用同一份顺序）。
+func enemy_candidates() -> Array:
+	if _assembly == null:
+		return []
+	return _assembly.call(&"enemy_candidates")
+
+
 ## 当前裁定出的施法者角色 ID（无阵位 / 全阵亡时为 -1）。
 func current_caster_id() -> int:
 	return int(_assembly.call(&"current_caster_id"))
