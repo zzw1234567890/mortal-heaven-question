@@ -3,8 +3,20 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 探索节点遭遇数据补齐完成（encounter/enemy_level/rewards 三字段 + popup 同源 + 两个超限文件拆分）；下一步 005 目标选择可视化 / 004 键盘手柄路径 / 003 拖拽视觉跟手
+Task: 节点图接真实数据完成（map_generated 信号 + 四类敌人模板 + 地图 ID 统一）；下一步 探索导航闭环（`get_map_list` 真实载荷、重入编排）或回 combat-ui-interaction 005 目标选择可视化
 <!-- /STATUS -->
+
+## Session Extract — 节点图读真实数据 + 敌人池四类模板（2026-11-10，commit 870b999）
+- 任务：`ExplorationSystem` 补 `map_generated` 信号、`NodeGraphScreen` 消费真实数据（stub 保留为降级）、敌人池补到 4 模板、地图 ID 命名统一 + 防回归断言、补集成测试、全量 GUT、提交
+- **`ExplorationSystem`**：新增 `map_generated(map_id: StringName, map_data: Dictionary)`（Cat 2b，经 `_emit_safe` 路由）；`enter_map` 末尾广播，载荷含 `graph/nodes/visited/current_node/ap_remaining` **取 GSM 写入后的实际值**（不是推测）；`generate_map` 是纯生成，**不**发信号（单测直调不惊动 UI）。新增常量 `ENTRY_NODE_ID`
+- **`enter_map` 语义补齐**：入口记为已访问 + **重置上一张图的 visited**（新增 `GameStateManager.reset_exploration_visited(Array)` → `GSMExplorationWrites` → `GSMAtomicWrites` 三层转发）。`set_exploration_map` 只重置位置不重置已访问——不重置会把上一张图路径画成新图绿色
+- **`NodeGraphScreen`（303 行）**：`trigger_map_load(map_id)` 真实源调 `enter_map(map_id, 玩家境界, RealmSystem.action_points)` 命令；无系统/无信号 → 降级 stub；`is_using_stub_source()` 暴露数据源。拆出三个子模块：`node_graph_load_source.gd`（数据源选择 + 加载编排 + 境界/AP 读取）、`node_graph_interaction_mount.gd`（移动/教程/弹窗挂载与转发）、`node_graph_reveal_animator.gd`（六态重算 + 逐层展开 Tween）
+- **`ExplorationScene`**：`_on_enter_map_requested(map_id)` 不再丢弃地图 ID，节点图进玩家点的那张（此前固定青云剑宗）
+- **敌人池 4 模板**：新增 `assets/enemies/yao_shou.tres`（妖兽，HP22/ATK5/DEF1）+ `gui_xiu.tres`（鬼修，境界2，HP38/ATK11/DEF2）及两份最小掉落；`exploration_map_catalog.gd` 改为**每图自有池配比**（青云/慕兰=散修+妖兽；血渊=魔修主；古战场/西域/归墟=鬼修主）
+- **地图 ID 统一**：章节表 + ADR-0026 改为地图选择写法（`cang_xuan_zheng_dao_meng` 等）；新增 `MAP_ID_ALIASES` + `canonical_id()`（`config_for`/`enemy_realm_of`/`has_map` 入口规范化）+ `is_legacy_id()` / `unknown_map_ids()`
+- 测试：新增 `test_map_generated_signal.gd`（9）、`test_node_graph_real_data.gd`（12，真实 enter_map → 渲染节点数/ID 集合/邻接表与系统一致 + 换图生效 + 降级路径）、`test_exploration_scene_map_id.gd`（3）；`test_map_catalog_and_pool.gd` +6（4 模板、池差异、池来源、别名解析、章节表防回归 ×2）；改 `test_node_graph_render.gd` 的 B-1 用例（真实 Autoload 现有信号，降级须显式注入无信号桩）
+- 全量：**4028 tests / 4027 passing / 1 pending 存量 / 3 orphans 存量**（3999 → 净增 29），零回归
+- **已知边界**：① 进入地图只重置 visited 与 AP，`map_states[map_id]` 的 `collected_*` 与 `entry_count` 仍按地图累计（重入不清零，符合 ADR-0014 §决策 1）；② 妖兽/鬼修只有基础攻击技能，行为差异仅体现在数值与行为配置（技能池扩充归 AI epic）；③ 章节表仍有 `wan_gu_dian` / `dajin_gulin` 等**尚未在地图选择界面出现**的新图（未登记 → 难度兜底，不是命名冲突）；④ `NodeGraphScreen.trigger_map_load` 默认参数仍为青云剑宗（编辑器预览用），生产路径由 `ExplorationScene` 传真实 ID；⑤ `map_generated` 走 `_emit_safe`，GSM 缺失时 push_warning 后直接发射（headless 单测路径）
 
 ## Session Extract — 探索敌人池生产接线 + 地图境界定档（2026-11-10）
 - 任务：真实 `enter_map` 接上敌人池（不再空名册）、地图配置补 `enemy_realm`（关闭 DEBT-EUI-006-3）、拆 `exploration_dag_builder.gd`（388）与 `node_interaction_rules.gd`（327）、补测试、全量 GUT、提交
