@@ -14,6 +14,9 @@ const TribulationScenePath: String = "res://src/feature/tribulation/tribulation_
 
 ## 桩战斗系统——记录 battle_start 载荷与 confirm_retreat 调用次数。
 class CombatStub extends Node:
+	## 结算接线订阅的 Cat 2b 信号（载荷同生产：result + rewards）。
+	signal battle_ended(result: int, rewards: Dictionary)
+
 	var last_config: Dictionary = {}
 	var retreat_calls: int = 0
 	var active: bool = false
@@ -264,6 +267,45 @@ func test_tribulation_scene_marks_is_tribulation() -> void:
 	var host: Variant = (trib.get("combat_root") as Control).get("settlement_host")
 	assert_true(bool(host.get("is_tribulation")),
 			"结算宿主应继承渡劫标识（撤退 80% 变体）")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 结算回流接线（Sprint 18）——battle_ended → CombatResultView
+# ═══════════════════════════════════════════════════════════════════════════════
+
+const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
+
+## 战斗结束 → 结算对象发布（结算/战败场景据此取数）。
+func test_battle_ended_publishes_result_view() -> void:
+	# Arrange
+	assert_not_null(scene.get("result_bridge"), "战斗场景应装配结算接线")
+	ViewScript.clear()
+	# Act
+	combat.battle_ended.emit(1, {"result": 1, "record": {
+		"outcome": "victory", "turn_count": 2, "effect_entries": 4,
+		"player": {"count": 1, "alive_count": 1, "remaining_hp": 6},
+		"enemy": {"count": 1, "alive_count": 0, "remaining_hp": 0},
+	}})
+	# Assert
+	var view: RefCounted = ViewScript.last()
+	assert_not_null(view, "battle_ended 应发布结算对象")
+	assert_eq(int(view.call(&"player_remaining_hp")), 6, "我方剩余 HP 应可读")
+	ViewScript.clear()
+
+
+## 接线挂在注入的战斗系统上（而非另找 Autoload）——注入优先的容器口径。
+## [br][b]退订语义[/b]由 [code]test_combat_result_bridge.gd::test_unbind_stops_publishing[/code]
+## 覆盖：容器 [code]_exit_tree[/code] 只是调用同一入口，在场景内出树会牵动
+## [code]SettlementHost[/code] 的销毁路径（既有缺陷，另案登记）。
+func test_result_bridge_bound_to_injected_combat_system() -> void:
+	# Arrange
+	var bridge: RefCounted = scene.get("result_bridge")
+	assert_not_null(bridge, "战斗场景应装配结算接线")
+	# Act——桩战斗系统发信号
+	combat.battle_ended.emit(1, {"result": 1})
+	# Assert——发布方就是本容器持有的接线
+	assert_eq(ViewScript.last(), bridge.get("published"), "发布应经本容器的接线实例")
+	ViewScript.clear()
 
 
 func test_tribulation_deploy_confirms_falls_back_to_plain_battle() -> void:

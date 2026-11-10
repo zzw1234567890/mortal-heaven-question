@@ -85,6 +85,12 @@ signal character_died(character_id: int, side: int, binding_card_ids: Array)
 signal retreat_requested()
 
 
+# === 子模块类型常量（Sprint 18 结算回流）=========================================
+
+## HP 跨战斗持久化子模块——[constant WRITE_UNAVAILABLE] 与回写口径的单一来源。
+const HpCarryoverScript := preload("res://src/feature/combat/combat_hp_carryover.gd")
+
+
 # === 内部状态 ====================================================================
 
 ## 当前阶段——状态机唯一真源。
@@ -164,6 +170,12 @@ var _roster_state: RefCounted = null
 
 ## 伤害落库 + 阵亡处理子模块（攻击结算 / 出牌效果结算共用）。
 var _damage_settlement: RefCounted = null
+
+## 本场战绩累积器（Sprint 18 结算回流——效果条目计数，结束定格）。
+var _battle_record: RefCounted = null
+
+## HP 跨战斗持久化子模块（Sprint 18 结算回流 / DEBT-CBT-018-3）。
+var _hp_carryover: RefCounted = null
 
 ## 攻击队列减伤覆盖子模块（DEBT-CBT-018-8 残留——Attack 阶段写入防御方减伤来源）。
 var _attack_coverage: RefCounted = null
@@ -285,6 +297,9 @@ func battle_start(config: Dictionary) -> void:
 	# Sprint 18：记录本场名册快照（END 阶段胜负判定的输入之一）
 	_capture_battle_rosters(config)
 
+	# Sprint 18（结算回流）：本场战绩计数归零
+	_get_battle_record().call(&"reset")
+
 	# Sprint 18 / DEBT-CBT-018-1：种子敌我 HP 状态 + 订阅自身 character_died（阵亡清位）
 	_seed_roster_state(config)
 	_connect_death_cleanup()
@@ -313,7 +328,11 @@ func battle_start(config: Dictionary) -> void:
 ##   3. GSM._set_battle_active(false) 清理 battle 域[br]
 ##   4. _emit_safe("battle_ended", [result, rewards]) 发射 Cat 2b 信号[br]
 ##   5. GSM._set_battle_active(false) 清理 battle 域[br]
-##   6. SceneManager.request_scene_change 切换场景
+##   6. SceneManager.request_scene_change 切换场景[br]
+## [br][b]Sprint 18 结算回流[/b]：结束瞬间定格本场战绩（胜负 / 回合数 / 双方剩余 HP /
+## 触发条目数）并入 [code]rewards["record"][/code]，同时把我方残血回写
+## [code]player.character_hp[/code]（[code]combat_hp_carryover.gd[/code]）。[br]
+## 两者都必须在 [code]_get_roster_state().clear()[/code] [b]之前[/b]取数。
 func battle_end(result: int) -> void:
 	# AC-011：入口防御清理
 	_attack_queue.clear()
@@ -324,11 +343,17 @@ func battle_end(result: int) -> void:
 	# Sprint 18：费用系统清理（未开始/已清理时自身为幂等 no-op）
 	_clear_cost_for_battle()
 
+	# Sprint 18（结算回流）：先定格本场战绩 + 回写我方残血，再清空 HP 状态表——
+	# 两者都以状态表为唯一取数来源，清表后读到的只会是空数组。
+	var record: Dictionary = _build_battle_record(result)
+
 	# Sprint 18 / DEBT-CBT-018-1：本场 HP 状态表退场（下一场重新种子）
 	_get_roster_state().call(&"clear")
 
 	# 结算奖励/损失
 	var rewards: Dictionary = _settle_result(result)
+	# 战绩随载荷下发（键为新增，旧消费者忽略即可）——battle_ended 的展示端据此渲染
+	rewards["record"] = record
 
 	# AC-014：VICTORY 清理快照
 	if result == CombatResult.VICTORY:
@@ -411,13 +436,41 @@ func _finish_pending_battle_end() -> void:
 
 # === HP 落库 + 阵亡清位（Sprint 18 / DEBT-CBT-018-1）===============================
 
+## 定格本场战绩 + 回写我方残血（Sprint 18 结算回流——必须在清表前调用）。[br]
+## [br]取数：HP 状态表全量快照（[method CombatRosterState.snapshot_all]）——
+##   1. 交战绩累积器定格 [code]{result, outcome, turn_count, effect_entries, player, enemy}[/code]；[br]
+##   2. 交 [code]combat_hp_carryover.gd[/code] 把 [code]side == 我方 且 known[/code]
+##      的条目写进 [code]player.character_hp[/code]。[br]
+## [br][b]回写失败要可见[/b]：持久化没写成意味着「带伤进下一场」断链——
+## [code]push_error[/code]（不是 warning：这是功能失效，而 warning 在 Godot 里不打断
+## 测试与 CI）。战斗结算本身照常进行，调用方不需要处理返回值。
+## [br][b]返回值[/b]：只给 [method CombatSystem.battle_end] 收进 [code]rewards["record"]`[/code]，
+## 不参与任何分支（回写成败都不改变本场结局）。
+func _build_battle_record(result: int) -> Dictionary:
+	var entries: Array = _get_roster_state().call(&"snapshot_all")
+	var written: int = int(_get_hp_carryover().call(&"write_back", entries))
+	if written == HpCarryoverScript.WRITE_UNAVAILABLE:
+		push_error("CombatSystem: 我方 HP 回写失败（无 GSM 入口）——"
+				+ "本场残血未持久化，下一场将按模板满血开局")
+	return _get_battle_record().call(&"build", result, _turn, entries)
+
+
+## 结算回流计数——子模块（[code]combat_on_play_effects.gd[/code] /
+## [code]combat_kill_trigger.gd[/code]）每结算一条效果条目调用一次。
+func _note_effect_entry() -> void:
+	_get_battle_record().call(&"note_effect_entry", 1)
+
 ## 种子敌我 HP 状态表——我方阵位（模板 base_hp 回退）+ 敌方阵容快照。[br]
 ## [br][param config] 可带 [code]player_stats: {character_id: {current_hp, max_hp}}[/code]
-## 覆盖模板值（interaction epic 的 battle_start 扩展契约；缺省走模板）。
+## 覆盖模板值（interaction epic 的 battle_start 扩展契约；缺省走模板）。[br]
+## [br][b]Sprint 18 结算回流[/b]：显式 [code]player_stats[/code] 缺省时，由
+## [code]combat_hp_carryover.gd[/code] 补上上一场的残血（[code]player.character_hp[/code]）——
+## 「带伤进入下一场」据此成立；持久层没有该角色时仍回退模板 [code]base_hp[/code]（满血）。
 func _seed_roster_state(config: Dictionary) -> void:
 	var stats: Variant = config.get("player_stats", {})
+	var explicit: Dictionary = stats if stats is Dictionary else {}
 	_get_roster_state().call(&"seed", _read_player_field(),
-			stats if stats is Dictionary else {},
+			_get_hp_carryover().call(&"seed_stats", _read_player_field(), explicit),
 			_battle_enemy_roster, _get_card_system())
 
 
@@ -1104,6 +1157,20 @@ func _get_roster_state() -> RefCounted:
 	if _roster_state == null:
 		_roster_state = preload("res://src/feature/combat/combat_roster_state.gd").new()
 	return _roster_state
+
+
+## 获取本场战绩累积器（Sprint 18 结算回流——效果条目计数 + 结束定格）。
+func _get_battle_record() -> RefCounted:
+	if _battle_record == null:
+		_battle_record = preload("res://src/feature/combat/combat_battle_record.gd").new()
+	return _battle_record
+
+
+## 获取 HP 跨战斗持久化子模块（Sprint 18 结算回流 / DEBT-CBT-018-3）。
+func _get_hp_carryover() -> RefCounted:
+	if _hp_carryover == null:
+		_hp_carryover = HpCarryoverScript.new(self)
+	return _hp_carryover
 
 
 ## 获取伤害落库 + 阵亡处理子模块（Sprint 18 / DEBT-CBT-018-1）。

@@ -54,6 +54,9 @@ func trigger(item: Dictionary, _victim_id: int) -> Dictionary:
 	var healing: int = int(evaluation.get("healing"))
 	if healing <= 0:
 		return {}
+	# 结算回流计数：本次击杀确实结算了至少一条 kill 条目
+	if _parent.has_method(&"_note_effect_entry"):
+		_parent.call(&"_note_effect_entry")
 	return _settlement().call(&"apply_heal", caster_id, healing)
 
 

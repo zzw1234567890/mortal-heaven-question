@@ -1,0 +1,157 @@
+class_name CombatResultView
+extends RefCounted
+## CombatResultView —— 结算结果对象（Sprint 18 结算回流——[b]可读视图[/b]）。[br]
+## [br][b]职责[/b]：把 [signal CombatSystem.battle_ended] 的载荷
+## （[code]rewards[/code]，含 [code]record[/code]）折成一个只读对象，
+## 供结算/战败占位场景与后续正式界面消费。[br]
+## [br][b]为什么是独立类而非裸 Dictionary[/b]：展示端要「读」而不是「猜」——
+## 胜负中英对照、剩余 HP、条目数都用具名属性暴露，缺字段时给出明确默认值，
+## 不把 [code]payload.get("record", {}).get("player", {})...[/code] 散落到各场景。[br]
+## [br][b]零状态所有权[/b]（ADR-0031 §2）：本类只持一份[b]载荷拷贝[/b]（打完即固定），
+## 不读 GSM / 战斗系统，也不回写任何东西——UI 侧拿到的是一份「历史记录」。[br]
+## [br][b]信息不足时的默认值[/b]（上游没给 [code]record[/code] 的旧载荷、或字段缺失）：[br]
+##   · [code]result[/code] 缺失 → [constant RESULT_NONE]；[br]
+##   · HP / 条目数缺失 → 0；[br]
+##   · [code]outcome[/code] 缺失 → 由 [code]result[/code] 推导。[br]
+##   —— 展示端据此渲染「无战绩数据」，不臆造数字。[br]
+## [br]来源: production/session-state/active.md（Sprint 18 结算回流）、ADR-0031 §2、
+## ADR-0008 §信号分类。
+
+## 结局枚举——镜像 [code]CombatSystem.CombatResult[/code]（0 无 / 1 胜 / 2 败 / 3 撤退）。
+const RESULT_NONE: int = 0
+const RESULT_VICTORY: int = 1
+const RESULT_DEFEAT: int = 2
+const RESULT_RETREAT: int = 3
+
+## 结局 token → 中文标题（占位场景与后续界面共用；本地化 epic 后改为 key）。
+const OUTCOME_TITLES: Dictionary = {
+	"victory": "战斗胜利",
+	"defeat": "战斗失败",
+	"retreat": "撤退",
+	"none": "战斗结束",
+}
+
+## [code]result[/code] → 结局 token（record 缺 [code]outcome[/code] 时回退推导）。
+const OUTCOME_BY_RESULT: Dictionary = {
+	RESULT_NONE: "none",
+	RESULT_VICTORY: "victory",
+	RESULT_DEFEAT: "defeat",
+	RESULT_RETREAT: "retreat",
+}
+
+## 战斗结果（[constant RESULT_NONE] / [constant RESULT_VICTORY] / …）。
+var result: int = RESULT_NONE
+## 结局 token（[code]victory[/code] / [code]defeat[/code] / [code]retreat[/code] / [code]none[/code]）。
+var outcome: String = "none"
+## 结束时的回合数。
+var turn_count: int = 0
+## 本场结算的效果条目数（打出即生效 + 击杀触发）。
+var effect_entries: int = 0
+## 我方战绩 [code]{count, alive_count, remaining_hp, unknown_count, roster}[/code]。
+var player: Dictionary = {}
+## 敌方战绩（同上结构）。
+var enemy: Dictionary = {}
+## 胜利时为 [code]{lingshi, cultivation, cards}[/code]；战败/撤退为 [code]{retain_ratio}[/code]。
+var rewards: Dictionary = {}
+## 上游是否提供了 [code]record[/code]（false = 旧载荷，展示端应标注「无战绩数据」）。
+var has_record: bool = false
+
+## 最近一场的结算对象——跨场景传递（战斗场景销毁后结算场景仍要读得到）。[br]
+## [br][b]为什么用 static var[/b]：结算场景是独立 .tscn，实例化时战斗场景已释放；
+## 项目内跨场景轻量缓存的既有口径即 static var（同 [code]combat_icon_atlas.gd[/code]）。
+## 写入口只有 [method publish]（战斗场景挂载侧），读出口 [method last]。
+static var _last: CombatResultView = null
+
+
+## 发布本场结算对象（CombatScene 在 [signal CombatSystem.battle_ended] 时调用）。
+static func publish(view: CombatResultView) -> void:
+	_last = view
+
+
+## 最近一场的结算对象——从未打过战斗时返回 null（展示端走「无战绩数据」分支）。[br]
+## [br][b]只读快照[/b]：返回的是发布时的那一份（发布后不再变动），调用方不必再拷贝。
+static func last() -> CombatResultView:
+	return _last
+
+
+## 清空缓存——测试隔离用（生产路径不需调用：每场战斗都会重新 publish）。
+static func clear() -> void:
+	_last = null
+
+
+## 从 [signal CombatSystem.battle_ended] 载荷构造结算对象。[br]
+## [br][param p_result] 结局枚举。[br]
+## [param p_rewards] 信号载荷（含 [code]record[/code] / 奖励字段）。[br]
+## [br][b]不抛错、不告警[/b]：载荷不完整是上游状态（如旧调用方只传 result），
+## 缺的字段一律取默认值——把「读不到」变成崩溃不是展示端该做的事。
+static func from_battle_ended(p_result: int, p_rewards: Dictionary = {}) -> CombatResultView:
+	var view := CombatResultView.new()
+	view.result = p_result
+	view.rewards = (p_rewards as Dictionary).duplicate(true)
+	var record: Variant = (p_rewards as Dictionary).get("record", null)
+	if record is Dictionary and not (record as Dictionary).is_empty():
+		view._apply_record(record as Dictionary)
+		view.has_record = true
+	# 结局 token 的最终裁决：[b]没有 record 时一律由 result 推导[/b]。
+	# 不能只看「token 是否在表里」——[constant OUTCOME_TITLES] 含 "none"，
+	# 于是「无 record 的战败载荷」会停在默认的 none 上，被渲染成「战斗结束」
+	# 而不是「战斗失败」（结果与 result 自相矛盾）。
+	if not view.has_record or not OUTCOME_TITLES.has(view.outcome):
+		view.outcome = String(OUTCOME_BY_RESULT.get(p_result, "none"))
+	return view
+
+
+## 应用战绩字典（[code]CombatBattleRecord.build[/code] 的产出）。[br]
+## [br][b]结局 token 只在记录里有明确取值时采用[/b]：记录缺 [code]outcome[/code]
+## 时留空，交给 [method from_battle_ended] 按 [member result] 推导。
+func _apply_record(record: Dictionary) -> void:
+	outcome = String(record.get("outcome", "")) if record.has("outcome") else ""
+	turn_count = maxi(int(record.get("turn_count", 0)), 0)
+	effect_entries = maxi(int(record.get("effect_entries", 0)), 0)
+	var p: Variant = record.get("player", {})
+	player = (p as Dictionary).duplicate(true) if p is Dictionary else {}
+	var e: Variant = record.get("enemy", {})
+	enemy = (e as Dictionary).duplicate(true) if e is Dictionary else {}
+
+
+## 结局中文标题（占位场景标题行用）。
+func title() -> String:
+	return String(OUTCOME_TITLES.get(outcome, OUTCOME_TITLES["none"]))
+
+
+## 是否胜利。
+func is_victory() -> bool:
+	return result == RESULT_VICTORY
+
+
+## 我方剩余 HP 合计（[code]unknown_count > 0[/code] 时该值[b]偏低[/b]——读不到的角色不计入）。
+func player_remaining_hp() -> int:
+	return maxi(int(player.get("remaining_hp", 0)), 0)
+
+
+## 敌方剩余 HP 合计（同 [method player_remaining_hp] 的口径）。
+func enemy_remaining_hp() -> int:
+	return maxi(int(enemy.get("remaining_hp", 0)), 0)
+
+
+## 纯文本摘要——占位场景直接 print 的内容（一行一条，便于人工核对与日志检索）。[br]
+## [br][b]不含本地化 key[/b]：占位阶段的中文文案集中在此处与 [constant OUTCOME_TITLES]，
+## 本地化 epic 落地后统一替换（同 [code]PlaceholderScene[/code] 的 TEXT_* 豁免口径）。
+func summary_lines() -> PackedStringArray:
+	var lines := PackedStringArray()
+	lines.append("结局: %s (result=%d)" % [title(), result])
+	lines.append("回合数: %d" % turn_count)
+	lines.append("触发效果条目: %d" % effect_entries)
+	lines.append("我方: 存活 %d/%d，剩余 HP %d%s" % [
+		int(player.get("alive_count", 0)), int(player.get("count", 0)),
+		player_remaining_hp(), _unknown_suffix(player)])
+	lines.append("敌方: 存活 %d/%d，剩余 HP %d%s" % [
+		int(enemy.get("alive_count", 0)), int(enemy.get("count", 0)),
+		enemy_remaining_hp(), _unknown_suffix(enemy)])
+	return lines
+
+
+## 未知条目提示后缀——有读不到 HP 的角色时标注，避免把「少算」看成「打空」。
+func _unknown_suffix(side: Dictionary) -> String:
+	var unknown: int = int(side.get("unknown_count", 0))
+	return "（另有 %d 条无 HP 数据）" % unknown if unknown > 0 else ""

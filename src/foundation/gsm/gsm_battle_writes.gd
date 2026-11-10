@@ -65,6 +65,37 @@ func _set_battle_deployment_snapshot(snapshot: Dictionary) -> void:
 	_gsm._buffer_change("battle.deployment_snapshot", old_snapshot, snapshot)
 
 
+## 原子写入我方角色 HP——仅 CombatSystem（经 [code]combat_hp_carryover.gd[/code]）
+## 在战斗结束时调用。[br]
+## [br][b]存储结构[/b]：[code]player.character_hp = {"<character_id>": {current_hp, max_hp}}[/code]——
+## 键为字符串（存档 JSON 的对象键必为字符串），读取侧兼容整数键。[br]
+## [br][b]为什么写 player 域而非 battle 域[/b]：battle 域战斗结束即置 null
+## （ADR-0008 §GSM 边界），存不下跨战斗数据。[br]
+## [br][b]逐键写入[/b]：[code]character_hp[/code] 整体替换会丢掉本场未上场角色的残血，
+## 故按角色 ID 增量改键；同值去重避免无意义的 [signal GameStateManager.batch_updated]。[br]
+## [br]来源: tech-debt DEBT-CBT-018-3（HP 跨战斗持久化）。
+func _set_player_character_hp(character_id: int, hp: Dictionary) -> void:
+	if character_id < 0:
+		push_warning("GSM._set_player_character_hp: 无效角色 ID（收到 %d），拒绝写入" % character_id)
+		return
+	var current_hp: int = maxi(int(hp.get("current_hp", 0)), 0)
+	var max_hp: int = maxi(int(hp.get("max_hp", 0)), 0)
+	if max_hp > 0:
+		current_hp = mini(current_hp, max_hp)
+
+	if not _gsm.player.has("character_hp") or not (_gsm.player.character_hp is Dictionary):
+		_gsm.player.character_hp = {}
+
+	var key: String = str(character_id)
+	var old: Variant = _gsm.player.character_hp.get(key, null)
+	var new_value: Dictionary = {"current_hp": current_hp, "max_hp": max_hp}
+	if old is Dictionary and _gsm._deep_equal(old, new_value):
+		return  # 值无变化——去重
+
+	_gsm.player.character_hp[key] = new_value
+	_gsm._buffer_change("player.character_hp.%s" % key, old, new_value)
+
+
 ## 原子写入不可用角色列表——仅 DeploymentSystem 调用。
 func _set_player_unavailable_characters(data: Dictionary) -> void:
 	var old: Dictionary = _gsm.player.get("unavailable_characters", {})

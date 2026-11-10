@@ -104,6 +104,8 @@ func _set_battle_deployment_snapshot(snapshot: Dictionary) -> void:
 	_battle_writes._set_battle_deployment_snapshot(snapshot)
 func _set_player_unavailable_characters(data: Dictionary) -> void:
 	_battle_writes._set_player_unavailable_characters(data)
+func _set_player_character_hp(character_id: int, hp: Dictionary) -> void:
+	_battle_writes._set_player_character_hp(character_id, hp)
 func _set_battle_bindings(snapshot: Array) -> void:
 	_battle_writes._set_battle_bindings(snapshot)
 func _set_battle_formation_snapshot(snapshot: Dictionary) -> void:

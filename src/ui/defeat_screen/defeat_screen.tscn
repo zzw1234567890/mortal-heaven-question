@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://src/ui/shared/placeholder_scene.gd" id="1_script"]
+[ext_resource type="Script" path="res://src/ui/defeat_screen/defeat_screen.gd" id="1_script"]
 
 [node name="DefeatScreen" type="Control"]
 layout_mode = 3

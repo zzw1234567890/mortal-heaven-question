@@ -81,6 +81,13 @@ func collect(card: Variant, targets: Array, caster_id: int) -> Dictionary:
 		# 击杀类条目（trigger="kill"）不在此结算——那由 combat_kill_trigger.gd 按事实触发。
 		if not bool(entry.call("matches_trigger", EntryScript.TRIGGER_ON_PLAY)):
 			continue
+		# 结算回流计数：进入执行端的条目计一条（含尚无执行端的增益/控制/抽牌——
+		# 它们同样是「被这张卡触发」的条目，只是本模块不落库）。[br]
+		# 不计数的是[b]空占位条目[/b]：汇总器对「既无 effects 也无 effect_type」的卡
+		# （只给 template_id 的测试桩 / 空模板）会合成一条全空条目，它没有声明任何效果，
+		# 计进去会让「无效果卡」平白多出 1 条。
+		if not String(entry.get("effect_type")).is_empty():
+			_note_entry()
 		var data: Dictionary = entry.call("to_card_data", context)
 		var is_self: bool = String(entry.get("target")) == TARGET_SELF
 		var category: int = _evaluator().category_of(data)
@@ -233,6 +240,13 @@ func _evaluator() -> RefCounted:
 ## 落库子模块——经父节点取（与出牌/击杀结算共用同一实例，不重复建）。
 func _settlement() -> RefCounted:
 	return _parent.call(&"_get_damage_settlement")
+
+
+## 结算回流计数——交父节点的战绩累积器（[code]combat_battle_record.gd[/code]）。[br]
+## [br]计数只增不减、失败静默：计数本身不参与战斗逻辑，父节点缺该入口时不应打断结算。
+func _note_entry() -> void:
+	if _parent.has_method(&"_note_effect_entry"):
+		_parent.call(&"_note_effect_entry")
 
 
 ## 战斗状态表——ATK / HP 的现读来源。

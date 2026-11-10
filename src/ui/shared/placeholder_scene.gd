@@ -69,6 +69,10 @@ var scene_manager: Node = null
 var return_button: Button = null
 ## 标题标签（测试断言用）。
 var title_label: Label = null
+## 状态标签（「尚未开放」——子类拿到真实数据后可覆写文案）。
+var status_label: Label = null
+## 提示标签（占位说明——子类可覆写为真实摘要）。
+var hint_label: Label = null
 
 
 func _ready() -> void:
@@ -98,8 +102,10 @@ func _build() -> void:
 	title_label = _make_label(TITLES.get(screen_id, TEXT_FALLBACK_TITLE),
 			TITLE_FONT_SIZE, "Title")
 	box.add_child(title_label)
-	box.add_child(_make_label(TEXT_NOT_AVAILABLE, HINT_FONT_SIZE, "Status"))
-	box.add_child(_make_label(str(HINTS.get(screen_id, "")), HINT_FONT_SIZE, "Hint"))
+	status_label = _make_label(TEXT_NOT_AVAILABLE, HINT_FONT_SIZE, "Status")
+	box.add_child(status_label)
+	hint_label = _make_label(str(HINTS.get(screen_id, "")), HINT_FONT_SIZE, "Hint")
+	box.add_child(hint_label)
 
 	return_button = Button.new()
 	return_button.name = "ReturnButton"

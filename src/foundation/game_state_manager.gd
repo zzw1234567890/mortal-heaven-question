@@ -184,6 +184,9 @@ func _set_battle_active(active: bool) -> void:
 	_atomic_writes._set_battle_active(active)
 func _set_player_unavailable_characters(data: Dictionary) -> void:
 	_atomic_writes._set_player_unavailable_characters(data)
+## 我方角色 HP 跨战斗持久化写入（DEBT-CBT-018-3）——仅 CombatSystem 战斗结束调用。
+func _set_player_character_hp(character_id: int, hp: Dictionary) -> void:
+	_atomic_writes._set_player_character_hp(character_id, hp)
 func battle_start(config: Dictionary) -> void:
 	_atomic_writes.battle_start(config)
 func battle_end(result: Dictionary) -> void:

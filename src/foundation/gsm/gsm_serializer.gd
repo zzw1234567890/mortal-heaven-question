@@ -103,6 +103,7 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"talents": [],
 				"talent_map": {},
 				"unavailable_characters": {},
+				"character_hp": {},
 				"tribulation_state": 0,
 				"consecutive_tribulation_failures": 0,
 			}

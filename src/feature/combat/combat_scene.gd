@@ -7,19 +7,17 @@ extends Control
 ## 加载失败，[code]scene_transition.gd[/code] 走「目标场景缺失 → 回退 MAIN_MENU」，
 ## 核心循环第一跳出口断路（gate-check 2026-11-08 §B1）。[br]
 ## [br][b]结构[/b]：root Control 挂载 [code]CombatRoot[/code]（combat-ui-layout
-## story 001-008 交付的战场根：四区域 + 顶部/底部条 + 手牌区 + 备战面板 +
-## 结算宿主）；本容器只做依赖注入与信号接线，不持有游戏状态。[br]
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：不缓存战斗/卡组/角色状态；卡组上限、
-## 回合阶段等一切数值经注入系统现读。[br]
+## story 001-008 交付的战场根）；本容器只做依赖注入与信号接线，不持有游戏状态。[br]
+## [br][b]零状态所有权[/b]（ADR-0031 §2）：不缓存战斗/卡组/角色状态，数值一律现读
+## （只读取数见 [code]combat_scene_readers.gd[/code]）。[br]
 ## [br][b]零轮询[/b]（ADR-0031 §3）：无 [code]_process()[/code]——信号驱动。[br]
 ## [br][b]接线边界[/b]：出牌/目标选择/拖拽/确认出战的持久写入归
 ## [code]combat-ui-interaction[/code] epic（0/9 未实现）。本容器只接通
 ## [b]转场与面板生命期[/b]：备战确认 → [code]battle_start[/code]；备战返回/撤退确认 →
 ## 经 SceneManager 回探索；战斗结束 → 由 [code]CombatSystem[/code] 自行请求
 ## RESULT_SCREEN / DEFEAT_SCREEN 转场（[method CombatSystem._request_scene_change]）。[br]
-## [br][b]自动开战[/b]：本容器[b]不[/b]自动 [code]battle_start[/code]——敌方卡组与出战
-## 阵容来源属 interaction epic（story 006 的 config 扩展契约），当前以备战面板
-## 「确认出战」为唯一开战入口。
+## [br][b]自动开战[/b]：本容器[b]不[/b]自动 [code]battle_start[/code]——以备战面板
+## 「确认出战」为唯一开战入口（阵容来源属 interaction epic story 006 契约）。
 ##
 ## @experimental
 ## 来源: ADR-0005（场景切换唯一仲裁）、ADR-0031（表现层基线）、ADR-0008（战斗
@@ -28,10 +26,12 @@ extends Control
 
 ## 战场根场景——实例化后由本容器注入依赖（脚本 new() 不会加载 .tscn 节点）。
 const CombatRootScene := preload("res://src/ui/combat/layout/CombatRoot.tscn")
-## SettingsStore 脚本常量——reduce_motion 偏好读取（S17 同源口径）。
-const SettingsStoreScript := preload("res://src/ui/main_menu/settings_store.gd")
 ## SceneManager 脚本常量——SceneID / TransitionType 单一真理来源。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
+## 结算回流接线——battle_ended → CombatResultView（Sprint 18 结算回流）。
+const ResultBridgeScript := preload("res://src/ui/combat/shared/combat_result_bridge.gd")
+## 只读取数模块——境界 / 上场上限 / 不动效偏好（容器不承载取数逻辑）。
+const ReadersScript := preload("res://src/feature/combat/combat_scene_readers.gd")
 
 ## 备战面板标题（GDD §8 备战阶段 UI）。
 const TEXT_BATTLE_TITLE: String = "⚔ 遭遇战"
@@ -49,6 +49,19 @@ var is_tribulation: bool = false
 ## [b]测试注入[/b]：reduce_motion 覆盖（null = 读 SettingsStore）。
 var reduce_motion_override: Variant = null
 
+## 结算回流接线（battle_ended → CombatResultView——结算/战败场景据此取数）。
+var result_bridge: RefCounted = null
+
+## 只读取数模块实例（境界 / 上场上限 / 不动效偏好——惰性创建）。
+var _readers_instance: RefCounted = null
+
+
+## 退场先断开结算发布器——信号源是常驻 Autoload，不断开会让旧容器继续发布。
+func _exit_tree() -> void:
+	if result_bridge != null:
+		result_bridge.call(&"unbind")
+	result_bridge = null
+
 
 func _ready() -> void:
 	combat_root = CombatRootScene.instantiate()
@@ -57,7 +70,21 @@ func _ready() -> void:
 	_wire_panels()
 	_wire_deployment()
 	_wire_feedback()
+	_wire_result_bridge()
 	combat_root.call(&"play_entrance", _read_reduce_motion())
+
+
+## 结算回流接线——订阅 battle_ended，把载荷折成 CombatResultView 并发布到
+## 跨场景缓存（结算/战败场景据此读回）。[br]
+## [br][b]为什么在场景侧接而不在战斗系统内发布[/b]：战斗系统属 Feature 层，
+## 不应知道「有 UI 要显示战绩」；发布时机与展示端同属表现层（ADR-0031 §2）。[br]
+## [br][b]降级[/b]：战斗系统不可用时静默跳过（同 [method _wire_feedback]）。
+func _wire_result_bridge() -> void:
+	var cs: Node = _combat()
+	if cs == null:
+		return
+	result_bridge = ResultBridgeScript.new()
+	result_bridge.call(&"bind", cs)
 
 
 ## 音频——注入 AudioManager 并请求进入战斗音频状态（AC-7；未注入时静默跳过）。
@@ -114,10 +141,9 @@ func _wire_deployment() -> void:
 
 ## 战斗表现层接线（Sprint 18 / DEBT-CBT-018-1 残留闭环）。[br]
 ## 把 [code]CombatFeedbackCoordinator[/code] 从「只有测试在用」变成生产组件：
-## 信号源接 CombatSystem（伤害/阵亡/战斗结束）+ DeploymentSystem（待命切换），
-## HP 终值走 [code]Callable(CombatSystem, "get_character_hp")[/code]——UI 不缓存 HP。[br]
-## [br][b]降级[/b]：战斗系统不可用时静默跳过（反馈编排器保持未接线状态，
-## 场景仍可运行——不把「缺数据源」变成崩溃）。
+## 信号源接 CombatSystem + DeploymentSystem，HP 终值走
+## [code]Callable(CombatSystem, "get_character_hp")[/code]——UI 不缓存 HP。[br]
+## [br][b]降级[/b]：战斗系统不可用时静默跳过（不把「缺数据源」变成崩溃）。
 func _wire_feedback() -> void:
 	var cs: Node = _combat()
 	if cs == null:
@@ -206,9 +232,8 @@ func _on_defeat_confirmed() -> void:
 	_request_exploration()
 
 
-## 请求回探索——唯一导航入口（ADR-0005；禁止直调 change_scene_to_file）。[br]
-## [br][b]from 动态取当前场景[/b]：转场完成后 [code]_current_scene_id[/code] 已为
-## COMBAT（PauseMenu / MainMenu 同源先例——不写魔数）。
+## 请求回探索——唯一导航入口（ADR-0005）。[br]
+## [br][b]from 动态取当前场景[/b]：不写魔数（PauseMenu / MainMenu 同源先例）。
 func _request_exploration() -> void:
 	var sm: Node = _scene_manager()
 	if sm == null or not sm.has_method(&"request_scene_change"):
@@ -223,35 +248,27 @@ func _request_exploration() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 数据现读（零缓存）
+# 数据现读（零缓存——实现见 combat_scene_readers.gd）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 当前境界 ID（[member GameStateManager.player].realm；缺失回退 1 = 炼气）。
 func _realm_id() -> int:
-	var gsm: Node = _autoload(&"GameStateManager")
-	if gsm == null:
-		return 1
-	var player: Variant = gsm.get("player")
-	if player is Dictionary:
-		return int((player as Dictionary).get("realm", 1))
-	return 1
+	return _readers().call(&"realm_id")
 
 
-## 当前境界上场人数上限（RealmSystem 只读查询；缺失回退 2 = 炼气默认）。
 func _max_deploy() -> int:
-	var rs: Node = _autoload(&"RealmSystem")
-	if rs == null or not rs.has_method(&"get_current_property"):
-		return 2
-	return maxi(int(rs.call(&"get_current_property", &"max_deploy")), 1)
+	return _readers().call(&"max_deploy")
 
 
 ## 读取减少动态偏好——注入覆盖优先，否则读 SettingsStore 画面分类。
 func _read_reduce_motion() -> bool:
-	if reduce_motion_override != null:
-		return bool(reduce_motion_override)
-	var store: RefCounted = SettingsStoreScript.new()
-	var gfx: Dictionary = store.load_graphics_category()
-	return bool(gfx.get(SettingsStoreScript.GFX_KEY_REDUCE_MOTION, false))
+	return bool(_readers().call(&"reduce_motion", reduce_motion_override))
+
+
+## 只读取数模块（境界 / 上场上限 / 不动效偏好）——单例惰性创建。
+func _readers() -> RefCounted:
+	if _readers_instance == null:
+		_readers_instance = ReadersScript.new()
+	return _readers_instance
 
 
 ## 战斗系统——注入优先，否则 /root/CombatSystem。
@@ -261,7 +278,7 @@ func _combat() -> Node:
 	return _autoload(&"CombatSystem")
 
 
-## 卡组系统——注入优先，否则 /root/DeckEditingSystem（[code]get_deck_summary[/code]）。
+## 卡组系统——注入优先，否则 /root/DeckEditingSystem。
 func _deck() -> Node:
 	if deck_system != null:
 		return deck_system

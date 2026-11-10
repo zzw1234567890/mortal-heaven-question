@@ -162,6 +162,28 @@ func get_atk(character_id: int) -> int:
 	return int(state.get("atk", 0)) if not state.is_empty() else 0
 
 
+## 全表快照——结算回流用（Sprint 18）：逐角色一条
+## [code]{character_id, side, current_hp, max_hp, is_alive, known}[/code]，按 ID 升序。[br]
+## [br][b]必须在 clear() 之前调用[/b]：battle_end 清空状态表后这里读到的就是空数组
+## （结算对象与 HP 回写都以它为唯一取数来源）。[br]
+## [br][b]不含 ref[/b]：外部持有者（敌方阵容条目）不进快照，避免把对象带进结算数据。
+func snapshot_all() -> Array:
+	var keys: Array = _states.keys()
+	keys.sort()
+	var out: Array = []
+	for key: Variant in keys:
+		var st: Dictionary = _states[key]
+		out.append({
+			"character_id": int(key),
+			"side": int(st.get("side", SIDE_PLAYER)),
+			"current_hp": int(st.get("current_hp", 0)),
+			"max_hp": int(st.get("max_hp", 0)),
+			"is_alive": bool(st.get("is_alive", true)),
+			"known": bool(st.get("known", false)),
+		})
+	return out
+
+
 ## 状态只读副本（调试/断言用）。
 func get_state(character_id: int) -> Dictionary:
 	var state: Dictionary = _states.get(character_id, {})

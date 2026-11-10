@@ -214,7 +214,12 @@ func _get_on_play_effects() -> RefCounted:
 
 ## 给结果项补上打出卡的上下文（原地不改入参——返回浅拷贝列表）。[br]
 ## [br]卡牌为 Resource（CardTemplate）时写 [code]card_data[/code]；为 Dictionary
-## （测试桩 / CardEffectEngine 的宽松载荷）时按存在的键透传，由落库侧自行查模板。
+## （测试桩 / CardEffectEngine 的宽松载荷）时按存在的键透传，由落库侧自行查模板。[br]
+## [br][b]字典卡带内联效果时整份作为 card_data[/b]：出牌执行端
+## （[code]combat_on_play_effects.gd[/code]）读的就是内联 [code]effects[/code]；
+## 若只透传 template_id，击杀触发（[code]combat_kill_trigger.gd[/code]）会去 CardSystem
+## 查一个测试桩里并不存在的模板而拿 null → [b]同一张卡，打出即生效的条目生效、
+## 击杀条目静默失效[/b]。两条路径必须读同一份效果数据。
 func _with_card_context(results: Array, card: Variant, caster_id: int) -> Array:
 	var enriched: Array = []
 	for result: Variant in results:
@@ -225,8 +230,11 @@ func _with_card_context(results: Array, card: Variant, caster_id: int) -> Array:
 		if card is Object:
 			_fill_missing(item, "card_data", card)
 		elif card is Dictionary:
+			var declared: Dictionary = card
+			if declared.has("effects") or declared.has("effect_type"):
+				_fill_missing(item, "card_data", declared)
 			for key: String in ["card_id", "template_id", "caster_id", "attacker_id"]:
-				_fill_missing(item, key, (card as Dictionary).get(key, null))
+				_fill_missing(item, key, declared.get(key, null))
 		if caster_id >= 0:
 			_fill_missing(item, "caster_id", caster_id)
 		enriched.append(item)
