@@ -22,6 +22,8 @@ func after_each() -> void:
 	cs.set_battle_active(false)
 	cs.call("set_deck_state", [], [], [])
 	cs.call("set_attack_queue", [])
+	# 开战配置是跨用例残留源（battle_end 不清它，下一场 battle_start 才覆盖）
+	cs.set("_battle_config", {})
 
 
 # ============================================================================
@@ -54,27 +56,39 @@ func test_settle_result_defeat_returns_retain_ratio() -> void:
 
 
 # ============================================================================
-# AC-003：_calculate_lingshi_reward 桩返回 0
+# AC-003~005：掉落来自开战配置（探索节点在节点生成时定档，战斗侧只结算）
 # ============================================================================
 
-func test_calculate_lingshi_reward_stub_returns_zero() -> void:
-	assert_eq(cs.call("_calculate_lingshi_reward"), 0, "桩默认返回 0")
+## 开战配置带 rewards 时，三项计算都读它（而不是写死 0 / 空）。
+func test_rewards_come_from_battle_config() -> void:
+	# Arrange——模拟探索节点带进来的掉落
+	cs.call("battle_start", {"rewards": {
+		"lingshi": 12, "cultivation": 6,
+		"cards": [{"card_id": "basic_attack", "rarity": 1}],
+	}})
+	# Assert
+	assert_eq(cs.call("_calculate_lingshi_reward"), 12, "灵石取配置值")
+	assert_eq(cs.call("_calculate_cultivation_reward"), 6, "修为取配置值")
+	var drops: Array = cs.call("_calculate_card_drops")
+	assert_eq(drops.size(), 1, "卡牌掉落取配置列表")
+	assert_eq(drops[0]["card_id"], "basic_attack", "掉落条目透传")
+	# 清场（下一用例不继承本场配置）
+	cs.call("battle_end", 2)
 
 
-# ============================================================================
-# AC-004：_calculate_cultivation_reward 桩返回 0
-# ============================================================================
+## 配置缺失时按 0 / 空处理——不臆造奖励。
+func test_rewards_default_to_zero_without_config() -> void:
+	assert_eq(cs.call("_calculate_lingshi_reward"), 0, "无配置时灵石为 0")
+	assert_eq(cs.call("_calculate_cultivation_reward"), 0, "无配置时修为为 0")
+	assert_eq(cs.call("_calculate_card_drops"), [], "无配置时掉落为空 Array")
 
-func test_calculate_cultivation_reward_stub_returns_zero() -> void:
-	assert_eq(cs.call("_calculate_cultivation_reward"), 0, "桩默认返回 0")
 
-
-# ============================================================================
-# AC-005：_calculate_card_drops 桩返回空 Array
-# ============================================================================
-
-func test_calculate_card_drops_stub_returns_empty() -> void:
-	assert_eq(cs.call("_calculate_card_drops"), [], "桩默认返回空 Array")
+## 负值配置钳到 0——掉落配置是数据，不能把玩家余额打成负数。
+func test_rewards_clamp_negative_config() -> void:
+	cs.call("battle_start", {"rewards": {"lingshi": -5, "cultivation": -1}})
+	assert_eq(cs.call("_calculate_lingshi_reward"), 0, "负灵石钳到 0")
+	assert_eq(cs.call("_calculate_cultivation_reward"), 0, "负修为钳到 0")
+	cs.call("battle_end", 2)
 
 
 # ============================================================================

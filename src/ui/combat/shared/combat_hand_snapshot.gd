@@ -112,10 +112,18 @@ static func _int_field(p_entry: Variant, p_template: Variant, p_key: String,
 	return int(_card_field(p_template, p_key, p_default))
 
 
-## 模板字段读取（模板为空 / 无该属性时返回默认）。
+## 模板字段读取（模板为空 / 无该属性时返回默认）。[br]
+## [br][b]两种承载都支持[/b]：生产路径是 [code]CardTemplate[/code]（Object，
+## 用 [method Object.get] 读属性）；测试与内联卡用 Dictionary。Dictionary 分支
+## 让测试桩不必再自定义 [code]get()[/code]——那会与 [method Object.get] 的
+## 原生签名冲突（解析期即失败）。
 static func _card_field(p_template: Variant, p_key: String, p_default: Variant) -> Variant:
 	if p_template == null:
 		return p_default
-	var value: Variant = (p_template as Object).get(p_key)
+	var value: Variant = null
+	if p_template is Dictionary:
+		value = (p_template as Dictionary).get(p_key)
+	else:
+		value = (p_template as Object).get(p_key)
 	return p_default if value == null else value
 

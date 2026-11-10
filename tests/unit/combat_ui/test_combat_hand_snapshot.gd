@@ -14,25 +14,16 @@ class CardSystemStub extends RefCounted:
 		return templates.get(card_instance_id)
 
 
-## 桩模板（Object + get）。
-class TemplateStub extends RefCounted:
-	var fields: Dictionary = {}
-
-	func _init(p_fields: Dictionary) -> void:
-		fields = p_fields
-
-	func get(key: String) -> Variant:
-		return fields.get(key)
-
-
-## 整数条目（旧形态：手牌只存实例 ID）→ 模板字段折出。
+## 整数条目（旧形态：手牌只存实例 ID）→ 模板字段折出。[br]
+## [br][b]桩模板用 Dictionary[/b]：自定义 [code]get()[/code] 会与
+## [method Object.get] 的原生签名冲突（解析期失败），快照侧两种承载都支持。
 func test_int_entry_uses_template_fields() -> void:
 	# Arrange
 	var card_system: CardSystemStub = CardSystemStub.new()
-	card_system.templates[11] = TemplateStub.new({
+	card_system.templates[11] = {
 		"name": "御剑术", "cost": 2, "rarity": 3, "type": 1,
 		"target_type": &"single_enemy",
-	})
+	}
 	# Act
 	var snapshot: Array = Snapshot.build([11], card_system)
 	# Assert
@@ -82,5 +73,5 @@ func test_affordability_flags() -> void:
 func test_target_type_of_entry_and_template() -> void:
 	assert_eq(Snapshot.target_type_of({"target_type": &"self"}, null), &"self",
 			"条目自带优先")
-	assert_eq(Snapshot.target_type_of(5, TemplateStub.new({"target_type": &"all_enemy"})),
+	assert_eq(Snapshot.target_type_of(5, {"target_type": &"all_enemy"}),
 			&"all_enemy", "回退模板")

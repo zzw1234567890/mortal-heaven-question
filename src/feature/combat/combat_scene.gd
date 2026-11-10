@@ -13,8 +13,12 @@ extends Control
 ## [br][b]接线边界[/b]：本容器只接通[b]转场与面板生命期[/b]——备战确认 → [code]battle_start[/code]；
 ## 备战返回/撤退确认 → 经 SceneManager 回探索；战斗结束由 [code]CombatSystem[/code] 自行
 ## 请求 RESULT_SCREEN / DEFEAT_SCREEN。[b]不自动开战[/b]：以备战面板「确认出战」为唯一入口。[br]
-## [br][b]出牌交互[/b]：输入层与手牌供给委托 [code]combat_scene_interaction.gd[/code]
-## （[method _wire_interaction] 装配，开战建卡后 [code]enable()[/code] 放行）。
+## [br][b]表现层装配[/b]：音频 / 面板 / 备战 / 反馈 / 结算回流 / 出牌交互六组接线
+## 全部委托 [code]combat_scene_mounting.gd[/code]；开战建卡后由开战前置放行输入。[br]
+## [br][b]开战上下文[/b]：探索节点带进来的敌方阵容 / 等级 / 掉落 / 玩家阵容经
+## [code]combat_launch_context.gd[/code] 跨场景传递，本容器 [code]_ready[/code] 一次性
+## 取走（[code]combat_scene_launch.gd[/code]）；缺字段时开战给可读失败，
+## [b]不再兜底默认遭遇资源[/b]。
 ##
 ## @experimental
 ## 来源: ADR-0005（场景切换唯一仲裁）、ADR-0031（表现层基线）、ADR-0008（战斗
@@ -23,16 +27,16 @@ extends Control
 
 ## 战场根场景——实例化后由本容器注入依赖（脚本 new() 不会加载 .tscn 节点）。
 const CombatRootScene := preload("res://src/ui/combat/layout/CombatRoot.tscn")
-## 结算回流接线——battle_ended → CombatResultView（Sprint 18 结算回流）。
-const ResultBridgeScript := preload("res://src/ui/combat/shared/combat_result_bridge.gd")
+## 表现层装配（音频 / 面板 / 备战 / 反馈 / 结算回流 / 出牌交互）。
+const MountingScript := preload("res://src/feature/combat/combat_scene_mounting.gd")
 ## 只读取数模块——境界 / 上场上限 / 不动效偏好（容器不承载取数逻辑）。
 const ReadersScript := preload("res://src/feature/combat/combat_scene_readers.gd")
-## 出牌交互接线（输入层 + 手牌供给——交互契约，非转场逻辑）。
-const InteractionScript := preload("res://src/feature/combat/combat_scene_interaction.gd")
 ## 出口与撤退流转（备战返回 / 撤退确认 / 战败确认 / 回探索）。
 const ExitsScript := preload("res://src/feature/combat/combat_scene_exits.gd")
-## 开战前置（布阵 / 牌堆 / 敌方阵容——本容器只负责「何时开战」）。
-const BattleSetupScript := preload("res://src/feature/combat/combat_scene_battle_setup.gd")
+## 探索侧开战上下文消费（敌方阵容 / 等级 / 掉落 / 玩家阵容——可读失败）。
+const LaunchScript := preload("res://src/feature/combat/combat_scene_launch.gd")
+## 开战守卫与执行（布阵 / 牌堆 / 敌方阵容——本容器只负责「何时开战」）。
+const LauncherScript := preload("res://src/feature/combat/combat_scene_battle_launcher.gd")
 
 ## 备战面板标题（GDD §8 备战阶段 UI）。
 const TEXT_BATTLE_TITLE: String = "⚔ 遭遇战"
@@ -49,22 +53,26 @@ var combat_root: Control = null
 var is_tribulation: bool = false
 ## [b]测试注入[/b]：reduce_motion 覆盖（null = 读 SettingsStore）。
 var reduce_motion_override: Variant = null
-## 遭遇战配置覆盖（null = 读默认资源；渡劫 / 精英节点可注入变体）。
+## 遭遇战配置覆盖（null = 无显式配置；渡劫 / 精英节点可注入变体）。[br]
+## [b]仅测试与特殊变体使用[/b]——探索路径一律经 [member launch_context_override]
+## 或跨场景缓存，不再读默认遭遇资源兜底。
 var encounter: Resource = null
-## 敌方阵容覆盖（探索系统已生成名册时的入口；空 = 走遭遇战配置）。
+## 敌方阵容覆盖（测试 / 特殊变体已生成运行时名册时的入口；空 = 走开战上下文）。
 var enemy_roster_override: Array = []
+## [b]测试注入[/b]：显式开战上下文（非空时优先于跨场景缓存）。
+var launch_context_override: Dictionary = {}
 
 ## 结算回流接线（battle_ended → CombatResultView——结算/战败场景据此取数）。
 var result_bridge: RefCounted = null
+## 探索侧开战上下文（[method _ready] 一次性取走——空 = 无上下文，开战给可读失败）。
+var launch: RefCounted = null
+## 开战被拒的可读失败文案（空串 = 未失败；UI/测试据此展示原因）。
+var launch_failure: String = ""
 
-## 只读取数模块实例（境界 / 上场上限 / 不动效偏好——惰性创建）。
+## 只读取数模块 / 出牌交互接线 / 出口流转（各自惰性创建或 _ready 创建）。
 var _readers_instance: RefCounted = null
-## 出牌交互接线（输入层 + 手牌供给——[method _wire_interaction] 创建）。
 var interaction_wiring: RefCounted = null
-## 出口与撤退流转（[method _ready] 创建）。
 var exits: RefCounted = null
-## 开战前置实例（[method _start_battle] 惰性创建）。
-var _battle_setup: RefCounted = null
 
 
 ## 退场先断开结算发布器——信号源是常驻 Autoload，不断开会让旧容器继续发布。
@@ -80,106 +88,28 @@ func _exit_tree() -> void:
 func _ready() -> void:
 	combat_root = CombatRootScene.instantiate()
 	add_child(combat_root)
+	_consume_launch_context()
 	exits = ExitsScript.new()
 	exits.call(&"setup", _combat(), _scene_manager())
-	_wire_audio()
-	_wire_panels()
-	_wire_deployment()
-	_wire_feedback()
-	_wire_result_bridge()
-	_wire_interaction()
+	# 六组表现层接线（音频 / 面板 / 备战 / 反馈 / 结算回流 / 出牌交互）
+	var mounting: RefCounted = MountingScript.new(self, combat_root)
+	var wired: Dictionary = mounting.call(&"wire_all", _on_deploy_confirmed,
+			_on_deploy_back, _on_retreat_confirmed, _on_defeat_confirmed)
+	result_bridge = wired.get("result_bridge")
+	interaction_wiring = wired.get("interaction_wiring")
 	combat_root.call(&"play_entrance", _read_reduce_motion())
 
 
-## 结算回流接线——订阅 battle_ended，把载荷折成 CombatResultView 并发布到
-## 跨场景缓存（结算/战败场景据此读回）。[br]
-## [br][b]为什么在场景侧接而不在战斗系统内发布[/b]：战斗系统属 Feature 层，
-## 不应知道「有 UI 要显示战绩」；发布时机与展示端同属表现层（ADR-0031 §2）。[br]
-## [br][b]降级[/b]：战斗系统不可用时静默跳过（同 [method _wire_feedback]）。
-func _wire_result_bridge() -> void:
-	var cs: Node = _combat()
-	if cs == null:
-		return
-	result_bridge = ResultBridgeScript.new()
-	result_bridge.call(&"bind", cs)
-
-
-## 出牌交互层 + 手牌供给——装配与开关全部委托 [code]combat_scene_interaction.gd[/code]
-## （手势入口、供牌时机、退订；本容器只负责「何时开战 / 何时退场」）。
-func _wire_interaction() -> void:
-	interaction_wiring = InteractionScript.new()
-	interaction_wiring.call(&"wire", combat_root, _combat(), _autoload(&"CostSystem"),
-			_read_reduce_motion())
-
-
-## 音频——注入 AudioManager 并请求进入战斗音频状态（AC-7；未注入时静默跳过）。
-func _wire_audio() -> void:
-	var sm: Node = _scene_manager()
-	if sm == null or not sm.has_method(&"get_audio_manager"):
-		return
-	var am: Variant = sm.call(&"get_audio_manager")
-	if am != null:
-		combat_root.call(&"set_audio_manager", am)
-	combat_root.call(&"request_in_combat_audio")
-
-
-## 顶部条/底部条/手牌区信号接线（数据源现读 Autoload——缺失时静默跳过，
-## 各组件自带 null 守卫）。
-func _wire_panels() -> void:
-	var cs: Node = _combat()
-	var topbar: Variant = combat_root.get("combat_topbar")
-	if topbar != null:
-		topbar.call(&"bind_signals", cs, _autoload(&"FormationSystem"))
-	var bottombar: Variant = combat_root.get("combat_bottombar")
-	if bottombar != null:
-		bottombar.call(&"bind_signals", cs, _autoload(&"CostSystem"))
-		bottombar.call(&"set_reduce_motion", _read_reduce_motion())
-	var hand: Variant = combat_root.get("hand_area")
-	if hand != null:
-		hand.call(&"bind_signals", cs)
-		hand.call(&"set_reduce_motion", _read_reduce_motion())
-	# 结算/撤退/渡劫警示宿主（交接后战斗结束 → 面板；确认信号走下方出口）
-	combat_root.call(&"setup_settlement", cs, _deck(), is_tribulation)
-	if is_tribulation:
-		combat_root.call(&"show_pre_battle_warning")
-
-
-## 备战面板——注入依赖、下发名册并打开（与战斗系统信号接线由本容器负责）。
-func _wire_deployment() -> void:
-	var deploy: Variant = combat_root.get("deploy_panel")
-	if deploy == null:
-		return
-	deploy.call(&"setup", _autoload(&"GameStateManager"), _autoload(&"CardSystem"),
-			deployment_system if deployment_system != null else _autoload(&"DeploymentSystem"),
-			_autoload(&"BindingManager"))
-	deploy.connect(&"confirm_requested", _on_deploy_confirmed)
-	deploy.connect(&"back_requested", _on_deploy_back)
-	combat_root.call(&"show_deploy_panel", _max_deploy(), _realm_id(),
-			_deploy_title())
-	# 结算宿主出口（持久写入归 interaction epic——本容器只做最小闭环：
-	# 撤退确认 → 战斗系统；战败确认 → 回探索）
-	var host: Variant = combat_root.get("settlement_host")
-	if host != null:
-		host.connect(&"retreat_confirmed", _on_retreat_confirmed)
-		host.connect(&"defeat_confirmed", _on_defeat_confirmed)
-
-
-## 战斗表现层接线（Sprint 18 / DEBT-CBT-018-1 残留闭环）。[br]
-## 把 [code]CombatFeedbackCoordinator[/code] 从「只有测试在用」变成生产组件：
-## 信号源接 CombatSystem + DeploymentSystem，HP 终值走
-## [code]Callable(CombatSystem, "get_character_hp")[/code]——UI 不缓存 HP。[br]
-## [br][b]降级[/b]：战斗系统不可用时静默跳过（不把「缺数据源」变成崩溃）。
-func _wire_feedback() -> void:
-	var cs: Node = _combat()
-	if cs == null:
-		return
-	var reader: Callable = Callable()
-	if cs.has_method(&"get_character_hp"):
-		reader = Callable(cs, &"get_character_hp")
-	combat_root.call(&"setup_feedback", cs,
-			deployment_system if deployment_system != null else _autoload(&"DeploymentSystem"),
-			reader, _autoload(&"CardSystem"), _autoload(&"BindingManager"),
-			_read_reduce_motion())
+## 探索侧开战上下文——一次性取走并做契约校验。[br]
+## [br][b]校验失败不阻断场景挂载[/b]：玩家仍可点「返回探索」离开；失败文案
+## 经 [member launch_failure] 暴露，开战时再 push_error 并拒绝开战
+## （避免带着空敌方阵容打一场判不出胜负的战斗）。[br]
+## [br][b]为什么不在这里 push_error[/b]：[code]_ready[/code] 阶段的错误会被
+## GUT 归罪到挂载场景的测试用例；失败留给 [method _start_battle] 的可读出口。
+func _consume_launch_context() -> void:
+	launch = LaunchScript.new()
+	launch.call(&"consume", launch_context_override)
+	launch_failure = str(launch.call(&"failure_text"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -193,63 +123,69 @@ func _on_deploy_confirmed(character_ids: Array) -> void:
 	_start_battle(character_ids)
 
 
-## 备战面板标题（子类覆写点——渡劫场景用渡劫标题）。
+## 开战是否必须有探索侧上下文（[b]子类覆写点[/b]）。[br]
+## [br][b]为什么渡劫不需要[/b]：渡劫战由渡劫台直接进入，敌方配置由
+## [code]TribulationSystem[/code] 组装（[code]tribulation_data.boss_config[/code]），
+## 不经过探索战斗节点的「点节点 → 弹窗 → 转场」链路。
+func _requires_launch_context() -> bool:
+	return true
+
+
+## 备战面板标题（子类覆写点——渡劫场景用渡劫标题）。[br]
+## [br]探索侧给了遭遇展示名时以它为准（「⚔ 山道巡守」而非泛化的「⚔ 遭遇战」）。
 func _deploy_title() -> String:
-	return TEXT_BATTLE_TITLE
+	if launch == null:
+		return TEXT_BATTLE_TITLE
+	return str(launch.call(&"title", TEXT_BATTLE_TITLE))
+
+
+## 备战面板预选——把探索侧带来的玩家阵容点选上（玩家仍可改选；实现见
+## [method CombatSceneLaunch.preselect]，容器只做转发）。
+func _preselect_roster(p_deploy: Variant) -> void:
+	if launch == null:
+		return
+	launch.call(&"preselect", p_deploy)
 
 
 ## 开战入口（[b]子类覆写点[/b]：渡劫场景改走 TribulationSystem 委托——
 ## 其状态机需在 battle_start 前进入 IN_COMBAT，否则结算不会被渡劫系统消费）。[br]
-## [br]默认实现只保证「有阵容 → 战斗开始」的最小闭环；config 扩展契约见
-## combat-ui-interaction story 006。[br]
-## [br][b]开战前置[/b]：布阵 / 牌堆 / 敌方阵容由 [code]combat_scene_battle_setup.gd[/code]
-## 一次备齐——对手来自数据资源（[code]EnemyEncounter[/code]），不再依赖 AISystem 残留名册。[br]
-## 顺序不可换：[code]init_deck[/code] 必须在 [code]battle_start[/code] 之前——开局手牌在
-## battle_start 内发出，先开战再发牌只会发出 0 张。
+## [br][b]守卫与执行委托[/b] [code]combat_scene_battle_launcher.gd[/code]：
+## 战斗系统可用 / 未在战斗中 / 开战上下文齐备，任一不满足即 push_error 并
+## 拒绝开战（带着空敌方阵容开战只会得到一场判不出胜负的战斗）。
 func _start_battle(character_ids: Array) -> void:
-	var cs: Node = _combat()
-	if cs == null or not cs.has_method(&"battle_start"):
-		push_error("CombatScene: CombatSystem 不可用——战斗未开始")
-		return
-	if cs.has_method(&"is_battle_active") and bool(cs.call(&"is_battle_active")):
-		return  # 已开战——重复确认守卫
-	if _battle_setup == null:
-		_battle_setup = BattleSetupScript.new()
-		var ds: Node = deployment_system if deployment_system != null \
-				else _autoload(&"DeploymentSystem")
-		_battle_setup.call(&"setup", _autoload(&"AISystem"), ds, _deck(),
-				encounter, enemy_roster_override)
-	var plan: Dictionary = _battle_setup.call(&"prepare",
-			character_ids.duplicate(), _realm_id(), is_tribulation)
-	var deck_ids: Array = plan.get("deck_ids", [])
-	if not deck_ids.is_empty() and cs.has_method(&"init_deck"):
-		cs.call(&"init_deck", deck_ids)
-	cs.call(&"battle_start", plan.get("config", {}))
-	# 开战后再建卡：敌方名册快照与 HP 种子都由 battle_start 定格（先建卡读到 0/0）。
-	combat_root.call(&"build_battle_roster", character_ids.duplicate())
-	# 开完战、建完卡才放行输入并首次供牌（此前只有备战面板可交互）。
-	if interaction_wiring != null:
-		interaction_wiring.call(&"enable")
+	var launcher: RefCounted = LauncherScript.new()
+	var reason: String = launcher.call(&"start", _combat(), combat_root,
+			interaction_wiring, launch, _requires_launch_context(), _launch_deps(),
+			character_ids, _realm_id(), is_tribulation)
+	if not reason.is_empty():
+		push_error("CombatScene: " + reason)
 
 
-## 备战返回——回探索（实现见 [code]combat_scene_exits.gd[/code]）。
+## 开战前置的依赖包（AI / 布阵 / 卡组 / 显式遭遇 / 运行时名册）。
+func _launch_deps() -> Dictionary:
+	var ds: Node = deployment_system if deployment_system != null \
+			else _autoload(&"DeploymentSystem")
+	return {
+		"ai": _autoload(&"AISystem"),
+		"deployment": ds,
+		"deck": _deck(),
+		"encounter": encounter,
+		"roster_override": enemy_roster_override,
+	}
+
+
+## 三个面板出口（备战返回 / 撤退确认 / 战败确认）——导航细节见
+## [code]combat_scene_exits.gd[/code]（本容器只做转发）。
 func _on_deploy_back() -> void:
 	exits.call(&"on_deploy_back")
 
 
-## 撤退确认——战斗活跃走战斗系统结算；未开战直接回探索。
 func _on_retreat_confirmed() -> void:
 	exits.call(&"on_retreat_confirmed")
 
 
-## 战败面板确认返回探索。
 func _on_defeat_confirmed() -> void:
 	exits.call(&"on_defeat_confirmed")
-
-
-## 请求回探索——唯一导航入口（ADR-0005）。
-func _request_exploration() -> void:
-	exits.call(&"request_exploration")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -263,9 +199,11 @@ func _realm_id() -> int:
 func _max_deploy() -> int:
 	return _readers().call(&"max_deploy")
 
+
 ## 读取减少动态偏好——注入覆盖优先，否则读 SettingsStore 画面分类。
 func _read_reduce_motion() -> bool:
 	return bool(_readers().call(&"reduce_motion", reduce_motion_override))
+
 
 ## 只读取数模块（境界 / 上场上限 / 不动效偏好）——单例惰性创建。
 func _readers() -> RefCounted:
@@ -273,23 +211,19 @@ func _readers() -> RefCounted:
 		_readers_instance = ReadersScript.new()
 	return _readers_instance
 
-## 战斗系统——注入优先，否则 /root/CombatSystem。
+
+## 注入优先、否则查 Autoload 的三个依赖取数入口。
 func _combat() -> Node:
-	if combat_system != null:
-		return combat_system
-	return _autoload(&"CombatSystem")
+	return combat_system if combat_system != null else _autoload(&"CombatSystem")
 
-## 卡组系统——注入优先，否则 /root/DeckEditingSystem。
+
 func _deck() -> Node:
-	if deck_system != null:
-		return deck_system
-	return _autoload(&"DeckEditingSystem")
+	return deck_system if deck_system != null else _autoload(&"DeckEditingSystem")
 
-## SceneManager——注入优先，否则 /root/SceneManager。
+
 func _scene_manager() -> Node:
-	if scene_manager != null:
-		return scene_manager
-	return _autoload(&"SceneManager")
+	return scene_manager if scene_manager != null else _autoload(&"SceneManager")
+
 
 ## Autoload 动态查找（避免测试环境缺 Autoload 时的 NameError——同 CombatSystem 先例）。
 func _autoload(node_name: StringName) -> Node:

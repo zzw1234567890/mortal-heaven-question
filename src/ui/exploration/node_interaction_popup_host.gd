@@ -30,6 +30,8 @@ const BlurMaskScript := preload("res://src/ui/exploration/node_popup_blur_mask.g
 ## SceneManager 枚举真理来源（preload 避免 headless 下的全局名解析问题）。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
 const RealmSystemScript := preload("res://src/core/realm_system.gd")
+## 探索→战斗开战上下文构建（跨场景传递——战斗场景据此重建敌方阵容）。
+const LaunchRequestScript := preload("res://src/ui/exploration/combat_launch_request.gd")
 
 ## === 信号（宿主/后续 story 消费——本组件不自行完成场景编排）=================
 
@@ -72,6 +74,11 @@ var _open_node_id: int = -1
 var _open_kind: StringName = &""
 ## 当前点击的战斗类型（combat/elite——确认派发时回传）。
 var _pending_combat_type: StringName = &"combat"
+## 当前战斗弹窗的敌方名册载荷（确认时折进开战上下文）。
+var _pending_combat_roster: Array = []
+## 玩家出战阵容提供者（[code]func() -> Array[/code]；空 = 读 GSM deck.slots）。
+## 测试注入点——生产路径走 Autoload 现读，UI 不缓存名册。
+var player_roster_provider: Callable = Callable()
 ## 当前弹窗的商店库存载荷（确认时随 [signal shop_opened] 回传）。
 var _shop_inventory: Dictionary = {}
 ## 弹窗实例引用（首用时构建——[method _popup] 的缓存，避免每帧 get_node）。
@@ -132,8 +139,9 @@ func on_node_interaction(node_id: int, interaction_type: StringName,
 	match kind:
 		Rules.KIND_COMBAT:
 			combat_type = interaction_type
+			_pending_combat_roster = _roster_copy(payload.get("enemy_roster", []))
 			lines = Rules.combat_lines(
-					payload.get("enemy_roster", []), _max_deploy(),
+					_pending_combat_roster, _max_deploy(),
 					int(payload.get("recommended_deploy", 0)))
 		Rules.KIND_SHOP:
 			_shop_inventory = (payload.get("inventory", {}) as Dictionary).duplicate(true)
@@ -146,7 +154,8 @@ func on_node_interaction(node_id: int, interaction_type: StringName,
 ## 战斗/精英节点由 [code]combat_node_reached[/code] 单独派发）。[br]
 ## [param combat_type]: [code]&"combat"[/code] 或 [code]&"elite"[/code]。
 func on_combat_arrival(enemy_roster: Array, combat_type: StringName) -> void:
-	var lines: Array = Rules.combat_lines(enemy_roster, _max_deploy())
+	_pending_combat_roster = _roster_copy(enemy_roster)
+	var lines: Array = Rules.combat_lines(_pending_combat_roster, _max_deploy())
 	_show(int(_snapshot.get("current_node", -1)), Rules.KIND_COMBAT, lines, [],
 			combat_type)
 
@@ -212,6 +221,7 @@ func _on_confirmed() -> void:
 	var node_id: int = _open_node_id
 	match _open_kind:
 		Rules.KIND_COMBAT:
+			_publish_launch_context(node_id)
 			combat_entry_requested.emit(_pending_combat_type)
 			_request_scene_change(SceneManagerScript.SceneID.COMBAT,
 					SceneManagerScript.TransitionType.EXPLORE_TO_COMBAT)
@@ -226,6 +236,22 @@ func _on_confirmed() -> void:
 			_request_scene_change(SceneManagerScript.SceneID.TRIBULATION,
 					SceneManagerScript.TransitionType.TRIBULATION)
 	close_popup()
+
+
+## 发布探索→战斗的开战上下文（构建与发布委托 [code]combat_launch_request.gd[/code]）。[br]
+## [br][b]为什么在确认时发布[/b]：场景切换会释放本场景，上下文必须在请求转场
+## [b]之前[/b]落盘到跨场景缓存；战斗场景 [code]_ready[/code] 一次性取走。
+## 节点详情取渲染快照 [code]nodes[node_id][/code]（可含 encounter 子字典）。
+func _publish_launch_context(node_id: int) -> void:
+	var request: RefCounted = LaunchRequestScript.new()
+	request.set(&"player_roster_provider", player_roster_provider)
+	request.call(&"publish", node_id, _pending_combat_type, _pending_combat_roster,
+			_snapshot, get_node_or_null(NodePath("/root/AISystem")))
+
+
+## 名册载荷拷贝（非 Array 退化为空——弹窗正文与上下文共用同一份快照）。
+func _roster_copy(p_roster: Variant) -> Array:
+	return (p_roster as Array).duplicate(true) if p_roster is Array else []
 
 
 ## 灵泉——调用探索系统 API（效果执行归 Feature 层），返回系统给出的回复量。

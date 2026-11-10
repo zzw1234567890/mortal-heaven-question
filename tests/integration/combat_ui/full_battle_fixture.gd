@@ -40,10 +40,16 @@ var _deck_before: Dictionary = {}
 var _collection_before: Dictionary = {}
 var _roster_before: Array = []
 var _clicks: RefCounted = null
+## 是否给战斗场景注入夹具自带的开战上下文（默认 true）。[br]
+## [br][b]子类在 [code]setup()[/code] 前置 false[/b]：让场景走真实的跨场景缓存
+## （探索侧发布 → 战斗侧消费）——探索→战斗补链用例必须走这条路径。
+var use_fixture_launch_context: bool = true
 
 
-## 开战前置——卡组 / 角色 / 场景装配。测试体自行 [code]confirm_deploy()[/code]。
-func setup(p_defeat: bool = false) -> void:
+## 开战前置——卡组 / 角色 / 场景装配。测试体自行 [code]confirm_deploy()[/code]。[br]
+## [br][param p_mount] false 时只备数据不挂场景——需要「先让探索侧发布上下文、
+## 再挂战斗场景」的用例用 [method mount_now] 补挂。
+func setup(p_defeat: bool = false, p_mount: bool = true) -> void:
 	ViewScript.clear()
 	_clicks = ClickDriverScript.new()
 	_clicks.call("setup", Callable(self, "_root"))
@@ -62,18 +68,29 @@ func setup(p_defeat: bool = false) -> void:
 		battle_events.append({"result": result, "rewards": rewards}))
 	cs.connect("enemy_action_resolved", func(payload: Dictionary) -> void:
 		enemy_actions.append(payload))
+	if p_mount:
+		mount_now(p_defeat)
+
+
+## 挂载战斗场景（[method setup] 传 p_mount=false 时由测试在合适时机调用）。
+func mount_now(p_defeat: bool = false) -> void:
 	_mount_scene(p_defeat)
 
 
-## 确认出战——走备战面板的真实选择与按钮路径（不直接调 battle_start）。
+## 确认出战——走备战面板的真实选择与按钮路径（不直接调 battle_start）。[br]
+## [br][b]预选已由开战上下文下发[/b]（探索侧带进来的玩家阵容）：先断言预选生效，
+## 再只补选遗漏项，最后点确认按钮。
 func confirm_deploy() -> void:
 	var deploy: Variant = _root().get("deploy_panel")
 	assert_eq(int(deploy.call("get_cards").size()), char_ids.size(),
 			"前置：备战面板应读到 %d 名角色的名册" % char_ids.size())
+	var selected: Array = deploy.call("get_selected_ids")
 	for cid: int in char_ids:
+		if selected.has(cid):
+			continue
 		assert_true(bool(deploy.call("toggle_selection", cid)), "点选角色 %d" % cid)
 	var button: Button = deploy.get("confirm_button") as Button
-	assert_false(button.disabled, "前置：已选满且名额足够，确认按钮应可用")
+	assert_false(button.disabled, "前置：已选满且名额足够，确认按钮可用")
 	button.emit_signal("pressed")
 	assert_true(bool(cs.call("is_battle_active")), "确认出战应真的开战")
 
@@ -213,7 +230,9 @@ func _root() -> Variant:
 	return scene.get("combat_root")
 
 
-## 场景挂载——注入独立战斗系统 + 真实卡组/阵位/费用数据源。
+## 场景挂载——注入独立战斗系统 + 真实卡组/阵位/费用数据源。[br]
+## [br][b]开战上下文[/b]：与探索侧同一条路径（模板 ID + 等级 + 掉落 + 玩家阵容），
+## 不再走默认遭遇资源——本夹具验证的正是「探索节点带进来的遭遇」。
 func _mount_scene(p_defeat: bool) -> void:
 	scene = (load(CombatScenePath) as PackedScene).instantiate() as Control
 	scene.set("combat_system", cs)
@@ -221,18 +240,30 @@ func _mount_scene(p_defeat: bool) -> void:
 	scene.set("deployment_system", _autoload(&"DeploymentSystem"))
 	scene.set("scene_manager", sm)
 	scene.set("reduce_motion_override", true)
-	if p_defeat:
-		var encounter: Resource = EncounterScript.new()
-		encounter.set("encounter_id", &"test_mo_xiu")
-		var ids: Array[StringName] = [&"mo_xiu"]
-		encounter.set("enemy_template_ids", ids)
-		scene.set("encounter", encounter)
+	if use_fixture_launch_context:
+		scene.set("launch_context_override", _launch_context(p_defeat))
 	# 用尺寸确定的宿主 Control 承载全屏锚点的战斗场景——由父级给尺寸，
 	# 避免「_ready 后直接改 size」触发引擎覆写告警。
 	_host = Control.new()
 	_host.size = Vector2(1280.0, 720.0)
 	add_child(_host)
 	_host.add_child(scene)
+
+
+## 开战上下文——胜利用散修、战败用魔修（与既有验收口径一致）。
+func _launch_context(p_defeat: bool) -> Dictionary:
+	var tid: StringName = &"mo_xiu" if p_defeat else &"san_xiu"
+	return {
+		"node_id": 101,
+		"combat_type": &"combat",
+		"encounter_id": "test_%s" % tid,
+		"display_name": "测试遭遇·%s" % tid,
+		"enemy_template_ids": [tid],
+		"enemy_roster": [],
+		"enemy_level": 1,
+		"rewards": {"lingshi": 12, "cultivation": 6, "cards": []},
+		"player_roster": char_ids.duplicate(),
+	}
 
 
 ## 卡组与角色种子（真实 CardSystem 实例 + GSM 收藏/卡组/角色位）。

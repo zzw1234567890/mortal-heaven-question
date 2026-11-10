@@ -581,19 +581,31 @@ func _settle_result(result: int) -> Dictionary:
 	return rewards
 
 
-## 计算灵石奖励——基础值由战斗配置决定（桩默认 0）。
+## 计算灵石奖励——[b]由开战配置的 [code]rewards[/code] 决定[/b]（探索节点掉落）。[br]
+## [br][b]为什么读配置而不是现算[/b]：掉落属于「哪一格打哪一批人、给什么」的
+## 探索侧数据（[code]combat_launch_context.gd[/code] 在节点生成时定档）；战斗系统
+## 只负责结算，不重复一套掉落表。配置缺失时为 0（不臆造奖励）。
 func _calculate_lingshi_reward() -> int:
-	return 0
+	return maxi(_configured_rewards().get("lingshi", 0), 0)
 
 
-## 计算修为奖励——基础值由战斗配置决定（桩默认 0）。
+## 计算修为奖励——同上，读开战配置 [code]rewards.cultivation[/code]。
 func _calculate_cultivation_reward() -> int:
-	return 0
+	return maxi(_configured_rewards().get("cultivation", 0), 0)
 
 
-## 计算卡牌掉落——基础值由战斗配置决定（桩默认空）。
+## 计算卡牌掉落——同上，读开战配置 [code]rewards.cards[/code]（字典列表深拷贝）。
 func _calculate_card_drops() -> Array:
-	return []
+	var raw: Variant = _configured_rewards().get("cards", [])
+	if not (raw is Array):
+		return []
+	return (raw as Array).duplicate(true)
+
+
+## 开战配置里的掉落字典（缺失/类型不符时为空——结算侧按 0/空处理）。
+func _configured_rewards() -> Dictionary:
+	var raw: Variant = _battle_config.get("rewards", {})
+	return raw if raw is Dictionary else {}
 
 
 ## 应用胜利奖励——通过 ResourceSystem.add_resource / CultivationSystem.gain_cultivation。[br]

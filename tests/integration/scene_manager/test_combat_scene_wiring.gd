@@ -86,6 +86,8 @@ func before_each() -> void:
 	scene.set("combat_system", combat)
 	scene.set("deployment_system", deployment)
 	scene.set("reduce_motion_override", true)  # 进场动画直跳终态（确定性）
+	# 探索侧开战上下文（缺了它开战会按设计拒绝——本文件只验出口接线）
+	scene.set("launch_context_override", _launch_context())
 	add_child_autofree(scene)
 
 
@@ -100,6 +102,21 @@ func after_each() -> void:
 func _instantiate(path: String) -> Control:
 	var packed: PackedScene = load(path)
 	return packed.instantiate() as Control
+
+
+## 最小可用的开战上下文——敌方模板 + 玩家阵容（掉落留空，本文件不验奖励）。
+func _launch_context() -> Dictionary:
+	return {
+		"node_id": 101,
+		"combat_type": &"combat",
+		"encounter_id": "wiring_test",
+		"display_name": "接线测试遭遇",
+		"enemy_template_ids": [&"san_xiu"],
+		"enemy_roster": [],
+		"enemy_level": 1,
+		"rewards": {},
+		"player_roster": [101, 202],
+	}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -30,6 +30,12 @@ func _deploy_title() -> String:
 	return TEXT_TRIBULATION_TITLE
 
 
+## 渡劫不要求探索侧开战上下文——敌方配置由 [code]TribulationSystem[/code] 组装
+## （[code]tribulation_data.boss_config[/code]），不经探索战斗节点链路。
+func _requires_launch_context() -> bool:
+	return false
+
+
 ## 开战——优先走渡劫系统委托（其内部进入 IN_COMBAT 状态并组装 boss config）。[br]
 ## [br][b]降级路径[/b]：渡劫系统不可用或状态非 PREPARING（例如玩家直接从节点图
 ## 撞上渡劫台）时退回父类的最小开战，并 push_warning 说明——避免玩家卡在

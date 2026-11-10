@@ -265,13 +265,21 @@ func _hold_lock() -> void:
 	_lock_held = true
 
 
-## 释放本组件推入的锁——只弹自己的 source，不动别的锁。
+## 释放本组件推入的锁——只弹自己的 source，不动别的锁。[br]
+## [br][b]先判 [code]has_lock[/code] 再 pop[/b]：本组件的锁会被外部清掉
+## （[code]SceneManager[/code] 的 [code]tree_changed[/code] 清栈、
+## [code]CombatSystem._clear_animation_lock[/code] 的按 source 清理），
+## 此时 [member _lock_held] 仍为 true 而栈里已没有本 source——直接 pop 会
+## 触发 InputManager 的「source not found」警告，战斗结束路径上尤其明显。
 func _release_lock() -> void:
 	if not _lock_held:
 		return
 	var manager: Node = _input_manager()
 	if manager != null and manager.has_method(&"pop_lock"):
-		manager.call(&"pop_lock", LOCK_SOURCE)
+		var still_held: bool = not manager.has_method(&"has_lock") \
+				or bool(manager.call(&"has_lock", LOCK_SOURCE))
+		if still_held:
+			manager.call(&"pop_lock", LOCK_SOURCE)
 	_lock_held = false
 
 
