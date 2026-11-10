@@ -24,8 +24,10 @@ extends RefCounted
 ## ADR-0008 §Phase 5、ADR-0017 §关键接口 execute_turn、
 ## production/epics/combat-ui-interaction/story-002-turn-cycle.md。
 
-## 战场状态表（AI 快照的 HP/ATK 取数来源——与落库侧同源）。
+## 战场状态表（AI 快照的 HP/ATK/防御取数来源——与落库侧同源）。
 const RosterStateScript := preload("res://src/feature/combat/combat_roster_state.gd")
+## 固定值防御结算纯函数（max(0, 伤害 − DEF)）。
+const DefenseRules := preload("res://src/feature/combat/combat_defense_rules.gd")
 
 ## 阵位未知哨兵——排到末尾（与 [code]combat_caster_rules.gd[/code] 同口径）。
 const POSITION_UNKNOWN: int = 1 << 30
@@ -108,6 +110,10 @@ func _resolve_action(p_action: Dictionary) -> Dictionary:
 		# 无可作用目标（我方全灭 / 目标信息缺失）——发一条 none 记录，
 		# 保持「每次行动都有可观测结果」的契约，而不是静默跳过。
 		return _emit_result(enemy_id, ACTION_NONE, -1, 0, false, false, 0)
+	if _target_already_dead(target_id):
+		# 目标已被同回合先手击杀——不再对尸体落库（否则会飘出一次不存在的伤害），
+		# 也不让阵亡角色在后续播报里再次出场。发 none 记录保持每次行动可观测。
+		return _emit_result(enemy_id, ACTION_NONE, -1, 0, false, true, 0)
 	var damage: int = _damage_of(p_action.get("enemy_id"), target_id, p_action)
 	var outcome: Dictionary = _apply_damage(target_id, damage)
 	return _emit_result(enemy_id, ACTION_SKILL, target_id, damage,
@@ -125,7 +131,12 @@ func _apply_damage(p_target_id: int, p_damage: int) -> Dictionary:
 			{"damage": p_damage, "is_kill": false})
 
 
-## 伤害取数——攻击力 − 目标防御，下限 1（GDD §公式 1 的简化攻击口径）。[br]
+## 伤害取数——[code]max(0, 技能威力/攻击力 − 目标防御)[/code]。[br]
+## [br][b]与攻击声明路径的区别[/b]：本路径按下限 0 结算（允许高防完全免伤），
+## 攻击声明路径保留 [code]max(1, ...)[/code] 保底；两套口径并存的原因写在
+## [code]combat_defense_rules.gd[/code] 与 GDD §公式「玩家防御字段」。[br]
+## [br][b]顺序[/b]：固定值 DEF 先减，百分比减伤后乘算（本路径目前没有百分比来源，
+## 故只执行第一步）。[br]
 ## [br][b]为什么不用 [code]calculate_damage[/code][/b]：那条路径含境界压制与百分比
 ## 减伤，需要攻防双方境界与减伤来源（[code]combat_attack_coverage.gd[/code] 那套），
 ## 属攻击声明阶段的口径。[br]
@@ -138,7 +149,7 @@ func _damage_of(p_enemy: Variant, p_target_id: int, p_action: Dictionary) -> int
 	# 技能自带威力（AI 侧给了就以它为准，缺省回退攻击力）
 	var declared: int = int(p_action.get("damage", 0))
 	var base: int = declared if declared > 0 else atk
-	return maxi(base - _defense_of(p_target_id), 1)
+	return DefenseRules.apply_flat(base, _defense_of(p_target_id))
 
 
 ## 敌方攻击力——优先读对象自带的 [code]attack[/code]（[code]EnemyBattleState[/code]），
@@ -153,11 +164,21 @@ func _attack_of(p_enemy: Variant) -> int:
 	return 0
 
 
-## 我方目标防御——暂无独立状态字段，恒 0（GDD §边缘情况「0 防御时伤害 = 攻击力」）。
-## [br][b]不臆造[/b]：宁可让伤害偏高也不编一个防御数字——编错会让玩家看到
-## 与 GDD 公式对不上的减伤。
-func _defense_of(_p_target_id: int) -> int:
-	return 0
+## 目标防御——读战斗状态表（[code]CombatRosterState[/code] 的 [code]defense[/code]）。
+## [br][b]默认 0[/b]：未注入 [code]player_stats.defense[/code] 的角色按 0 处理，
+## 不臆造防御数字；[b]未知角色[/b]的 [code]read_hp[/code] 同样返回 0。
+func _defense_of(p_target_id: int) -> int:
+	var roster: Variant = _parent.call("_get_roster_state")
+	var info: Dictionary = roster.call(&"read_hp", p_target_id)
+	return int(info.get("defense", 0))
+
+
+## 目标是否已在本次结算中被击杀——只在 [code]known=true[/code] 时判死，
+## 读不到 HP 的角色仍可被攻击（信息不足不臆造，同状态表口径）。
+func _target_already_dead(p_target_id: int) -> bool:
+	var roster: Variant = _parent.call("_get_roster_state")
+	var info: Dictionary = roster.call(&"read_hp", p_target_id)
+	return bool(info.get("known", false)) and not bool(info.get("is_alive", true))
 
 
 ## 目标角色 ID——AI 回传的是目标条目本身（我方快照字典），取其

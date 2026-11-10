@@ -31,9 +31,9 @@ func _init(parent: Node = null) -> void:
 ## [br][b]我方条目补齐 HP/防御字段[/b]：[code]DeploymentSystem.get_field()[/code] 的条目
 ## 只有阵位与状态（ADR-0016 §阵位数据模型），而决策引擎要读
 ## [code]current_hp[/code] / [code]max_hp[/code] / [code]is_alive[/code] / [code]defense[/code]——
-## 缺少这些键会让 [code]char_state.is_alive[/code] 取键报错。HP 从战斗状态表现读（同源）。[br]
-## [br][b]防御恒 0[/b]：玩家角色的 defense 尚无状态字段，不臆造数值——
-## 按 GDD §边缘情况「0 防御时伤害 = 攻击力」处理。[br]
+## 缺少这些键会让 [code]char_state.is_alive[/code] 取键报错。HP/防御从战斗状态表
+## 现读（与结算侧同源）。[br]
+## [br][b]防御默认 0[/b]：状态表未种到 defense 的角色按 0 处理，不臆造数值。[br]
 ## [br][param p_ai] AISystem（取敌方名册）；为 null 时敌方侧为空。
 func build(p_ai: Node = null) -> Dictionary:
 	var roster: RefCounted = _parent.call("_get_roster_state")
@@ -77,7 +77,7 @@ func _player_chars(p_roster: RefCounted) -> Array:
 			"current_hp": int(info.get("current_hp", 0)),
 			"max_hp": int(info.get("max_hp", 0)),
 			"atk": int(info.get("atk", 0)),
-			"defense": 0,
+			"defense": int(info.get("defense", 0)),
 			"is_alive": bool(p_roster.call(&"is_alive", character_id)),
 			"is_taunting": _entry_bool(entry, "is_taunting", false),
 		})

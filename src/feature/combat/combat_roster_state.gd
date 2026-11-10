@@ -26,8 +26,10 @@ const ENEMY_ID_BASE: int = 100000
 ## 敌方角色 ID 步长（每实例一段，避免同模板多实例 ID 冲突）。
 const ENEMY_ID_STRIDE: int = 10000
 
-## 状态表——[code]{character_id: {side, current_hp, max_hp, atk, is_alive, known, ref}}[/code]。
-## [code]ref[/code] 为外部持有者（敌方阵容条目）；我方条目为 null（本表即真理来源）。
+## 状态表——[code]{character_id: {side, current_hp, max_hp, atk, defense, is_alive,
+## known, ref}}[/code]。我方 [code]defense[/code] 来自 [code]player_stats.defense[/code]，
+## 缺省 0（不臆造）。[code]ref[/code] 为外部持有者（敌方阵容条目）；我方条目为 null
+## （本表即真理来源）。
 var _states: Dictionary = {}
 
 
@@ -84,6 +86,7 @@ func seed_enemy_roster(roster: Array) -> void:
 		var known: bool = max_hp > 0
 		_states[character_id] = _make_state(SIDE_ENEMY, hp, max_hp,
 				_entry_int(entry, "attack", 0),
+				_entry_int(entry, "defense", 0),
 				bool(_entry_int(entry, "is_alive", 1)) and (hp > 0 or not known), known, entry)
 
 
@@ -100,19 +103,24 @@ func seed_player_field(field: Array, stats: Dictionary,
 		var max_hp: int = 0
 		var hp: int = 0
 		var atk: int = 0
+		var defense: int = 0
 		if injected is Dictionary and not (injected as Dictionary).is_empty():
 			max_hp = int((injected as Dictionary).get("max_hp", 0))
 			hp = int((injected as Dictionary).get("current_hp",
 					(injected as Dictionary).get("hp", max_hp)))
 			atk = int((injected as Dictionary).get("atk",
 					(injected as Dictionary).get("attack", 0)))
+			defense = int((injected as Dictionary).get("defense",
+					(injected as Dictionary).get("def", 0)))
 		else:
 			max_hp = _read_template_field(card_system, character_id, "base_hp")
 			hp = max_hp
+			# 卡牌模板暂无 base_defense 字段；模板回退读到 0 = 「无数据」，不臆造。
+			defense = _read_template_field(card_system, character_id, "base_defense")
 		if atk <= 0:
 			atk = _read_template_field(card_system, character_id, "base_attack")
 		var known: bool = max_hp > 0 or hp > 0
-		_states[character_id] = _make_state(SIDE_PLAYER, hp, max_hp, atk,
+		_states[character_id] = _make_state(SIDE_PLAYER, hp, max_hp, atk, defense,
 				hp > 0 or not known, known, null)
 
 
@@ -143,7 +151,8 @@ func get_hp(character_id: int) -> Dictionary:
 func read_hp(character_id: int) -> Dictionary:
 	var state: Variant = _states.get(character_id)
 	if not (state is Dictionary):
-		return {"known": false, "side": SIDE_PLAYER, "current_hp": 0, "max_hp": 0, "atk": 0, "is_alive": true}
+		return {"known": false, "side": SIDE_PLAYER, "current_hp": 0, "max_hp": 0,
+				"atk": 0, "defense": 0, "is_alive": true}
 	var st: Dictionary = state
 	return {
 		"known": bool(st["known"]),
@@ -151,6 +160,7 @@ func read_hp(character_id: int) -> Dictionary:
 		"current_hp": int(st["current_hp"]),
 		"max_hp": int(st["max_hp"]),
 		"atk": int(st.get("atk", 0)),
+		"defense": int(st.get("defense", 0)),
 		"is_alive": bool(st["is_alive"]),
 	}
 
@@ -224,13 +234,14 @@ func apply_damage(character_id: int, damage: int) -> Dictionary:
 
 # === 内部 ========================================================================
 
-func _make_state(side: int, hp: int, max_hp: int, atk: int, is_alive: bool,
-		known: bool, ref: Variant) -> Dictionary:
+func _make_state(side: int, hp: int, max_hp: int, atk: int, defense: int,
+		is_alive: bool, known: bool, ref: Variant) -> Dictionary:
 	return {
 		"side": side,
 		"current_hp": maxi(hp, 0),
 		"max_hp": maxi(max_hp, 0),
 		"atk": maxi(atk, 0),
+		"defense": maxi(defense, 0),
 		"is_alive": is_alive,
 		"known": known,
 		"ref": ref,

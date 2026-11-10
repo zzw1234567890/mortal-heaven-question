@@ -113,6 +113,10 @@ var feedback: CombatFeedbackCoordinator:
 		if _feedback != null:
 			_feedback.coordinator = value
 
+## 敌方行动播报（combat-ui-interaction 002——逐条战报 + 播报期输入锁）。
+var enemy_broadcast: Control:
+	get: return (_feedback.broadcast as Control) if _feedback != null else null
+
 ## 角色卡装配台（Sprint 18）。[b]类型宽松（Node）[/b]：其 class_name 依赖导入缓存，
 ## 鸭子类型调用可避免「首次导入前解析失败」的次序问题。
 var actor_stage: Node:
@@ -193,8 +197,15 @@ func open_retreat_dialog() -> void:
 func setup_feedback(p_combat_system: Node, p_deployment_system: Node,
 		p_hp_reader: Callable, p_card_system: Node = null,
 		p_binding_manager: Node = null, p_reduce_motion: bool = false) -> void:
+	# 战报同时进战斗日志：日志节点由顶部条持有（缺失时只显示播报背板）。
+	var log_sink: Callable = Callable()
+	var bar: Variant = combat_topbar
+	if bar != null:
+		var log_node: Variant = bar.get("combat_log")
+		if log_node is Object:
+			log_sink = Callable(log_node, &"append_entry")
 	_feedback.call(&"setup", [p_combat_system, p_deployment_system], p_hp_reader,
-			p_reduce_motion)
+			p_reduce_motion, p_card_system, log_sink)
 	_assembly.call(&"setup", p_combat_system, p_deployment_system, p_card_system,
 			p_binding_manager, feedback)
 

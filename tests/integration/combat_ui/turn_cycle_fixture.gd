@@ -81,21 +81,25 @@ func _enemy_state(p_tid: StringName, p_pos: int, p_atk: int = ENEMY_ATK) -> Obje
 
 ## 开战：我方 2 人上场 + 敌方名册 + 费用就绪。[br]
 ## [param p_enemies] 敌方运行时实例列表（测试自建，可控制阵位与数量）。[br]
-## [param p_is_first_player] 先后手（抽牌与首回合费用的分岔开关）。
-func _start(p_enemies: Array, p_is_first_player: bool = true) -> void:
+## [param p_is_first_player] 先后手（抽牌与首回合费用的分岔开关）。[br]
+## [param p_player_stats] 我方属性覆盖（空 = 10 HP / 3 ATK 的基准夹具）；
+## 防御相关用例用它注入 [code]defense[/code]。
+func _start(p_enemies: Array, p_is_first_player: bool = true,
+		p_player_stats: Dictionary = {}) -> void:
 	var ok: bool = DeploymentSystem.setup_field([CHAR_A, CHAR_B], {})
 	assert_true(ok, "前置：两名角色上场成功")
 	if ok:
 		_release_ids.append_array([CHAR_A, CHAR_B])
 	AISystem.set_enemy_roster(p_enemies)
+	var stats: Dictionary = p_player_stats if not p_player_stats.is_empty() else {
+		CHAR_A: {"current_hp": 10, "max_hp": 10, "atk": 3},
+		CHAR_B: {"current_hp": 10, "max_hp": 10, "atk": 3},
+	}
 	cs.call("battle_start", {
 		"enemy_roster": p_enemies,
 		"character_ids": [CHAR_A, CHAR_B],
 		"is_first_player": p_is_first_player,
-		"player_stats": {
-			CHAR_A: {"current_hp": 10, "max_hp": 10, "atk": 3},
-			CHAR_B: {"current_hp": 10, "max_hp": 10, "atk": 3},
-		},
+		"player_stats": stats,
 	})
 	# 开局手牌注入（牌堆 → 发牌 → 手牌就绪；GDD §2 先手 4 / 后手 5）
 	cs.call("set_deck_state", _deck_ids(12), [], [])
