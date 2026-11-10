@@ -63,20 +63,45 @@ func test_init_deck_clears_hand_and_discard() -> void:
 # ============================================================================
 
 func test_draw_cards_moves_to_hand() -> void:
-	# Arrange
+	# Arrange——[b]第 2 回合[/b]：GDD §2 抽牌表里第 1 回合按先后手分岔
+	# （先手不抽牌），基础 2 张从第 2 回合起生效。本用例验证的是「抽牌动作本身
+	# 会把牌从牌堆移进手牌」，故直接摆出第 2 回合的上下文。
 	cs.call("init_deck", [1, 2, 3, 4, 5])
 
-	# Act——_draw_cards 是内部方法，通过 set_battle_active + advance 到 DRAW 阶段触发
-	# 或直接测试抽牌逻辑
+	# Act
 	cs.call("set_deck_state", [1, 2, 3, 4, 5], [], [])
 	cs.call("set_hand", [])
-	# 触发 DRAW 阶段
-	cs.set_battle_active(true)
+	cs.call("set_battle_active", true, 2)  # 第 2 回合
 	cs.advance_phase()  # PREPARATION → DRAW
 
 	# Assert
-	assert_eq(cs.call("get_hand").size(), 2, "手牌应有 2 张（基础抽牌数）")
+	assert_eq(cs.call("get_hand").size(), 2, "手牌应有 2 张（第 2 回合基础抽牌数）")
 	assert_eq(cs.call("get_deck").size(), 3, "牌库应剩 3 张")
+
+
+## 第 1 回合抽牌按先后手分岔（GDD §2 抽牌表——先手 0 / 后手 3）。
+func test_draw_count_turn1_splits_by_first_player() -> void:
+	# Arrange + Act——先手第 1 回合：不抽牌（使用开局手牌）
+	cs.call("set_deck_state", [1, 2, 3, 4, 5], [], [])
+	cs.call("set_hand", [])
+	cs.set("_battle_config", {"is_first_player": true})
+	cs.call("set_battle_active", true, 1)
+	cs.advance_phase()  # PREPARATION → DRAW
+
+	# Assert
+	assert_eq(cs.call("get_hand").size(), 0, "先手第 1 回合不抽牌")
+
+	# Arrange + Act——后手第 1 回合：抽 3 张（补偿）
+	cs.call("set_deck_state", [1, 2, 3, 4, 5], [], [])
+	cs.call("set_hand", [])
+	cs.set("_battle_config", {"is_first_player": false})
+	cs.call("set_battle_active", true, 1)
+	cs.advance_phase()  # PREPARATION → DRAW
+
+	# Assert
+	assert_eq(cs.call("get_hand").size(), 3, "后手第 1 回合抽 3 张（补偿）")
+	assert_eq(cs.call("get_deck").size(), 2, "牌库相应减少 3 张")
+	cs.set("_battle_config", {})
 
 
 # ============================================================================

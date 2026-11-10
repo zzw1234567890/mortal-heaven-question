@@ -84,11 +84,36 @@ signal character_died(character_id: int, side: int, binding_card_ids: Array)
 ## 撤退请求——玩家调用 retreat() 时发射（Cat 2b），UI 展示确认弹窗。
 signal retreat_requested()
 
+## 新回合开始——[b]回合切换的显式信号[/b]（Cat 2b）。[br]
+## 载荷: [code]{turn: int, is_player_turn: bool}[/code] 具名字典（ADR-0007 >3 参数规则）。[br]
+## [br][b]为什么与 phase_changed 并存[/b]：[code]phase_changed[/code] 是「阶段推进」
+## 的通用事件，每回合发 7 次；「回合切换」是玩家心智里的另一个层级（手牌与费用刚重置、
+## 轮到我/对方行动）。UI 侧要靠 7 次阶段信号里筛 [code]new_phase == PREPARATION[/code]
+## 才能知道回合换了——那是把编排细节漏进表现层。本信号在回合边界发一次，
+## 消费者（回合横幅 / 手牌刷新 / 音效）不必再理解阶段编号。[br]
+## [br][b]发射时机[/b]：[method advance_phase] 中 [code]END→PREPARATION[/code] 回绕、
+## 回合号递增[b]并且[/b]费用与手牌已重置之后（读者拿到信号时状态已是新回合的）。
+signal turn_started(turn_data: Dictionary)
+
+## 敌方单次行动结算完毕——敌方回合的可观测结果（Cat 2b）。[br]
+## 载荷: [code]{enemy_id, action, target_id, damage, is_kill, known, hp_after}[/code]
+## 具名字典。[br]
+## [br][code]action[/code] 取 [code]combat_enemy_turn.gd[/code] 的常量
+## （[code]skill[/code] / [code]retreat[/code] / [code]none[/code]）；
+## [code]known=false[/code] 表示目标读不到可信 HP、本次未落库
+## （同 [code]character_damaged[/code] 的不臆造口径）。[br]
+## [br][b]为什么要有[/b]：敌方回合此前是「黑盒一跳」——[code]execute_turn()[/code]
+## 的行动被丢弃，玩家看不到敌人打了谁、掉多少血。本信号是战报与表现层的唯一入口。
+signal enemy_action_resolved(action_data: Dictionary)
+
 
 # === 子模块类型常量（Sprint 18 结算回流）=========================================
 
 ## HP 跨战斗持久化子模块——[constant WRITE_UNAVAILABLE] 与回写口径的单一来源。
 const HpCarryoverScript := preload("res://src/feature/combat/combat_hp_carryover.gd")
+
+## 回合经济规则（开局手牌 / 抽牌表——纯函数，与阶段侧同一份口径）。
+const TurnEconomy := preload("res://src/feature/combat/combat_turn_economy.gd")
 
 
 # === 内部状态 ====================================================================
@@ -162,6 +187,9 @@ var _card_resolver: RefCounted = null
 ## 阶段管理子模块——惰性初始化（Sprint 9 Story 8 拆分）。
 var _phase_manager: RefCounted = null
 
+## 敌方回合结算模块（决策 + 落库 + 广播）——惰性创建（combat-ui-interaction 002）。
+var _enemy_turn: RefCounted = null
+
 ## 战斗开始/结束接线子模块（Sprint 18 补链——名册快照 / 费用激活 / END 判定）。
 var _battle_wiring: RefCounted = null
 
@@ -198,6 +226,13 @@ var _field_engaged: bool = false
 ## battle_end() 会把已结束的战斗再写一次阶段。改为「END 入口判定 + advance_phase
 ## 簿记后收尾」，保证 7 阶段序列完整走完再退出（ADR-0008 §Phase 6）。
 var _pending_battle_result: int = 0
+
+## 本场开战 config 快照——回合经济规则的输入（先手/后手由
+## [code]is_first_player[/code] 决定抽牌数与首回合费用）。[br]
+## [br][b]为什么留快照而非现读[/b]：battle_start 之后调用方可以改自己那份字典，
+## 而「本场谁是先手」在一场战斗内不可变；现读会让同一场里前后两次抽牌
+## 按不同先后手口径算。
+var _battle_config: Dictionary = {}
 
 
 # === 生命周期 ====================================================================
@@ -300,6 +335,9 @@ func battle_start(config: Dictionary) -> void:
 	# Sprint 18（结算回流）：本场战绩计数归零
 	_get_battle_record().call(&"reset")
 
+	# 回合经济规则输入快照（先手/后手——开战定格，见成员文档）
+	_battle_config = config.duplicate(true)
+
 	# Sprint 18 / DEBT-CBT-018-1：种子敌我 HP 状态 + 订阅自身 character_died（阵亡清位）
 	_seed_roster_state(config)
 	_connect_death_cleanup()
@@ -310,8 +348,14 @@ func battle_start(config: Dictionary) -> void:
 	# AC-004：创建战斗快照
 	_create_battle_snapshot()
 
-	# AC-005：推入输入锁
-	_push_animation_lock()
+	# GDD §2 开局手牌（先手 4 / 后手 5）——「先手第 1 回合不抽牌」的前提。
+	# 牌堆尚未就绪（调用方未 init_deck）时发 0 张，不报错：本场的抽牌阶段
+	# 会照常走牌堆为空的分支（GDD §边缘情况「抽空牌库」）。
+	deal_opening_hand()
+
+	# AC-005 / DEBT-CBT-018-11：动画锁不再整场持有——改由阶段 4/5 的
+	# 进/出配对推弹（见 _sync_animation_lock）。开战瞬间不在阶段 4/5，
+	# 故此处不推锁。
 
 	# AC-003：发射 battle_started 信号（Cat 2b）
 	_emit_safe(&"battle_started", [config.duplicate(true)])
@@ -578,6 +622,12 @@ func _clear_battle_snapshot() -> void:
 
 
 ## 推入 ANIMATION 输入锁（AC-005）。
+## [br][b]只在阶段 4/5 持有[/b]（DEBT-CBT-018-11 收窄）：GDD 只要求攻击结算与
+## 敌方行动这两个「玩家只看不动」的阶段拦截玩法输入；整场持锁会让出牌阶段
+## （2）永远收不到点击，输入层不得不为它开一条豁免口子。[br]
+## [br][b]与 [method _clear_animation_lock] 严格配对[/b]：每次推入都在
+## [method _sync_animation_lock] 里以「当前是否在阶段 4/5」为唯一判据，
+## 重复推入由 InputManager 的 source 去重兜底（不会叠加）。
 func _push_animation_lock() -> void:
 	var im = _get_input_manager()
 	if im != null and im.has_method("push_lock"):
@@ -586,10 +636,25 @@ func _push_animation_lock() -> void:
 
 
 ## 清理 CombatSystem 推入的输入锁（AC-011）。
+## [br][b]也用 [code]clear_locks[/code] 而非 pop[/b]：本方法同时服务「离开阶段 4/5」
+## 与「战斗结束」两个场景，后者要求无论当前阶段如何都清干净
+## （残留锁会让下一场战斗开局的输入被吞）。
 func _clear_animation_lock() -> void:
 	var im = _get_input_manager()
 	if im != null and im.has_method("clear_locks"):
 		im.clear_locks(&"combat_system")
+
+
+## 阶段驱动的锁同步——进入阶段 4/5 推锁，其余阶段不持有。[br]
+## [br][b]为什么以「当前阶段」而非「翻越了边界」判定[/b]：状态机可能因校验失败
+## 原地不动，边界法会积累漂移；按当前阶段幂等地推/清，任何路径走到这里
+## 都会收敛到正确状态（推入与清除各自幂等）。[br]
+## [br][param p_phase] 刚进入的阶段（[method advance_phase] 在簿记后调用）。
+func _sync_animation_lock(p_phase: int) -> void:
+	if p_phase == CombatPhase.ATTACK_RESOLUTION or p_phase == CombatPhase.ENEMY_TURN:
+		_push_animation_lock()
+	else:
+		_clear_animation_lock()
 
 
 ## 请求场景切换（AC-015）。
@@ -671,13 +736,23 @@ func advance_phase() -> bool:
 
 	# AC-005：END→PREPARATION 回绕时递增回合
 	# （Sprint 18：已判定结束的战斗不开启下一回合——回合数停在结束的那一回合）
+	var turn_changed: bool = false
 	if next == CombatPhase.PREPARATION and old_phase == CombatPhase.END \
 			and _pending_battle_result == 0:
 		_turn += 1
 		_gsm_increment_battle_turn()
+		turn_changed = true
 
 	# AC-002：Cat 2b 信号——通过 _emit_signal_safe 路由（ADR-0007）
 	_emit_safe(&"phase_changed", [old_phase, next, _turn])
+
+	# 回合切换信号（新回合的显式广播——费用与手牌已在 END 阶段重置完毕，
+	# 读者拿到此信号时状态已是新回合的）
+	if turn_changed:
+		_emit_turn_started()
+
+	# AC-005 / DEBT-CBT-018-11：动画锁按阶段 4/5 配对持有
+	_sync_animation_lock(next)
 
 	# Sprint 18：Phase 6 END 判定出的结局收尾（簿记 + 信号完成后才退出，
 	# 保证 7 阶段序列与 phase_changed 不被 battle_end 截断——ADR-0008 §Phase 6）
@@ -744,6 +819,18 @@ func _get_field_characters() -> Array:
 ## 计算抽牌数量——委托给子模块。
 func _calculate_draw_count() -> int:
 	return _get_phase_manager()._calculate_draw_count()
+
+
+## 发射 [signal turn_started]——回合边界的显式广播。[br]
+## [br][code]is_player_turn[/code] 在 7 阶段模型下恒为 true：敌我共用同一个回合
+## 序列（阶段 5 是「本回合里的敌方行动」，不是对方的独立回合）。该字段保留，
+## 是为了让消费者不必理解阶段编号——将来若拆出独立的敌方回合，只改这里的取值，
+## 信号形状与所有订阅方都不动。
+func _emit_turn_started() -> void:
+	_emit_safe(&"turn_started", [{
+		"turn": _turn,
+		"is_player_turn": true,
+	}])
 
 
 # === 手动确认 API（Phase 2/3 玩家交互入口）========================================
@@ -848,6 +935,31 @@ func init_deck(card_ids: Array) -> void:
 		var tmp = _deck[i]
 		_deck[i] = _deck[j]
 		_deck[j] = tmp
+
+
+## 发开局手牌——GDD §2「开局手牌：先手 4 张，后手 5 张」。<br>
+## [br][b]为什么需要显式发牌[/b]：GDD 抽牌表里「先手第 1 回合不抽牌」的前提是
+## 玩家手里[b]已经有[/b]开局手牌。此前该前提没有兑现——第 1 回合不抽牌就等于空手开局
+## （无牌可出），所以旧实现用「恒抽 2 张」绕过。本方法把开局手牌补上，
+## 抽牌表才能按 GDD 原样执行。<br>
+## [br][b]与 [method init_deck] 的分工[/b]：init_deck 只负责「洗牌 + 清手牌」
+## （既有 Story 001 契约，不改），发牌是它的下一步——单独成方法让
+## 「牌堆就绪」与「发牌」可以分别测试，也让 battle_start 能在牌堆为空时安全跳过。<br>
+## [br][b]牌堆不足时发多少算多少[/b]：不从弃牌堆返还（那会让开局凭空多出牌），
+## 有多少发多少——不足是牌组配置问题，应由组牌侧暴露。<br>
+## [br][b]返回[/b]: 实际发出的张数（牌堆为空时为 0）。
+func deal_opening_hand() -> int:
+	var count: int = TurnEconomy.opening_hand_size(_is_first_player())
+	# 沿用既有抽牌路径（含牌库抽空返还与手牌追加语义）——不另开一条发牌实现，
+	# 否则「开局手牌」与「回合抽牌」的手牌顺序语义会分家。
+	var before: int = _hand.size()
+	_draw_cards(count)
+	return _hand.size() - before
+
+
+## 先手标志——开战 config 供数（回合经济规则的输入）。
+func _is_first_player() -> bool:
+	return TurnEconomy.is_first_player(_battle_config)
 
 
 ## 弃牌——将手牌中的指定卡牌移到弃牌堆。[br]
@@ -1166,6 +1278,13 @@ func _get_phase_manager() -> RefCounted:
 	if _phase_manager == null:
 		_phase_manager = preload("res://src/feature/combat/combat_phase_manager.gd").new(self)
 	return _phase_manager
+
+
+## 敌方回合结算模块（决策 + 落库 + 广播）——惰性创建。
+func _get_enemy_turn() -> RefCounted:
+	if _enemy_turn == null:
+		_enemy_turn = preload("res://src/feature/combat/combat_enemy_turn.gd").new(self)
+	return _enemy_turn
 
 
 ## 获取战斗接线子模块实例（Sprint 18——名册快照 / 费用激活 / END 判定）。

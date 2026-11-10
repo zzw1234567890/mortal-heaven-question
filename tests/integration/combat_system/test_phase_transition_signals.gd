@@ -460,7 +460,10 @@ func test_ac010_only_cat2b_signals_declared() -> void:
 	# 过滤掉 Node 内置信号（tree_entered 等），只检查脚本声明的信号
 	# Sprint 18：新增 character_damaged（伤害增量通知——不带 HP 终值，
 	# 消费者持 get_character_hp() 读取契约现读，不构成数据信号）
-	var expected: Array = ["phase_changed", "battle_started", "battle_ended", "attack_resolved", "character_died", "retreat_requested", "character_damaged"]
+	# combat-ui-interaction 002：新增 turn_started（回合边界广播）与
+	# enemy_action_resolved（敌方单次行动结果）——两者都是事件通知，
+	# 均不带可被 UI 复制的权威状态（turn 是事件携带的时点值，HP 终值仍需现读）。
+	var expected: Array = ["phase_changed", "battle_started", "battle_ended", "attack_resolved", "character_died", "retreat_requested", "character_damaged", "turn_started", "enemy_action_resolved"]
 	var builtin: Array = ["tree_entered", "tree_exiting", "tree_exited", "child_entered_tree", "child_exiting_tree", "child_order_changed", "replacing_by", "editor_description_changed", "editor_state_changed", "script_changed", "property_list_changed", "ready", "renamed"]
 	var signals: Array = cs.get_signal_list()
 	for s in signals:

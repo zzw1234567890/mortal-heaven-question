@@ -54,6 +54,21 @@ func _advance_to_turn(target_turn: int) -> void:
 		cs.call("advance_phase")  # 每回合 7 阶段——回绕 PREPARATION 时回合 +1
 
 
+## 推进到当前回合的指定阶段（用于制造阶段 4/5 的持锁态与阶段 2 的无锁态）。[br]
+## [br][b]带步数上限[/b]：阶段校验失败时 advance_phase 返回 false 且阶段不变
+## （如出牌阶段缺确认标志），无上限的 while 会死循环卡住整个测试套件。
+func _advance_to_phase(target_phase: int) -> void:
+	for i: int in range(12):
+		if cs.call("get_current_phase") == target_phase:
+			return
+		if not cs.call("advance_phase"):
+			# 出牌/攻击声明阶段需要玩家确认标志才能推进——直接置位，
+			# 否则推进链在此断掉（本用例只关心阶段与锁，不验证确认流程）
+			cs.set("_player_confirmed_end", true)
+			cs.set("_player_confirmed_attack_skip", true)
+			cs.call("advance_phase")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # AC-2：战斗状态保持（AC-hud-011 核心）
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -89,12 +104,15 @@ func test_ac002_gsm_battle_domain_preserved() -> void:
 			"battle.turn 应不变")
 
 func test_ac002_pause_while_combat_lock_active() -> void:
-	## AC-2 edge: 战斗动画锁（ANIMATION）下 ESC 暂停——恢复后战斗锁仍在且状态不变
-	## （battle_start 推入 ANIMATION 锁——MODAL 叠加其上，关闭后战斗锁恢复）
+	## AC-2 edge: 动画锁（ANIMATION）期间 ESC 暂停——恢复后锁与状态都不变。
+	## [br][b]前置已按 DEBT-CBT-018-11 收窄[/b]：战斗不再整场持锁，改为阶段 4/5
+	## 持有。本用例推进到阶段 5（敌方行动）制造持锁态——那是「玩家只看不动」的
+	## 阶段，也正是需要验证「锁不会被暂停流程吞掉」的场景。
 	# Arrange
 	cs.call("battle_start", {"enemy_deck_id": "test_deck"})
+	_advance_to_phase(5)
 	assert_true(InputManager.has_lock(&"combat_system"),
-			"前置：battle_start 推入战斗 ANIMATION 锁")
+			"前置：阶段 5 期间战斗 ANIMATION 锁应持有")
 	var turn_before: int = cs.call("get_turn_number")
 	# Act —— 战斗中 ESC（UI_NAV 在 ANIMATION 锁下允许——test_modal_integration 先例）
 	hud.request_pause(&"esc")
@@ -106,6 +124,19 @@ func test_ac002_pause_while_combat_lock_active() -> void:
 	assert_false(InputManager.has_lock(&"pause_menu"),
 			"暂停 MODAL 锁应已释放")
 	assert_eq(cs.call("get_turn_number"), turn_before, "回合数应不变")
+
+func test_ac002_play_phase_holds_no_combat_lock() -> void:
+	## AC-2 边缘（DEBT-CBT-018-11 收窄的直接断言）：出牌阶段[b]不持[/b]战斗锁。[br]
+	## [br][b]为什么值得单测[/b]：整场持锁正是「出牌阶段收不到点击」的根因，
+	## 而修复方式是在输入层开豁免口子。现在豁免已删——若锁又回到整场持有，
+	## 点击会静默失效（无报错、无提示），只有这条断言能在那一刻拦住。
+	# Arrange
+	cs.call("battle_start", {"enemy_deck_id": "test_deck"})
+	_advance_to_phase(2)
+	# Assert
+	assert_eq(cs.call("get_current_phase"), 2, "前置：处于出牌阶段")
+	assert_false(InputManager.has_lock(&"combat_system"),
+			"出牌阶段不应持有战斗 ANIMATION 锁（否则点击被吞）")
 
 func test_ac002_multi_pause_resume_cycles_in_combat() -> void:
 	## AC-2 edge: 战斗中多轮暂停/恢复——状态稳定（无累积漂移）
@@ -121,4 +152,6 @@ func test_ac002_multi_pause_resume_cycles_in_combat() -> void:
 	assert_true(cs.call("is_battle_active"), "3 轮后战斗仍活跃")
 	assert_eq(cs.call("get_turn_number"), 1, "回合数应仍为 1（无推进）")
 	assert_false(InputManager.has_lock(&"pause_menu"), "暂停锁应清空")
-	assert_true(InputManager.has_lock(&"combat_system"), "战斗锁应保持")
+	# 阶段 0（battle_start 停在准备阶段）不属阶段 4/5——无战斗锁（收窄后的口径）
+	assert_false(InputManager.has_lock(&"combat_system"),
+			"准备阶段不持战斗锁（锁已收窄到阶段 4/5）")

@@ -8,6 +8,12 @@ extends RefCounted
 ##
 ## [br]来源: ADR-0008 §7 阶段状态机 §阶段转换验证矩阵 §子系统编排顺序。
 ## [br]Sprint 9 Story 8：从 combat_system.gd 拆分。
+## [br]combat-ui-interaction Story 002：ENEMY_TURN 改走 [code]combat_enemy_turn.gd[/code]
+## 真结算（此前 AI 决策完就丢弃）；抽牌/费用改由 [code]combat_turn_economy.gd[/code]
+## 的数据驱动口径供数（此前恒返 2 张 + 恒按先手重置）。
+
+## 回合经济规则（抽牌表 / 手牌上限——纯函数）。
+const TurnEconomy := preload("res://src/feature/combat/combat_turn_economy.gd")
 
 ## CombatPhase 枚举值（避免依赖父节点枚举）。
 const PHASE_PREPARATION: int = 0
@@ -83,20 +89,22 @@ func enter_phase(phase: int) -> void:
 			_parent.call("_resolve_attack_queue")
 			_schedule_auto_advance()
 		PHASE_ENEMY_TURN:
-			# AISystem.execute_turn——Sprint 8 Story 004 接线
+			# AISystem.execute_turn → 逐条结算并广播（combat_enemy_turn.gd）
 			_execute_ai_turn()
 			_schedule_auto_advance()
 		PHASE_END:
-			# 1. CostSystem.reset_for_turn
+			# 1. 手牌超限弃置（GDD card-system §手牌限制：回合结束弃至 10 张）
+			_enforce_hand_limit()
+			# 2. CostSystem.reset_for_turn（先手/后手与首回合口径由经济模块供数）
 			_reset_cost_for_turn()
-			# 2. DeploymentSystem.clear_standby_state
+			# 3. DeploymentSystem.clear_standby_state
 			_clear_standby_state()
-			# 3. 战斗结束检查（Sprint 18：真实现——敌我全灭判定，GDD §9）
+			# 4. 战斗结束检查（Sprint 18：真实现——敌我全灭判定，GDD §9）
 			#    判定命中即停在此阶段：advance_phase 簿记后由父节点收尾 battle_end，
 			#    不再调度下一回合（否则已结束的战斗会先绕回 PREPARATION）。
 			if _check_battle_end():
 				return
-			# 4. 未结束 → 调度下一回合
+			# 5. 未结束 → 调度下一回合
 			_schedule_auto_advance()
 
 
@@ -136,12 +144,39 @@ func _tick_status_effects() -> void:
 
 
 ## 重置费用——通过 CostSystem Autoload。[br]
-## 不可用时静默跳过。
+## 不可用时静默跳过。[br]
+## [br][b]先手/后手由开战 config 决定[/b]（[code]combat_turn_economy.is_first_player[/code]
+## 供数，缺省先手——与改造前的硬编码口径逐位一致）；[code]is_first_turn[/code]
+## 取「END 时仍是第 1 回合」（费用在 END 重置，下一回合才是它的生效回合）。
 func _reset_cost_for_turn() -> void:
 	var cs = _get_cost_system()
 	if cs != null and cs.has_method("reset_for_turn"):
-		# is_first_player / is_first_turn 由战斗上下文决定——此处用简化默认值
-		cs.reset_for_turn(true, _parent.get("_turn") == 1)
+		cs.reset_for_turn(_is_first_player(), int(_parent.get("_turn")) == 1)
+
+
+## 手牌超限弃置——回合结束弃至上限（GDD card-system.md §手牌限制）。[br]
+## [br][b]弃最旧的[/b]：从手牌头部开始弃（数组头部是先抽到的牌），
+## 与「新抽的牌留在手上」的玩家预期一致；抽牌追加在尾部（同
+## [code]CombatSystem._draw_cards[/code] 的 [code]append[/code]）。[br]
+## [br][b]经 [code]discard_card[/code] 走既有落库路径[/b]——手牌/弃牌堆两侧同时更新，
+## 不在这里手改数组（否则弃牌堆数量不对，牌库抽空返还时少一张牌）。[br]
+## [br][b]返回[/b]: 实际弃置张数（未超限为 0）。
+func _enforce_hand_limit() -> int:
+	var hand: Array = _parent.get("_hand")
+	var overflow: int = TurnEconomy.hand_overflow(hand.size())
+	if overflow <= 0:
+		return 0
+	# 先快照要弃的 ID 再弃——discard_card 会改动手牌数组，边遍历边删会漏项。
+	var victims: Array = []
+	for i: int in range(mini(overflow, hand.size())):
+		victims.append(_card_id_of(hand[i]))
+	var discarded: int = 0
+	for card_id: int in victims:
+		if card_id < 0:
+			continue
+		_parent.call("discard_card", card_id)
+		discarded += 1
+	return discarded
 
 
 ## 清除待命状态——通过 DeploymentSystem Autoload。[br]
@@ -161,21 +196,23 @@ func _check_battle_end() -> bool:
 	return bool(_parent.call("_check_battle_end"))
 
 
-## 执行 AI 回合——通过 AISystem Autoload。[br]
-## 不可用时静默跳过。
-func _execute_ai_turn() -> void:
-	var ai = _get_ai_system()
-	if ai != null and ai.has_method("execute_turn"):
-		var field_state: Dictionary = _build_field_state()
-		ai.execute_turn(field_state)
+## 执行 AI 回合——决策 + 逐条结算（[code]combat_enemy_turn.gd[/code]）。[br]
+## [br][b]返回[/b]: 每次行动的结算载荷列表（AISystem 不可用时为空）。
+## [br][b]为什么不再直接调 [code]execute_turn[/code][/b]：那样只拿到行动指令、
+## 从不落库——敌方伤害对玩家不可见（本轮修掉的断路）。
+func _execute_ai_turn() -> Array:
+	var module: RefCounted = _parent.call("_get_enemy_turn")
+	if module == null:
+		return []
+	return module.call(&"run")
 
 
-## 构建场上状态快照——供 AISystem.execute_turn 使用。
+## 构建场上状态快照——委托敌方回合模块（键名与决策引擎的读取面对齐）。
 func _build_field_state() -> Dictionary:
-	var ds = _get_deployment_system()
-	if ds != null and ds.has_method("get_field"):
-		return {"characters": ds.get_field(), "turn": _parent.get("_turn")}
-	return {"characters": [], "turn": _parent.get("_turn")}
+	var module: RefCounted = _parent.call("_get_enemy_turn")
+	if module == null:
+		return {"player_chars": [], "enemy_chars": [], "turn": int(_parent.get("_turn"))}
+	return module.call(&"build_field_state", _get_ai_system())
 
 
 ## 获取场上角色列表——通过 DeploymentSystem Autoload。
@@ -186,10 +223,30 @@ func _get_field_characters() -> Array:
 	return []
 
 
-## 计算抽牌数量——基础 2 张（GDD §2 抽牌规则）。[br]
-## [br][b]桩实现[/b]——Story 002 接线后补后手补偿 +3 逻辑。
+## 计算抽牌数量——GDD §2 抽牌规则表（先手第 1 回合 0 / 后手第 1 回合 3 /
+## 第 2 回合起基础 2）。[br]
+## [br][b]规则表在 [code]combat_turn_economy.gd[/code][/b]——本方法只负责
+## 「在抽牌阶段问它要数字」，不在这里写条件分支（数值口径单一来源）。
 func _calculate_draw_count() -> int:
-	return 2
+	return TurnEconomy.draw_count(_is_first_player(), int(_parent.get("_turn")))
+
+
+## 先手标志——开战 config 供数（[code]combat_turn_economy.is_first_player[/code]）。
+func _is_first_player() -> bool:
+	return TurnEconomy.is_first_player(_parent.get("_battle_config"))
+
+
+## 手牌条目 → 卡牌实例 ID（兼容 Dictionary / 对象 / 裸整数三种既有形态）。
+func _card_id_of(p_card: Variant) -> int:
+	if p_card is Dictionary:
+		var dict: Dictionary = p_card
+		return int(dict.get("card_instance_id", dict.get("instance_id", -1)))
+	if p_card is Object:
+		var raw: Variant = (p_card as Object).get("card_instance_id")
+		return int(raw) if raw != null else -1
+	if p_card is int or p_card is float:
+		return int(p_card)
+	return -1
 
 
 # === Autoload 查找（子模块内自用）=================================================

@@ -553,6 +553,11 @@ func test_ac013_draw_when_both_empty_after_return() -> void:
 # ============================================================================
 
 func test_enter_phase_draw_triggers_draw_cards() -> void:
+	## [b]第 2 回合[/b]口径（GDD §2 抽牌表：第 1 回合按先后手分岔，基础 2 张从
+	## 第 2 回合起）——本用例验证「进入 DRAW 阶段会自动抽牌」，与回合数无关，
+	## 故摆出基础值适用的第 2 回合。第 1 回合的分岔另见
+	## test_deck_management.gd::test_draw_count_turn1_splits_by_first_player。
+	cs.set_battle_active(true, 2)
 	cs.call("set_deck_state", [1, 2, 3, 4, 5], [], [])
 	cs.call("advance_phase")  # 0→1 DRAW，_enter_phase(DRAW) 应抽 2 张
 	var hand: Array = cs.call("get_hand")

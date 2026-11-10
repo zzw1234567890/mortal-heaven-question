@@ -29,8 +29,14 @@ const GestureScript := preload("res://src/ui/combat/interaction/combat_gesture_m
 const ProviderScript := preload("res://src/ui/combat/interaction/combat_play_provider.gd")
 ## 结果字典工具（判成功 / 取提示文本）。
 const PlayResultScript := preload("res://src/feature/combat/combat_play_result.gd")
-## 阶段常量（出牌阶段——兼容锁放行用）。
+## 阶段常量（出牌阶段——手势准入判据）。
 const PLAY_PHASE: int = 2
+
+## 非出牌阶段的提示文案（敌方行动 / 攻击结算期间玩家点了手牌时显示）。[br]
+## [br][b]为什么写在这里而不是 [code]CombatPlayResult[/code][/b]：那份文案表是
+## 「出牌被系统拒绝」的原因映射（费用不足 / 目标非法…），本提示是[b]手势根本没提交[/b]
+## 的说明——两者不是同一类事件，混进去会让「出牌结果」表混入非出牌结果。
+const NOT_PLAY_PHASE_HINT: String = "当前阶段不能出牌，请等待你的回合"
 
 ## 门面（需实现 current_caster_id / select_actor / enemy_at / ally_at /
 ## hand_snapshot / play_controller 等同形状方法）。
@@ -113,6 +119,11 @@ func _handle_button(event: InputEventMouseButton) -> void:
 		if button.pressed:
 			if not _input_allowed():
 				return
+			# 非出牌阶段（阶段 5 敌方行动等）——不接受任何手势，但要给可读提示：
+			# 「点了没反应」正是本轮要消灭的失败形态。
+			if not _is_play_phase():
+				_hint(NOT_PLAY_PHASE_HINT)
+				return
 			var hit: Dictionary = hit_test(button.global_position)
 			_gesture.call(&"press", int(hit["card_id"]), button.global_position)
 			accept_event()
@@ -135,8 +146,14 @@ func _handle_motion(event: InputEventMouseMotion) -> void:
 	_gesture.call(&"move", event.global_position)
 
 
-## 释放——按状态机结果分流为点击或拖拽。
+## 释放——按状态机结果分流为点击或拖拽。[br]
+## [br][b]阶段已离开出牌则整体作废[/b]（GDD §边缘情况「拖拽中阶段切换 → 无效释放」）：
+## 按压发生在阶段 2、释放时已是敌方行动——这次手势不能生效，否则玩家能在
+## 敌方回合里出一张牌。手势状态机一并复位，避免残留的按压态污染下一次操作。
 func _release(p_global_pos: Vector2) -> void:
+	if not _is_play_phase():
+		_gesture.call(&"cancel")
+		return
 	var outcome: Dictionary = _gesture.call(&"release")
 	var kind: int = int(outcome.get("kind", GestureScript.KIND_NONE))
 	var card_id: int = int(outcome.get("card_id", -1))
@@ -198,36 +215,27 @@ func _hint(p_message: String) -> void:
 
 
 ## 输入锁判定（无 InputManager 时放行——桩环境不锁死）。[br]
-## [br][b]兼容说明（已知遗留）[/b]：[code]CombatSystem.battle_start()[/code] 在整场战斗
-## 期间持有一把 [code]ANIMATION[/code] 锁（AC-005），而 GDD 只要求阶段 4/5 拦截玩法
-## 输入。严格按锁栈判定会让出牌阶段（2）永远收不到点击——故这里在「只有战斗系统的
-## 那把锁 + 当前是出牌阶段」时放行，其余锁（MODAL / TRANSITION / 对话等）一律照常拦。
-## 根治（把 ANIMATION 锁收窄到阶段 4/5）归战斗系统侧，见 tech-debt 登记。
+## [br][b]不再有任何豁免[/b]（DEBT-CBT-018-11 已根治）：战斗系统此前整场持有
+## [code]ANIMATION[/code] 锁，为让出牌阶段能收到点击，这里曾开过一条
+## 「只剩战斗那把锁 + 阶段 2」的窄口子。现在 [code]CombatSystem[/code] 已把锁
+## 收窄到阶段 4/5（进/出配对），严格按锁栈判定即可——豁免连同它的判据
+## （[code]_only_battle_animation_lock[/code]）一并删除，少一条需要长期维护的例外。
 func _input_allowed() -> bool:
 	var im: Node = _autoload(&"InputManager")
 	if im == null or not im.has_method(&"is_input_allowed"):
 		return true
-	if bool(im.call(&"is_input_allowed",
-			im.get(&"ActionType").GAMEPLAY, im.get(&"DeviceType").MOUSE)):
-		return true
-	return _only_battle_animation_lock(im) and _current_phase() == PLAY_PHASE
+	return bool(im.call(&"is_input_allowed",
+			im.get(&"ActionType").GAMEPLAY, im.get(&"DeviceType").MOUSE))
 
 
-## 锁栈里是否只剩战斗系统推入的 ANIMATION 锁（战斗全程持有）。
-func _only_battle_animation_lock(p_im: Node) -> bool:
-	if not p_im.has_method(&"get_lock_stack"):
-		return false
-	var locks: Array = p_im.call(&"get_lock_stack")
-	if locks.is_empty():
-		return false
-	for entry: Variant in locks:
-		if not (entry is Dictionary):
-			return false
-		if StringName(str((entry as Dictionary).get("source", &""))) != &"combat_system":
-			return false
-		if int((entry as Dictionary).get("type", -1)) != 1:  # LockType.ANIMATION
-			return false
-	return true
+## 当前是否处于玩家可出牌的阶段（阶段 2）。[br]
+## [br][b]与输入锁的分工[/b]：锁管「动画/弹窗期间不许动」，阶段管「这个阶段本来
+## 就不是出牌的时候」——敌方行动（阶段 5）即使没有锁也不该接受出牌。[br]
+## [br][b]阶段未知（-1）时返回 true[/b]：门面未接线时保持宽松（与
+## [code]refresh()[/code] 的「未知即宽松」同口径），否则未接线的调用方会全被拒。
+func _is_play_phase() -> bool:
+	var phase: int = _current_phase()
+	return phase < 0 or phase == PLAY_PHASE
 
 
 ## 当前战斗阶段（门面不可用 → -1）。
