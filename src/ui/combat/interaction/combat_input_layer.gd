@@ -38,6 +38,12 @@ const PLAY_PHASE: int = 2
 ## 的说明——两者不是同一类事件，混进去会让「出牌结果」表混入非出牌结果。
 const NOT_PLAY_PHASE_HINT: String = "当前阶段不能出牌，请等待你的回合"
 
+## 出牌已提交（系统侧成功）——手牌 / 选中态需要刷新。[br]
+## [br][b]为什么要有[/b]：0 费卡出牌不触发 [code]cost_changed[/code]，手牌区
+## 不会自己重画——玩家会看到已打出的卡还留在手里，再点它只会再次提交同一张卡。
+## 刷新由场景接线负责（输入层不持有手牌区）。
+signal play_committed
+
 ## 门面（需实现 current_caster_id / select_actor / enemy_at / ally_at /
 ## hand_snapshot / play_controller 等同形状方法）。
 var _layout: Variant = null
@@ -195,6 +201,8 @@ func _act(p_outcome: Dictionary) -> void:
 		_show_rejection(result)
 	elif status == FlowScript.STATUS_PLAYED:
 		_hint("出牌成功")
+		# 手牌已变（卡离手），通知接线层重画——输入层不持有手牌区。
+		play_committed.emit()
 
 
 # === 内部 =====================================================================

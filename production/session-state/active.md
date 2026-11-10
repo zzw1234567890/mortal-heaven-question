@@ -3,8 +3,80 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: DEBT-CBT-018-10 第四阶段（UI 施法者接线 + 治疗按实际增量广播）已完成；下一步 combat-ui-interaction 001/003/005 出牌手势本体
+Task: combat-ui-interaction 002 表现层续：敌方行动逐条播报 + 防御字段建模完成；下一步 005 目标选择可视化 / 004 键盘手柄路径 / 003 拖拽视觉跟手
 <!-- /STATUS -->
+
+## Session Extract — 敌方回合表现层 + 防御字段（2026-11-10）
+- 任务：敌方逐条播报（可配置间隔 / 播报期输入屏蔽）、播报与飘字去重、`CombatRosterState.defense` 建模、阵亡不重复出场、集成测试
+- **新增 `src/ui/combat/feedback/enemy_action_broadcast.gd`（300）**：消费 `enemy_action_resolved`，批内去重 → 队列 → 一条战报背板；条间默认 350ms（`set_interval_ms` 可注入），首条立即、末条停留一个间隔；播报期间推 `ANIMATION` 锁（source=`enemy_broadcast`），队列清空后只弹自己的锁；`battle_ended` / `_exit_tree` 清队列并释放（Engine 主循环查找 InputManager，退场也可弹锁）
+- **播报/飘字去重口径**：`character_damaged` 是伤害数值动画（飘字/HP条）的唯一来源；`enemy_action_resolved` 只生成文字，不调飘字池、不播阵亡动画、不写 HP。批内字段完全相同（enemy_id/action/target_id/damage/is_kill/hp_after）只播一次，新批重置
+- **表现拆分**：`enemy_action_text.gd`（行文/命名/去重键，纯函数）+ `enemy_action_banner.gd`（单行背板视图），播报组件守 300 行
+- **命名**：敌方读开战名册模板 `display_name`，我方读 `CardTemplate.display_name`/`name`，兜底「敌人/角色 #id」
+- **防御建模**：`CombatRosterState` 状态条目新增 `defense`（默认 0；`player_stats.defense` 或 `def` 注入；敌方条目读 `defense`），`read_hp` 返回；新增 `combat_defense_rules.apply_flat = max(0, 伤害 − DEF)`；敌方行动 `_damage_of` 改用它（允许完全免伤），并写清「固定值 DEF 先于百分比乘算」
+- **阵亡不重复出场**：`combat_enemy_turn._resolve_action` 先查目标存活，已阵亡 → 发 `action=none`（不落库、不飘字）；播报侧对 `is_kill`/0HP 目标后续行动改记「行动落空（目标已阵亡）」
+- **GDD**：combat-ui-system §回合切换与敌方行动 补 3 条（逐条播报/去重口径/阵亡不出场）；combat-system §公式 补「玩家防御字段与敌方行动口径」（max(0) 与攻击声明 max(1) 并存）
+- 测试：新增 `test_roster_defense.gd`（10）+ `test_enemy_action_text.gd`（10）+ `test_enemy_action_broadcast.gd`（6，真实 CombatSystem/AI/状态表；覆盖三条顺序+间隔注入、真实 Timer 输入屏蔽、防御 0/2 减免、阵亡不重复、去重+单次飘字）；fixture `_start` 增 `player_stats` 覆盖
+- 全量：**3924 tests / 3923 passing / 1 pending 存量 / 0 failing / 3 orphans 存量**（3899 → 净增 25），零回归
+- **已知边界**：① 攻击声明路径仍是 `max(1, ATK−DEF)`，与敌方行动路径 `max(0)` 下限不同（已写入 GDD，待策划统一）；② 防御只能开战种子，尚无战斗中增减防御的效果接口；③ 播报行文为硬编码中文（项目现有 UI 文案同口径，未接本地化）；④ 播报锁为 `ANIMATION`（UI_NAV/灵能预览仍可用的 GDD 口径）
+
+## Session Extract — combat-ui-interaction 002：回合流程与敌我交替（2026-11-10）
+- 任务：结束回合 → 敌方按阵位顺序行动并结算 → 回到我方；费用/手牌按 GDD 重置；敌方回合输入屏蔽 + 可读提示；补集成测试；收窄 ANIMATION 锁
+- **修掉的两段断路**：① `AISystem.execute_turn()` 的返回此前被直接丢弃（敌方「决策了但从不落库」，玩家看不到任何敌方伤害）；② `_build_field_state()` 用 `characters` 键而决策引擎读 `player_chars`/`enemy_chars`——真实对局里 AI 恒拿空候选池、永远选不出目标
+- **新增 `src/feature/combat/combat_enemy_turn.gd`（244）**：按 `field_position` 升序重排行动并逐条结算（目标解析 → 伤害 → 落库 → 广播），每次发射 `enemy_action_resolved{enemy_id, action, target_id, damage, is_kill, known, hp_after}`；撤退/无目标也发记录（不静默跳过）；敌人 ID 按名册下标派生（与 `combat_roster_state.enemy_id_of` 同源）
+- **新增 `combat_enemy_field_state.gd`（172）**：AI 快照构建独成模块（读的一侧），键名对齐决策引擎真实读取面；我方条目补 HP/防御字段（阵位快照只有阵位与状态）
+- **新增 `combat_turn_economy.gd`（61）**：GDD §2 抽牌表（先手第 1 回合 0 / 后手 3 / 第 2 回合起 2）+ 开局手牌（4/5）+ 手牌上限 10，纯函数；`is_first_player` 缺省 true（与改造前硬编码口径逐位一致）
+- **开局手牌**：新增 `CombatSystem.deal_opening_hand()`——GDD「先手第 1 回合不抽牌」的前提是手里已有开局手牌，此前该前提未兑现（旧实现用「恒抽 2 张」绕过）
+- **阶段编排**：`_execute_ai_turn` 改走真结算；`_calculate_draw_count` 读经济表；END 新增 `_enforce_hand_limit`（弃最旧的、经 `discard_card` 走既有落库路径）；费用重置接入先后手
+- **回合切换信号**：新增 `turn_started{turn, is_player_turn}`——END→PREPARATION 回绕且未判结束时发射（在费用/手牌重置之后）
+- **ANIMATION 锁收窄（DEBT-CBT-018-11 关闭）**：`battle_start` 不再推锁，改由 `advance_phase` 末尾 `_sync_animation_lock(next)` 按「当前阶段是否 4/5」幂等推/清；`combat_input_layer` 删除窄豁免 `_only_battle_animation_lock`
+- **输入屏蔽**：非出牌阶段点手牌给提示「当前阶段不能出牌，请等待你的回合」；拖拽跨阶段（阶段 2 按下、阶段 5 释放）整体作废并复位手势
+- GDD：`combat-system.md` §3 补「回合结束重置清单」（弃最旧的手牌超限规则是本次补的缺约定）；`combat-ui-system.md` §6 补「回合切换与敌方行动的可观测性」四条
+- 测试：新增 `test_turn_economy.gd`（13）+ `test_turn_cycle_end_to_end.gd`（5）+ `test_enemy_turn_actions.gd`（5，与前者共用 `turn_cycle_fixture.gd`）；改 5 处既有测试（越界预期按新口径更新：Cat 2b 白名单 +2、暂停锁前置改阶段 5、抽牌用例改第 2 回合口径、新增先后手分岔用例）
+- 全量：**3899 tests / 3898 passing / 1 pending 存量 / 0 failing**（3875 → 净增 24）
+- **既有失败（非本轮引入，干净 HEAD 复现一致）**：`test_hud_bootstrap.gd::test_main_menu_does_not_auto_mount_when_not_current_scene`（仅 hud 单独跑红，全量跑绿）；`test_combat_hand_snapshot.gd` 在 GUT warnings-as-errors 下 parse error
+- **已知边界**：① 玩家角色 defense 无状态字段 → 敌方伤害按「0 防御」算（GDD §边缘情况口径，不臆造）；② 敌方技能威力取 `action.damage` 否则回退攻击力，未接境界压制/百分比减伤（那套属攻击声明阶段口径）；③ `is_player_turn` 在 7 阶段模型下恒 true（敌我共用回合序列）；④ 敌方回合同样走 7 阶段，未拆独立的敌方回合；⑤ 目标选择可视化/键盘手柄路径仍归 004/005
+
+## Session Extract — combat-ui-interaction 001 续：当前操作角色 + 真实输入路径（2026-11-10）
+- 任务：施法者从「阵位顺序临时裁定」改为显式「当前操作角色」；接真实鼠标输入路径（点卡/拖拽 ≥8px → 目标 → 出牌，非法/费用不足给可读提示）；卡面 target_type 驱动单/多目标；补集成测试；hand_area.gd 拆分
+- **当前操作角色（显式状态）**：新增 `src/ui/combat/shared/combat_actor_selection.gd`（96 行）——`refresh()` 按阵位 `slot_index` 升序筛出候选（已占用且未阵亡），当前角色仍合法则保留、否则顺位；`select()` 只接受候选（点阵亡/空位不生效）；`clear()` 退场。排序复用 `CombatCasterRules.sorted_field()`（新公开入口——两处各排各的会选出不同的人）
+- **施法者口径**：`CombatPlayBridge.set_actor_source()` 注入状态后，`current_caster_id()` 优先取当前操作角色，判不出才回退阵位首位（兜底而非默认）。装配台 `setup()` / `build_roster()` / 阵亡回调都 `refresh_actors()`——阵亡自动顺位
+- **真实输入路径**：新增 `src/ui/combat/interaction/` 四文件——`combat_gesture_model.gd`（84，按压/8px 阈值状态机）、`combat_input_layer.gd`（276，`_gui_input` → 命中测试 → 手势语义；点卡选中/再点确认、点敌方选目标、拖拽释放到目标出牌、右键/空白取消、点我方角色切施法者）、`combat_hint_toast.gd`（121，拒绝提示条 2s 淡出）、`combat_play_provider.gd`（102，目标词/可负担/敌方判定取数）
+- **手势语义**：新增 `src/ui/combat/shared/combat_play_flow.gd`（197）——点/拖、单/多、确认时机单一实现；`drop()` 拖到目标必确认、拖到空白取消
+- **卡面 target_type 驱动**：新增 `combat_target_policy.gd`（111，词表→模式：单体/多选/全体/自身/未知）+ `combat_target_picking.gd`（93，单体替换 / 多选累加再点取消）。**单目标卡拒绝多选**由 `Picking.apply` 的 MODE_SINGLE 分支保证（替换而非累加）
+- **手牌供给**：新增 `combat_hand_snapshot.gd`（125，战斗手牌→卡面快照带 target_type）+ `combat_hand_wiring.gd`（117，phase/cost/阵亡驱动刷新）+ `combat_scene_interaction.gd`（57，场景侧接线：备战期停用输入、开战建卡后 enable + 首次供牌）
+- **场景接线**：`combat_scene.gd` 调 `_wire_interaction()` / 开战后 `enable()`；退出 `_exit_tree` 退订
+- **门面**：`CombatLayout.setup_interaction()` / `interaction()`；`combat_layout_interaction_mount.gd`（149）作输入层的门面适配（施法者/命中/手牌快照/阶段）；控制器 `selection_changed` → 手牌区 `apply_selection`（选中态首次在真实对局有视觉落点）
+- **缺陷修复**：`CombatPlayController.setup()` 每次调用都新建选中模型——装配台每次取控制器重注入桥时会静默清掉玩家刚选中的卡（真缺陷，已改为「仅缺失时创建」）
+- **输入锁**：入口问 `is_input_allowed(GAMEPLAY, MOUSE)`；战斗系统整场持 ANIMATION 锁（AC-005）而 GDD 只要求阶段 4/5 拦——做窄豁免（只剩战斗系统那把锁 + 出牌阶段才放行），MODAL/TRANSITION 照拦（有集成测试锁死）。根治登记 DEBT-CBT-018-11
+- **拆分（DEBT-CUI-007-2 关闭）**：`hand_area.gd` 401→267（`hand_area_layout.gd` 166 / `hand_area_cards.gd` 120）；`combat_actor_stage.gd` 349→241（`actor_stage_layout.gd` 95 / `actor_stage_roster.gd` 164）；`combat_layout.gd` 377→284（交互装配外移 + 十处只读代理去 setter）；`combat_scene.gd` 335→297（`combat_scene_exits.gd` 71）
+- GDD：`combat-ui-system.md` §手牌交互 补 4 条 AC（点卡选中/再点确认、≥8px 拖拽、拒绝提示条、点我方角色切施法者）+ 新增「当前操作角色（施法者口径）」小节 + §出牌目标选择 补「卡面 target_type 驱动的选择模式」表
+- 测试：新增 9 文件 76 例——`test_combat_target_policy`(8) / `test_combat_target_picking`(8) / `test_combat_actor_selection`(9) / `test_combat_drag_rules`(9) / `test_combat_hand_snapshot`(6) / `test_combat_play_flow`(15) / `test_combat_click_play_end_to_end`(9，真实鼠标事件→真实 CombatSystem，含 MODAL 锁仍拦) / `test_actor_switch_caster`(8) / `test_combat_hand_wiring`(5)；`test_layout_mount_facade` 1 例随拆分改断言（编排器引用移到 roster 模块）
+- 全量：**3875 tests / 3874 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3802 → 净增 73）
+- **已知边界**：① 目标选择可视化（拖拽中高亮 / 脉冲 / 箭头连线）未做——归 interaction 005；② 键盘数字键 / 手柄路径未做——归 interaction 004；③ 拖拽中卡牌跟随鼠标 + 0.7 半透明未做（本轮的拖拽只做「判定 + 释放」，视觉跟手归 003 的剩余部分）；④ ANIMATION 锁窄豁免是权宜（DEBT-CBT-018-11）；⑤ 出牌伤害的 `damage_reduced` 缺省 false（同 DEBT-CBT-018-8 残留）；⑥ 增益/控制/抽牌/阵法等类别仍未建模
+- Next recommended: interaction 005（目标选择可视化）或 004（键盘/手柄路径）；或按 DEBT-CBT-018-11 收窄 ANIMATION 锁
+
+---
+
+## Session Extract — combat-ui-interaction 001：出牌交互闭环（2026-11-10）
+- 任务：epic 第一块——我方回合选卡后把「选了哪张卡 + 打哪个敌方目标」传给出牌链路；选中态可观测且可测；费用不足拒绝要有返回值与提示文本；补集成测试
+- 先读后写（链路现状）：`play_card(id, targets, caster_id := -1)` 只认施法者，**目标列表由调用方自己拼**（没有任何默认策略）；bool 返回值无法区分「费用不足 / 阶段不对 / 目标非法」，UI 无从提示；选中态只存在于 `HandCard` 的视觉（无代码持有「选了哪张」，故「非法时不可确认」无处可写）
+- **目标选择**：新增 `src/ui/combat/shared/combat_target_rules.gd`（121 行，纯函数）——五条策略：未指定 → 候选池**首个存活敌人**；显式 → 以其为准只留存活者；显式**全无效 → 拒绝**（不悄悄改打别人）；候选池**读不到 → 显式目标原样透传**（名册缺失 ≠ 玩家选错，越权否决会让未接线场景完全不能出牌，合法性归系统侧 `_validate_targets`）；候选池空/全灭 → `SOURCE_UNRESOLVED`（空目标 ≠ 打所有人）
+- 存活判定：`CombatSystem` 新增 `is_character_alive()`（真理来源是战斗状态表）——UI **不自算** `current_hp == 0`，那会在读不到 HP 时把活敌人抹掉；候选池只有 HP 时按 `is_alive_hp` 三态派生（`>0` 活 / `=0 且 max>0` 死 / 两者皆 0 = 未知 → 按活）
+- 候选池 ID 经 `CombatRosterState.enemy_id_of` 与状态表**同源**（不同源会让候选池永远读到 0/0，默认目标乱跳）
+- **费用不足拒绝**：新增 `src/feature/combat/combat_play_result.gd`（89 行）——`{ok, reason, message, context}` + 6 种原因常量 + 集中生成的中文提示（费用不足含「需要 N / 当前 M」两个数字）；`CombatCardResolver.play_card_detailed()` 是唯一结算实现，`play_card()` 退化为它的 bool 视图（既有调用方零改动）；未知原因返回**空串**而非通用兜底（兜底会藏起「没覆盖这个原因」）
+- 桥的降级：`combat_play_bridge` 在战斗系统只实现 bool 契约时**回退**到 bool 调用——更弱的替身不该把本该成功的出牌变成失败（这条修掉了 `test_layout_play_card` 的既有回归）
+- **选中态**：新增 `src/ui/combat/shared/hand_selection_model.gd`（191 行，纯状态机）+ `combat_play_controller.gd`（175 行，闭环：选中→目标→确认→反馈）。关键裁定：① 费用不足/灵能态**可选中但不可确认**（能看详情，按不动确认）；② 目标为空**不算非法**（走默认策略）；③ 切卡清目标、重选同卡保目标；④ `sync_hand()` 卡离开手牌时自清（防幽灵选中）；⑤ **被拒保留选中**（玩家可改目标重试，不必重选卡）
+- 视觉：`HandCard.set_selected()` 上移 24px + 青白描边加粗（位移/线宽/颜色**三通道**，不只靠颜色）；`HandArea.apply_selection()` 在手牌重建后**重放**选中（否则任何一次 `hand_changed` 都让选中视觉丢失而模型仍以为选着）
+- 接线：`CombatLayout`/`CombatActorStage` 暴露 `play_card_detailed()` / `resolve_targets()` / `enemy_candidates()` / `select_hand_card()` / `confirm_play()`；控制器在装配挂载侧**惰性单例**（多处手势必须共用，否则「选中的是哪张」出现多份真理来源）
+- GDD：`combat-ui-system.md` §手牌交互 补 3 条 AC（选中抬起/描边、非法不可确认且保留选中、拒绝必须有提示）+ 新增「出牌目标选择」小节（五条策略表 + 存活判定口径 + 结果形状）
+- 测试：新增 `test_combat_target_rules.gd`（19）+ `test_hand_selection_model.gd`（20）+ `test_combat_play_result.gd`（9）+ `test_combat_play_controller.gd`（14）+ `test_play_flow_cost_and_target.gd`（14，真实 CombatSystem + 真实 CostSystem）+ `test_hand_selection_visual.gd`（10）
+- 全量：**3802 tests / 3801 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3692 → 净增 110）
+- Tech debt：DEBT-CBT-018-10 追加「第六阶段已落地」；**DEBT-CUI-007-2 补记**——`hand_area.gd` 401 行（本轮新增前已 350 行，既有超限；本轮净增约 51 行），已写明按「排位与动画 / 快照与状态落定」两模块拆分的修复方向
+- **已知边界**：① 施法者仍是「阵位首个存活角色」的临时裁定，**不是玩家选中的角色**——「当前操作角色」概念（interaction 001/004）落地后应改为显式传入；② 出牌手势本体（拖拽 ≥8px 启动 / 数字键 / 手柄）仍归 interaction 003/004——本轮只落闭环内核与选中视觉，**真实对局里还没有 InputEvent 驱动 `CombatPlayController`**；③ 目标选择可视化（拖拽中高亮 / 蓝色脉冲 / 箭头连线）归 interaction 005；④ `CombatTargetRules` 已支持多目标列表，但卡面 `target_type` 词表尚未驱动「哪些卡允许选多个目标」——UI 层目前一律接受多目标
+- Next recommended: combat-ui-interaction 003（拖拽手势接线 + 8px 阈值状态机），落地后把施法者改成玩家选中的角色；或 interaction 005（目标选择可视化）
+
+---
+
 
 <!-- QA-PLAN：2026-09-08 | System：sprint-13 | Plan written：production/qa/qa-plan-sprint-13-2026-09-08.md -->
 <!-- SPIKE：2026-09-08 | S13-1 R-01 | Report：production/spikes/r01-dual-focus-spike.md | OQ-02 已关闭 | R-01 已关闭 -->
@@ -18,6 +90,18 @@ Task: DEBT-CBT-018-10 第四阶段（UI 施法者接线 + 治疗按实际增量�
 - 修复（f187efc）：before_each 对 7 个 TEST_SUBDIRS `make_dir_recursive`（测试自建自清理，card_system fixture 同款模式）→ 二跑 12→3
 - 残余 3 个为测试非确定性（非代码 bug，非 CI 配置问题）：card_system ac006/ac009（load_threaded 完成顺序竞态，Linux 间歇红）+ realm ac010（已知 flaky）——**登记 TD-014 移交 S14-9**，CI 保持红是真实信号，不禁用不跳过
 - 工作流注释已更新已知失败清单；sprint-status.yaml 14-1 → review
+
+## 会话摘录——Sprint 18 战斗结算回流（2026-11-10）
+- 半成品接手：三个红测（test_placeholder_scenes 的 3 例）实为 `.godot/global_script_class_cache.cfg` 陈旧所致，重新 `--import` 后自愈——未改测试、未降低占位契约
+- 交付（战绩）：`combat_battle_record.gd`（效果条目计数 + 结束定格）→ `combat_system.battle_end` 并入 `rewards["record"]`；`combat_result_view.gd`（只读结算对象 + static 跨场景缓存）→ `combat_result_bridge.gd` 订阅 `battle_ended` 发布 → 结算/战败场景读回
+- 交付（HP）：`combat_hp_carryover.gd` 开战读 / 结束写 `GSM.player.character_hp`（逐键写入 + 同值去重），写入经第二层原子方法 `_set_player_character_hp`；回读接口 `read_all` / `read_one` / `seed_stats`
+- 降级口径：读——GSM 缺失 / 域非字典 / 无键 → 空表，回退模板 `base_hp`；写——缺 GSM 入口 → `WRITE_UNAVAILABLE`(-1) + 战斗侧 `push_error`，本场残血丢失但结算不受影响
+- 展示抽层：新增 `src/ui/shared/battle_record_scene.gd`（结算/战败共用取数与降级），`result_screen.gd` / `defeat_screen.gd` 各只声明 SCENE_ID；`placeholder_scene.gd` 补暴露 `status_label` / `hint_label`
+- 容器瘦身：`combat_scene.gd` 312 → 300 行，只读取数抽到 `combat_scene_readers.gd`；补 `_exit_tree` 退订结算发布器（信号源是常驻 Autoload）
+- 顺带修 3 个真缺陷：① 无 `record` 的战败载荷被渲染成「战斗结束」（`"none"` 也在合法 token 表里，改由 `result` 兜底）；② 无效果卡的空占位条目被计入效果条目数；③ 字典卡只透传 `template_id` 导致击杀触发读不到内联 `effects`（与出牌路径口径不一致）
+- 测试：新增 4 个文件 28 例（`test_battle_record_carryover` 8 / `test_battle_record_entries` 8 / `test_battle_result_end_to_end` 3 / `test_combat_result_bridge` 9）+ `test_combat_scene_wiring` 2 例
+- 全量：**3722 tests / 3721 passing / 1 pending 存量 / 3 orphans 存量**，零回归（3670 → 净增 52）
+- 已知边界：① `SettlementHost._notification` 在场景销毁时对已释放对象调 `_disconnect_source` 产生 17 条 SCRIPT ERROR（改动前既有，非本轮引入，另案登记）；② 结算/战败场景仍是占位契约（标题/状态/摘要），非正式 UI；③ 阵亡 → `mark_unavailable` 仍归 interaction epic
 
 ## 会话摘录——S14-1 CI 落地 2026-09-21/22
 - 文件：.github/workflows/tests.yml（新建）、tests/unit/event_system/test_load_templates.gd（before_each 自建目录）、docs/tech-debt-register.md（TD-014）、production/sprint-status.yaml（14-1 review）

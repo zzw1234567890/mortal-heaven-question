@@ -33,8 +33,10 @@ const BACK_CAPACITY: int = 3
 ## 敌方阵位总数（前 3 后 3）。
 const TOTAL_SLOTS: int = 6
 
-## 模板目录路径。
+## 模板目录路径（默认值）。
 const TEMPLATE_DIR: String = "res://assets/enemies/"
+## 扫描目录——默认 [constant TEMPLATE_DIR]；测试可注入空目录验证「无模板不崩溃」。
+var template_dir: String = TEMPLATE_DIR
 
 
 # === 内部数据 ====================================================================
@@ -98,7 +100,7 @@ func _ready() -> void:
 ## [br]来源: ADR-0017 §关键接口 load_templates / GDD ai-system.md §2。
 func load_templates() -> void:
 	_template_registry.clear()
-	var dir: DirAccess = DirAccess.open(TEMPLATE_DIR)
+	var dir: DirAccess = DirAccess.open(template_dir)
 	if dir == null:
 		_templates_loaded = true
 		enemy_templates_loaded.emit()
@@ -107,7 +109,7 @@ func load_templates() -> void:
 	var file_name: String = dir.get_next()
 	while file_name != "":
 		if file_name.ends_with(".tres"):
-			var res_path: String = TEMPLATE_DIR + file_name
+			var res_path: String = template_dir + file_name
 			var loaded: Resource = load(res_path)
 			if loaded != null and loaded is _EnemyTemplate:
 				var tid: StringName = loaded.template_id

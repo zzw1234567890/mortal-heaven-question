@@ -151,6 +151,12 @@ var _auto_advance_enabled: bool = true
 ## [b]测试设 false[/b]——避免 SceneManager 尝试加载不存在的场景文件。
 var _scene_change_enabled: bool = true
 
+## SceneManager 覆盖（null = 按 /root 查找 Autoload）。[br]
+## [br][b]为什么需要注入[/b]：结算转场的目标场景是战斗结果的一部分，测试要断言
+## 「胜利 → RESULT_SCREEN / 失败 → DEFEAT_SCREEN」；用真实 SceneManager 会触发
+## 异步加载与自动存档（测试环境无有效场景树），故提供同形状注入点。
+var _scene_manager_override: Node = null
+
 ## 牌库（战斗内牌库管理——Sprint 8 接线）。
 var _deck: Array = []
 
@@ -294,6 +300,12 @@ func set_auto_advance(enabled: bool) -> void:
 ## 设置场景切换使能——测试时设 false 禁用 SceneManager 调用。
 func set_scene_change(enabled: bool) -> void:
 	_scene_change_enabled = enabled
+
+
+## 注入 SceneManager 覆盖（null = 恢复按 /root 查找 Autoload）。[br]
+## [br][param p_manager] 需实现 [code]request_scene_change(from, to, type)[/code]。
+func set_scene_manager(p_manager: Node) -> void:
+	_scene_manager_override = p_manager
 
 
 # === 战斗生命周期（Story 002）====================================================
@@ -686,8 +698,10 @@ func _get_input_manager() -> Node:
 	return tree.root.get_node_or_null("/root/InputManager")
 
 
-## 查找 SceneManager Autoload。
+## 查找 SceneManager——注入覆盖优先，否则 /root/SceneManager Autoload。
 func _get_scene_manager() -> Node:
+	if _scene_manager_override != null:
+		return _scene_manager_override
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
 		return null

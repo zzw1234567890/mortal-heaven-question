@@ -285,7 +285,9 @@ func test_template_instance_isolation() -> void:
 # ============================================================================
 
 func test_load_templates_empty_dir() -> void:
-	# 无 .tres 文件时注册表为空但不崩溃
+	# 无 .tres 文件时注册表为空但不崩溃——注入一个不存在的目录（真实目录
+	# assets/enemies/ 已随「完整战斗验收」落地了 san_xiu / mo_xiu 模板）。
+	ai.set("template_dir", "user://ai_empty_enemy_templates/")
 	ai.call("load_templates")
 	assert_eq(ai.call("get_template_count"), 0, "空目录 → 注册表 0 个模板")
 

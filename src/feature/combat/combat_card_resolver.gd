@@ -128,18 +128,23 @@ func _get_card_instance(card_instance_id: int) -> Variant:
 	return _parent.get("_card_instances").get(card_instance_id, null)
 
 
-## 获取卡牌费用——从卡牌数据中读取 cost 字段。[br]
-## [br][b]桩实现[/b]——Story 003 接线 CardSystem 后卡牌结构标准化。[br]
-## [br]当前策略：读取 card["cost"] 或 card.template["cost"]，默认 0。
+## 获取卡牌费用——支持 Dictionary / [code]CardTemplate[/code] / [code]get_cost()[/code]。[br]
+## [br][b]为什么必须读 Resource 的 [code]cost[/code][/b]：真实对局里
+## [code]_get_card_instance[/code] 返回的是 CardTemplate——此前只认字典与
+## [code]get_cost()[/code]，Resource 落到「未知格式，按 0 处理」，等于所有卡都免费。
 func _get_card_cost(card: Variant) -> int:
 	if card is Dictionary:
 		if card.has("cost"):
 			return int(card["cost"])
 		if card.has("template") and card["template"] is Dictionary and card["template"].has("cost"):
 			return int(card["template"]["cost"])
-	# 对象类型——尝试动态分派
-	if card.has_method("get_cost"):
-		return int(card.get_cost())
+	if card is Object:
+		# CardTemplate 的 cost 是 @export 属性——Object.get 读不到属性时返回 null。
+		var raw: Variant = (card as Object).get("cost")
+		if raw != null:
+			return int(raw)
+		if card.has_method("get_cost"):
+			return int(card.get_cost())
 	push_warning("CombatSystem: _get_card_cost unrecognized card format, defaulting to 0")
 	return 0
 
@@ -282,18 +287,12 @@ func _fill_missing(target: Dictionary, key: String, value: Variant) -> void:
 	target[key] = value
 
 
-## 从手牌移除已打出的卡牌。
+## 把已打出的卡移出手牌并放进弃牌堆。[br]
+## [br][b]为什么走 [method CombatSystem.discard_card][/b]：打出的牌按 GDD
+## card-system §牌库与弃牌堆属于「已消耗」——进入弃牌堆后，牌库抽空时可回收
+## （[code]_draw_cards[/code] 的抽空返还）。此前这里只从手牌删除、不落弃牌堆，
+## 一副 7 张的初始卡组打 7 张就彻底空了，长局无法继续出牌。[br]
+## [br][b]单一实现[/b]：手牌移除与弃牌堆追加都在既有 [method discard_card] 里，
+## 不在这里重写一份（否则两条路径对「弃牌堆里放什么形态」的口径会漂移）。
 func _remove_card_from_hand(card_instance_id: int) -> void:
-	var hand: Array = _parent.get("_hand")
-	for i in range(hand.size() - 1, -1, -1):
-		var card = hand[i]
-		# 兼容 Dictionary 和对象类型
-		var cid: Variant = null
-		if card is Dictionary:
-			cid = card.get("card_instance_id", card.get("instance_id", -1))
-		elif card.has_method("get"):
-			cid = card.get("card_instance_id", -1)
-		if cid == card_instance_id:
-			hand.remove_at(i)
-			return
-	push_warning("CombatSystem: _remove_card_from_hand card_instance_id=%d not found in hand" % card_instance_id)
+	_parent.call("discard_card", card_instance_id)

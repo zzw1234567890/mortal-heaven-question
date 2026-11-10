@@ -23,6 +23,7 @@ func after_each() -> void:
 	# 清理战斗状态
 	cs.set_battle_active(false)
 	cs.call("set_deck_state", [], [], [])
+	cs.call("set_card_instances", {})
 
 
 # ============================================================================
@@ -118,6 +119,30 @@ func test_discard_card_moves_to_discard() -> void:
 	# Assert
 	assert_eq(cs.call("get_hand").size(), 2, "手牌应剩 2 张")
 	assert_eq(cs.call("get_discard_pile").size(), 1, "弃牌堆应有 1 张")
+
+
+## 打出的卡也进弃牌堆（GDD card-system §牌库与弃牌堆：已消耗的牌）。
+## [br]回归点：此前 play_card 只把卡从手牌删除、不落弃牌堆——初始 7 张卡组
+## 打空后长局再也抽不到牌。
+func test_played_card_moves_to_discard() -> void:
+	# Arrange——独立实例：Autoload 的 get_card_instance_cb 已注入 CardSystem，
+	# 会绕过 set_card_instances 测试缓存（见 combat_card_resolver._get_card_instance）。
+	var local: Node = load("res://src/feature/combat_system.gd").new()
+	local.call("set_auto_advance", false)
+	local.call("set_scene_change", false)
+	local.call("set_card_instances", {77: {"card_instance_id": 77, "cost": 0}})
+	local.call("set_deck_state", [], [88], [77])
+	local.call("set_battle_active", true)
+	local.call("advance_phase")  # PREPARATION → DRAW
+	local.call("advance_phase")  # DRAW → PLAY
+	# Act
+	var result: Dictionary = local.call("play_card_detailed", 77, [])
+	# Assert
+	assert_true(bool(result.get("ok", false)), "0 费卡应能打出")
+	assert_eq(local.call("get_hand").size(), 0, "打出的卡应离开手牌")
+	assert_eq(local.call("get_discard_pile").size(), 2, "弃牌堆应增加该卡（原有 1 + 打出 1）")
+	assert_eq(int(local.call("get_discard_pile")[1]), 77, "弃牌堆记录的是打出的卡实例")
+	local.free()
 
 
 # ============================================================================

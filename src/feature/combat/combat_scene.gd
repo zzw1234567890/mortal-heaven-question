@@ -31,6 +31,8 @@ const ReadersScript := preload("res://src/feature/combat/combat_scene_readers.gd
 const InteractionScript := preload("res://src/feature/combat/combat_scene_interaction.gd")
 ## 出口与撤退流转（备战返回 / 撤退确认 / 战败确认 / 回探索）。
 const ExitsScript := preload("res://src/feature/combat/combat_scene_exits.gd")
+## 开战前置（布阵 / 牌堆 / 敌方阵容——本容器只负责「何时开战」）。
+const BattleSetupScript := preload("res://src/feature/combat/combat_scene_battle_setup.gd")
 
 ## 备战面板标题（GDD §8 备战阶段 UI）。
 const TEXT_BATTLE_TITLE: String = "⚔ 遭遇战"
@@ -47,6 +49,10 @@ var combat_root: Control = null
 var is_tribulation: bool = false
 ## [b]测试注入[/b]：reduce_motion 覆盖（null = 读 SettingsStore）。
 var reduce_motion_override: Variant = null
+## 遭遇战配置覆盖（null = 读默认资源；渡劫 / 精英节点可注入变体）。
+var encounter: Resource = null
+## 敌方阵容覆盖（探索系统已生成名册时的入口；空 = 走遭遇战配置）。
+var enemy_roster_override: Array = []
 
 ## 结算回流接线（battle_ended → CombatResultView——结算/战败场景据此取数）。
 var result_bridge: RefCounted = null
@@ -57,6 +63,8 @@ var _readers_instance: RefCounted = null
 var interaction_wiring: RefCounted = null
 ## 出口与撤退流转（[method _ready] 创建）。
 var exits: RefCounted = null
+## 开战前置实例（[method _start_battle] 惰性创建）。
+var _battle_setup: RefCounted = null
 
 
 ## 退场先断开结算发布器——信号源是常驻 Autoload，不断开会让旧容器继续发布。
@@ -194,9 +202,10 @@ func _deploy_title() -> String:
 ## 其状态机需在 battle_start 前进入 IN_COMBAT，否则结算不会被渡劫系统消费）。[br]
 ## [br]默认实现只保证「有阵容 → 战斗开始」的最小闭环；config 扩展契约见
 ## combat-ui-interaction story 006。[br]
-## [br][b]阵位落地[/b]：先把所选角色写入 `DeploymentSystem.setup_field()`——
-## Phase 6 END 的「己方全灭」判据读的就是阵位，不先布阵会让「阵位从未有人」
-## 被读成「信息不足」，阵亡永远判不出战败（combat_end_check.gd 的信息不足原则）。
+## [br][b]开战前置[/b]：布阵 / 牌堆 / 敌方阵容由 [code]combat_scene_battle_setup.gd[/code]
+## 一次备齐——对手来自数据资源（[code]EnemyEncounter[/code]），不再依赖 AISystem 残留名册。[br]
+## 顺序不可换：[code]init_deck[/code] 必须在 [code]battle_start[/code] 之前——开局手牌在
+## battle_start 内发出，先开战再发牌只会发出 0 张。
 func _start_battle(character_ids: Array) -> void:
 	var cs: Node = _combat()
 	if cs == null or not cs.has_method(&"battle_start"):
@@ -204,30 +213,23 @@ func _start_battle(character_ids: Array) -> void:
 		return
 	if cs.has_method(&"is_battle_active") and bool(cs.call(&"is_battle_active")):
 		return  # 已开战——重复确认守卫
-	_setup_field(character_ids)
-	cs.call(&"battle_start", {
-		"character_ids": character_ids.duplicate(),
-		"layout": [],
-		"is_tribulation": is_tribulation,
-	})
-	# 开战后再建卡：敌方名册快照与 HP 种子都由 battle_start 定格，
-	# 卡片首帧即拿到真实 HP/ATK（先建卡会读到 0/0）。
+	if _battle_setup == null:
+		_battle_setup = BattleSetupScript.new()
+		var ds: Node = deployment_system if deployment_system != null \
+				else _autoload(&"DeploymentSystem")
+		_battle_setup.call(&"setup", _autoload(&"AISystem"), ds, _deck(),
+				encounter, enemy_roster_override)
+	var plan: Dictionary = _battle_setup.call(&"prepare",
+			character_ids.duplicate(), _realm_id(), is_tribulation)
+	var deck_ids: Array = plan.get("deck_ids", [])
+	if not deck_ids.is_empty() and cs.has_method(&"init_deck"):
+		cs.call(&"init_deck", deck_ids)
+	cs.call(&"battle_start", plan.get("config", {}))
+	# 开战后再建卡：敌方名册快照与 HP 种子都由 battle_start 定格（先建卡读到 0/0）。
 	combat_root.call(&"build_battle_roster", character_ids.duplicate())
 	# 开完战、建完卡才放行输入并首次供牌（此前只有备战面板可交互）。
 	if interaction_wiring != null:
 		interaction_wiring.call(&"enable")
-
-
-## 布阵——经 DeploymentSystem.setup_field 落位（失败不阻断开战：无阵位时
-## 胜负判定走「信息不足则不判」，但战斗本身仍可进行）。
-func _setup_field(character_ids: Array) -> void:
-	var ds: Node = deployment_system
-	if ds == null:
-		ds = _autoload(&"DeploymentSystem")
-	if ds == null or not ds.has_method(&"setup_field"):
-		return
-	if not bool(ds.call(&"setup_field", character_ids.duplicate(), {})):
-		push_warning("CombatScene: 布阵失败（角色不可用或超出境界上限）——战斗继续，阵位为空")
 
 
 ## 备战返回——回探索（实现见 [code]combat_scene_exits.gd[/code]）。
