@@ -3,7 +3,7 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: combat-ui-interaction 002 表现层续：敌方行动逐条播报 + 防御字段建模完成；下一步 005 目标选择可视化 / 004 键盘手柄路径 / 003 拖拽视觉跟手
+Task: 探索节点遭遇数据补齐完成（encounter/enemy_level/rewards 三字段 + popup 同源 + 两个超限文件拆分）；下一步 005 目标选择可视化 / 004 键盘手柄路径 / 003 拖拽视觉跟手
 <!-- /STATUS -->
 
 ## Session Extract — 敌方回合表现层 + 防御字段（2026-11-10）
@@ -18,6 +18,20 @@ Task: combat-ui-interaction 002 表现层续：敌方行动逐条播报 + 防御
 - 测试：新增 `test_roster_defense.gd`（10）+ `test_enemy_action_text.gd`（10）+ `test_enemy_action_broadcast.gd`（6，真实 CombatSystem/AI/状态表；覆盖三条顺序+间隔注入、真实 Timer 输入屏蔽、防御 0/2 减免、阵亡不重复、去重+单次飘字）；fixture `_start` 增 `player_stats` 覆盖
 - 全量：**3924 tests / 3923 passing / 1 pending 存量 / 0 failing / 3 orphans 存量**（3899 → 净增 25），零回归
 - **已知边界**：① 攻击声明路径仍是 `max(1, ATK−DEF)`，与敌方行动路径 `max(0)` 下限不同（已写入 GDD，待策划统一）；② 防御只能开战种子，尚无战斗中增减防御的效果接口；③ 播报行文为硬编码中文（项目现有 UI 文案同口径，未接本地化）；④ 播报锁为 `ANIMATION`（UI_NAV/灵能预览仍可用的 GDD 口径）
+
+## Session Extract — 探索节点遭遇数据补齐 + 两个超限文件拆分（2026-11-10）
+- 任务：DAG 生成器写入 `encounter`/`enemy_level`/`rewards`；popup 读同一份数据；补直通测试；拆 `node_interaction_popup_host.gd`（399）与 `combat_launch_context.gd`（288）；两个 .tres 配最小掉落；全量 GUT
+- **新增 `assets/enemies/encounter_fields.gd`（250）**：五键遭遇契约唯一实现——`make`（生成器写）/ `of_detail` / `of_snapshot`（顶层与子字典合并，顶层非缺省优先）/ `template_ids`（显式保重复、派生去重）/ `enemy_level`（显式 > 名册最高境界）/ `rewards`（显式 > 条目 rewards > 模板 reward_config，灵石取区间中值，全零归 `{}`）/ `sanitize_rewards`（兼容旧键 `ling_shi`）/ `name_of`+`label_of`（标题不带数量、节点标签带 `×N`）
+- **新增 `assets/enemies/roster_entries.gd`（75）**：名册条目双形态读取（运行时对象 `template.*` / 预览字典直读），`template_id`/`realm`/`reward_config`/`field`/`lookup`
+- **生成器写入**（`exploration_dag_builder._fill_encounter`）：战斗/精英/Boss 节点写 `enemy_roster` + `label` + `encounter` 子字典 + 顶层 `enemy_level`/`rewards`；等级 = 名册最高境界 > 生成时玩家境界；`encounter_id` = `<map_id>_<node_id>`；新增注入点 `ExplorationSystem.enemy_template_lookup_cb`（单测可注入，生产回退 Autoload AISystem）
+- **开战上下文重写**（`combat_launch_context.gd` 288 → **151**）：只留组装/缓存/净化/校验，派生全部委托 `EncounterFields`；与生成器同一实现
+- **popup 读同一份数据**：`NodeInteractionRules.combat_lines_for_encounter` 先吃节点遭遇再回退名册——名册为空时数量退化为模板数（不再显示 `×0`），境界行与开战等级同源；`combat_lines` 保留为旧入口
+- **拆分**：`node_interaction_popup_host.gd` 399 → **296**，拆出 `node_popup_stage.gd`（177：冻结幂等/解冻还原原值/遮罩/定位/弹窗构建/ESC）与 `node_popup_services.gd`（75：灵泉/回复 API、转场、境界上限、渡劫判定）
+- **掉落资源**：`assets/enemies/rewards/san_xiu_reward.tres`（灵石 4-8 / 修为 2）、`mo_xiu_reward.tres`（10-16 / 5 / 20% 培元丹），两个模板 `reward_config` 已挂接（放在子目录避免被 AISystem 模板扫描误读）
+- GDD：`exploration-system.md` §3 补「节点遭遇数据口径」表（五键 + 缺省语义 + 键名统一）
+- 测试：新增 `tests/unit/exploration_system/test_node_encounter_fields.gd`（14）、`tests/integration/exploration_ui/test_node_encounter_to_popup.gd`（6）、`tests/unit/exploration_ui/test_node_popup_stage.gd`（11）
+- 全量：**3981 tests / 3980 passing / 1 pending 存量 / 0 failing / 3 orphans 存量**（3952 → 净增 29），零回归
+- **已知边界**：① 等级兜底用「生成时玩家境界」而非地图境界（DEBT-EUI-006-3）；② 卡牌掉落是配置清单不是实得（未掷骰，DEBT-EUI-006-4）；③ `generate_enemy_roster_cb` 在生产路径仍无注入点，真实 `enter_map` 的敌人池为空（DEBT-EUI-006-5）；④ `node_interaction_rules.gd` 327 行、`exploration_dag_builder.gd` 388 行为既有超限（本轮各增约 30/60 行，未拆）
 
 ## Session Extract — combat-ui-interaction 002：回合流程与敌我交替（2026-11-10）
 - 任务：结束回合 → 敌方按阵位顺序行动并结算 → 回到我方；费用/手牌按 GDD 重置；敌方回合输入屏蔽 + 可读提示；补集成测试；收窄 ANIMATION 锁

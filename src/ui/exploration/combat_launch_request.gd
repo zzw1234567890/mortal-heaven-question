@@ -8,6 +8,9 @@ extends RefCounted
 ## [b]之前[/b]落盘；晚一步就只剩一份空字典。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不缓存名册，玩家阵容每次现读
 ## （注入提供者优先，否则读 GSM [code]deck.slots[/code]）。[br]
+## [br][b]数据源[/b]：节点详情取生成器写入的 [code]encounter[/code] 契约
+## （[code]enemy_level[/code] / [code]rewards[/code] 顶层同值）——与弹窗正文、
+## 战斗侧读取是同一份数据，不在这里重算。[br]
 ##
 ## 来源: ADR-0014 §决策 3、ADR-0031 §2、exploration-system.md §3 步骤⑥。
 

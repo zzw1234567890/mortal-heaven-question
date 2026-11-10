@@ -176,6 +176,20 @@ generate_map(map_id, player_realm):
 - 商店库存的内容在所有商店节点生成时确定（但玩家看到前不展示具体内容）
 - 战斗节点的敌人阵容在节点生成时确定
 
+**节点遭遇数据口径（2026-11-10，探索遭遇数据补齐轮）**
+
+战斗/精英节点在生成时写入五键遭遇契约，写方（DAG 生成器）与读方（探索弹窗、开战上下文）共用 `assets/enemies/encounter_fields.gd`：
+
+| 字段 | 位置 | 缺省语义 |
+|------|------|----------|
+| `enemy_roster` | 节点详情顶层 | `[]` = 名册生成回调缺失（开战时 `validate` 给出可读失败，不静默兜底） |
+| `encounter` | 节点详情顶层（子字典） | 五键聚合：`encounter_id` / `display_name` / `enemy_template_ids` / `enemy_level` / `rewards` |
+| `enemy_level` | 顶层 + 子字典同值 | `0` = 未指定（**不是**第 0 境界）；名册自带最高境界优先，缺失时退化为生成时的玩家境界 |
+| `rewards` | 顶层 + 子字典同值 | `{}` = 本节点无掉落配置（**不是**「掉落为 0」）；聚合顺序：条目自带 `rewards` > 模板 `reward_config`（灵石取区间中值） |
+| `label` | 节点详情顶层 | 节点图文字（`散修 ×2`）；`display_name` 不带数量，供战斗标题使用 |
+
+`encounter_id` 永不为空——生成时按 `<map_id>_<node_id>` 构造，手写节点按 `node_<id>` 兜底，保证每场遭遇可追踪。掉落键名统一为战斗结算口径 `{lingshi, cultivation, cards}`，探索经济域的 `ling_shi` 仅在读取时兼容。
+
 #### 4. 节点导航
 
 **可见性规则：**

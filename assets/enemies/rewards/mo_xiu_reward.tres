@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="RewardConfig" format=3]
+
+[ext_resource type="Script" path="res://assets/enemies/reward_config.gd" id="1_reward_config"]
+
+[resource]
+script = ExtResource("1_reward_config")
+ling_shi_min = 10
+ling_shi_max = 16
+cultivation_reward = 5
+card_drops = Array[Dictionary]([{"card_id": &"pei_yuan_dan", "chance": 0.2}])

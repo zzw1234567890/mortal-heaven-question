@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://assets/enemies/enemy_template.gd" id="1_enemy_template"]
 [ext_resource type="Script" path="res://assets/enemies/behavior_profile.gd" id="2_behavior_profile"]
 [ext_resource type="Script" path="res://assets/enemies/skill_entry.gd" id="3_skill_entry"]
+[ext_resource type="Resource" path="res://assets/enemies/rewards/mo_xiu_reward.tres" id="4_reward_config"]
 
 [sub_resource type="Resource" id="Resource_behavior"]
 script = ExtResource("2_behavior_profile")
@@ -35,3 +36,4 @@ formation_limit = 0
 front_slot = false
 behavior_profile = SubResource("Resource_behavior")
 skill_pool = [SubResource("Resource_strike")]
+reward_config = ExtResource("4_reward_config")

@@ -19,6 +19,9 @@ extends RefCounted
 ## 来源: design/gdd/exploration-ui-system.md §4/§4b/§4c/§5、ADR-0014 §决策 3、
 ## exploration-ui Story 006（AC-1/AC-2/AC-6/AC-7/AC-9/AC-10）。
 
+## 遭遇字段契约（与 DAG 生成器 / 开战上下文共用——弹窗读同一份节点数据）。
+const EncounterFields := preload("res://assets/enemies/encounter_fields.gd")
+
 ## === 弹窗种类（kind）=======================================================
 
 const KIND_NONE: StringName = &""
@@ -189,20 +192,53 @@ static func combat_enemy_summary(enemy_roster: Array) -> Dictionary:
 ## [param recommended_override]: 地图配置显式推荐值（≤0 表示未配置 → 推定）。
 static func combat_lines(enemy_roster: Array, max_deploy: int,
 		recommended_override: int = 0) -> Array:
-	var summary: Dictionary = combat_enemy_summary(enemy_roster)
+	return combat_lines_for_encounter({}, enemy_roster, max_deploy,
+			recommended_override)
+
+
+## 战斗弹窗动态正文行——[b]与开战上下文读同一份节点遭遇数据[/b]。[br]
+## [br][b]为什么要带 encounter[/b]：弹窗若只读到达名册，展示的等级/数量与
+## 开战时用的会是两套推导（名册可能为空、或只含预览字段）。这里先吃节点的
+## 遭遇配置，再回退到名册——文案与 [code]CombatLaunchContext[/code] 同源。[br]
+## [br][param p_encounter] 规范化遭遇配置（[code]EncounterFields.make/of_detail[/code]）。[br]
+## [param p_roster] 到达名册（可为空——数量退化为模板 ID 数）。[br]
+## [param p_max_deploy] 当前境界上场上限。[br]
+## [param p_recommended_override] 地图配置显式推荐值（≤0 = 未配置）。
+static func combat_lines_for_encounter(p_encounter: Dictionary, p_roster: Array,
+		p_max_deploy: int, p_recommended_override: int = 0) -> Array:
+	var summary: Dictionary = combat_enemy_summary(p_roster)
 	var names: Array = summary["names"]
 	var count: int = int(summary["count"])
+	if count <= 0:
+		count = _template_count(p_encounter)
+	var first_name: String = ""
+	if not names.is_empty():
+		first_name = str(names[0])
+	if first_name.is_empty():
+		first_name = str(p_encounter.get(EncounterFields.KEY_DISPLAY_NAME, ""))
+		# 遭遇展示名可能自带「×N」——正文另有数量，去掉避免「散修 ×2 ×2」。
+		var marker: int = first_name.rfind(" ×")
+		if marker > 0:
+			first_name = first_name.substr(0, marker)
 	var lines: Array = []
-	if names.is_empty():
+	if first_name.is_empty():
 		lines.append("敌人：未知 ×%d" % count)
 	else:
-		lines.append("%s ×%d" % [str(names[0]), count])
-	var realm: int = int(summary["realm"])
+		lines.append("%s ×%d" % [first_name, count])
+	var realm: int = int(p_encounter.get(EncounterFields.KEY_ENEMY_LEVEL, 0))
+	if realm <= 0:
+		realm = int(summary["realm"])
 	if realm > 0:
 		lines.append(realm_name(realm))
 	lines.append(TEXT_RECOMMENDED_PREFIX + "≥%d"
-			% recommended_deploy(count, max_deploy, recommended_override))
+			% recommended_deploy(count, p_max_deploy, p_recommended_override))
 	return lines
+
+
+## 遭遇配置里的模板数（数量回退口径——名册为空时不让弹窗显示「×0」）。
+static func _template_count(p_encounter: Dictionary) -> int:
+	var ids: Variant = p_encounter.get(EncounterFields.KEY_TEMPLATE_IDS, [])
+	return (ids as Array).size() if ids is Array else 0
 
 
 ## 推荐上场角色数——[b]数据驱动[/b]：配置值优先，缺失时按敌人数对等推定

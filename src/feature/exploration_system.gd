@@ -74,6 +74,11 @@ var get_event_pool_cb: Callable = Callable()
 ## 可注入回调——生成商店库存（桩阶段返回空 Dictionary）。
 var generate_shop_inventory_cb: Callable = Callable()
 
+## 可注入回调——按模板 ID 查 EnemyTemplate（[code]func(template_id) -> Resource[/code]）。[br]
+## [b]用途[/b]：DAG 生成时按 [code]reward_config[/code] 聚合节点掉落；空 = 走
+## Autoload AISystem 的 [code]get_template[/code]（单测可注入桩，不依赖场景树）。
+var enemy_template_lookup_cb: Callable = Callable()
+
 ## 可注入回调——获取 RNG seed（桩阶段返回 42）。
 var get_seed_cb: Callable = Callable()
 
