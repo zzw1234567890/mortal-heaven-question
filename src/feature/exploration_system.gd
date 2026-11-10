@@ -113,6 +113,9 @@ const DIFFICULTY_CONFIGS: Array = [
 	},
 ]
 
+## 入口节点 ID——DAG 编码 [code]layer * 100 + idx[/code]，第 0 层 0 号。
+const ENTRY_NODE_ID: int = 0
+
 ## AP=0 豁免节点类型集合——不消耗行动力且行动力不足时仍可移动。
 const AP_EXEMPT_TYPES: Array = [NodeType.TELEPORT, NodeType.ACTION_SPRING, NodeType.BOSS]
 
@@ -164,6 +167,19 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 
 ## Cat 2b 信号——探索结束（ADR-0014 §决策 5）。
 signal exploration_ended(reason: int, summary: Dictionary)
+
+## Cat 2b 信号——DAG 生成完成（ADR-0014 §决策 3 信号表）。[br]
+## [br][b]载荷[/b]：[code]map_data[/code] 为渲染快照——
+## [code]{graph, nodes, visited, current_node, ap_remaining, layers, boss_node_id,
+## path_count, map_id}[/code]。前五项与 [NodeGraphScreen] 的消费契约同构
+## （[code]visited[/code] / [code]current_node[/code] / [code]ap_remaining[/code]
+## 在 [method enter_map] 里按 GSM 实际写入值补齐——不是「推测值」）。[br]
+## [br][b]何时发射[/b]：仅 [method enter_map]（含读档重建后的首次进入）——
+## [method generate_map] 是纯生成、不写导航状态，不发信号（单测直调它不会
+## 惊动 UI）。[br]
+## [br][b]监听方[/b]：探索 UI（节点图主界面）、音频系统。[br]
+## [br]来源: ADR-0014 §决策 3 信号表、GDD exploration-system.md §信号定义。
+signal map_generated(map_id: StringName, map_data: Dictionary)
 
 ## Cat 2b 信号——节点移动完成（ADR-0007 / ADR-0014 §决策 3）。
 signal node_moved(from_node: int, to_node: int, ap_remaining: int)
@@ -374,35 +390,55 @@ func _emit_safe(signal_name: StringName, args: Array) -> void:
 
 # === 导航状态 GSM 主存储（Story 002）===========================================
 
-## 进入地图——生成 DAG + 初始化 GSM exploration.* 导航状态。[br]
+## 进入地图——生成 DAG + 初始化 GSM exploration.* 导航状态 + 广播 map_generated。[br]
 ## [br][param map_id] 地图 ID。[br]
 ## [br][param player_realm] 玩家境界等级。[br]
 ## [br][param max_ap] 行动力上限（由 RealmSystem 查询，此处由调用方传入）。[br]
-## [br][b]流程[/b]：generate_map → set_exploration_map → set_exploration_ap → update_exploration_map_state(entry_count++)。[br]
-## [br][b]返回[/b]: generate_map 返回的图结构 Dictionary。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型 + §GSM 写入契约。
+## [br][b]流程[/b]：generate_map → set_exploration_map → reset_exploration_visited
+## → set_exploration_ap → update_exploration_map_state(entry_count++) →
+## 发射 [signal map_generated]。[br]
+## [br][b]已访问重置[/b]：进入地图即把入口节点记为已访问（GDD §4「入口 + 已访问
+## 节点 → 绿色」），并[b]清掉上一张图残留的 visited[/b]——[method
+## GameStateManager.set_exploration_map] 只重置位置、不重置已访问；不重置会让
+## 节点图把上一张图的路径画成本图的绿色路径。[br]
+## [br][b]信号载荷[/b]：渲染键取 GSM 写入后的实际值（[code]visited[/code] /
+## [code]current_node[/code] / [code]ap_remaining[/code]）——UI 不必再自行推断，
+## 也不会出现「信号说 AP=10、GSM 里是 5」的口径分裂。[br]
+## [br][b]返回[/b]: generate_map 返回的图结构 Dictionary（附加 map_id / visited /
+## current_node / ap_remaining 四个渲染键）。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型 + §决策 3 信号表 + §GSM 写入契约。
 func enter_map(map_id: StringName, player_realm: int = 1, max_ap: int = 10) -> Dictionary:
 	var map_data: Dictionary = generate_map(map_id, player_realm, _get_entry_count(map_id))
 
 	# generate_map 已填充 _node_graph / _node_details / _map_config——缓存就绪
 	_dag_ready = true
 
+	var visited: Array = [ENTRY_NODE_ID]
 	var gsm: Node = _get_gsm()
 	if gsm == null:
 		push_warning("ExplorationSystem.enter_map: GSM 不可用，导航状态未写入")
-		return map_data
+	else:
+		# 写入导航状态——通过 GSM 第二层原子方法（ADR-0014 §GSM 写入契约）
+		gsm.set_exploration_map(map_id)
+		gsm.reset_exploration_visited(visited)
+		gsm.set_exploration_ap(max_ap, max_ap)
 
-	# 写入导航状态——通过 GSM 第二层原子方法（ADR-0014 §GSM 写入契约）
-	gsm.set_exploration_map(map_id)
-	gsm.set_exploration_ap(max_ap, max_ap)
+		# 递增 entry_count + 缓存 DAG 快照到 map_states（供读档后重建）
+		var entry_count: int = _get_entry_count(map_id) + 1
+		gsm.update_exploration_map_state(map_id, {
+			"entry_count": entry_count,
+			"graph": map_data["graph"],
+			"nodes": map_data["nodes"],
+		})
 
-	# 递增 entry_count + 缓存 DAG 快照到 map_states（供读档后重建）
-	var entry_count: int = _get_entry_count(map_id) + 1
-	gsm.update_exploration_map_state(map_id, {
-		"entry_count": entry_count,
-		"graph": map_data["graph"],
-		"nodes": map_data["nodes"],
-	})
+	# 渲染快照——前五项与 NodeGraphScreen 的消费契约同构
+	map_data["map_id"] = map_id
+	map_data["visited"] = visited
+	map_data["current_node"] = ENTRY_NODE_ID
+	map_data["ap_remaining"] = max_ap
+
+	# DAG 生成完成——广播 Cat 2b 信号（ADR-0014 §决策 3）
+	_emit_safe(&"map_generated", [map_id, map_data])
 
 	return map_data
 

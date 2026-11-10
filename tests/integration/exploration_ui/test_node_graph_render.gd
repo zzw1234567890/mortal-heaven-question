@@ -167,22 +167,32 @@ func test_ap_label_reflects_snapshot() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# B-1 回归：stub 回退激活路径（走 trigger_map_load 端到端）
+# B-1 回归：stub 降级激活路径（走 trigger_map_load 端到端）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 func test_stub_fallback_activates_via_trigger_map_load() -> void:
-	# B-1 回归：Autoload 已注册（ExplorationSystem 存在）但未声明 map_generated
-	# 信号 → stub 回退分支仍建立，trigger_map_load 端到端驱动节点图构建。
-	# （before_each 的 screen 直调 _on_map_generated 绕过此分支，本测试补齐盲区）
+	# B-1 回归：信号源存在但[b]未声明 map_generated[/b] → 降级分支仍建立，
+	# trigger_map_load 端到端驱动节点图构建（Feature 层缺失时的保底路径）。
+	# （before_each 的 screen 直调 _on_map_generated 绕过此分支，本测试补齐盲区；
+	# 真实 Autoload 现在有 map_generated，故必须显式注入无信号桩——否则走真实
+	# 生成路径，本用例断言的是降级样本，两者不是一回事）
+	var bare: Node = Node.new()
+	var bare_script: GDScript = GDScript.new()
+	bare_script.source_code = "extends Node\n"
+	bare_script.reload()
+	bare.set_script(bare_script)
+	add_child_autofree(bare)
 	var screen2: Control = NodeGraphScreenScene.instantiate()
 	screen2.animate = false
+	screen2.exploration_system = bare
 	add_child_autofree(screen2)
 	screen2.trigger_map_load()
 	var states: Dictionary = screen2.get("viewport").renderer.states
+	assert_true(screen2.is_using_stub_source(), "无 map_generated 信号时应标记为 stub 降级")
 	assert_eq(states.size(), DATA_STUB.stub_node_details().size(),
-			"stub 回退应驱动全部节点注入六态（走 trigger_map_load 而非直调）")
+			"stub 降级应驱动全部节点注入六态（走 trigger_map_load 而非直调）")
 	assert_eq(int(states.get(0, -1)), NODE_LOGIC.NodeState.CURRENT,
-			"入口应为当前态（stub 回退路径端到端接通）")
+			"入口应为当前态（stub 降级路径端到端接通）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

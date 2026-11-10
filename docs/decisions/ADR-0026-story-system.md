@@ -74,7 +74,7 @@ const CHAPTER_TEMPLATES: Dictionary = {
             {branch_id = &"ch1_reject_mo",  label = "拒绝墨渊", flag_to_set = {&"ch1_accepted_mo_condition": false}},
         ],
         maps = [&"qing_yun_jian_zong", &"xue_yuan_mi_jing", &"yueguo_capital", &"dan_xia_gu"],
-        completion = {unlock_next_chapter = &"ch2_luanxinghai", unlock_maps = [&"cang_xuan_zhengdao_meng"]},
+        completion = {unlock_next_chapter = &"ch2_luanxinghai", unlock_maps = [&"cang_xuan_zheng_dao_meng"]},
     },
     # ... ch2~ch5（共 5 章）
 }

@@ -9,9 +9,10 @@ extends RefCounted
 ## [br][b]数据源[/b]：渲染快照（邻接表 graph / 已访问 visited / 当前节点
 ## current_node / 行动力 ap_remaining / 节点详情 node_details）——纯输入，
 ## 不缓存、不访问 Autoload、不写任何状态（ADR-0031 §2）。[br]
-## [br][b]stub 先行裁决[/b]（2026-10-26）：Feature 层 [code]can_move_to()[/code]
-## 当前三态混叠返回 false，本分类器先行按 GDD §2 规则区分六态；Feature 层
-## 补齐后本文件不动（渲染路径不变），仅替换信号源与数据源。[br]
+## [br][b]为什么不直接问 [code]can_move_to()[/code][/b]（2026-10-26 裁决，仍然成立）：
+## 系统的移动查询是三态混叠的布尔（可达 / 已访问 / AP 不足都返回 false），而
+## 六态要分开画。分类器按 GDD §2 规则从快照推导六态；数据源换成真实
+## [code]map_generated[/code] 后本文件不动（输入契约相同）。[br]
 ## [br][b]AP=0 豁免[/b]：Boss/传送/灵泉三类型行动力不足时仍可达（与
 ## [code]ExplorationSystem.AP_EXEMPT_TYPES[/code] 对齐）。
 ##

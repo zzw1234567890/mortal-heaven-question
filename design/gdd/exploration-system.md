@@ -202,7 +202,40 @@ generate_map(map_id, player_realm):
 
 `enemy_realm` 是节点等级的**唯一生成期基准**——名册条目自带的境界（来自敌人模板）不参与定档，否则出厂模板恒为炼气时，所有地图的节点强度会完全一样。
 
+**敌人模板与地图差异（2026-11-10）**
+
+出厂模板（`assets/enemies/*.tres`，AISystem 启动扫描）已扩到 **4 类**，每张地图引用**自己的池配比**，而不是所有图共用一份权重表：
+
+| 模板 ID | 名称 | 境界 | 主题 |
+|---------|------|------|------|
+| `san_xiu` | 散修 | 1 | 山野游散 |
+| `mo_xiu` | 魔修 | 1 | 血渊 / 魔道 |
+| `yao_shou` | 妖兽 | 1 | 山林 |
+| `gui_xiu` | 鬼修 | 2 | 古战场 / 古林 / 归墟 |
+
+| 地图 | 敌人池主题 |
+|------|-----------|
+| 青云剑宗、慕兰草原 | 散修为主 + 妖兽 |
+| 血渊秘境 | 魔修为主 + 散修 + 妖兽 |
+| 云澜城、丹霞谷、正道盟、碎星外环 | 散修 > 魔修 > 妖兽 |
+| 苍玄古战场、西域古林 | 鬼修为主 |
+| 归墟·浮云陆 | 鬼修 > 魔修 |
+
+**地图 ID 命名口径**：**以地图选择界面为准**（逐词下划线，如 `cang_xuan_zheng_dao_meng`）。章节表已统一为规范写法；历史连写（`cang_xuan_zhengdao_meng`）由 `exploration_map_catalog.gd::MAP_ID_ALIASES` + `canonical_id()` 承担读取兼容，单测锁定「别名解析到同一份配置」「章节表不再引用历史拼法」。
+
 #### 4. 节点导航
+
+**进入地图的初始状态（`enter_map`）：**
+
+- 生成 DAG 后把**入口节点记为已访问**（「入口 + 已访问节点 → 绿色」的起点），
+  并**清空上一张图残留的已访问集合**——否则换图后上一张图的路径会被画成新图的绿色路径
+- 当前节点 = 入口（`layer 0 / idx 0`），行动力 = RealmSystem `action_points`
+- 完成后广播 `map_generated(map_id, map_data)`，载荷含
+  `graph / nodes / visited / current_node / ap_remaining`——这五项取 GSM 写入后的
+  实际值，UI（节点图主界面）直接渲染，不再自行推断
+
+**已访问集合的实现口径**：`exploration.visited_nodes` 只在 `enter_map`（重置为
+`[入口]`）与 `move_to_node`（追加）两处写入，都由 ExplorationSystem 独占。
 
 **可见性规则：**
 
@@ -337,7 +370,7 @@ map_clear_reward():
 | `combat_node_reached` | 探索系统 | `(enemy_roster: Array, combat_type: String)` | 战斗系统 |
 | `combat_ended` | 战斗系统 | `(result: String, rewards: Dictionary)` | 探索系统 |
 | `boss_node_reached` | 探索系统 | `(boss_data: Dictionary)` | 战斗系统 |
-| `map_generated` | 探索系统 | `(map_data: Dictionary)` | UI系统 |
+| `map_generated` | 探索系统 | `(map_id: StringName, map_data: Dictionary)` | UI系统 |
 | `ap_changed` | 行动力系统 | `(current: int, max_ap: int)` | 探索系统、UI系统 |
 | `ap_depleted` | 探索系统 | `()` | UI系统 |
 | `map_cleared` | 探索系统 | `(map_id: String, rewards: Dictionary)` | 游戏状态管理器、UI系统 |

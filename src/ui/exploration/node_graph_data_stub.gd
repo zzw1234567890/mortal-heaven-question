@@ -1,13 +1,13 @@
 class_name NodeGraphDataStub
 ## NodeGraphDataStub —— 节点图 stub 载荷数据源（exploration-ui Story S16-3）。
 ##
-## [b]角色[/b]：承载节点图的临时 stub 载荷——探索系统 [code]map_generated[/code]
-## 信号 / [code]get_node_detail()[/code] 单数 API / 六态查询均未实现（Feature 层
-## 依赖缺口，story-003 Dependencies 已裁决「stub 先行」）。[br]
-## [br][b]生命周期[/b]：Feature 层补齐后删除本文件与 [method NodeGraphScreen] 的
-## stub 信号发射器——stub 数据与 UI 逻辑分离，删除不牵连 UI。[br]
-## [br][b]契约[/b]：节点详情字段与 story-003 stub 契约一致——Feature 层补齐时
-## 必须沿用同一契约：
+## [b]角色[/b]：节点图界面的[b]降级样本[/b]——真实信号源（[code]ExplorationSystem.map_generated[/code]）
+## 可用时不参与渲染；无系统 / 系统未声明信号（headless、编辑器预览、Feature 层
+## 缺失）时由 [MapGeneratedStub] 发射，保证界面不空白。[br]
+## [br][b]与真实数据的关系[/b]：两条路径共用同一渲染入口与同一快照契约
+## （graph/nodes/visited/current_node/ap_remaining），换数据源不改渲染路径；
+## 哪条路径生效由 [method NodeGraphScreen.is_using_stub_source] 标记。[br]
+## [br][b]契约[/b]：节点详情字段与生成器写出的节点详情同构——新字段要两边同步：
 ##   [code]type[/code]（NodeType 枚举值）、[code]layer[/code]、[code]idx[/code]、
 ##   [code]label[/code]、[code]description[/code]（悬停简短描述）、
 ##   [code]enemy_detail[/code]（战斗类敌人构成）、[code]tribulation_ready[/code]

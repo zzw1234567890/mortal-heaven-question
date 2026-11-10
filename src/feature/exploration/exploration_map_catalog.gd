@@ -28,25 +28,63 @@ const DIFFICULTY_DEFAULTS: Array = [
 		"enemy_realm": 4, "enemy_count_min": 3, "enemy_count_max": 4, "elite_bonus": 1},
 ]
 
-## 通用敌人池——现有模板只有散修/魔修两名（[code]assets/enemies/[/code]）。
-## 每张地图引用同一份键名，后续加模板只需改对应地图的权重表。
-const POOL_LIANQI: Array = [
-	{"template_id": &"san_xiu", "weight": 70},
-	{"template_id": &"mo_xiu", "weight": 30},
+## 敌人池——四类出厂模板（[code]assets/enemies/*.tres[/code]）：
+## 散修 / 魔修 / 妖兽 / 鬼修。[br]
+## [br][b]每张地图引用自己的配比[/b]，而不是共用一份权重表——「这张图会刷什么
+## 敌人」本身就是地图差异的一部分（山野多妖兽、血渊多魔修、古战场多鬼修）。
+## 新增模板只需在池里加条目，不必改生成器。
+const POOL_LIANQI: Array = [        # 山野：散修 + 妖兽
+	{"template_id": &"san_xiu", "weight": 60},
+	{"template_id": &"yao_shou", "weight": 40},
 ]
-const POOL_FOUNDATION: Array = [
-	{"template_id": &"san_xiu", "weight": 50},
+const POOL_BLOOD: Array = [         # 血渊：魔修主场
 	{"template_id": &"mo_xiu", "weight": 50},
+	{"template_id": &"san_xiu", "weight": 30},
+	{"template_id": &"yao_shou", "weight": 20},
+]
+const POOL_FOUNDATION: Array = [    # 城镇/宗门：正道散修为主，魔修与妖兽混入
+	{"template_id": &"san_xiu", "weight": 45},
+	{"template_id": &"mo_xiu", "weight": 30},
+	{"template_id": &"yao_shou", "weight": 25},
+]
+const POOL_GHOST: Array = [         # 古战场/古林：鬼修出没
+	{"template_id": &"gui_xiu", "weight": 50},
+	{"template_id": &"mo_xiu", "weight": 30},
+	{"template_id": &"san_xiu", "weight": 20},
+]
+const POOL_GUIYU: Array = [         # 归墟：鬼修 + 魔修
+	{"template_id": &"gui_xiu", "weight": 60},
+	{"template_id": &"mo_xiu", "weight": 40},
 ]
 
-## 地图登记表——键为地图 ID（与地图选择界面 / 章节表的地图 ID 对齐）。[br]
+## 地图 ID 别名表——历史写法 → 规范写法。[br]
+## [br][b]规范写法以地图选择界面为准[/b]（[code]map_data_stub.gd[/code] 的卡片
+## 列表与 [constant MAPS] 的键）：章节表早期用的是「单词连写」风格
+## （[code]cang_xuan_zhengdao_meng[/code]），与地图选择的「逐词下划线」风格
+## （[code]cang_xuan_zheng_dao_meng[/code]）不一致。章节表已改为规范写法；
+## 本表保留旧写法的读取兼容（存档里的历史地图 ID、外部数据），并作为
+## [method canonical_id] 的唯一转换入口。[br]
+## [br][b]只收录「同一个地图的两种写法」[/b]——章节表里尚未在地图选择界面出现的
+## 地图（如 [code]wan_gu_dian[/code]）不在此表，它们是「未登记地图」，
+## 由难度档位兜底，不是命名冲突。
+const MAP_ID_ALIASES: Dictionary = {
+	&"cang_xuan_zhengdao_meng": &"cang_xuan_zheng_dao_meng",
+	&"cang_xuan_guzhanchang": &"cang_xuan_gu_zhan_chang",
+	&"suixing_waihuan": &"sui_xing_wai_huan",
+	&"xiyu": &"xi_yu_gu_lin",
+	&"mulan_caoyuan": &"mu_lan_cao_yuan",
+	&"guixu_fuyun_lu": &"gui_xu_fu_yun_lu",
+}
+
+## 地图登记表——键为地图 ID（[b]规范写法[/b]：与地图选择界面一致）。[br]
 ## [br][code]difficulty[/code] 为 MapDifficulty 枚举值（0=LOW … 3=VERY_HIGH）；
 ## [code]enemy_realm[/code] 是该地图的敌人基准境界（GDD「敌人强度按地图本身
 ## 境界设定」）；[code]max_realm[/code] 是该地图允许的最高玩家境界（通关奖励
 ## 的境界差额惩罚读它）。[br]
-## [br][b]已知命名不一致[/b]：章节表用 [code]cang_xuan_zhengdao_meng[/code] 等
-## 无下划线写法，地图选择用 [code]cang_xuan_zheng_dao_meng[/code]——两套 ID
-## 并存是既有现状，本目录以地图选择界面的写法为准，未登记写法走难度兜底。
+## [br][b]命名口径[/b]：章节表早期用连写 ID（[code]cang_xuan_zhengdao_meng[/code]），
+## 地图选择用逐词下划线（[code]cang_xuan_zheng_dao_meng[/code]）——章节表已改为
+## 规范写法，历史写法的读取兼容由 [constant MAP_ID_ALIASES] + [method
+## canonical_id] 承担（见 [method config_for] 的入口规范化）。
 const MAPS: Dictionary = {
 	&"qing_yun_jian_zong": {
 		"difficulty": 0, "max_realm": 1, "enemy_realm": 1,
@@ -54,7 +92,7 @@ const MAPS: Dictionary = {
 	},
 	&"xue_yuan_mi_jing": {
 		"difficulty": 1, "max_realm": 1, "enemy_realm": 1,
-		"enemy_pool": POOL_LIANQI, "enemy_count_min": 2, "enemy_count_max": 2,
+		"enemy_pool": POOL_BLOOD, "enemy_count_min": 2, "enemy_count_max": 2,
 	},
 	&"yun_lan_cheng": {
 		"difficulty": 2, "max_realm": 2, "enemy_realm": 2,
@@ -70,7 +108,7 @@ const MAPS: Dictionary = {
 	},
 	&"cang_xuan_gu_zhan_chang": {
 		"difficulty": 1, "max_realm": 2, "enemy_realm": 2,
-		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 2, "enemy_count_max": 2,
+		"enemy_pool": POOL_GHOST, "enemy_count_min": 2, "enemy_count_max": 2,
 	},
 	&"sui_xing_wai_huan": {
 		"difficulty": 0, "max_realm": 2, "enemy_realm": 2,
@@ -78,28 +116,38 @@ const MAPS: Dictionary = {
 	},
 	&"xi_yu_gu_lin": {
 		"difficulty": 2, "max_realm": 3, "enemy_realm": 3,
-		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 2, "enemy_count_max": 3,
+		"enemy_pool": POOL_GHOST, "enemy_count_min": 2, "enemy_count_max": 3,
 	},
 	&"mu_lan_cao_yuan": {
 		"difficulty": 2, "max_realm": 4, "enemy_realm": 4,
-		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 2, "enemy_count_max": 3,
+		"enemy_pool": POOL_LIANQI, "enemy_count_min": 2, "enemy_count_max": 3,
 	},
 	&"gui_xu_fu_yun_lu": {
 		"difficulty": 3, "max_realm": 5, "enemy_realm": 5,
-		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 3, "enemy_count_max": 4,
+		"enemy_pool": POOL_GUIYU, "enemy_count_min": 3, "enemy_count_max": 4,
 	},
 }
 
 
+## 地图 ID 规范化——别名表命中的历史写法转成规范写法，其余原样返回。[br]
+## [br][b]唯一转换入口[/b]：所有按地图 ID 查表的静态方法（[method config_for] /
+## [method enemy_realm_of] / [method has_map]）入口先过本方法，调用方无需自己
+## 记住两套写法。[br]
+## [br][param p_map_id] 任意写法的地图 ID。[br]
+## [br][b]返回[/b]：规范写法（未登记别名时返回入参本身）。[br]
+static func canonical_id(p_map_id: StringName) -> StringName:
+	return MAP_ID_ALIASES.get(p_map_id, p_map_id)
+
+
 ## 地图配置——登记表优先，未登记按玩家境界推难度档位兜底。[br]
-## [br][param p_map_id] 地图 ID。[br]
-## [param p_player_realm] 玩家境界（仅用于未登记地图的难度兜底，[b]不参与
+## [br][param p_map_id] 地图 ID（历史写法经 [method canonical_id] 规范化）。[br]
+## [br][param p_player_realm] 玩家境界（仅用于未登记地图的难度兜底，[b]不参与
 ## 敌人等级[/b]——等级基准恒为地图自身的 [code]enemy_realm[/code]）。[br]
 ## [br][b]返回[/b]：完整配置字典（含 layers / min_nodes / max_nodes /
 ## enemy_realm / enemy_pool / enemy_count_min / enemy_count_max / elite_bonus /
 ## max_realm / weights）。[br]
 static func config_for(p_map_id: StringName, p_player_realm: int = 1) -> Dictionary:
-	var registered: Variant = MAPS.get(p_map_id)
+	var registered: Variant = MAPS.get(canonical_id(p_map_id))
 	var config: Dictionary = _difficulty_defaults(
 			int((registered as Dictionary).get("difficulty", -1)) if registered is Dictionary
 			else _difficulty_of_realm(p_player_realm))
@@ -115,9 +163,32 @@ static func enemy_realm_of(p_map_id: StringName, p_player_realm: int = 1) -> int
 	return int(config_for(p_map_id, p_player_realm).get("enemy_realm", 1))
 
 
-## 该地图是否已登记（未登记走难度兜底——调试/数据核对用）。
+## 该地图是否已登记（未登记走难度兜底——调试/数据核对用）。[br]
+## [br][b]历史写法算已登记[/b]：别名表命中即视为登记（同一张地图的两种写法
+## 不应因为拼写而掉进难度兜底）。[br]
 static func has_map(p_map_id: StringName) -> bool:
-	return MAPS.has(p_map_id)
+	return MAPS.has(canonical_id(p_map_id))
+
+
+## 地图 ID 是否属于别名表登记的历史写法（防回归断言用——见
+## [method unknown_map_ids]）。[br]
+static func is_legacy_id(p_map_id: StringName) -> bool:
+	return MAP_ID_ALIASES.has(p_map_id)
+
+
+## 一组地图 ID 中「既不是规范写法、也没有别名」的那些。[br]
+## [br][b]用途[/b]：章节表 / 存档 / 外部数据里的地图 ID 若拼错，[method
+## config_for] 会静默走难度兜底（不报错但配错档位）。本方法把这类「查无此图」
+## 的 ID 挑出来，供测试做防回归断言。[br]
+## [br][param p_map_ids] 待检查的地图 ID 集合。[br]
+## [br][b]返回[/b]：未登记且无别名的 ID 数组（顺序同入参）。[br]
+static func unknown_map_ids(p_map_ids: Array) -> Array:
+	var unknown: Array = []
+	for raw: Variant in p_map_ids:
+		var map_id: StringName = StringName(str(raw))
+		if not MAPS.has(canonical_id(map_id)):
+			unknown.append(map_id)
+	return unknown
 
 
 ## 玩家境界 → 难度档位索引（1→LOW，2→MEDIUM，3→HIGH，4+→VERY_HIGH）。

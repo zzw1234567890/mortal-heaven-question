@@ -221,6 +221,8 @@ func set_exploration_map(map_id: StringName) -> void:
 	_atomic_writes.set_exploration_map(map_id)
 func set_exploration_position(layer: int, idx: int) -> void:
 	_atomic_writes.set_exploration_position(layer, idx)
+func reset_exploration_visited(p_initial: Array) -> void:
+	_atomic_writes.reset_exploration_visited(p_initial)
 func add_visited_node(node_id: int) -> void:
 	_atomic_writes.add_visited_node(node_id)
 func set_exploration_ap(current: int, max_ap: int) -> void:

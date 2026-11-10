@@ -40,6 +40,21 @@ func set_exploration_position(layer: int, idx: int) -> void:
 	_gsm._buffer_change("exploration.node_position", old_pos, new_pos)
 
 
+## 重置已访问节点集合——进入地图时写入「入口已访问」的初始集合。[br]
+## [br][b]仅 ExplorationSystem.enter_map() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
+## [br][b]为什么需要单独的方法[/b]：[method set_exploration_map] 只重置
+## [code]current_map[/code] 与 [code]node_position[/code]；换图时若不清空
+## [code]visited_nodes[/code]，上一张图的路径会被节点图画进新图的绿色已访问态。[br]
+## [br][param p_initial] 初始已访问集合（深拷贝写入，不与调用方共享引用）。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型、GDD exploration-system.md §4。
+func reset_exploration_visited(p_initial: Array) -> void:
+	var old_visited: Array = \
+			(_gsm.exploration.get("visited_nodes", []) as Array).duplicate()
+	var new_visited: Array = p_initial.duplicate()
+	_gsm.exploration.visited_nodes = new_visited
+	_gsm._buffer_change("exploration.visited_nodes", old_visited, new_visited.duplicate())
+
+
 ## 追加已访问节点——写入 exploration.visited_nodes（去重）。[br]
 ## [br][b]仅 ExplorationSystem.move_to_node() 调用[/b]——ADR-0014 §GSM 写入契约。[br]
 ## [br]来源: ADR-0014 §决策 1 状态分层模型。

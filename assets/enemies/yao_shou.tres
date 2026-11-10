@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://assets/enemies/enemy_template.gd" id="1_enemy_template"]
+[ext_resource type="Script" path="res://assets/enemies/behavior_profile.gd" id="2_behavior_profile"]
+[ext_resource type="Script" path="res://assets/enemies/skill_entry.gd" id="3_skill_entry"]
+[ext_resource type="Resource" path="res://assets/enemies/rewards/yao_shou_reward.tres" id="4_reward_config"]
+
+[sub_resource type="Resource" id="Resource_behavior"]
+script = ExtResource("2_behavior_profile")
+aggression = 0.85
+focus_fire = 0.5
+front_priority = 0.8
+retreat_threshold = 0.2
+
+[sub_resource type="Resource" id="Resource_strike"]
+script = ExtResource("3_skill_entry")
+skill_id = &"basic_attack"
+display_name = "撕咬"
+skill_type = 0
+base_weight = 60
+cost = 0
+cooldown = 0
+target_type = 0
+
+[resource]
+script = ExtResource("1_enemy_template")
+template_id = &"yao_shou"
+display_name = "妖兽"
+realm = 1
+is_elite = false
+is_boss = false
+base_hp = 22
+base_attack = 5
+base_defense = 1
+formation_limit = 0
+front_slot = false
+behavior_profile = SubResource("Resource_behavior")
+skill_pool = [SubResource("Resource_strike")]
+reward_config = ExtResource("4_reward_config")

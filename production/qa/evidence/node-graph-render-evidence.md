@@ -40,7 +40,7 @@
 
 ## 3. 已知边界（非遗留阻塞）
 
-- stub 先行：`map_generated_stub.gd` + `node_graph_data_stub.gd` 待 Feature 层 `map_generated` 信号/`get_node_detail()` 落地后替换。
+- **真实数据接入（2026-11-10 更新）**：`ExplorationSystem.map_generated(map_id, map_data)` 已落盘，`NodeGraphScreen` 改为消费该信号——`trigger_map_load()` 调 `enter_map()` 命令，地图生成 / GSM 写入 / 广播都在系统侧。`map_generated_stub.gd` + `node_graph_data_stub.gd` **保留为无系统时的降级路径**（`using_stub_source` 标记），不再驱动生产流程。集成证据见 `tests/integration/exploration_ui/test_node_graph_real_data.gd`（真实 `enter_map` 后渲染节点数 / 节点 ID 集合 / 邻接表与系统一致；换图后图随之改变；无信号源时降级到 stub）。
 - GDD 渡劫台图标勘误：GDD §2 写作 ⚡，本 story 按 🌩 实现，GDD 源表待 design 侧同步。
 
 ## 4. 签收

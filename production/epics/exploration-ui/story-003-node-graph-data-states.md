@@ -130,4 +130,5 @@
 
 - Depends on: Story 001（渲染基座）
 - Feature 层数据源缺口（S16-3 实现时以 UI 侧 stub 先行，2026-10-26 裁决）：探索系统 `map_generated` 信号 / `get_node_detail()` 单数 API / 节点状态六态查询（`can_move_to`/`get_node_detail`）均未实现——本 story 按「stub 载荷先行 + 记录依赖缺口上报」执行（与 story-002 同款裁决），UI 侧模拟 map_generated 信号 + stub 节点数据（10 类型 + 六态）驱动渲染，六态判定用 stub；Feature 层补齐后替换。本 story 同时在薄容器 `exploration_scene.tscn` 内补节点图挂载点（NodeGraphViewport 实例化）。
+- **已闭环（2026-11-10）**：`ExplorationSystem.map_generated(map_id, map_data)` 已实现并在 `enter_map` 结束后广播（载荷含 `graph/nodes/visited/current_node/ap_remaining`，取 GSM 实际写入值）。`NodeGraphScreen.trigger_map_load()` 改为调用 `enter_map()` 命令，`_on_map_generated` 渲染路径未改；`map_generated_stub.gd` 降级为「无系统 / 无信号源」时的保底路径（`using_stub_source` 标记）。集成证据：`tests/integration/exploration_ui/test_node_graph_real_data.gd`。
 - Unlocks: Story 005（移动交互在渲染节点上）、Story 006（弹窗锚定节点位置）

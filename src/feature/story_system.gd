@@ -47,7 +47,7 @@ const CHAPTER_TEMPLATES: Dictionary = {
 		],
 		"completion": {
 			"unlock_next_chapter": &"ch2_luanxinghai",
-			"unlock_maps": [&"cang_xuan_zhengdao_meng"],
+			"unlock_maps": [&"cang_xuan_zheng_dao_meng"],
 		},
 		"maps": [&"qing_yun_jian_zong", &"xue_yuan_mi_jing", &"yueguo_capital", &"dan_xia_gu"],
 	},
@@ -80,7 +80,7 @@ const CHAPTER_TEMPLATES: Dictionary = {
 			"unlock_next_chapter": &"ch3_tiannan",
 			"unlock_maps": [&"wan_gu_dian", &"dajin_gulin", &"dajin_bianjing"],
 		},
-		"maps": [&"cang_xuan_zhengdao_meng", &"cang_xuan_guzhanchang", &"suixing_waihuan", &"suixing_neihai"],
+		"maps": [&"cang_xuan_zheng_dao_meng", &"cang_xuan_gu_zhan_chang", &"sui_xing_wai_huan", &"suixing_neihai"],
 	},
 	# 第三话：苍玄之争（金丹期）
 	&"ch3_tiannan": {
@@ -106,7 +106,7 @@ const CHAPTER_TEMPLATES: Dictionary = {
 		],
 		"completion": {
 			"unlock_next_chapter": &"ch4_lingsheng",
-			"unlock_maps": [&"xiyu", &"mulan_caoyuan", &"guixu_tongdao"],
+			"unlock_maps": [&"xi_yu_gu_lin", &"mu_lan_cao_yuan", &"guixu_tongdao"],
 		},
 		"maps": [&"wan_gu_dian", &"dajin_gulin", &"dajin_bianjing"],
 	},
@@ -133,9 +133,9 @@ const CHAPTER_TEMPLATES: Dictionary = {
 		],
 		"completion": {
 			"unlock_next_chapter": &"ch5_lingjie",
-			"unlock_maps": [&"guixu_fuyun_lu", &"guixu_wanyao_gu", &"guixu_gumo_zhanchang"],
+			"unlock_maps": [&"gui_xu_fu_yun_lu", &"guixu_wanyao_gu", &"guixu_gumo_zhanchang"],
 		},
-		"maps": [&"xiyu", &"mulan_caoyuan", &"guixu_tongdao"],
+		"maps": [&"xi_yu_gu_lin", &"mu_lan_cao_yuan", &"guixu_tongdao"],
 	},
 	# 第五话：归墟征途（化神期）——最终章
 	&"ch5_lingjie": {
@@ -162,7 +162,7 @@ const CHAPTER_TEMPLATES: Dictionary = {
 			"unlock_next_chapter": &"",  # 最终章无下一章
 			"unlock_maps": [],
 		},
-		"maps": [&"guixu_fuyun_lu", &"guixu_wanyao_gu", &"guixu_gumo_zhanchang"],
+		"maps": [&"gui_xu_fu_yun_lu", &"guixu_wanyao_gu", &"guixu_gumo_zhanchang"],
 	},
 }
 
