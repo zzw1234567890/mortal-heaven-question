@@ -1,9 +1,16 @@
 [gd_resource type="Resource" script_class="CardTemplate" format=3]
 
-[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+[ext_resource type="Script" path="res://src/core/card_system/effect_entry.gd" id="1_effect_entry"]
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="2_card_template"]
+
+[sub_resource type="Resource" id="Resource_basicattack_damage"]
+script = ExtResource("1_effect_entry")
+effect_type = &"damage_multiplier"
+value = 100
+target = &"single_enemy"
 
 [resource]
-script = ExtResource("1_card_template")
+script = ExtResource("2_card_template")
 card_id = &"basic_attack"
 name = "基础攻击"
 type = 5
@@ -11,6 +18,5 @@ rarity = 1
 cost = 0
 description = "造成攻击力×1.0的伤害。"
 flavor_text = "最朴素的一击，也是所有杀招的起点。"
-effect_type = &"damage_multiplier"
-effect_value = 100
+effects = Array[ExtResource("1_effect_entry")]([SubResource("Resource_basicattack_damage")])
 target_type = &"single_enemy"

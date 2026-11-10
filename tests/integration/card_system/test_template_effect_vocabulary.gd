@@ -3,16 +3,23 @@ extends GutTest
 ## [br][b]背景[/b]：`card_effect_evaluator._category_for` 原先只有 8 个 `effect_type` 前缀，
 ## 补上减伤/倍率/伤害加成/治疗加成/阵法亲和五类后，模板侧逐张回填并在此锁定。[br]
 ## [br][b]锁定的四件事[/b]：[br]
-##   1. 百分比减伤卡 → [code]damage_reduce[/code]，数值为百分比整数，本命值走 [code]native_effect_value[/code]；[br]
+##   1. 百分比减伤卡 → [code]damage_reduce[/code]，数值为百分比整数，本命值走「本命数值」字段
+##      （未迁移卡 = [code]native_effect_value[/code]，已迁移卡 = 条目的 [code]native_value[/code]）；[br]
 ##   2. 攻击类符箓 → [code]damage_multiplier[/code]，数值为倍率百分比整数；[br]
 ##   3. 三张此前「留空」的卡各自回填为新类别（不得留空，也不得退回 buff）；[br]
 ##   4. 概率触发卡声明 [code]trigger_chance[/code] / [code]native_trigger_chance[/code]。[br]
 ## [br][b]数值唯一真理来源[/b]：[code]design/gdd/identity-selection-system.md[/code] §①~§⑥
 ## 的「初始卡牌详情」表。[br]
+## [br][b]已迁移的卡不改变本文件的断言口径[/b]（DEBT-CBT-018-10 迁移批次）：[code]yan_yun_bu[/code]
+## / [code]huan_hua_mi_zong_bu[/code] / [code]basic_attack[/code] / [code]sha_qi_zhan[/code]
+## 等改由 [member CardTemplate.effects] 表达，本文件经 [method _primary] 两条通道统一取值——
+## 锁的是[b]数值口径[/b]，不是「存在哪边」；「哪些卡已迁移」由
+## [code]test_multi_effect_templates.gd[/code] 的迁移清单锁定（不在此重复）。[br]
 ## [br]加载方式与 `test_template_assets.gd` 相同（独立实例 + 重试驱动，避免 Autoload 污染）。
 
 const CS_SCRIPT: GDScript = preload("res://src/core/card_system/card_system.gd")
 const CardTemplateClass: GDScript = preload("res://src/core/card_system/card_template.gd")
+const EffectEntryClass: GDScript = preload("res://src/core/card_system/effect_entry.gd")
 
 var cs: Node = null
 var _gsm_validation_before: bool = false
@@ -55,6 +62,20 @@ func _require(id: StringName) -> CardTemplateClass:
 	return tpl
 
 
+## 取一张卡的[b]主效果[/b]三元组（类型 / 数值 / 本命值）。[br]
+## [br]已迁移卡（[code]effects[/code] 非空）读首条条目；未迁移卡读扁平字段——两种表述在
+## 评估层等价（扁平字段经 [code]CardEffectComposer.effects_of[/code] 合成同一条目），
+## 故本文件不区分通道，只锁数值。[br]
+## [br][b]返回[/b]: [code]{type: String, value: int, native: int}[/code]。
+func _primary(tpl: CardTemplateClass) -> Dictionary:
+	if tpl.effects.size() > 0:
+		var entry: EffectEntryClass = tpl.effects[0]
+		return {"type": String(entry.effect_type), "value": entry.value,
+				"native": entry.native_value}
+	return {"type": String(tpl.effect_type), "value": tpl.effect_value,
+			"native": tpl.native_effect_value}
+
+
 # ---- 1. 百分比减伤 ----
 
 ## 「受到伤害降低 X%」→ [code]damage_reduce[/code]，[code]effect_value[/code] 为百分比整数，
@@ -68,10 +89,11 @@ func test_damage_reduction_cards_use_damage_reduce() -> void:
 		var tpl: CardTemplateClass = _require(id)
 		if tpl == null:
 			continue
-		assert_eq(String(tpl.effect_type), "damage_reduce", "%s 应归 damage_reduce" % id)
-		assert_eq(tpl.effect_value, int(expected[id]["pct"]),
+		var primary: Dictionary = _primary(tpl)
+		assert_eq(String(primary["type"]), "damage_reduce", "%s 应归 damage_reduce" % id)
+		assert_eq(int(primary["value"]), int(expected[id]["pct"]),
 			"%s 的减伤百分比应与 GDD 一致" % id)
-		assert_eq(tpl.native_effect_value, int(expected[id]["native"]),
+		assert_eq(int(primary["native"]), int(expected[id]["native"]),
 			"%s 的本命减伤百分比应与 GDD 一致（不做 ×1.5）" % id)
 		assert_true(tpl.description.contains("受到伤害降低"),
 			"%s 的描述应保留 GDD 的百分比减伤口径" % id)
@@ -90,18 +112,20 @@ func test_previously_blank_effect_types_backfilled() -> void:
 		var tpl: CardTemplateClass = _require(id)
 		if tpl == null:
 			continue
-		assert_eq(String(tpl.effect_type), String(expected[id]["type"]),
+		var primary: Dictionary = _primary(tpl)
+		assert_eq(String(primary["type"]), String(expected[id]["type"]),
 			"%s 应回填为 %s（留空会让评估落 UNEVALUABLE）" % [id, expected[id]["type"]])
-		assert_eq(tpl.effect_value, int(expected[id]["value"]), "%s 主数值应与 GDD 一致" % id)
-		assert_eq(tpl.native_effect_value, int(expected[id]["native"]),
+		assert_eq(int(primary["value"]), int(expected[id]["value"]), "%s 主数值应与 GDD 一致" % id)
+		assert_eq(int(primary["native"]), int(expected[id]["native"]),
 			"%s 本命值应与 GDD 一致" % id)
 
 
 # ---- 3. 攻击类符箓 ----
 
 ## 攻击类符箓 → [code]damage_multiplier[/code]，[code]effect_value[/code] 为倍率百分比整数。[br]
-## [br][b]血杀掌已迁到 [code]effects[/code] 列表[/b]（DEBT-CBT-018-10 示范卡），不在此列——
-## 它的两条效果由 [code]test_multi_effect_templates.gd[/code] 锁定。
+## [br][b]已迁到 [code]effects[/code] 列表的卡[/b]（[code]basic_attack[/code] / [code]sha_qi_zhan[/code]
+## / [code]xue_sha_zhang[/code]，DEBT-CBT-018-10 第二批次）仍在本表内——数值口径不变，
+## 只换了承载字段；血杀掌的[b]两条[/b]效果另有 [code]test_multi_effect_templates.gd[/code] 锁定。
 func test_attack_talismans_use_damage_multiplier() -> void:
 	var expected: Dictionary = {
 		&"basic_attack": 100, &"sha_qi_zhan": 150,
@@ -112,8 +136,9 @@ func test_attack_talismans_use_damage_multiplier() -> void:
 		var tpl: CardTemplateClass = _require(id)
 		if tpl == null:
 			continue
-		assert_eq(String(tpl.effect_type), "damage_multiplier", "%s 应归 damage_multiplier" % id)
-		assert_eq(tpl.effect_value, int(expected[id]),
+		var primary: Dictionary = _primary(tpl)
+		assert_eq(String(primary["type"]), "damage_multiplier", "%s 应归 damage_multiplier" % id)
+		assert_eq(int(primary["value"]), int(expected[id]),
 			"%s 的伤害倍率（百分比整数）应与 GDD 一致" % id)
 
 

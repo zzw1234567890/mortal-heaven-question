@@ -1,9 +1,16 @@
 [gd_resource type="Resource" script_class="CardTemplate" format=3]
 
-[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+[ext_resource type="Script" path="res://src/core/card_system/effect_entry.gd" id="1_effect_entry"]
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="2_card_template"]
+
+[sub_resource type="Resource" id="Resource_huanhuamizongbu_reduce"]
+script = ExtResource("1_effect_entry")
+effect_type = &"damage_reduce"
+value = 15
+native_value = 20
 
 [resource]
-script = ExtResource("1_card_template")
+script = ExtResource("2_card_template")
 card_id = &"huan_hua_mi_zong_bu"
 name = "幻花迷踪步"
 type = 1
@@ -11,7 +18,5 @@ rarity = 2
 cost = 2
 description = "绑定后角色受到伤害降低15%（汐音本命→受到伤害降低20%）。"
 flavor_text = "花影重重，踏之无痕。"
-effect_type = &"damage_reduce"
-effect_value = 15
-native_effect_value = 20
+effects = Array[ExtResource("1_effect_entry")]([SubResource("Resource_huanhuamizongbu_reduce")])
 native_owner = &"xi_yin"

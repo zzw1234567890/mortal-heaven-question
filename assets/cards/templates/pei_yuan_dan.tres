@@ -1,9 +1,16 @@
 [gd_resource type="Resource" script_class="CardTemplate" format=3]
 
-[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+[ext_resource type="Script" path="res://src/core/card_system/effect_entry.gd" id="1_effect_entry"]
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="2_card_template"]
+
+[sub_resource type="Resource" id="Resource_peiyuandan_heal"]
+script = ExtResource("1_effect_entry")
+effect_type = &"heal"
+value = 3
+target = &"self"
 
 [resource]
-script = ExtResource("1_card_template")
+script = ExtResource("2_card_template")
 card_id = &"pei_yuan_dan"
 name = "培元丹"
 type = 4
@@ -11,6 +18,5 @@ rarity = 1
 cost = 1
 description = "回复3点生命。"
 flavor_text = "培元固本，丹霞谷外门弟子的日常。"
-effect_type = &"heal"
-effect_value = 3
+effects = Array[ExtResource("1_effect_entry")]([SubResource("Resource_peiyuandan_heal")])
 target_type = &"self"

@@ -208,3 +208,49 @@ func test_multi_entry_aggregate_respects_sixty_percent_cap() -> void:
 	var pcts: Array = BindingManager.get_damage_reduction_pcts(CHAR_MULTI)
 	# Assert
 	assert_almost_eq(float(pcts[0]), 60.0, 0.0001, "多条来源乘算后封顶 60%")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 3. 真实资产：迁移后的减伤卡仍生效（端到端，不再用合成模板）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 真实资产 [code]yan_yun_bu[/code]（DEBT-CBT-018-10 第二批次已迁到 [code]effects[/code]，
+## 扁平 [code]effect_type[/code] / [code]effect_value[/code] 已清空）——仍贡献 10%。[br]
+## [br]上面各例都用合成模板，本用例补真实资产的端到端一例：当初把减伤卡迁到 [code]effects[/code]
+## 却不改绑定侧读取路径时，症状正是「这里算出 0%」且不报错。[br]
+## [br][b]非本命口径[/b]：不传 [code]native_owner[/code]，读到的应是基础 10%（不是 15%）。
+func test_real_migrated_asset_still_contributes_reduction() -> void:
+	# Arrange——真实模板已在 CardSystem 注册表（Autoload 加载），无需注入
+	var tpl: Variant = CardSystem.templates.get(&"yan_yun_bu")
+	assert_not_null(tpl, "前置：真实资产 yan_yun_bu 应已加载")
+	if tpl == null:
+		return
+	assert_eq(tpl.effects.size(), 1, "前置：该卡应已迁到 effects（本用例的前提）")
+	_bind(CHAR_MIGRATED, &"yan_yun_bu")
+	# Act
+	var pcts: Array = BindingManager.get_damage_reduction_pcts(CHAR_MIGRATED)
+	# Assert
+	assert_eq(pcts, [10.0], "真实迁移卡仍贡献 10%（迁移不该让减伤静默消失）")
+
+
+## 真实资产的本命口径同样不变：同一张 [code]yan_yun_bu[/code] 在 [code]lin_yuan[/code]
+## 身上应贡献 15%（迁移前来自扁平 [code]native_effect_value[/code]，现在来自条目
+## [code]native_value[/code]），[b]不是[/b] 10 × 1.5 = 15 这种巧合——本命值是非线性覆盖，
+## 15% 与 20% 两张卡才能分辨口径（[code]huan_hua_mi_zong_bu[/code] 本命 20%，×1.5 会得 22.5）。
+func test_real_migrated_asset_keeps_native_value() -> void:
+	# Arrange——native_owner 与角色卡 ID 匹配 → is_native
+	_bind(CHAR_MIGRATED_NATIVE, &"yan_yun_bu", &"lin_yuan")
+	# Act
+	var pcts: Array = BindingManager.get_damage_reduction_pcts(CHAR_MIGRATED_NATIVE)
+	# Assert
+	assert_eq(pcts, [15.0], "迁移卡本命仍取条目 native_value=15")
+
+
+## 本命 20% 的卡可区分「非线性覆盖」与「×1.5」（20 × 1.5 = 30 ≠ 20）。
+func test_real_migrated_native_twenty_is_not_multiplied() -> void:
+	# Arrange
+	_bind(CHAR_MIGRATED_NATIVE, &"huan_hua_mi_zong_bu", &"xi_yin")
+	# Act
+	var pcts: Array = BindingManager.get_damage_reduction_pcts(CHAR_MIGRATED_NATIVE)
+	# Assert
+	assert_eq(pcts, [20.0], "本命 20% 应按原值采用，不做 ×1.5（否则会得 30）")

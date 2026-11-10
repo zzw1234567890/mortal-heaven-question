@@ -245,6 +245,8 @@
 3. 评估时**逐条评估后汇总**：伤害/治疗/属性增量/状态按条累加；百分比减伤交 `combine_damage_reduction` 乘算并封顶 60%；多条伤害倍率只取最强一条（叠乘规则未定义，不臆造）；
 4. **击杀类条目（`trigger = kill`）不计入打出结算**——干跑不知道击杀是否真的发生。
 
+**迁移进度**：迁移按「效果类别是否已有执行端」分批推进，一次只迁已建模且已接线的类别，避免迁完仍是死数据。已迁 7 张（减伤 `yan_yun_bu` / `huan_hua_mi_zong_bu`；治疗 `pei_yuan_dan` / `ku_mu_feng_chun_jue`；倍率 `basic_attack` / `sha_qi_zhan` / `xue_sha_zhang`，其中血杀掌另带击杀回血条目）；其余 30 张仍走扁平通道，行为不变。迁移时**清空扁平效果字段**（`effect_type` / `effect_value` / `native_effect_value`）——留着旧值会让「哪份是真源」永久含混；**`target_type` 不清**，它是「这张卡打谁」的卡片级描述，不属于单条效果。批次白名单由 `test_multi_effect_templates.gd` 的 `MIGRATED_IDS` 锁定（多迁一张即红）。
+
 **执行端（2026-11-09，DEBT-CBT-018-10 第二阶段）**
 
 上面四条是**评估口径**；出牌时真正落库由 `src/feature/combat/combat_on_play_effects.gd` 执行（此前 `damage_multiplier`/`heal` 只在评估层算出、`play_card` 结算链里无人消费）：
