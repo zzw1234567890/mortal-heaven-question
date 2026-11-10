@@ -188,7 +188,11 @@ func test_setup_feedback_wires_coordinator_and_stage() -> void:
 	# Assert
 	assert_eq(feedback._connected_sources.size(), 2, "编排器应订阅战斗系统 + 部署系统两个信号源")
 	assert_true(bool(feedback.reduce_motion), "reduce_motion 应透传到编排器")
-	assert_true(stage.get("_coordinator") == feedback,
+	# 节点表与建卡已拆到 actor_stage_roster.gd（DEBT-CUI-007-2）——编排器引用随之
+	# 落在那层；断言仍指向「装配台持有编排器」这条契约。
+	var roster: RefCounted = stage.get("_roster")
+	assert_not_null(roster, "装配台应持有节点表模块")
+	assert_true(roster.get("_coordinator") == feedback,
 		"装配台应绑定编排器——此后建的卡自动注册")
 
 

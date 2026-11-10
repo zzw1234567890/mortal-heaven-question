@@ -49,10 +49,16 @@ var _selection: RefCounted = null
 
 ## 注入依赖。[br]
 ## [param p_bridge] 出牌桥（需实现 [code]play_card_detailed[/code]）。[br]
-## [param p_selection] 选中模型（可空——缺省自建一个空的）。
+## [param p_selection] 选中模型（可空——缺省自建一个空的）。[br]
+## [br][b]重复调用保留状态[/b]：装配台每次取控制器都会重新注入桥（换战斗系统时
+## 必须重接），但选中模型[b]只在缺失时创建[/b]——每次 setup 都新建模型会把
+## 「玩家刚选中的卡」静默清掉（选中态出现两份真理来源的另一种形态）。
 func setup(p_bridge: RefCounted, p_selection: RefCounted = null) -> void:
 	_bridge = p_bridge
-	_selection = p_selection if p_selection != null else SelectionModel.new()
+	if p_selection != null:
+		_selection = p_selection
+	elif _selection == null:
+		_selection = SelectionModel.new()
 
 
 ## 选中一张手牌。[br]

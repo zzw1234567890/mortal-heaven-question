@@ -7,8 +7,11 @@ extends Control
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：布局常量为渲染参数，过渡进度是瞬态视觉状态
 ## （§2.1 豁免）。[b]零轮询[/b]：无 [code]_process()[/code]，过渡用一次性 Tween。[br]
 ## [br][b]装配已拆出[/b]（DEBT-CUI-007-2）：原为 465 行单体门面，现拆成
-## [code]combat_layout_{zones,deploy,settlement,feedback,assembly,entrance}_mount.gd[/code]，
+## [code]combat_layout_{zones,deploy,settlement,feedback,assembly,entrance,interaction}_mount.gd[/code]，
 ## 本类只留薄转发；对外 API 与节点树顺序不变（顺序即绘制层级）。[br]
+## [br][b]出牌交互[/b]（combat-ui-interaction 001）：[method setup_interaction] 惰性装配
+## 输入层 + 提示条；施法者切换 / 命中测试 / 手牌快照 / 阶段查询统一走
+## [code]interaction().call(&"…")[/code]——它们只服务交互，留在门面会成为第二份真理来源。[br]
 ## [br]下面标着「代理属性」的成员读写直达对应挂载模块（它是唯一持有者）。
 ##
 ## @experimental
@@ -26,6 +29,8 @@ const AssemblyMountScript: GDScript = preload(
 		"res://src/ui/combat/layout/combat_layout_assembly_mount.gd")
 const EntranceMountScript: GDScript = preload(
 		"res://src/ui/combat/layout/combat_layout_entrance_mount.gd")
+const InteractionMountScript: GDScript = preload(
+		"res://src/ui/combat/layout/combat_layout_interaction_mount.gd")
 
 ## 区域高度常量——引用骨架模块的单一定义（外部既有引用点保持不变，不抄数值）。
 const TOPBAR_HEIGHT_RATIO: float = ZonesScript.TOPBAR_HEIGHT_RATIO
@@ -46,72 +51,44 @@ var _settlement: RefCounted = null
 var _feedback: RefCounted = null
 var _assembly: RefCounted = null
 var _entrance: RefCounted = null
+## 出牌交互层（[method setup_interaction] 惰性装配——节点排在覆盖层之前）。
+var _interaction: RefCounted = null
 
 # === 区域与装配节点的代理属性（挂载模块是唯一持有者）=======================
 
 ## 五区域容器（内容归后续 story 组件）。
 var topbar: Control:
 	get: return (_zones.topbar as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.topbar = value
 
 var enemy_area: Control:
 	get: return (_zones.enemy_area as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.enemy_area = value
 
 var midline: Control:
 	get: return (_zones.midline as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.midline = value
 
 var ally_area: Control:
 	get: return (_zones.ally_area as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.ally_area = value
 
 var bottombar: Control:
 	get: return (_zones.bottombar as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.bottombar = value
 
 ## 右上角撤退按钮位（内容/点击行为归 008/interaction）。
 var retreat_button_slot: Control:
 	get: return (_zones.retreat_button_slot as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.retreat_button_slot = value
 
 ## 暂停按钮位（顶部条内——点击/ESC 转发 hud 暂停菜单，菜单本体归 hud 005）。
 var pause_button_slot: Control:
 	get: return (_zones.pause_button_slot as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.pause_button_slot = value
 
 ## 顶部条 / 底部条 / 手牌区组装器（story 004/005/006）。
 var combat_topbar: Control:
 	get: return (_zones.combat_topbar as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.combat_topbar = value
 
 var combat_bottombar: Control:
 	get: return (_zones.combat_bottombar as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.combat_bottombar = value
 
 var hand_area: Control:
 	get: return (_zones.hand_area as Control) if _zones != null else null
-	set(value):
-		if _zones != null:
-			_zones.hand_area = value
 
 ## 备战面板（story 007——默认隐藏，由 [method show_deploy_panel] 打开）。
 var deploy_panel: DeployPanel:
@@ -267,6 +244,28 @@ func enemy_candidates() -> Array:
 ## 当前裁定出的施法者角色 ID（无阵位 / 全阵亡时为 -1）。
 func current_caster_id() -> int:
 	return int(_assembly.call(&"current_caster_id"))
+
+
+## 出牌交互层挂载（[method setup_interaction] 之后非空）。[br]
+## [br][b]为什么施法者切换 / 命中测试 / 手牌快照都在那一层[/b]：它们只服务交互，
+## 放在这里会把门面撑成第二个真理来源；场景挂载侧与测试统一走
+## [code]interaction().call(&"…")[/code]（方法同名同义）。
+func interaction() -> RefCounted:
+	return _interaction
+
+
+## 装配出牌交互层（输入节点 + 提示条）并接线——场景挂载侧在依赖注入[br]
+## （[method setup_feedback] / [method build_battle_roster]）之后调用一次。[br]
+## [br][b]幂等[/b]：重复调用不重建节点（避免重复的输入层抢事件）。[br]
+## [param p_reduce_motion] 减少动态（提示条淡出改瞬时）。[br]
+## [b]返回[/b]: 交互挂载模块（交互层 / 场景接线取 [method interaction] 即可）。
+func setup_interaction(p_reduce_motion: bool = false) -> RefCounted:
+	if _interaction != null:
+		return _interaction
+	_interaction = InteractionMountScript.new(self, _assembly)
+	_interaction.call(&"build")
+	_interaction.call(&"set_reduce_motion", p_reduce_motion)
+	return _interaction
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

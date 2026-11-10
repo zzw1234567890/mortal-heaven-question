@@ -5,82 +5,111 @@ extends Node
 ## [b]职责[/b]：把「战斗系统持有的敌我名册」变成战场上的 [CharacterStatusCard]，
 ## 并把这些卡注册进 [CombatFeedbackCoordinator]——此后 HP 条 / 伤害飘字 /
 ## 阵亡淡出才有真实数据可消费。[br]
-## [br][b]为什么独立成文件[/b]：此前全库没有任何生产代码创建角色卡，
-## [code]CombatFeedbackCoordinator[/code] 的卡表永远是空的（HP 落库只停在数据层）。
-## 装配逻辑塞进 [code]combat_scene.gd[/code]（260 行）会顶穿 300 行软上限，
-## 也破坏「薄容器只接线」的职责边界。[br]
+## [br][b]出牌入口（本台同时是交互层的唯一取数点）[/b]：[br]
+##   - 施法者：[member actor_selection]（[code]CombatActorSelection[/code]）持有
+##     「当前操作角色」——玩家可 [method select_actor] 切换，阵亡后自动顺位，
+##     出牌桥按它取施法者；[br]
+##   - 手牌：[method hand_snapshot] 折出卡面快照（带 [code]target_type[/code]）；[br]
+##   - 目标：[method enemy_candidates] 存活敌方候选池；[method enemy_at] 命中测试。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：名册/HP/ATK 一律经
 ## [code]combat_actor_reader.gd[/code] 现读；建卡瞬间取一次快照做初始渲染
-## （[member _cards] 是 UI 节点表，不是游戏状态副本）。[br]
+## （节点表在 [code]actor_stage_roster.gd[/code]，是 UI 节点表不是游戏状态副本）。[br]
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——建卡由 [method build_roster]
 ## 显式驱动，排布由容器 [signal Control.resized] 驱动。[br]
+## [br][b]拆分[/b]：几何排布归 [code]actor_stage_layout.gd[/code]，节点表与建卡归
+## [code]actor_stage_roster.gd[/code]（DEBT-CUI-007-2 / 单文件 300 行软上限）。
 ##
 ## @experimental
 ## 来源: ADR-0031、ADR-0008 §Phase 1/Phase 6、design/ux/combat-ui.md §Layout Zones、
-## combat-ui-layout Story 002/003、DEBT-CBT-018-1 残留项。
+## combat-ui-layout Story 002/003、combat-ui-interaction Story 001、DEBT-CBT-018-1。
 
-## 角色卡脚本（按需 new——同 CombatLayout 的组件装配先例）。
-const CardScript := preload("res://src/ui/combat/layout/character_status_card.gd")
 ## 取数入口（名册 / HP / ATK——单一读取链路）。
 const ReaderScript := preload("res://src/ui/combat/layout/combat_actor_reader.gd")
-## UI 出牌桥（DEBT-CBT-018-10 第四阶段——出牌前裁定施法者再转交 CombatSystem）。
+## 排布模块（几何 / 行内居中 / resized 重排）。
+const LayoutScript := preload("res://src/ui/combat/layout/actor_stage_layout.gd")
+## 节点表与建卡（建卡 / 注册 / 阵亡摘除 / 命中测试）。
+const RosterScript := preload("res://src/ui/combat/layout/actor_stage_roster.gd")
+## UI 出牌桥（DEBT-CBT-018-10 第四阶段——出牌前取施法者再转交 CombatSystem）。
 const PlayBridgeScript := preload("res://src/ui/combat/shared/combat_play_bridge.gd")
-
-## 卡间距（UX 角色区布局细节：16px）。
-const CARD_GAP: float = 16.0
-## 行内边距（容器上下留白）。
-const ROW_MARGIN: float = 8.0
-## 容器尺寸不可用时的回退（UX 基准 1920×340——纯 headless 环境兜底）。
-const FALLBACK_AREA_SIZE: Vector2 = Vector2(1920.0, 340.0)
+## 当前操作角色状态（交互 001——显式施法者）。
+const ActorSelectionScript := preload("res://src/ui/combat/shared/combat_actor_selection.gd")
+## 手牌快照折出（战斗手牌 → 卡面快照，带 target_type）。
+const HandSnapshotScript := preload("res://src/ui/combat/shared/combat_hand_snapshot.gd")
+## 阶段常量（CombatPhase.PLAY）。
+const PLAY_PHASE: int = 2
 
 ## 取数入口实例（RefCounted）。
 var _reader: RefCounted = ReaderScript.new()
-## 反馈编排器（卡建好后注册——由挂载侧注入）。
-var _coordinator: Control = null
-## UI 出牌桥（出牌时裁定施法者——数据源与 [member _reader] 同一组注入）。
+## 节点表与建卡模块。
+var _roster: RefCounted = null
+## 排布模块（几何 / 行内居中 / resized 重排）。
+var _layout: RefCounted = null
+## UI 出牌桥（出牌时取施法者——数据源与 [member _reader] 同一组注入）。
 var _play_bridge: RefCounted = PlayBridgeScript.new()
+## 卡牌系统（手牌快照的模板回退——可空）。
+var _card_system: Node = null
+## 战斗系统（阶段查询——可空）。
+var _combat: Node = null
+
+## 当前操作角色状态（施法者的唯一真理来源——[method setup] 后由阵位刷新）。
+var actor_selection: RefCounted = ActorSelectionScript.new()
 
 ## === 容器（CombatLayout 的区域）=============================================
 
 var _ally_container: Control = null
 var _enemy_container: Control = null
 
-## === UI 节点表（非游戏状态——ADR-0031 §2 合规）==============================
 
-## 敌方卡（按建卡顺序）。
-var _enemy_cards: Array[Control] = []
-## 我方卡（按建卡顺序）。
-var _ally_cards: Array[Control] = []
-## 角色 ID → 卡（[method get_card] 查询与清理用）。
-var _cards: Dictionary = {}
+## 构造——建节点表与排布模块（不依赖场景树时序，同 CombatLayout 先例）。
+func _init() -> void:
+	_roster = RosterScript.new(_reader)
+	_layout = LayoutScript.new(self)
 
 
-## 注入数据源（全部可空——缺失时对应侧不建卡，不抛错）。
+## 注入数据源（全部可空——缺失时对应侧不建卡，不抛错）。[br]
+## [br][b]顺带刷新当前操作角色[/b]：阵位是「谁上场了」的唯一来源，
+## 注入后立即按它筛出候选——出牌前不必再手动接手一次。
 func setup(p_combat: Node, p_deployment: Node, p_card_system: Node = null,
 		_p_binding_manager: Node = null) -> void:
 	_reader.call(&"setup", p_combat, p_deployment, p_card_system)
 	_play_bridge.call(&"setup", p_combat, p_deployment)
+	_play_bridge.call(&"set_actor_source", actor_selection)
+	_combat = p_combat
+	_card_system = p_card_system
 	_connect_death(p_combat)
+	refresh_actors()
 
 
-## UI 出牌入口——裁定施法者后转交 [code]CombatSystem.play_card()[/code]。[br]
-## [br][b]为什么从角色卡装配台暴露[/b]：本台已持有战斗系统与部署系统两份数据源
-## （[method setup] 注入），出牌桥所需正好齐备，不必新增一层容器。[br]
-## [br][b]层级关系[/b]：[code]CombatLayout[/code] 是场景挂载侧持有的那个节点
-## （[code]combat_scene.gd[/code] 调的是它的 [code]setup_feedback[/code]），本台是它的
-## 子组件；交互层应调 [code]CombatLayout.play_card()[/code]，本方法只作下层入口。[br]
-## [br][b]施法者口径（临时）[/b]：我方阵位第一个存活角色（见
-## [code]combat_caster_rules.gd[/code]）；interaction epic 落地「当前操作角色」后
-## 应改为显式传入。[br]
-## [br][param p_card_instance_id] 卡牌实例 ID。[param p_target_indices] 目标索引列表。[br]
-## [b]返回[/b]: 出牌是否成功。
+## 按我方阵位刷新当前操作角色（开战 / 阵亡 / 换人后调用）。[br]
+## [b]返回[/b]: 刷新后的当前角色 ID（判不出为 [constant ActorSelectionScript.NO_ACTOR]）。
+func refresh_actors() -> int:
+	return int(actor_selection.call(&"refresh", _player_field()))
+
+
+## 切换当前操作角色（玩家点选我方角色卡）。[br]
+## [br][b]只接受上场且未阵亡的角色[/b]——点错不生效，当前角色保持不变。[br]
+## [b]返回[/b]: 是否切换成功。
+func select_actor(p_character_id: int) -> bool:
+	return bool(actor_selection.call(&"select", p_character_id, _player_field()))
+
+
+## 当前操作角色 ID（无角色为 -1）。
+func current_actor_id() -> int:
+	return int(actor_selection.call(&"current_id"))
+
+
+## 可切换的我方角色 ID（候选——UI 据此决定哪些卡可点）。
+func actor_candidates() -> Array:
+	return actor_selection.call(&"candidates")
+
+
+## UI 出牌入口——取当前操作角色作施法者后转交 [code]CombatSystem.play_card()[/code]。
 func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
 	return bool(_play_bridge.call(&"play_card", p_card_instance_id, p_target_indices))
 
 
 ## 同上，但带上拒绝原因与提示文本（交互层显示提示用）。[br]
-## [br]目标为空 → 走默认策略（首个存活敌人）；详见
-## [code]CombatPlayBridge.play_card_detailed[/code]。
+## 目标为空 → 走默认策略（首个存活敌人）；详见 [code]CombatPlayBridge[/code]。
 func play_card_detailed(p_card_instance_id: int,
 		p_target_indices: Array) -> Dictionary:
 	return _play_bridge.call(&"play_card_detailed", p_card_instance_id,
@@ -92,12 +121,12 @@ func resolve_targets(p_explicit: Array) -> Dictionary:
 	return _play_bridge.call(&"resolve_targets", p_explicit)
 
 
-## 敌方候选池（顺序即 UI 建卡顺序——默认目标与高亮都用它）。
+## 敌方候选池（顺序即 UI 建卡顺序——默认目标与命中测试共用同一份顺序）。
 func enemy_candidates() -> Array:
 	return _play_bridge.call(&"enemy_candidates")
 
 
-## 当前裁定出的施法者 ID（测试与后续交互层查询用；判不出为 -1）。
+## 当前施法者 ID（出牌桥口径——判不出为 -1）。
 func current_caster_id() -> int:
 	return int(_play_bridge.call(&"current_caster_id"))
 
@@ -107,19 +136,45 @@ func get_play_bridge() -> RefCounted:
 	return _play_bridge
 
 
+## 手牌快照——战斗手牌折成 [code]{card_instance_id, name, cost, rarity, type,
+## target_type, affordable}[/code] 数组（交互层的卡面词来源）。[br]
+## [br][b]战斗系统不可用 → 空数组[/b]（手牌区显示「无手牌」，不崩）。
+func hand_snapshot() -> Array:
+	if _combat == null or not _combat.has_method(&"get_hand"):
+		return []
+	var hand: Variant = _combat.call(&"get_hand")
+	if not (hand is Array):
+		return []
+	return HandSnapshotScript.build(hand, _card_system)
+
+
+## 当前战斗阶段（战斗系统不可用 → -1；交互层据此判灵能预览）。
+func current_phase() -> int:
+	if _combat == null or not _combat.has_method(&"get_current_phase"):
+		return -1
+	return int(_combat.call(&"get_current_phase"))
+
+
+## 命中测试——全局坐标下的敌方角色 ID（交互层点选目标用）；无命中 -1。
+func enemy_at(p_global_pos: Vector2) -> int:
+	return int(_roster.call(&"enemy_at", p_global_pos))
+
+
+## 命中测试——全局坐标下的我方角色 ID（点击切换当前操作角色用）；无命中 -1。
+func ally_at(p_global_pos: Vector2) -> int:
+	return int(_roster.call(&"ally_at", p_global_pos))
+
+
 ## 指定卡的落地容器（我方区 / 敌方区）。
 func set_containers(p_ally: Control, p_enemy: Control) -> void:
 	_ally_container = p_ally
 	_enemy_container = p_enemy
-	_connect_resized(_ally_container)
-	_connect_resized(_enemy_container)
+	_layout.call(&"attach", _ally_container, _enemy_container)
 
 
 ## 绑定反馈编排器——此后新建的卡自动注册（已建卡也补注册）。
 func bind_coordinator(p_coordinator: Control) -> void:
-	_coordinator = p_coordinator
-	for character_id: int in _cards.keys():
-		_register(character_id)
+	_roster.call(&"bind_coordinator", p_coordinator)
 
 
 ## 构建全部角色卡（开战时调用）。[br]
@@ -127,8 +182,11 @@ func bind_coordinator(p_coordinator: Control) -> void:
 ## [br][b]先清后建[/b]：重复开战不会残留上一场的卡与注册关系。
 func build_roster(p_player_ids: Array = []) -> void:
 	clear_roster()
-	_build_side(_reader.call(&"player_entries", p_player_ids), _ally_container, _ally_cards)
-	_build_side(_reader.call(&"enemy_entries"), _enemy_container, _enemy_cards)
+	_roster.call(&"build_side", _reader.call(&"player_entries", p_player_ids),
+			_ally_container, _roster.get(&"ally_cards"))
+	_roster.call(&"build_side", _reader.call(&"enemy_entries"), _enemy_container,
+			_roster.get(&"enemy_cards"))
+	refresh_actors()
 	_relayout()
 
 
@@ -137,37 +195,21 @@ func build_roster(p_player_ids: Array = []) -> void:
 ## [b]立即摘父[/b]：只 queue_free 会让节点滞留到帧末，下一场的 card_count /
 ## 子节点数会读到「上一场的残影」——先 remove_child 再 queue_free。
 func clear_roster() -> void:
-	for character_id: int in _cards.keys():
-		if _coordinator != null and _coordinator.has_method(&"unregister_card"):
-			_coordinator.call(&"unregister_card", character_id)
-		var card: Control = _cards[character_id] as Control
-		if card != null and is_instance_valid(card):
-			if card.get_parent() != null:
-				card.get_parent().remove_child(card)
-			card.queue_free()
-	_cards.clear()
-	_ally_cards.clear()
-	_enemy_cards.clear()
+	_roster.call(&"clear")
+	actor_selection.call(&"clear")
 
 
-## 查询角色卡（测试与后续交互层命中测试用）。[br]
-## 卡被阵亡流程移除后对象已 freed——此时返回 null（防调用方拿到悬空引用；
-## 对已释放实例做 `is Control` 判断会抛引擎错误，故先判有效性）。
+## 查询角色卡（测试与交互层命中测试用；卡被移除/释放后返回 null）。
 func get_card(character_id: int) -> Control:
-	var card: Variant = _cards.get(character_id)
-	if card == null or not is_instance_valid(card):
-		return null
-	if not (card is Control):
-		return null
-	return card
+	return _roster.call(&"get_card", character_id) as Control
 
 
 ## 已建卡数量（两侧合计——测试断言用）。
 func card_count() -> int:
-	return _cards.size()
+	return int(_roster.call(&"count"))
 
 
-## 订阅阵亡信号——卡被战斗侧判死后从节点表摘除（防「UI 仍以为卡在」）。[br]
+## 订阅阵亡信号——卡被战斗侧判死后从节点表摘除，并刷新当前操作角色（阵亡顺位）。[br]
 ## [br][b]与编排器的分工[/b]：动效（淡出→移除→空位框）归
 ## [code]CombatFeedbackCoordinator[/code]；本台只维护「谁还有卡」的索引，
 ## 两个消费者各自订阅同一条信号（ADR-0008 §架构原则 #2 信号不承载逻辑）。[br]
@@ -181,131 +223,19 @@ func _connect_death(source: Node) -> void:
 
 
 func _on_character_died(character_id: int, _side: int, _ids: Array) -> void:
-	if not _cards.has(character_id):
-		return
-	var card: Variant = _cards[character_id]
-	_cards.erase(character_id)
-	_forget_from_rows(card)
+	if bool(_roster.call(&"forget", character_id)):
+		refresh_actors()
 
 
-## 从行内数组摘除已阵亡的卡（排布重算时不把已释放节点算进去）。
-func _forget_from_rows(card: Variant) -> void:
-	for bucket: Array in [_ally_cards, _enemy_cards]:
-		for i: int in range(bucket.size() - 1, -1, -1):
-			var entry: Variant = bucket[i]
-			if entry == card or entry == null or not is_instance_valid(entry):
-				bucket.remove_at(i)
+## 我方阵位快照（部署系统不可用时为空数组——当前角色刷新为「无」）。
+func _player_field() -> Array:
+	var raw: Variant = _reader.call(&"player_field")
+	return raw if raw is Array else []
 
 
-# === 建卡 ====================================================================
+# === 排布（几何归 actor_stage_layout.gd）=====================================
 
-## 单侧建卡（entries 形状：[code][{character_id, is_front}][/code]）。
-func _build_side(entries: Variant, container: Control, bucket: Array[Control]) -> void:
-	if not (entries is Array) or container == null:
-		return
-	for entry: Variant in entries:
-		if not (entry is Dictionary):
-			continue
-		var character_id: int = int((entry as Dictionary).get("character_id", -1))
-		if character_id < 0:
-			continue
-		var card: Control = _spawn_card(character_id,
-				bool((entry as Dictionary).get("is_front", true)), container)
-		if card != null:
-			bucket.append(card)
-
-
-## 建一张卡：初始渲染快照（HP/ATK）+ 注册。
-func _spawn_card(character_id: int, is_front: bool, container: Control) -> Control:
-	var card: Control = CardScript.new()
-	card.name = "ActorCard%d" % character_id
-	container.add_child(card)
-	# 非容器父节点不会自动撑开子节点——显式落到最小尺寸（120×168 基准），
-	# 否则排布与飘字起点都会按 0×0 计算。
-	card.size = card.custom_minimum_size
-	_cards[character_id] = card
-	card.call(&"set_front_row", is_front)
-	# 初始快照：HP 优先读战斗系统（开战已种子），读不到再回退模板/条目 max_hp，
-	# 避免首帧「0/0 等刷新」的闪烁。
-	var hp: Dictionary = _reader.call(&"hp", character_id)
-	var current: int = int(hp.get("current", 0))
-	var max_hp: int = int(hp.get("max", 0))
-	if max_hp <= 0:
-		max_hp = int(_reader.call(&"base_hp", character_id))
-		current = maxi(current, max_hp)
-	card.call(&"apply_atk", int(_reader.call(&"attack", character_id)))
-	card.call(&"apply_hp", current, max_hp)
-	_register(character_id)
-	return card
-
-
-## 注册到反馈编排器（编排器未注入时静默跳过——建卡仍可独立测试）。
-func _register(character_id: int) -> void:
-	if _coordinator == null or not _coordinator.has_method(&"register_card"):
-		return
-	_coordinator.call(&"register_card", character_id, _cards.get(character_id))
-
-
-# === 排布 ====================================================================
-
-## 重排两侧全部卡：前排贴中线、后排靠外沿，各自水平居中。
+## 重排两侧全部卡（容器 resized 与建卡后调用）。
 func _relayout() -> void:
-	_layout_side(_ally_cards, _ally_container, true)
-	_layout_side(_enemy_cards, _enemy_container, false)
-
-
-## 单侧排布。[param front_at_top] 我方前排在上（贴中线），敌方前排在下。[br]
-## 前排卡 100% / 后排卡 85%（[method CharacterStatusCard.set_front_row] 已设 scale），
-## 行内按各自实际宽度累加——不做固定网格（前后排卡宽不同）。
-func _layout_side(cards: Array[Control], container: Control, front_at_top: bool) -> void:
-	if container == null:
-		return
-	var area: Vector2 = container.size
-	if area.x <= 0.0 or area.y <= 0.0:
-		area = FALLBACK_AREA_SIZE
-	var front: Array[Control] = []
-	var back: Array[Control] = []
-	for card: Control in cards:
-		if not is_instance_valid(card):
-			continue
-		if bool(card.get(&"is_front_row")):
-			front.append(card)
-		else:
-			back.append(card)
-	var front_h: float = _card_height(front)
-	var back_h: float = _card_height(back)
-	var front_y: float = ROW_MARGIN
-	var back_y: float = area.y - ROW_MARGIN - back_h
-	if not front_at_top:
-		front_y = area.y - ROW_MARGIN - front_h
-		back_y = ROW_MARGIN
-	_place_row(front, area.x, front_y)
-	_place_row(back, area.x, back_y)
-
-
-## 行内水平居中摆放。
-func _place_row(row: Array[Control], area_width: float, y: float) -> void:
-	if row.is_empty():
-		return
-	var total: float = CARD_GAP * float(row.size() - 1)
-	for card: Control in row:
-		total += card.size.x * card.scale.x
-	var x: float = (area_width - total) * 0.5
-	for card: Control in row:
-		card.position = Vector2(x, y)
-		x += card.size.x * card.scale.x + CARD_GAP
-
-
-## 行高——取该行最高卡的实际视觉高度（无卡时 0）。
-func _card_height(row: Array[Control]) -> float:
-	var height: float = 0.0
-	for card: Control in row:
-		height = maxf(height, card.size.y * card.scale.y)
-	return height
-
-
-## 容器尺寸变化 → 重排（锚点布局下窗口缩放不丢排列）。
-func _connect_resized(container: Control) -> void:
-	if container == null or container.resized.is_connected(_relayout):
-		return
-	container.resized.connect(_relayout)
+	_layout.call(&"relayout", _roster.get(&"ally_cards"),
+			_roster.get(&"enemy_cards"), _ally_container, _enemy_container)

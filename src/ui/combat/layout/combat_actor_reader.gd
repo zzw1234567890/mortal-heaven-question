@@ -116,6 +116,13 @@ func base_hp(character_id: int) -> int:
 	return 0
 
 
+## 我方阵位快照（部署系统不可用时为空数组）。[br]
+## [br][b]公开给装配台用[/b]：当前操作角色的「候选筛出」与「切换校验」都读同一份
+## 快照——取数入口只此一处，避免两处各读各的。
+func player_field() -> Array:
+	return _read_player_field()
+
+
 ## 我方阵位前后排——查不到该角色时按前排处理（不做无依据的臆测）。
 func _player_is_front(character_id: int) -> bool:
 	for entry: Variant in _read_player_field():

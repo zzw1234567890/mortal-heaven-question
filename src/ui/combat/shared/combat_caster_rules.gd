@@ -49,11 +49,7 @@ const SLOT_INDEX_UNKNOWN: int = 1 << 30
 ## （只有显式 DEAD 才排除，不靠「字段缺失」推定阵亡）。[br]
 ## [br][b]返回[/b]: 施法者角色 ID；判不出返回 [constant NO_CASTER]（-1）。
 static func resolve_caster(field: Variant) -> int:
-	if not (field is Array):
-		return NO_CASTER
-	var ordered: Array = (field as Array).duplicate()
-	ordered.sort_custom(_slot_before)
-	for raw: Variant in ordered:
+	for raw: Variant in sorted_field(field):
 		if not (raw is Dictionary):
 			continue
 		var entry: Dictionary = raw
@@ -65,6 +61,17 @@ static func resolve_caster(field: Variant) -> int:
 			continue
 		return character_id
 	return NO_CASTER
+
+
+## 阵位快照副本 → 按 [code]slot_index[/code] 升序（[b]不改入参[/b]）。[br]
+## [br][b]为什么公开[/b]：[code]CombatActorSelection[/code] 的「自动顺位」必须与这里的
+## 兜底裁定同序——两处各排各的，会选出不同的施法者。非数组输入返回空数组。
+static func sorted_field(field: Variant) -> Array:
+	if not (field is Array):
+		return []
+	var ordered: Array = (field as Array).duplicate()
+	ordered.sort_custom(_slot_before)
+	return ordered
 
 
 ## 排序谓词——按 [code]slot_index[/code] 升序；缺该键或非字典条目排到末尾

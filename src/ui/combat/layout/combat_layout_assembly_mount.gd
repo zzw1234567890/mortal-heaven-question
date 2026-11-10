@@ -2,9 +2,10 @@ extends RefCounted
 ## CombatLayoutAssemblyMount —— 战场角色卡装配台的接线（combat_layout 拆分模块·装配组）。
 ##
 ## [b]职责[/b]：实例化 [code]CombatActorStage[/code]（把敌我名册变成战场角色卡并注册进
-## 反馈编排器），转发三件事——[method setup]（注入数据源并绑定编排器）、
+## 反馈编排器），转发四件事——[method setup]（注入数据源并绑定编排器）、
 ## [method build_roster] / [method clear_roster]（开战建卡 / 退场清卡）、
-## [method play_card] / [method current_caster_id]（UI 出牌入口与施法者查询）。[br]
+## [method play_card] / [method current_caster_id]（UI 出牌入口与施法者查询）、
+## [method select_actor] / [method hand_snapshot]（当前操作角色与手牌快照）。[br]
 ## [b]不持有游戏状态[/b]：名册、HP、ATK 全部经装配台的读取链路现读。
 ##
 ## [b]为什么单独成文件[/b]：[code]combat_layout.gd[/code] 是场景挂载侧唯一持有的节点，
@@ -47,7 +48,7 @@ func build(p_ally_area: Control, p_enemy_area: Control) -> void:
 
 ## 注入数据源并绑定反馈编排器——此后建的卡自动注册（HP 条 / 飘字 / 阵亡淡出才有对象）。
 ## [br][param p_combat] 战斗系统（信号源 + 名册快照）。[param p_deployment] 部署系统（我方阵位）。[br]
-## [param p_card_system] 卡牌系统（角色卡初始 ATK/HP 模板回退，可空）。[br]
+## [param p_card_system] 卡牌系统（角色卡初始 ATK/HP 模板回退 + 手牌快照模板，可空）。[br]
 ## [param p_binding_manager] 绑定管理器（图标数预留接缝，可空）。[br]
 ## [param p_coordinator] 反馈编排器（可空——为空时只接线不注册）。
 func setup(p_combat: Node, p_deployment: Node, p_card_system: Node = null,
@@ -73,9 +74,7 @@ func clear_roster() -> void:
 		stage.call(&"clear_roster")
 
 
-## UI 出牌请求——裁定施法者后转交 [code]CombatSystem.play_card()[/code]。[br]
-## [br][b]接线边界[/b]：拖拽 / 点选 / 数字键的出牌手势本体归 combat-ui-interaction epic
-## （0/9 未实现）；它们落地时直接调本方法即可，不必自己拼 [code]caster_id[/code]。
+## UI 出牌请求——取当前操作角色作施法者后转交 [code]CombatSystem.play_card()[/code]。
 func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
 	if stage == null:
 		push_warning("CombatLayout.play_card: 角色卡装配台未装配——出牌中止")
@@ -83,7 +82,16 @@ func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
 	return bool(stage.call(&"play_card", p_card_instance_id, p_target_indices))
 
 
-## 当前裁定出的施法者角色 ID（无阵位 / 全阵亡时为 [constant CasterRulesScript.NO_CASTER]）。
+## 门面转发：带原因的出牌结果（交互层显示提示用）。
+func play_card_detailed(p_card_instance_id: int,
+		p_target_indices: Array) -> Dictionary:
+	if stage == null:
+		return {"ok": false, "reason": &"no_combat", "message": "战斗系统未就绪",
+			"context": {}}
+	return stage.call(&"play_card_detailed", p_card_instance_id, p_target_indices)
+
+
+## 当前施法者角色 ID（无角色时为 [constant CasterRulesScript.NO_CASTER]）。
 ## [br][b]为什么本层不裸写 -1[/b]：[code]-1 = 不猜[/code] 是跨三层的同一约定，
 ## 哨兵只在 [code]combat_caster_rules.gd[/code] 定义一处，这里引用它保持可检索。
 func current_caster_id() -> int:
@@ -92,13 +100,88 @@ func current_caster_id() -> int:
 	return int(stage.call(&"current_caster_id"))
 
 
+## 切换当前操作角色（玩家点选我方角色卡——施法者随之改变）。
+func select_actor(p_character_id: int) -> bool:
+	if stage == null:
+		return false
+	return bool(stage.call(&"select_actor", p_character_id))
+
+
+## 按阵位刷新当前操作角色（阵亡 / 换人后调用）。
+func refresh_actors() -> int:
+	if stage == null:
+		return CasterRulesScript.NO_CASTER
+	return int(stage.call(&"refresh_actors"))
+
+
+## 当前操作角色 ID（交互层高亮用；无角色为 -1）。
+func current_actor_id() -> int:
+	if stage == null:
+		return CasterRulesScript.NO_CASTER
+	return int(stage.call(&"current_actor_id"))
+
+
+## 可切换的我方角色 ID（候选）。
+func actor_candidates() -> Array:
+	if stage == null:
+		return []
+	return stage.call(&"actor_candidates")
+
+
+## 手牌快照（带卡面目标词——手牌区与交互层共用同一份）。
+func hand_snapshot() -> Array:
+	if stage == null:
+		return []
+	return stage.call(&"hand_snapshot")
+
+
+## 命中测试——全局坐标下的敌方角色 ID（无命中 -1）。
+func enemy_at(p_global_pos: Vector2) -> int:
+	if stage == null:
+		return -1
+	return int(stage.call(&"enemy_at", p_global_pos))
+
+
+## 命中测试——全局坐标下的我方角色 ID（无命中 -1）。
+func ally_at(p_global_pos: Vector2) -> int:
+	if stage == null:
+		return -1
+	return int(stage.call(&"ally_at", p_global_pos))
+
+
+## 解析目标列表（不出牌）——UI 高亮 / 选中态合法性查询用。
+func resolve_targets(p_explicit: Array) -> Dictionary:
+	if stage == null:
+		return {"targets": [], "source": 0, "reason": &"unresolved"}
+	return stage.call(&"resolve_targets", p_explicit)
+
+
+## 敌方候选池（顺序即建卡顺序——默认目标与命中测试共用同一份顺序）。
+func enemy_candidates() -> Array:
+	if stage == null:
+		return []
+	return stage.call(&"enemy_candidates")
+
+
+## 当前战斗阶段（战斗系统不可用 → -1）。
+func current_phase() -> int:
+	if stage == null:
+		return -1
+	return int(stage.call(&"current_phase"))
+
+
+## 装配台实例（交互层取手牌 / 目标数据时用；未装配为 null）。
+func get_stage() -> Variant:
+	return stage
+
+
 ## 出牌交互闭环控制器（选中 → 目标 → 确认 → 反馈）。[br]
 ## [br][b]惰性创建 + 单例[/b]：UI 的多处手势（拖拽 / 数字键 / 手柄）必须共用同一个
 ## 控制器——各建一个会让「选中的是哪张」出现多份真理来源。[br]
 ## [br][b]装配台缺失时返回空的控制器（而非 null）[/b]：交互层不必到处判空；空控制器
 ## 的 [code]confirm()[/code] 会走「无桥」路径返回拒绝结果，不崩溃。[br]
-## [br][b]桥数据源现读[/b]：每次调 [method _wire_play_controller] 都重取——装配台
-## 重新 [method setup] 后（换战斗系统）控制器不该继续拿着旧桥。
+## [br][b]桥数据源现读[/b]：每次调用都重取——装配台重新 [method setup] 后
+## （换战斗系统）控制器不该继续拿着旧桥。
 func play_controller() -> RefCounted:
 	if _play_controller == null:
 		_play_controller = PlayControllerScript.new()
@@ -107,13 +190,12 @@ func play_controller() -> RefCounted:
 	return _play_controller
 
 
-## 出牌交互闭环的拒绝结果载体（UI 提示文本的唯一来源）。[br]
-## 门面转发用——交互层只需 [code]controller.confirm().message[/code]。
+## 出牌交互闭环的拒绝结果载体（UI 提示文本的唯一来源）。
 func confirm_play() -> Dictionary:
 	return play_controller().call(&"confirm")
 
 
-## 选中一张手牌（走闭环控制器的唯一入口——UI 手势调这个）。[br]
+## 选中一张手牌（走闭环控制器的唯一入口——UI 手势调这个）。
 ## [b]返回[/b]: 选中后能否确认（非法时不可确认，见 HandSelectionModel）。
 func select_hand_card(p_card_instance_id: int, p_affordable: bool = true,
 		p_psychic: bool = false) -> bool:

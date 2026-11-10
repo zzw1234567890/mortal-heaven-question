@@ -32,14 +32,25 @@ const RosterState := preload("res://src/feature/combat/combat_roster_state.gd")
 
 ## 战斗系统（[code]play_card[/code]）。
 var _combat: Node = null
-## 部署系统（[code]get_field[/code]——施法者裁定的数据来源）。
+## 部署系统（[code]get_field[/code]——施法者兜底裁定的数据来源）。
 var _deployment: Node = null
+## 当前操作角色提供者（需实现 [code]current_id()[/code]——「谁在行动」的显式状态）。[br]
+## [br][b]可空[/b]：未接线时退化为 [CombatCasterRules] 的阵位顺序裁定（旧口径），
+## 不把「还没接角色切换」变成不能出牌。
+var _actor_source: Variant = null
 
 
 ## 注入数据源（全部可空——缺失时对应能力退化，不抛错）。
 func setup(p_combat: Node, p_deployment: Node) -> void:
 	_combat = p_combat
 	_deployment = p_deployment
+
+
+## 注入当前操作角色提供者（[code]CombatActorSelection[/code] 或同形状桩）。[br]
+## [br][b]注入后施法者口径改变[/b]：优先用玩家选中的角色；它判不出（无角色 / 阵亡清空）
+## 时仍回退阵位顺序——回退是[b]兜底[/b]而不是默认。
+func set_actor_source(p_actor_source: Variant) -> void:
+	_actor_source = p_actor_source
 
 
 ## 数据源是否齐备。[br]
@@ -53,9 +64,16 @@ func has_sources() -> bool:
 	return _combat != null and _deployment != null
 
 
-## 当前施法者角色 ID——我方阵位第一个已占用且未阵亡的角色；判不出返回 -1。[br]
-## [br][b]为什么现读阵位而非缓存[/b]：阵亡清位会改变阵位，缓存会让「刚死的人」继续出牌。
+## 当前施法者角色 ID——[b]优先「当前操作角色」[/b]，判不出再回退阵位首个存活角色。[br]
+## [br][b]口径来源[/b]：[method set_actor_source] 注入的 [code]CombatActorSelection[/code]
+## 是「谁在行动」的唯一真理来源（玩家可切换、阵亡自动顺位）；未接该状态时才用
+## [code]CombatCasterRules[/code] 的阵位顺序（旧口径，仅作降级兜底）。[br]
+## [br][b]为什么现读而非缓存[/b]：阵亡清位会改变阵位，缓存会让「刚死的人」继续出牌。
 func current_caster_id() -> int:
+	if _actor_source != null:
+		var selected: int = int(_actor_source.call(&"current_id"))
+		if selected != CasterRules.NO_CASTER:
+			return selected
 	if _deployment == null or not _deployment.has_method(&"get_field"):
 		return CasterRules.NO_CASTER
 	return CasterRules.resolve_caster(_deployment.call(&"get_field"))
@@ -77,8 +95,8 @@ func play_card(p_card_instance_id: int, p_target_indices: Array) -> bool:
 ##   - 非空 → 显式覆盖，但只保留候选池里存活的那些；全无效则拒绝
 ##     （[constant CombatTargetRules.SOURCE_NONE]）。[br]
 ## 候选池取自战斗系统的敌方名册快照 + 当前 HP（UI 不自算存活，见下）。[br]
-## [br][b]施法者[/b]：仍由 [method current_caster_id] 裁定（阵位首个存活角色）——
-## 「玩家选中的操作角色」归 story 001/004，本桥等它落地后改为显式传入。[br]
+## [br][b]施法者[/b]：由 [method current_caster_id] 取「当前操作角色」（玩家选中的
+## 角色；未接该状态时回退阵位首个存活角色）——多角色阵容里出牌不再一律记在阵位首位。[br]
 ## [br][b]返回[/b]: [code]{ok, reason, message, context}[/code]；桥自身的降级
 ## （战斗系统未注入）用 [code]REASON_NO_COMBAT[/code] 表达，形状与系统侧一致。
 func play_card_detailed(p_card_instance_id: int, p_target_indices: Array) -> Dictionary:
