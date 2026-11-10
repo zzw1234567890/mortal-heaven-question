@@ -73,6 +73,16 @@ func _template(p_id: String, p_realm: int, p_lo: int, p_hi: int,
 	return template
 
 
+## 收集本用例中「文本包含 [param p_text]」的 push_warning（[b]不消费[/b]——
+## [method GutTest.assert_push_warning_count] 会把告警标记为已处理）。
+func _warnings_containing(p_text: String) -> Array:
+	var found: Array = []
+	for err: Variant in gut.error_tracker.get_errors_for_test():
+		if err.is_push_warning() and err.contains_text(p_text):
+			found.append(err)
+	return found
+
+
 ## 生成一张图并返回第一个战斗类节点的详情（找不到返回空字典）。
 func _first_combat_detail(p_result: Dictionary) -> Dictionary:
 	var nodes: Dictionary = p_result.get("nodes", {})
@@ -109,8 +119,8 @@ func test_generator_writes_encounter_level_and_rewards() -> void:
 			"顶层 rewards 与子字典同值")
 	assert_eq(detail["encounter"]["enemy_template_ids"], ["san_xiu"],
 			"模板 ID 来自生成的名册")
-	assert_eq(int(detail.get("enemy_level", -1)), 1,
-			"名册自带境界优先（生成时的玩家境界只作兜底）")
+	assert_eq(int(detail.get("enemy_level", -1)), 2,
+			"等级取地图配置的 enemy_realm（MEDIUM 档 = 2），不随名册境界走")
 	assert_eq(str(detail["encounter"]["display_name"]), "散修",
 			"展示名取敌人名（不含数量——标题会再拼）")
 	assert_eq(str(detail.get("label", "")), "散修 ×2", "节点标签带数量")
@@ -118,17 +128,49 @@ func test_generator_writes_encounter_level_and_rewards() -> void:
 			"encounter_id 以地图 ID 为前缀（可追踪）")
 
 
-func test_generator_falls_back_to_player_realm_when_roster_has_no_realm() -> void:
+func test_generator_uses_map_realm_when_roster_has_no_realm() -> void:
 	# Arrange——名册条目不带境界（生成时只有模板 ID）
 	_inject_config()
 	_inject_other_cbs()
 	_inject_roster([{"template_id": "san_xiu"}])
-	# Act——玩家境界 3
+	# Act——玩家境界 3（高于 MEDIUM 档的地图境界 2）
 	var detail: Dictionary = _first_combat_detail(
 			es.call("generate_map", &"realm_fallback_map", 3, 1))
-	# Assert——兜底到生成时的玩家境界（节点定档基准）
+	# Assert——等级按地图配置定档，不随玩家境界上涨（GDD §7 回旧地图）
+	assert_eq(int(detail.get("enemy_level", 0)), 2,
+			"名册无境界时用地图配置的 enemy_realm 定档")
+
+
+func test_generator_falls_back_to_player_realm_when_config_lacks_enemy_realm() -> void:
+	# Arrange——旧配置：没有 enemy_realm 键
+	var legacy: Dictionary = (es.get("DIFFICULTY_CONFIGS") as Array)[1].duplicate(true)
+	legacy.erase("enemy_realm")
+	es.set("get_map_config_cb", Callable(func(_mid, _r): return legacy.duplicate(true)))
+	_inject_other_cbs()
+	_inject_roster([{"template_id": "san_xiu"}])
+	# Act——玩家境界 3
+	var detail: Dictionary = _first_combat_detail(
+			es.call("generate_map", &"legacy_map", 3, 1))
+	# Assert——回退玩家境界，且告警可观测（只一条、点名缺的键）
 	assert_eq(int(detail.get("enemy_level", 0)), 3,
-			"名册无境界时用生成时的玩家境界定档")
+			"缺 enemy_realm 时回退玩家境界（旧配置兼容）")
+	var warnings: Array = _warnings_containing("enemy_realm")
+	assert_eq(warnings.size(), 1, "缺键只警告一次（不按节点刷屏），且文案点名该键")
+
+
+func test_generator_ignores_player_realm_on_high_level_return() -> void:
+	# Arrange——地图境界 1，玩家已到金丹（3）
+	var low: Dictionary = (es.get("DIFFICULTY_CONFIGS") as Array)[0].duplicate(true)
+	low["enemy_realm"] = 1
+	es.set("get_map_config_cb", Callable(func(_mid, _r): return low.duplicate(true)))
+	_inject_other_cbs()
+	_inject_roster([{"template_id": "san_xiu", "name": "散修", "realm": 1}])
+	# Act
+	var detail: Dictionary = _first_combat_detail(
+			es.call("generate_map", &"low_return_map", 3, 1))
+	# Assert——节点等级不随玩家上涨（「碾压的回味」靠柔性压制，不靠敌人变强）
+	assert_eq(int(detail.get("enemy_level", 0)), 1,
+			"高境界玩家回低境界地图，节点等级仍取地图境界")
 
 
 func test_generator_leaves_zero_rewards_as_empty_dictionary() -> void:
@@ -167,7 +209,8 @@ func test_generated_node_is_accepted_by_launch_context() -> void:
 	assert_eq(ContextScript.validate(context), "", "生成器产出的节点应能直接开战")
 	assert_eq(context[ContextScript.KEY_TEMPLATE_IDS], [&"san_xiu"],
 			"模板 ID 直通")
-	assert_eq(int(context[ContextScript.KEY_ENEMY_LEVEL]), 1, "等级取节点定档")
+	assert_eq(int(context[ContextScript.KEY_ENEMY_LEVEL]), 2,
+			"等级取节点定档（地图 enemy_realm = 2）")
 	assert_eq(int(context[ContextScript.KEY_REWARDS]["lingshi"]), 6,
 			"灵石取 reward_config 区间中值 (4+8)/2")
 	assert_eq(int(context[ContextScript.KEY_REWARDS]["cultivation"]), 2,
@@ -226,8 +269,8 @@ func test_missing_player_roster_produces_readable_failure() -> void:
 	# Assert
 	assert_string_contains(ContextScript.validate(context), "玩家出战阵容",
 			"缺玩家阵容应给出可读失败")
-	assert_eq(int(context[ContextScript.KEY_ENEMY_LEVEL]), 1,
-			"玩家阵容缺失不影响敌方等级透传")
+	assert_eq(int(context[ContextScript.KEY_ENEMY_LEVEL]), 2,
+			"玩家阵容缺失不影响敌方等级透传（地图 enemy_realm = 2）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

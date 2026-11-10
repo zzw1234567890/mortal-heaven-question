@@ -85,26 +85,30 @@ var get_seed_cb: Callable = Callable()
 
 # === 常量（保留在主文件——测试通过 es.get 访问）==============================
 
-## 默认地图难度配置表——按 MapDifficulty 枚举索引。
+## 默认地图难度配置表——按 MapDifficulty 枚举索引。[br]
+## [br][code]enemy_realm[/code] 是节点敌人强度的定档基准（GDD「回旧地图」§7：
+## 敌人强度按地图本身境界设定，不随玩家境界上涨）。缺键的地图配置会回退玩家
+## 境界并警告一次——生产配置由 [code]exploration_map_catalog.gd[/code] 提供，
+## 本表只是难度档位的通用兜底（境界取难度档位的默认值 1~4）。[br]
 const DIFFICULTY_CONFIGS: Array = [
 	{  # LOW
 		"layers": 4, "min_nodes": 2, "max_nodes": 3,
-		"elite_count": 1, "shop_count": 1, "event_count": 2,
+		"elite_count": 1, "shop_count": 1, "event_count": 2, "enemy_realm": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
 	},
 	{  # MEDIUM
 		"layers": 5, "min_nodes": 2, "max_nodes": 4,
-		"elite_count": 2, "shop_count": 1, "event_count": 3,
+		"elite_count": 2, "shop_count": 1, "event_count": 3, "enemy_realm": 2,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
 	},
 	{  # HIGH
 		"layers": 5, "min_nodes": 3, "max_nodes": 4,
-		"elite_count": 2, "shop_count": 2, "event_count": 3,
+		"elite_count": 2, "shop_count": 2, "event_count": 3, "enemy_realm": 3,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
 	},
 	{  # VERY_HIGH
 		"layers": 6, "min_nodes": 3, "max_nodes": 4,
-		"elite_count": 3, "shop_count": 2, "event_count": 4,
+		"elite_count": 3, "shop_count": 2, "event_count": 4, "enemy_realm": 4,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
 	},
 ]

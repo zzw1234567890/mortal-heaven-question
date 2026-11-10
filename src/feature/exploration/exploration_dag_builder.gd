@@ -2,16 +2,27 @@
 ##
 ## 从 exploration_system.gd 提取的纯 DAG 生成逻辑。[br]
 ## 持有父节点 ExplorationSystem 引用，通过它访问 _rng / 回调字段 / 常量。[br]
+## 边连接与独立路径计数委托给 [code]exploration_dag_graph.gd[/code]（纯算法，
+## RNG 由本模块注入——确定性口径不因拆分改变）。[br]
 ## [br]来源: ADR-0014 §决策 2 程序化 DAG 生成 / GDD exploration-system.md §2-3。
-## [br]Sprint 8 Story 8-9：从 exploration_system.gd 拆分。
+## [br]Sprint 8 Story 8-9：从 exploration_system.gd 拆分；2026-11-10 图算法再拆分。
 extends RefCounted
 
 ## 遭遇数据契约（写入 / 读取的唯一口径——生成器与开战上下文共用）。
 const Fields := preload("res://assets/enemies/encounter_fields.gd")
+## 图骨架算法（边连接 / 交叉边 / 独立路径计数）。
+const Graph := preload("res://src/feature/exploration/exploration_dag_graph.gd")
+
+## 地图配置里敌人基准境界的键（缺键 = 旧配置，回退玩家境界并警告一次）。
+const KEY_ENEMY_REALM: String = "enemy_realm"
 
 
 ## 父节点引用——ExplorationSystem Autoload 实例。
 var _parent: Node = null
+
+## 缺 [constant KEY_ENEMY_REALM] 的告警已发标志——每次生成只提醒一次，
+## 避免每张图几十个战斗节点各刷一条（旧配置回退是过渡态，不是逐节点事件）。
+var _warned_missing_enemy_realm: bool = false
 
 
 ## 构造——传入父节点引用。
@@ -39,33 +50,18 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 	var total_layers: int = int(config.get("layers", 5))
 	var min_n: int = int(config.get("min_nodes", 2))
 	var max_n: int = int(config.get("max_nodes", 4))
-	var nodes_per_layer: Array = []
-	for i in range(total_layers):
-		if i == 0 or i == total_layers - 1:
-			nodes_per_layer.append(1)
-		else:
-			nodes_per_layer.append(rng.randi_range(min_n, max_n))
-
-	# 生成节点 ID——格式: layer * 100 + idx
-	var all_nodes: Array = []
-	for layer in range(total_layers):
-		for idx in range(nodes_per_layer[layer]):
-			all_nodes.append(layer * 100 + idx)
+	var nodes_per_layer: Array = Graph.roll_layers(rng, total_layers, min_n, max_n)
+	var all_nodes: Array = Graph.all_nodes(nodes_per_layer)
 
 	# Phase 3：分配节点类型
-	var node_types: Dictionary = _assign_node_types(all_nodes, nodes_per_layer, config, total_layers)
+	var node_types: Dictionary = _assign_node_types(
+			all_nodes, nodes_per_layer, config, total_layers)
 
 	# Phase 4：边连接 + 连通性验证 + ≥2 独立路径（迭代重试，不递归——避免栈下溢）
-	var graph: Dictionary = _build_edges(all_nodes, nodes_per_layer, total_layers)
+	var graph: Dictionary = Graph.build_edges(all_nodes, nodes_per_layer, total_layers, rng)
 	var sink_id: int = all_nodes[all_nodes.size() - 1]
-	var path_count: int = _count_vertex_disjoint_paths(graph, 0, sink_id)
-
-	# 独立路径不足时先添加交叉边（最多 2 次）
-	var cross_retry: int = 0
-	while path_count < 2 and cross_retry < 2:
-		_add_cross_edges(graph, nodes_per_layer, total_layers)
-		path_count = _count_vertex_disjoint_paths(graph, 0, sink_id)
-		cross_retry += 1
+	var path_count: int = Graph.count_vertex_disjoint_paths(graph, 0, sink_id)
+	path_count = _repair_paths(graph, nodes_per_layer, total_layers, sink_id, rng, path_count)
 
 	# 仍不足时整体重新生成（最多 2 次，迭代而非递归）
 	var regen_retry: int = 0
@@ -73,30 +69,19 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 		regen_retry += 1
 		# 重置 RNG seed 并加扰重试计数，避免相同图重复生成
 		rng.seed = (base_seed ^ map_hash ^ entry_count) + regen_retry
-		nodes_per_layer = []
-		for i in range(total_layers):
-			if i == 0 or i == total_layers - 1:
-				nodes_per_layer.append(1)
-			else:
-				nodes_per_layer.append(rng.randi_range(min_n, max_n))
-		all_nodes = []
-		for layer in range(total_layers):
-			for idx in range(nodes_per_layer[layer]):
-				all_nodes.append(layer * 100 + idx)
+		nodes_per_layer = Graph.roll_layers(rng, total_layers, min_n, max_n)
+		all_nodes = Graph.all_nodes(nodes_per_layer)
 		node_types = _assign_node_types(all_nodes, nodes_per_layer, config, total_layers)
-		graph = _build_edges(all_nodes, nodes_per_layer, total_layers)
+		graph = Graph.build_edges(all_nodes, nodes_per_layer, total_layers, rng)
 		sink_id = all_nodes[all_nodes.size() - 1]
-		path_count = _count_vertex_disjoint_paths(graph, 0, sink_id)
-		cross_retry = 0
-		while path_count < 2 and cross_retry < 2:
-			_add_cross_edges(graph, nodes_per_layer, total_layers)
-			path_count = _count_vertex_disjoint_paths(graph, 0, sink_id)
-			cross_retry += 1
+		path_count = Graph.count_vertex_disjoint_paths(graph, 0, sink_id)
+		path_count = _repair_paths(graph, nodes_per_layer, total_layers, sink_id, rng, path_count)
 	if path_count < 2:
 		push_warning("ExplorationSystem: map %s path_count=%d < 2 after retries" % [map_id, path_count])
 
 	# Phase 5：填充节点内容
-	var node_details: Dictionary = _fill_node_content(all_nodes, node_types, nodes_per_layer, total_layers, map_id, player_realm)
+	var node_details: Dictionary = _fill_node_content(
+			all_nodes, node_types, map_id, player_realm, config)
 
 	# Phase 6：返回图结构
 	_parent.set("_node_graph", graph.duplicate(true))
@@ -111,6 +96,18 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 		"boss_node_id": boss_id,
 		"path_count": path_count,
 	}
+
+
+## 独立路径不足时加交叉边（最多 2 次），返回最终路径数。
+func _repair_paths(p_graph: Dictionary, p_nodes_per_layer: Array, p_total_layers: int,
+		p_sink: int, p_rng: RandomNumberGenerator, p_path_count: int) -> int:
+	var path_count: int = p_path_count
+	var cross_retry: int = 0
+	while path_count < 2 and cross_retry < 2:
+		Graph.add_cross_edges(p_graph, p_nodes_per_layer, p_total_layers, p_rng)
+		path_count = Graph.count_vertex_disjoint_paths(p_graph, 0, p_sink)
+		cross_retry += 1
+	return path_count
 
 
 ## 加权随机分配节点类型——排除超限类型后重新加权。
@@ -173,131 +170,17 @@ func _string_to_node_type(type_str: String) -> int:
 		_: return _parent.NodeType.COMBAT
 
 
-## 构建边连接——每层每个节点至少连接上层 1 个节点。
-func _build_edges(all_nodes: Array, nodes_per_layer: Array, total_layers: int) -> Dictionary:
-	var graph: Dictionary = {}
-	for node_id in all_nodes:
-		graph[node_id] = []
-	var rng: RandomNumberGenerator = _parent.get("_rng")
-
-	# 从第 1 层开始，每个节点连接上层 1-2 个节点
-	for layer in range(1, total_layers):
-		var prev_layer: int = layer - 1
-		var prev_count: int = nodes_per_layer[prev_layer]
-		var curr_count: int = nodes_per_layer[layer]
-		for idx in range(curr_count):
-			var node_id: int = layer * 100 + idx
-			# 至少连接上层 1 个节点
-			var parent_idx: int = rng.randi_range(0, prev_count - 1)
-			var parent_id: int = prev_layer * 100 + parent_idx
-			if not graph[parent_id].has(node_id):
-				graph[parent_id].append(node_id)
-			# 50% 概率连接第二个父节点（如果上层有 ≥2 节点）
-			if prev_count >= 2 and rng.randf() < 0.5:
-				var parent2_idx: int = (parent_idx + 1) % prev_count
-				var parent2_id: int = prev_layer * 100 + parent2_idx
-				if not graph[parent2_id].has(node_id):
-					graph[parent2_id].append(node_id)
-
-	# 确保上层每个节点都有至少 1 个子节点（避免孤儿父节点）
-	for layer in range(total_layers - 1):
-		var next_layer: int = layer + 1
-		var next_count: int = nodes_per_layer[next_layer]
-		for idx in range(nodes_per_layer[layer]):
-			var node_id: int = layer * 100 + idx
-			if graph[node_id].is_empty():
-				# 连接下层第一个节点
-				var child_id: int = next_layer * 100 + 0
-				graph[node_id].append(child_id)
-	return graph
-
-
-## 添加交叉边——增加独立路径数。
-func _add_cross_edges(graph: Dictionary, nodes_per_layer: Array, total_layers: int) -> void:
-	var rng: RandomNumberGenerator = _parent.get("_rng")
-	for layer in range(1, total_layers):
-		var prev_layer: int = layer - 1
-		var prev_count: int = nodes_per_layer[prev_layer]
-		for idx in range(nodes_per_layer[layer]):
-			var node_id: int = layer * 100 + idx
-			# 尝试连接额外的父节点
-			for parent_idx in range(prev_count):
-				var parent_id: int = prev_layer * 100 + parent_idx
-				if not graph[parent_id].has(node_id):
-					if rng.randf() < 0.3:
-						graph[parent_id].append(node_id)
-
-
-## 计算顶点不相交路径数——简化版：BFS 找路径 + 移除中间顶点 + 重复。[br]
-## [br]DAG 中顶点不相交路径数 = 找一条路径→移除中间顶点→再找→直到找不到。[br]
-## 最多查找 max_paths 条（防止无限循环）。
-func _count_vertex_disjoint_paths(graph: Dictionary, source: int, sink: int) -> int:
-	# 深拷贝图（不修改原图）
-	var working: Dictionary = graph.duplicate(true)
-	var path_count: int = 0
-	var max_paths: int = 10
-	while path_count < max_paths:
-		var path: Array = _bfs_path(working, source, sink)
-		if path.is_empty():
-			break
-		path_count += 1
-		# 移除中间顶点（保留 source 和 sink）
-		for i in range(1, path.size() - 1):
-			var mid: int = path[i]
-			working.erase(mid)
-		# 从所有邻接列表中移除已删顶点
-		for parent_id in working:
-			var children: Array = working[parent_id]
-			for c in range(children.size() - 1, -1, -1):
-				if not working.has(children[c]):
-					children.remove_at(c)
-	return path_count
-
-
-## BFS 寻找路径——返回 source→sink 的节点 ID 路径。[br]
-## [br]注意：visited 检查必须包裹 parent 赋值和 queue.append，[br]
-## 否则已访问节点会被反复入队导致 BFS 无法终止→栈崩溃。
-func _bfs_path(graph: Dictionary, source: int, sink: int) -> Array:
-	if source == sink:
-		return [source]
-	var queue: Array = [source]
-	var visited: Dictionary = {source: true}
-	var parent: Dictionary = {source: -1}
-	while not queue.is_empty():
-		var u: int = queue.pop_front()
-		if not graph.has(u):
-			continue
-		for v in graph[u]:
-			if not visited.has(v):
-				visited[v] = true
-				parent[v] = u
-				if v == sink:
-					# 回溯路径
-					var path: Array = []
-					var curr: int = v
-					while curr != -1:
-						path.push_front(curr)
-						curr = int(parent.get(curr, -1))
-					return path
-				queue.append(v)
-	return []
-
-
 ## 填充战斗/精英节点的遭遇数据（[code]enemy_roster[/code] + 四键遭遇契约）。[br]
-## [br][b]写入什么[/b]：名册本身 + [code]encounter[/code] 子字典 + 顶层
+## [br][b]写入什么[/b]：名册 + [code]encounter[/code] 子字典 + 顶层
 ## [code]enemy_level[/code] / [code]rewards[/code] / [code]label[/code]——
-## 顶层两键是 [code]CombatLaunchContext[/code] 的读取面，子字典是弹窗预览与
-## 后续消费方的聚合载体。[br]
-## [br][b]等级口径[/b]：名册条目自带的最高境界 > 地图生成时的玩家境界
-## （节点定档的重入基准——GDD「敌人强度按地图本身境界设定」）。[br]
-## [br][b]掉落口径[/b]：条目自带 [code]rewards[/code] > 模板
-## [code]reward_config[/code] 聚合（经 AISystem 模板查询）；两者都没有则为
-## [code]{}[/code]（「本节点无掉落配置」，不是 0 掉落）。[br]
-## [br][b]不臆造[/b]：名册生成回调缺失或返回空时，名册为 [code][][/code]，
-## 遭遇仍带可读标识与等级——由 [code]CombatLaunchContext.validate[/code]
-## 在开战时给出可读失败，而不是静默兜底。[br]
+## 顶层两键是 [code]CombatLaunchContext[/code] 的读取面，子字典是弹窗预览的聚合载体。[br]
+## [br][b]等级口径[/b]（GDD §7 回旧地图：敌人强度按地图本身境界）：地图配置
+## [code]enemy_realm[/code] > 玩家当前境界（旧配置缺键的过渡兜底，警告一次）。[br]
+## [br][b]掉落口径[/b]：条目自带 [code]rewards[/code] > 模板 [code]reward_config[/code]
+## 聚合；都没有则为 [code]{}[/code]（「本节点无掉落配置」，不是 0 掉落）。[br]
+## [br][b]不臆造[/b]：名册回调缺失时名册为 [code][][/code]，由开战校验给出可读失败。
 func _fill_encounter(p_detail: Dictionary, p_node_id: int, p_map_id: StringName,
-		p_player_realm: int, p_is_elite: bool) -> void:
+		p_player_realm: int, p_is_elite: bool, p_config: Dictionary) -> void:
 	var roster_cb: Callable = _parent.get("generate_enemy_roster_cb")
 	var roster: Array = []
 	if roster_cb.is_valid():
@@ -309,10 +192,8 @@ func _fill_encounter(p_detail: Dictionary, p_node_id: int, p_map_id: StringName,
 	var encounter: Dictionary = Fields.make(
 			"%s_%d" % [p_map_id, p_node_id], Fields.name_of(roster, p_is_elite),
 			Fields.template_ids_of(roster), Fields.LEVEL_UNSPECIFIED, {})
-	# 等级：名册显式境界优先，缺失时用生成时的玩家境界（节点定档基准）。
-	var level: int = Fields.enemy_level(encounter, roster, lookup)
-	if level <= 0:
-		level = maxi(p_player_realm, Fields.LEVEL_UNSPECIFIED)
+	# 等级：地图境界定档优先（GDD「回旧地图」），旧配置缺键时回退玩家境界。
+	var level: int = _level_of(p_map_id, p_player_realm, p_config)
 	encounter[Fields.KEY_ENEMY_LEVEL] = level
 	var rewards: Dictionary = Fields.rewards(encounter, roster, lookup)
 	encounter[Fields.KEY_REWARDS] = rewards
@@ -323,12 +204,31 @@ func _fill_encounter(p_detail: Dictionary, p_node_id: int, p_map_id: StringName,
 	p_detail[Fields.KEY_REWARDS] = rewards
 
 
+## 节点等级定档——地图配置 [code]enemy_realm[/code] 优先，缺键（旧配置）时
+## 回退玩家境界并警告一次。[br]
+## [br][b]为什么不再让名册境界插队[/b]：GDD §7 要求「高境界玩家回低境界地图，
+## 敌人强度仍按地图本身境界设定」。名册条目的境界来自敌人模板（出厂模板恒为
+## 炼气），若它先命中，地图境界配置就永远不起作用——低境界图与高境界图的节点
+## 强度会完全一样。名册境界只在开战上下文（[code]EncounterFields.enemy_level[/code]）
+## 作为「节点未定档」时的读取兜底，不参与生成期定档。[br]
+## [br][b]旧配置兼容[/b]：缺 [constant KEY_ENEMY_REALM] 时回退玩家境界并警告
+## 一次（每次生成一条，不按节点刷屏）。
+func _level_of(p_map_id: StringName, p_player_realm: int, p_config: Dictionary) -> int:
+	var map_realm: int = int(p_config.get(KEY_ENEMY_REALM, 0))
+	if map_realm > 0:
+		return map_realm
+	if not _warned_missing_enemy_realm:
+		_warned_missing_enemy_realm = true
+		push_warning("ExplorationDAGBuilder: 地图配置缺少 %s（map=%s），节点等级回退玩家境界 %d"
+				% [KEY_ENEMY_REALM, p_map_id, p_player_realm])
+	return maxi(p_player_realm, Fields.LEVEL_UNSPECIFIED)
+
+
 ## 模板查询闭包——注入回调优先，其次 Autoload AISystem，都没有时返回无效
 ## Callable（掉落聚合退化为「只读名册条目自带的 rewards」）。[br]
 ## [br][b]为什么允许注入[/b]：DAG 生成在单测里跑在裸 [code]Node[/code] 上
-## （不在场景树中），此时 [method Node.get_node] 拿不到 Autoload——注入让
-## 「生成器据 reward_config 聚合掉落」这条路径也能被单测覆盖。[br]
-## [br][b]为什么不硬依赖 AISystem[/b]：缺模板不应让地图生成崩溃。
+## （不在场景树中），此时拿不到 Autoload——注入让「据 reward_config 聚合掉落」
+## 也能被单测覆盖。缺模板不应让地图生成崩溃。
 func _template_lookup() -> Callable:
 	if _parent == null:
 		return Callable()
@@ -344,7 +244,8 @@ func _template_lookup() -> Callable:
 
 
 ## 填充节点内容——战斗=敌人阵容、事件=pool、商店=库存。
-func _fill_node_content(all_nodes: Array, node_types: Dictionary, nodes_per_layer: Array, total_layers: int, map_id: StringName, player_realm: int) -> Dictionary:
+func _fill_node_content(all_nodes: Array, node_types: Dictionary,
+		map_id: StringName, player_realm: int, config: Dictionary) -> Dictionary:
 	var details: Dictionary = {}
 	for node_id in all_nodes:
 		var layer: int = node_id / 100
@@ -362,7 +263,7 @@ func _fill_node_content(all_nodes: Array, node_types: Dictionary, nodes_per_laye
 				detail["label"] = "Boss"
 			_parent.NodeType.COMBAT, _parent.NodeType.ELITE:
 				_fill_encounter(detail, node_id, map_id, player_realm,
-						ntype == _parent.NodeType.ELITE)
+						ntype == _parent.NodeType.ELITE, config)
 			_parent.NodeType.EVENT:
 				# 不分配具体事件——仅记录 pool
 				var event_cb: Callable = _parent.get("get_event_pool_cb")

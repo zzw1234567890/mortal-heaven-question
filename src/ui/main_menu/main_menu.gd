@@ -84,6 +84,10 @@ const KeybindStoreScript := preload("res://src/ui/main_menu/keybind_store.gd")
 ## 「启动承载者」：HUD 经 [code]SceneManager.register_persistent()[/code] 挂入
 ## PersistentLayer 后跨场景常驻，主菜单本体结构不变（ADR-0031 §1.2）。
 const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
+## ExplorationBootstrap 脚本常量——探索系统的生产装配入口（地图配置 + 敌人池）。
+## 与 HUD 同源：主菜单是启动承载者，探索系统的回调注入点必须在场景层装配，
+## 而不是写进 ExplorationSystem 内部（DEBT-EUI-006-3 / DEBT-EUI-006-5）。
+const ExplorationBootstrapScript := preload("res://src/feature/exploration/exploration_bootstrap.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -125,6 +129,7 @@ func _ready() -> void:
 	_refresh_save_state()
 	_connect_save_signals()
 	_mount_global_hud_if_boot_scene()
+	_mount_exploration_bootstrap()
 	if animate:
 		_play_intro()
 	# 初始焦点：继续游戏优先（UX 规范场景 2「零摩擦中转站」），
@@ -171,6 +176,21 @@ func _mount_global_hud() -> void:
 ## [br][b]返回[/b]：已挂载的 HUD；SceneManager 不可用/不支持时 null（静默降级）。
 func _mount_hud() -> CanvasLayer:
 	return HudBootstrapScript.mount(_get_scene_manager())
+
+## === 探索系统生产装配（地图配置 + 敌人池）====================================
+
+## 把地图配置目录与敌人池接进 ExplorationSystem 的注入点。[br]
+## [br][b]为什么由主菜单做[/b]：与 HUD 挂载同源——启动承载者负责把「数据实现」
+## 接到「系统接口」上；系统内部不硬编码地图表与敌人池。[br]
+## [br][b]为什么不做 current_scene 守卫[/b]：本装配只改回调字段、不挂节点，
+## 集成测试把主菜单当普通节点 add_child 时装配同样有意义（测试正是要验真实
+## 回调路径）；重复执行幂等。[br]
+## [br][b]返回[/b]：是否装配成功（探索系统缺失时为 false，静默降级）。
+func _mount_exploration_bootstrap() -> bool:
+	var es: Node = get_node_or_null(NodePath("/root/ExplorationSystem"))
+	if es == null:
+		return false
+	return ExplorationBootstrapScript.mount(es, get_node_or_null(NodePath("/root/AISystem")))
 
 ## === 按键绑定启动加载（Story 004）==============================================
 

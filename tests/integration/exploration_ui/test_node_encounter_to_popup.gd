@@ -136,7 +136,8 @@ func test_handwritten_node_derives_level_and_rewards_from_templates() -> void:
 	_confirm_button().pressed.emit()
 	var context: Dictionary = ContextScript.peek()
 	var rewards: Dictionary = context.get(ContextScript.KEY_REWARDS, {})
-	# Assert——等级由模板 realm 补、掉落由 reward_config 聚合（不再恒为空）
+	# Assert——手写节点无 encounter 子字典：等级由模板 realm 派生、掉落由
+	# reward_config 聚合（不再恒为空）
 	assert_eq(int(context.get(ContextScript.KEY_ENEMY_LEVEL, 0)), 1,
 			"等级由模板 realm 派生")
 	assert_true(int(rewards.get("lingshi", 0)) > 0,

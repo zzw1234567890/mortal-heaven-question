@@ -184,11 +184,23 @@ generate_map(map_id, player_realm):
 |------|------|----------|
 | `enemy_roster` | 节点详情顶层 | `[]` = 名册生成回调缺失（开战时 `validate` 给出可读失败，不静默兜底） |
 | `encounter` | 节点详情顶层（子字典） | 五键聚合：`encounter_id` / `display_name` / `enemy_template_ids` / `enemy_level` / `rewards` |
-| `enemy_level` | 顶层 + 子字典同值 | `0` = 未指定（**不是**第 0 境界）；名册自带最高境界优先，缺失时退化为生成时的玩家境界 |
+| `enemy_level` | 顶层 + 子字典同值 | `0` = 未指定（**不是**第 0 境界）；生成期按**地图配置的 `enemy_realm`** 定档（§7 回旧地图：敌人强度按地图本身境界，不随玩家上涨）；旧配置缺键时回退玩家境界并告警一次 |
 | `rewards` | 顶层 + 子字典同值 | `{}` = 本节点无掉落配置（**不是**「掉落为 0」）；聚合顺序：条目自带 `rewards` > 模板 `reward_config`（灵石取区间中值） |
 | `label` | 节点详情顶层 | 节点图文字（`散修 ×2`）；`display_name` 不带数量，供战斗标题使用 |
 
 `encounter_id` 永不为空——生成时按 `<map_id>_<node_id>` 构造，手写节点按 `node_<id>` 兜底，保证每场遭遇可追踪。掉落键名统一为战斗结算口径 `{lingshi, cultivation, cards}`，探索经济域的 `ling_shi` 仅在读取时兼容。
+
+**数据来源（生产装配，2026-11-10）**
+
+生成器的三个注入点由**启动层**装配，系统内部不硬编码地图表与敌人池：
+
+| 注入点 | 生产实现 | 装配点 |
+|--------|----------|--------|
+| `get_map_config_cb` | `exploration_map_catalog.gd::config_for`（每张地图的层数 / `enemy_realm` / 敌人池 / 人数范围；未登记地图按难度档位兜底） | `exploration_bootstrap.gd::mount`，由 `MainMenu._ready()` 调用 |
+| `generate_enemy_roster_cb` | `exploration_enemy_pool.gd::make_roster`（按地图池权重抽模板、人数 `[min,max]` + 精英加成；模板缺失跳过并告警一次） | 同上 |
+| `enemy_template_lookup_cb` | `AISystem.get_template`（掉落聚合与名册共用同一注册表） | 同上 |
+
+`enemy_realm` 是节点等级的**唯一生成期基准**——名册条目自带的境界（来自敌人模板）不参与定档，否则出厂模板恒为炼气时，所有地图的节点强度会完全一样。
 
 #### 4. 节点导航
 

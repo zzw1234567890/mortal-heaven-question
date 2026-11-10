@@ -6,6 +6,19 @@ Feature: Sprint 18（表现层接真实数据）
 Task: 探索节点遭遇数据补齐完成（encounter/enemy_level/rewards 三字段 + popup 同源 + 两个超限文件拆分）；下一步 005 目标选择可视化 / 004 键盘手柄路径 / 003 拖拽视觉跟手
 <!-- /STATUS -->
 
+## Session Extract — 探索敌人池生产接线 + 地图境界定档（2026-11-10）
+- 任务：真实 `enter_map` 接上敌人池（不再空名册）、地图配置补 `enemy_realm`（关闭 DEBT-EUI-006-3）、拆 `exploration_dag_builder.gd`（388）与 `node_interaction_rules.gd`（327）、补测试、全量 GUT、提交
+- **新增 `src/feature/exploration/exploration_map_catalog.gd`（137）**：10 张地图登记表（difficulty / max_realm / **enemy_realm** / enemy_pool / enemy_count_min,max / elite_bonus）；`config_for` 未登记地图按难度档位兜底（档位默认 enemy_realm 1~4）；`enemy_realm_of` / `has_map` 单查入口
+- **新增 `src/feature/exploration/exploration_enemy_pool.gd`（145）**：按地图池权重抽模板 → 预览条目 `{template_id, name, realm}`；人数 `[min,max]` + 精英 `elite_bonus`；模板缺失跳过并 `push_warning` 一次（不臆造敌人）；每次调用按 `(map_id, player_realm, is_elite)` 重设种子 → 同图同境界可复现
+- **新增 `src/feature/exploration/exploration_bootstrap.gd`（77）**：`mount(exploration, ai)` 把三个注入点接上（地图目录 / 敌人池 / AISystem 模板查询）；幂等；探索系统缺失返回 false 静默降级；`MainMenu._ready()` 新增 `_mount_exploration_bootstrap()`
+- **等级口径反转**：`_level_of()` = 地图 `enemy_realm` > 玩家境界（缺键时，告警一次）。**名册条目境界不再插队**——出厂模板恒为炼气 1，若让它先命中，地图境界配置永远不起作用（低境界图与高境界图节点强度会完全一样）。`DIFFICULTY_CONFIGS` 四档各补 `enemy_realm`（1/2/3/4）
+- **拆分（两个超限文件）**：`exploration_dag_builder.gd` 388 → **289**（图骨架算法 → `exploration_dag_graph.gd` 160：`roll_layers` / `all_nodes` / `build_edges` / `add_cross_edges` / `count_vertex_disjoint_paths` / `bfs_path`，RNG 由调用方注入——确定性口径不变）；`node_interaction_rules.gd` 327 → **255**（战斗预览 → `node_combat_preview_rules.gd` 140：敌人摘要 / 正文行 / 推荐上场数 / 境界名 / 双形态读取；原入口保留为转发，既有调用方零改动）
+- GDD：`exploration-system.md` §3「节点遭遇数据口径」补「数据来源（生产装配）」表 + `enemy_level` 缺省语义改为地图定档
+- Tech debt：DEBT-EUI-006-3 / -5 标记闭环并写明实现与残留
+- 测试：新增 `tests/integration/exploration_ui/test_exploration_bootstrap.gd`（6，真实 Autoload + 真实 `enter_map`）+ `tests/unit/exploration_system/test_map_catalog_and_pool.gd`（10）；改 `test_node_encounter_fields.gd` 4 例（等级取地图境界 / 缺键回退且告警 / 高境界回低境界图等级不涨 / 开战直通等级 2）
+- 全量：**3999 tests / 3998 passing / 1 pending 存量 / 0 failing / 3 orphans 存量**（3981 → 净增 18），零回归
+- **已知边界**：① `NodeGraphScreen` 仍由 `map_generated_stub` 驱动节点图（`ExplorationSystem` 无 `map_generated` 信号）——真实数据链已通、UI 仍走 stub 图；② 敌人池只有散修/魔修两名（资产只有这两张模板），各图仅权重不同；③ 章节表与地图选择的地图 ID 命名不一致（`cang_xuan_zhengdao_meng` vs `cang_xuan_zheng_dao_meng`），目录以地图选择写法为准；④ 名册人数在精英/普通间有差异，但同一图同境界的多名册完全一致（回调签名无节点 ID，逐节点差异化需改契约）
+
 ## Session Extract — 敌方回合表现层 + 防御字段（2026-11-10）
 - 任务：敌方逐条播报（可配置间隔 / 播报期输入屏蔽）、播报与飘字去重、`CombatRosterState.defense` 建模、阵亡不重复出场、集成测试
 - **新增 `src/ui/combat/feedback/enemy_action_broadcast.gd`（300）**：消费 `enemy_action_resolved`，批内去重 → 队列 → 一条战报背板；条间默认 350ms（`set_interval_ms` 可注入），首条立即、末条停留一个间隔；播报期间推 `ANIMATION` 锁（source=`enemy_broadcast`），队列清空后只弹自己的锁；`battle_ended` / `_exit_tree` 清队列并释放（Engine 主循环查找 InputManager，退场也可弹锁）
