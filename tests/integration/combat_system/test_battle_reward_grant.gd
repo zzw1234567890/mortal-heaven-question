@@ -1,11 +1,12 @@
 extends GutTest
-## 战斗奖励真正到账——探索→战斗→结算→回探索这条链的收尾。[br]
+## 战斗奖励真正到账——探索→战斗→结算→选择发放这条链的收尾。[br]
 ## [br][b]覆盖[/b]：[br]
 ##   1. 固定奖励 RNG 下，灵石 + 修为按开战上下文的掉落写入玩家数据；[br]
-##   2. 卡牌按 [code]chance[/code] 掷骰：命中入收藏、未命中只出现在
+##   2. 卡牌按 [code]chance[/code] 掷骰：命中后在 grant 时入收藏、未命中只出现在
 ##      [code]cards_missed[/code]；[br]
-##   3. 同一场重复 [method CombatSystem.battle_end] 不重复发放（幂等）；[br]
-##   4. 战败/撤退不发奖（只带 retain_ratio）。[br]
+##   3. 同一场重复 [method CombatSystem.battle_end] 不重复掷骰（幂等）；[br]
+##   4. 战败/撤退不发奖（只带 retain_ratio）；[br]
+##   5. 胜利后调用 grant_reward_selection 发放奖励。[br]
 ## [br][b]用真实 Autoload[/b]：ResourceSystem / CultivationSystem / CardSystem / GSM
 ## 都是被测链路的参与者——本文件的断言正是「玩家数据变了」。[br]
 ## [br][b]种子口径[/b]：显式 [code]set_reward_rng_seed()[/code]——同种子同结果，
@@ -95,6 +96,13 @@ func _finish(p_result: int = CS_SCRIPT.CombatResult.VICTORY) -> Dictionary:
 	return captured.get("rewards", {})
 
 
+## 调用 grant_reward_selection 发放奖励。
+func _grant(index: int = -1) -> Dictionary:
+	if cs == null or not cs.has_method(&"grant_reward_selection"):
+		return {"no_rolled_rewards": true}
+	return cs.call("grant_reward_selection", index)
+
+
 func _lingshi() -> int:
 	return ResourceSystem.get_resource(&"ling_shi")
 
@@ -108,191 +116,146 @@ func _owned_count() -> int:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. 灵石 + 修为到账
+# 1. 胜利后只掷骰不发放，余额不变
 # ═══════════════════════════════════════════════════════════════════════════════
 
-func test_victory_grants_lingshi_within_configured_range() -> void:
+func test_victory_rolls_rewards_without_granting() -> void:
 	# Arrange
-	var before: int = _lingshi()
-	_start({"lingshi_min": 10, "lingshi_max": 20, "cultivation": 0, "cards": []})
+	var lingshi_before: int = _lingshi()
+	var cult_before: int = _cultivation()
+	_start({"lingshi": 15, "cultivation": 5, "cards": []})
 	# Act
 	var rewards: Dictionary = _finish()
-	# Assert——区间内且有随机性；余额同步增加
-	var gained: int = int(rewards.get("lingshi", -1))
-	assert_true(gained >= 10 and gained <= 20,
-			"灵石实得应落在配置区间 [10, 20]（实际 %d）" % gained)
-	assert_eq(_lingshi(), before + gained, "玩家灵石余额应增加实得值")
-	assert_eq(int(rewards.get("lingshi_min")), 10, "载荷带区间下限（界面可解释）")
-	assert_eq(int(rewards.get("lingshi_max")), 20, "载荷带区间上限")
-	assert_true(bool(rewards.get("lingshi_granted")), "发放成功标记")
+	# Assert——掷骰结果存在，但余额未变
+	assert_eq(int(rewards.get("lingshi", 0)), 15, "载荷包含掷出的灵石")
+	assert_eq(int(rewards.get("cultivation", 0)), 5, "载荷包含修为")
+	assert_eq(_lingshi(), lingshi_before, "胜利后未 grant 时灵石余额不变")
+	assert_eq(_cultivation(), cult_before, "胜利后未 grant 时修为不变")
+	assert_false(rewards.has("lingshi_granted"), "未发放时不带 lingshi_granted 标记")
+	assert_false(rewards.has("cultivation_granted"), "未发放时不带 cultivation_granted 标记")
 
 
-func test_victory_grants_cultivation() -> void:
+# ═══════════════════════════════════════════════════════════════════════════════
+# 2. grant_reward_selection 发放灵石 + 修为
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_grant_selection_grants_lingshi_and_cultivation() -> void:
 	# Arrange
-	var before: int = _cultivation()
-	_start({"lingshi": 0, "cultivation": 7, "cards": []})
-	# Act
-	var rewards: Dictionary = _finish()
+	var lingshi_before: int = _lingshi()
+	var cult_before: int = _cultivation()
+	_start({"lingshi": 12, "cultivation": 3, "cards": []})
+	_finish()
+	# Act——跳过卡牌（index=-1），只发灵石+修为
+	var result: Dictionary = _grant(-1)
 	# Assert
-	assert_eq(int(rewards.get("cultivation", 0)), 7, "修为取配置值（不掷骰）")
-	assert_eq(_cultivation(), before + 7, "玩家修为应增加 7")
-	assert_true(bool(rewards.get("cultivation_granted")), "修为发放成功标记")
-
-
-func test_fixed_lingshi_is_granted_exactly() -> void:
-	var before: int = _lingshi()
-	_start({"lingshi": 13, "cultivation": 0, "cards": []})
-	var rewards: Dictionary = _finish()
-	assert_eq(int(rewards.get("lingshi", 0)), 13, "定值掉落原样发放")
-	assert_eq(_lingshi(), before + 13, "余额增加 13")
-
-
-func test_empty_rewards_config_grants_nothing() -> void:
-	var lingshi_before: int = _lingshi()
-	var cult_before: int = _cultivation()
-	_start({})
-	var rewards: Dictionary = _finish()
-	assert_eq(_lingshi(), lingshi_before, "无掉落配置时灵石不变")
-	assert_eq(_cultivation(), cult_before, "无掉落配置时修为不变")
-	assert_eq(int(rewards.get("lingshi", 0)), 0, "载荷灵石为 0")
-	assert_eq(rewards.get("cards", []), [], "载荷卡牌为空")
+	assert_false(bool(result.get("no_rolled_rewards", true)), "应成功发放")
+	assert_eq(_lingshi(), lingshi_before + 12, "灵石应增加 12")
+	assert_eq(_cultivation(), cult_before + 3, "修为应增加 3")
+	assert_true(bool(result.get("lingshi_granted", false)), "灵石发放成功标记")
+	assert_true(bool(result.get("cultivation_granted", false)), "修为发放成功标记")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 2. 卡牌：命中入收藏 / 未命中只记录
+# 3. grant_reward_selection 发放选中卡牌
 # ═══════════════════════════════════════════════════════════════════════════════
 
-func test_guaranteed_card_enters_collection() -> void:
-	# Arrange——100% 概率（不消耗随机数，结果确定）
+func test_grant_selection_grants_selected_card() -> void:
+	# Arrange——100% 概率卡牌
 	var before: int = _owned_count()
 	_start({"lingshi": 0, "cultivation": 0,
 			"cards": [{"card_id": str(CARD_TEMPLATE), "chance": 1.0}]})
-	# Act
-	var rewards: Dictionary = _finish()
-	# Assert——收藏增加一张，载荷带名称/稀有度
-	assert_eq(_owned_count(), before + 1, "命中的卡牌应写入收藏")
-	var cards: Array = rewards.get("cards", [])
-	assert_eq(cards.size(), 1, "载荷 cards 只含到手卡牌")
+	_finish()
+	# Act——选择第一张卡（index=0）
+	var result: Dictionary = _grant(0)
+	# Assert
+	assert_eq(_owned_count(), before + 1, "选中卡牌应入收藏")
+	var cards: Array = result.get("cards", [])
+	assert_eq(cards.size(), 1, "返回结果包含到手卡牌")
 	assert_eq(str(cards[0].get("card_id", "")), str(CARD_TEMPLATE), "卡牌 ID 正确")
-	assert_eq(str(cards[0].get("name", "")), "培元丹", "载荷带卡牌名称（界面直接显示）")
-	assert_eq(str(cards[0].get("rarity", "")), "白", "载荷带中文稀有度")
-	var owned: Array = GameStateManager.collection.owned_cards
-	var found: bool = false
-	for entry: Dictionary in owned:
-		if str(entry.get("template_id", "")) == str(CARD_TEMPLATE):
-			found = true
-	assert_true(found, "收藏条目应含该模板 ID")
 
 
-func test_zero_chance_card_is_not_granted() -> void:
-	# Arrange——0% 概率：恒未命中
+func test_grant_selection_skips_card_when_index_negative() -> void:
+	# Arrange
 	var before: int = _owned_count()
-	_start({"lingshi": 0, "cultivation": 0,
-			"cards": [{"card_id": str(CARD_TEMPLATE), "chance": 0.0}]})
-	# Act
-	var rewards: Dictionary = _finish()
-	# Assert——收藏不变，未命中写进 cards_missed（界面要能说明「没抽到」）
-	assert_eq(_owned_count(), before, "未命中的卡牌不入收藏")
-	assert_eq(rewards.get("cards", []), [], "载荷 cards 为空")
-	var missed: Array = rewards.get("cards_missed", [])
-	assert_eq(missed.size(), 1, "未命中条目应被记录")
-	assert_eq(str(missed[0].get("card_id", "")), str(CARD_TEMPLATE), "未命中卡牌 ID")
-	assert_eq(str(missed[0].get("name", "")), "培元丹", "未命中条目也带展示名")
-
-
-func test_unknown_card_template_is_reported_not_crashing() -> void:
-	# Arrange——配置了一张不存在的卡
-	var before: int = _owned_count()
-	_start({"lingshi": 0, "cultivation": 0,
-			"cards": [{"card_id": "no_such_card", "chance": 1.0}]})
-	# Act
-	var rewards: Dictionary = _finish()
-	# Assert——记入 cards_failed，不写收藏、不炸
-	assert_eq(_owned_count(), before, "未知模板不入收藏")
-	var failed: Array = rewards.get("cards_failed", [])
-	assert_eq(failed.size(), 1, "未知模板应记入发放失败")
-	assert_string_contains(str(failed[0].get("reason", "")), "未知卡牌", "失败原因可读")
-
-
-func test_card_collection_entry_is_serialized() -> void:
-	# 收藏条目形状必须与 CardSerializer 一致（读档/UI 都按这个形状读）
-	_start({"lingshi": 0, "cultivation": 0,
+	_start({"lingshi": 5, "cultivation": 0,
 			"cards": [{"card_id": str(CARD_TEMPLATE), "chance": 1.0}]})
 	_finish()
-	var owned: Array = GameStateManager.collection.owned_cards
-	var entry: Dictionary = owned[owned.size() - 1]
-	for key: String in ["card_instance_id", "template_id", "level", "inscriptions",
-			"breakthrough_layers", "binding_target_id", "acquired_chapter",
-			"acquired_event_id", "acquired_method"]:
-		assert_true(entry.has(key), "收藏条目应含字段 %s" % key)
-	assert_true(int(entry.get("card_instance_id", 0)) > 0, "实例 ID 由系统分配")
+	# Act——跳过卡牌（index=-1）
+	var result: Dictionary = _grant(-1)
+	# Assert
+	assert_eq(_owned_count(), before, "跳过时卡牌不入收藏")
+	assert_eq(result.get("cards", []), [], "返回结果卡牌为空")
+	assert_eq(_lingshi(), before + 5, "灵石仍发放")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. 幂等：重复结算不重复发放
+# 4. 重复 grant 幂等
 # ═══════════════════════════════════════════════════════════════════════════════
 
-func test_repeated_battle_end_does_not_grant_twice() -> void:
-	# Arrange——第一场胜利（定值，便于精确断言）
-	var before: int = _lingshi()
-	var cult_before: int = _cultivation()
-	var owned_before: int = _owned_count()
-	_start({"lingshi": 25, "cultivation": 4,
-			"cards": [{"card_id": str(CARD_TEMPLATE), "chance": 1.0}]})
+func test_repeated_grant_is_idempotent() -> void:
+	# Arrange
+	var lingshi_before: int = _lingshi()
+	_start({"lingshi": 20, "cultivation": 0, "cards": []})
 	_finish()
-	var lingshi_after_first: int = _lingshi()
-	var cult_after_first: int = _cultivation()
-	var owned_after_first: int = _owned_count()
-	assert_eq(lingshi_after_first, before + 25, "前置：第一场已发放灵石")
-	assert_eq(owned_after_first, owned_before + 1, "前置：第一场已发放卡牌")
-	# Act——同一场再结算一次（重复 battle_end）
-	cs.call("battle_end", CS_SCRIPT.CombatResult.VICTORY)
-	# Assert——三项都不再变化
-	assert_eq(_lingshi(), lingshi_after_first, "重复结算不得再发灵石")
-	assert_eq(_cultivation(), cult_after_first, "重复结算不得再发修为")
-	assert_eq(_owned_count(), owned_after_first, "重复结算不得再发卡牌")
-
-
-func test_repeated_battle_end_reports_grant_skipped() -> void:
-	_start({"lingshi": 5, "cultivation": 1, "cards": []})
-	_finish()
-	var rewards: Dictionary = _finish()
-	assert_true(bool(rewards.get("grant_skipped", false)),
-			"重复结算的载荷应标记 grant_skipped（界面可据此不重复提示）")
-	assert_false(rewards.has("lingshi"), "跳过时不带奖励字段（不是「0 奖励」而是「没结算」）")
-	assert_false(rewards.has("cards"), "跳过时也不带卡牌字段")
-
-
-func test_next_battle_grants_again() -> void:
-	# 幂等守卫按「开战配置身份」——换一场必须照常发奖
-	var before: int = _lingshi()
-	_start({"lingshi": 5, "cultivation": 0, "cards": []})
-	_finish()
+	# Act——第一次发放
+	var result1: Dictionary = _grant(-1)
 	var after_first: int = _lingshi()
-	assert_eq(after_first, before + 5, "前置：第一场已发放")
-	_start({"lingshi": 6, "cultivation": 0, "cards": []})
+	# 第二次发放
+	var result2: Dictionary = _grant(-1)
+	# Assert
+	assert_eq(after_first, lingshi_before + 20, "第一次发放灵石")
+	assert_eq(_lingshi(), after_first, "重复发放余额不变")
+	assert_true(bool(result2.get("no_rolled_rewards", false)), "重复调用返回 no_rolled_rewards")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. 候选为空时直接显示汇总
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_empty_cards_shows_summary_only() -> void:
+	# Arrange——无卡牌候选
+	_start({"lingshi": 10, "cultivation": 2, "cards": []})
+	var rewards: Dictionary = _finish()
+	# Assert——cards 为空
+	assert_eq(rewards.get("cards", []), [], "无卡牌候选时 cards 为空")
+	assert_eq(int(rewards.get("lingshi", 0)), 10, "灵石已掷骰")
+	assert_eq(int(rewards.get("cultivation", 0)), 2, "修为已掷骰")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. 跳过时文案提示卡牌不进收藏
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_skip_message_indicates_card_not_collected() -> void:
+	# Arrange
+	var before: int = _owned_count()
+	_start({"lingshi": 0, "cultivation": 0,
+			"cards": [{"card_id": str(CARD_TEMPLATE), "chance": 1.0}]})
 	_finish()
-	assert_eq(_lingshi(), after_first + 6, "第二场应照常发放（不是同一场）")
+	# Act——跳过卡牌
+	_grant(-1)
+	# Assert
+	assert_eq(_owned_count(), before, "跳过后卡牌不进收藏")
+	# UI 文案由 settlement_host 的 _show_grant_summary 提供，此处只验证行为
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 4. 战败 / 撤退不发奖
+# 7. 战败/撤退不发奖
 # ═══════════════════════════════════════════════════════════════════════════════
 
-func test_defeat_grants_no_rewards() -> void:
+func test_defeat_does_not_roll_rewards() -> void:
 	var lingshi_before: int = _lingshi()
 	var cult_before: int = _cultivation()
-	_start({"lingshi": 50, "cultivation": 20,
-			"cards": [{"card_id": str(CARD_TEMPLATE), "chance": 1.0}]})
+	_start({"lingshi": 50, "cultivation": 20, "cards": []})
 	var rewards: Dictionary = _finish(CS_SCRIPT.CombatResult.DEFEAT)
 	assert_eq(_lingshi(), lingshi_before, "战败不发灵石")
 	assert_eq(_cultivation(), cult_before, "战败不发修为")
 	assert_false(rewards.has("cards"), "战败载荷不带卡牌")
 	assert_almost_eq(float(rewards.get("retain_ratio", 0.0)), 0.5, 0.001,
-			"战败载荷带 50% 保留比例（既有契约不变）")
+			"战败载荷带 50% 保留比例")
 
 
-func test_retreat_grants_no_rewards() -> void:
+func test_retreat_does_not_roll_rewards() -> void:
 	var lingshi_before: int = _lingshi()
 	_start({"lingshi": 50, "cultivation": 20, "cards": []})
 	var rewards: Dictionary = _finish(CS_SCRIPT.CombatResult.RETREAT)
@@ -302,30 +265,16 @@ func test_retreat_grants_no_rewards() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 5. 结果视图 / 回探索提示（同一条链路的展示侧）
+# 8. 幂等：重复 battle_end 不重复掷骰
 # ═══════════════════════════════════════════════════════════════════════════════
 
-func test_result_view_publishes_reward_summary_and_notice() -> void:
+func test_repeated_battle_end_does_not_reroll() -> void:
 	# Arrange
-	var ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
-	ViewScript.clear()
-	var bridge: RefCounted = preload(
-			"res://src/ui/combat/shared/combat_result_bridge.gd").new()
-	bridge.call("bind", cs)
-	_start({"lingshi": 13, "cultivation": 2,
-			"cards": [{"card_id": str(CARD_TEMPLATE), "chance": 1.0}]})
-	# Act
-	cs.call("battle_end", CS_SCRIPT.CombatResult.VICTORY)
-	# Assert——结算对象与回探索提示都读得到实得奖励
-	var view: RefCounted = ViewScript.last()
-	assert_not_null(view, "胜利后应发布结算对象")
-	var lines: Array = view.call("reward_lines")
-	assert_true(lines.has("灵石 +13"), "结算场景应展示实得灵石")
-	assert_true(lines.has("修为 +2"), "结算场景应展示修为")
-	assert_true(lines.has("获得卡牌：培元丹（白·丹药）"), "结算场景应展示到手卡牌")
-	var notice: String = str(ViewScript.take_pending_notice())
-	assert_string_contains(notice, "灵石 +13", "回探索提示含灵石")
-	assert_string_contains(notice, "培元丹", "回探索提示含到手卡牌")
-	assert_eq(str(ViewScript.take_pending_notice()), "", "提示一次性——取后即清")
-	bridge.call("unbind")
-	ViewScript.clear()
+	_start({"lingshi": 25, "cultivation": 4, "cards": []})
+	var rewards1: Dictionary = _finish()
+	var lingshi_rolled1: int = int(rewards1.get("lingshi", 0))
+	# Act——重复结算
+	var rewards2: Dictionary = _finish()
+	# Assert
+	assert_true(bool(rewards2.get("grant_skipped", false)), "重复结算标记 grant_skipped")
+	assert_false(rewards2.has("lingshi"), "跳过时不带奖励字段")

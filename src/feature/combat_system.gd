@@ -236,6 +236,9 @@ var _battle_record: RefCounted = null
 ## HP 跨战斗持久化子模块（Sprint 18 结算回流 / DEBT-CBT-018-3）。
 var _hp_carryover: RefCounted = null
 
+## 本场已掷骰但未发放的奖励（胜利后暂存，等待 UI 选择）。
+var _rolled_rewards: Dictionary = {}
+
 ## 攻击队列减伤覆盖子模块（DEBT-CBT-018-8 残留——Attack 阶段写入防御方减伤来源）。
 var _attack_coverage: RefCounted = null
 
@@ -669,6 +672,8 @@ func is_character_alive(character_id: int) -> bool:
 
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]
 ## [br]Sprint 8 Story 005 接线——通过 ResourceSystem / CultivationSystem 派生奖励。[br]
+## [br][b]胜利时[/b]：只掷骰不发放，结果存 _rolled_rewards 并持久化到 GSM battle 字段；[br]
+## [b]失败/撤退时[/b]：不发奖、不掷骰，只带 retain_ratio。[br]
 ## [br][b]返回[/b]: rewards Dictionary。
 func _settle_result(result: int) -> Dictionary:
 	var rewards: Dictionary = {"result": result}
@@ -681,18 +686,16 @@ func _settle_result(result: int) -> Dictionary:
 		rewards["grant_skipped"] = true
 		return rewards
 	_mark_rewards_settled()
+	# 胜利时只掷骰不发放
 	var rolled: Dictionary = RewardRoller.roll(_configured_rewards(), _reward_rng)
 	# 未命中条目也要带展示名/稀有度——结算界面要说明「没抽到什么」
 	RewardRoller.enrich(rolled.get("cards_missed", []), _get_card_system())
-	var granted: Dictionary = RewardRoller.apply(rolled, _get_resource_system(),
-			_get_cultivation_system(), _get_card_system(), _get_gsm())
+	# 存入内部状态
+	_rolled_rewards = rolled.duplicate(true)
+	# 持久化到 GSM battle 字段
+	_persist_rolled_rewards(rolled)
+	# 返回掷骰结果（不含发放标记，因为还没发放）
 	rewards.merge(rolled, true)
-	rewards["lingshi_granted"] = bool(granted.get("lingshi_granted", true))
-	rewards["cultivation_granted"] = bool(granted.get("cultivation_granted", true))
-	# 到手卡牌用「发放后」的列表（带名称/稀有度，且只含真正入库的）；
-	# 未命中/失败保留掷骰与发放阶段的原因，供结算界面说明「没到手」。
-	rewards["cards"] = granted.get("cards", [])
-	rewards["cards_failed"] = granted.get("cards_failed", [])
 	return rewards
 
 
@@ -708,6 +711,85 @@ func _is_rewards_settled() -> bool:
 ## 标记本场已结算——记下当前开战序号；下一场 [method battle_start] 递增后自然失效。
 func _mark_rewards_settled() -> void:
 	_rewards_settled_for = _battle_serial
+
+
+## 持久化已掷骰奖励到 GSM battle 字段——供 UI 选择时读取。
+func _persist_rolled_rewards(p_rolled: Dictionary) -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null or not gsm.has_method(&"set"):
+		push_warning("CombatSystem: GSM 不可用，奖励掷骰结果无法持久化")
+		return
+	if gsm.battle == null:
+		gsm.battle = {}
+	var battle: Dictionary = gsm.battle
+	battle["rolled_rewards"] = p_rolled.duplicate(true)
+	gsm.set("battle", battle)
+
+
+## 从 GSM battle 字段读取已掷骰奖励——供 grant_reward_selection 使用。
+func _load_rolled_rewards() -> Dictionary:
+	var gsm: Node = _get_gsm()
+	if gsm == null or gsm.battle == null:
+		return {}
+	var battle: Dictionary = gsm.battle
+	return battle.get("rolled_rewards", {})
+
+
+## 奖励选择发放——index>=0 发灵石+修为+该张卡，index<0 只发灵石+修为。[br]
+## [br]发放后清空 _rolled_rewards（重复调用返回 no_rolled_rewards 且不重复发奖）。[br]
+## [br][param index] 卡牌索引（>=0 选择该卡，<0 跳过卡牌）。[br]
+## [br][b]返回[/b]: [code]{no_rolled_rewards, lingshi_granted, cultivation_granted,
+## cards, cards_failed}[/code]——no_rolled_rewards=true 表示已发放或无掷骰结果。
+func grant_reward_selection(index: int) -> Dictionary:
+	var result: Dictionary = {"no_rolled_rewards": true}
+	# 幂等守卫：已清空或无掷骰结果
+	if _rolled_rewards.is_empty():
+		var loaded: Dictionary = _load_rolled_rewards()
+		if loaded.is_empty():
+			return result
+		_rolled_rewards = loaded.duplicate(true)
+	if _rolled_rewards.is_empty():
+		return result
+
+	# 准备发放内容——灵石和修为始终发放，卡牌按 index 选择
+	var to_grant: Dictionary = _rolled_rewards.duplicate(true)
+	var cards: Array = to_grant.get("cards", [])
+	var selected_cards: Array = []
+
+	if index >= 0 and index < cards.size():
+		# 选择指定卡牌
+		selected_cards.append(cards[index])
+	else:
+		# 跳过卡牌
+		selected_cards = []
+
+	to_grant["cards"] = selected_cards
+
+	# 发放
+	var granted: Dictionary = RewardRoller.apply(to_grant, _get_resource_system(),
+			_get_cultivation_system(), _get_card_system(), _get_gsm())
+
+	# 清空掷骰结果（幂等）
+	_rolled_rewards.clear()
+	_clear_rolled_rewards_from_gsm()
+
+	# 返回发放结果
+	result["no_rolled_rewards"] = false
+	result["lingshi_granted"] = bool(granted.get("lingshi_granted", true))
+	result["cultivation_granted"] = bool(granted.get("cultivation_granted", true))
+	result["cards"] = granted.get("cards", [])
+	result["cards_failed"] = granted.get("cards_failed", [])
+	return result
+
+
+## 清空 GSM battle 字段中的 rolled_rewards——发放后调用。
+func _clear_rolled_rewards_from_gsm() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null or gsm.battle == null:
+		return
+	var battle: Dictionary = gsm.battle
+	battle.erase("rolled_rewards")
+	gsm.set("battle", battle)
 
 
 ## 本场奖励掷骰播种——每开一场推进一步（见 [method set_reward_rng_seed]）。[br]

@@ -308,3 +308,12 @@ func _notification(what: int) -> void:
 		View.apply_fonts(_parts, Frame.viewport_height(self))
 	elif what == NOTIFICATION_PREDELETE:
 		_fade.kill()
+
+
+## 显示「已到账汇总」视图——三选一网格隐藏，只显示奖励汇总行。[br]
+## [param lines] 奖励汇总行数组（["灵石 +10", "修为 +5", "获得卡牌：培元丹（白）"]）。
+func show_grant_summary(lines: Array) -> void:
+	loot_grid.visible = false
+	_clear_loot_cards()
+	skip_button.visible = false
+	View.apply_reward_lines(reward_lines_label, lines)

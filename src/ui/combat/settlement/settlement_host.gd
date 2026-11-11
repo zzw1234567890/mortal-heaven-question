@@ -55,6 +55,8 @@ var deck_system: Node = null
 var is_tribulation: bool = false
 ## 减少动态偏好（三面板统一）。
 var reduce_motion: bool = false
+	## 当前战斗的掷骰奖励缓存（用于发放后刷新汇总视图）。
+	var _current_rolled_rewards: Dictionary = {}
 
 ## === 子面板 ===============================================================
 
@@ -106,15 +108,16 @@ func has_sources() -> bool:
 
 ## 战斗结束信号处理——按结果开对应面板（AC-2）。[br]
 ## [param result]: [code]CombatSystem.CombatResult[/code] 取值。[br]
-## [param rewards]: 胜利时为实得奖励 [code]{lingshi, lingshi_min, lingshi_max,
-## cultivation, cards, cards_missed, cards_failed, ...}[/code]；
+## [param rewards]: 胜利时为掷骰奖励 [code]{lingshi, lingshi_min, lingshi_max,
+## cultivation, cards, cards_missed, cards_failed, ...}[/code]（尚未发放）；
 ## 战败/撤退为 [code]{retain_ratio}[/code]。[br]
-## [br][b]战利品 vs 奖励汇总[/b]：[code]cards[/code] / [code]lingshi[/code] 已在结算时
-## 到账，面板把它们列成「三选一」只是展示与后续选择接口的形状；「实得/未抽到/未入库」
+## [br][b]战利品 vs 奖励汇总[/b]：[code]cards[/code] / [code]lingshi[/code] 尚未到账，
+## 面板把它们列成「三选一」供玩家选择；「实得/未抽到/未入库」
 ## 的全文由 [code]CombatRewardLines[/code] 以汇总行呈现——两处读同一份载荷。
 func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 	var kind: StringName = Rules.panel_kind_for(result)
 	if kind == Rules.KIND_VICTORY:
+		_current_rolled_rewards = rewards.duplicate(true)
 		var counts: Dictionary = _deck_counts()
 		settlement_panel.show_victory(_victory_options(rewards),
 				int(counts["count"]), int(counts["limit"]),
@@ -166,8 +169,8 @@ func _build_panels() -> void:
 	settlement_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(settlement_panel)
 	settlement_panel.loot_selected.connect(func(i: int) -> void: loot_selected.emit(i))
-	settlement_panel.loot_confirmed.connect(func(i: int) -> void: loot_confirmed.emit(i))
-	settlement_panel.loot_skipped.connect(func() -> void: loot_skipped.emit())
+	settlement_panel.loot_confirmed.connect(_on_loot_confirmed)
+	settlement_panel.loot_skipped.connect(_on_loot_skipped)
 	settlement_panel.defeat_confirmed.connect(func() -> void: defeat_confirmed.emit())
 
 	retreat_dialog = RetreatScript.new()
@@ -305,3 +308,50 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_disconnect_source(_bound_combat_system)
 		_bound_combat_system = null
+
+
+## 战利品确认——调用 CombatSystem.grant_reward_selection 发放奖励。[br]
+## [param index] 玩家选择的卡牌索引（-1 表示跳过卡牌）。
+func _on_loot_confirmed(index: int) -> void:
+	if combat_system == null or not combat_system.has_method(&"grant_reward_selection"):
+		loot_confirmed.emit(index)
+		return
+	var result: Dictionary = combat_system.call(&"grant_reward_selection", index)
+	# 发放后刷新为「已到账汇总」视图
+	_show_grant_summary(result)
+	loot_confirmed.emit(index)
+
+
+## 战利品跳过——调用 CombatSystem.grant_reward_selection(-1) 只发灵石+修为。
+func _on_loot_skipped() -> void:
+	if combat_system == null or not combat_system.has_method(&"grant_reward_selection"):
+		loot_skipped.emit()
+		return
+	var result: Dictionary = combat_system.call(&"grant_reward_selection", -1)
+	_show_grant_summary(result)
+	loot_skipped.emit()
+
+
+## 显示「已到账汇总」视图——三选一网格隐藏，只显示奖励汇总行。[br]
+## [param result] grant_reward_selection 的返回值。
+func _show_grant_summary(result: Dictionary) -> void:
+	var lines: Array = []
+	if not bool(result.get("no_rolled_rewards", true)):
+		var lingshi: int = int(_current_rolled_rewards.get("lingshi", 0))
+		var cultivation: int = int(_current_rolled_rewards.get("cultivation", 0))
+		if lingshi > 0:
+			lines.append("灵石 +%d" % lingshi)
+		if cultivation > 0:
+			lines.append("修为 +%d" % cultivation)
+		var cards: Array = result.get("cards", [])
+		for card: Variant in cards:
+			if card is Dictionary:
+				var name: String = str(card.get("name", ""))
+				var rarity: String = str(card.get("rarity", ""))
+				if not name.is_empty():
+					if not rarity.is_empty():
+						lines.append("获得卡牌：%s（%s）" % [name, rarity])
+					else:
+						lines.append("获得卡牌：%s" % name)
+	# 隐藏战利品网格，只显示汇总
+	settlement_panel.show_grant_summary(lines)

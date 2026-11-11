@@ -6,6 +6,7 @@ extends GutTest
 ##   - 使用 CombatSystem Autoload 实例
 ##   - 验证 _settle_result 各分支返回值
 ##   - 验证 is_kill 从 target_hp 派生
+##   - 验证 grant_reward_selection 发放逻辑
 
 var cs: Node = null
 
@@ -24,6 +25,8 @@ func after_each() -> void:
 	cs.call("set_attack_queue", [])
 	# 开战配置是跨用例残留源（battle_end 不清它，下一场 battle_start 才覆盖）
 	cs.set("_battle_config", {})
+	# 清空内部掷骰奖励缓存
+	cs.set("_rolled_rewards", {})
 
 
 # ============================================================================
@@ -92,10 +95,10 @@ func test_rewards_clamp_negative_config() -> void:
 
 
 # ============================================================================
-# AC-006：_apply_victory_rewards 通过 ResourceSystem.add_resource 写入灵石
+# AC-006：grant_reward_selection 通过 ResourceSystem.add_resource 写入灵石
 # ============================================================================
 
-func test_apply_victory_rewards_writes_lingshi() -> void:
+func test_grant_selection_writes_lingshi() -> void:
 	# Arrange——记录 ResourceSystem 灵石余额
 	var rs: Node = Engine.get_main_loop().root.get_node_or_null("/root/ResourceSystem")
 	if rs == null or not rs.has_method("get_resource"):
@@ -103,12 +106,15 @@ func test_apply_victory_rewards_writes_lingshi() -> void:
 		return
 	var before: int = rs.get_resource(&"ling_shi")
 
-	# Act
-	cs.call("_apply_victory_rewards", {"lingshi": 100, "cultivation": 0, "cards": []})
+	# Act——先开战掷骰，再发放
+	cs.call("battle_start", {"rewards": {"lingshi": 100, "cultivation": 0, "cards": []}})
+	cs.call("_settle_result", 1)  # VICTORY，只掷骰不发放
+	var result: Dictionary = cs.call("grant_reward_selection", -1)  # 跳过卡牌
 
 	# Assert
 	var after: int = rs.get_resource(&"ling_shi")
 	assert_eq(after, before + 100, "灵石应增加 100")
+	assert_true(bool(result.get("lingshi_granted", false)), "灵石发放成功标记")
 
 	# Cleanup——回退灵石
 	if rs.has_method("spend_resource"):
@@ -116,10 +122,10 @@ func test_apply_victory_rewards_writes_lingshi() -> void:
 
 
 # ============================================================================
-# AC-007：_apply_victory_rewards 通过 CultivationSystem.gain_cultivation 写入修为
+# AC-007：grant_reward_selection 通过 CultivationSystem.gain_cultivation 写入修为
 # ============================================================================
 
-func test_apply_victory_rewards_writes_cultivation() -> void:
+func test_grant_selection_writes_cultivation() -> void:
 	# Arrange——记录 CultivationSystem 修为
 	var cult: Node = Engine.get_main_loop().root.get_node_or_null("/root/CultivationSystem")
 	if cult == null or not cult.has_method("get_cultivation"):
@@ -128,20 +134,25 @@ func test_apply_victory_rewards_writes_cultivation() -> void:
 	var before: int = cult.get_cultivation()
 
 	# Act
-	cs.call("_apply_victory_rewards", {"lingshi": 0, "cultivation": 50, "cards": []})
+	cs.call("battle_start", {"rewards": {"lingshi": 0, "cultivation": 50, "cards": []}})
+	cs.call("_settle_result", 1)
+	var result: Dictionary = cs.call("grant_reward_selection", -1)
 
 	# Assert
 	var after: int = cult.get_cultivation()
 	assert_eq(after, before + 50, "修为应增加 50")
+	assert_true(bool(result.get("cultivation_granted", false)), "修为发放成功标记")
 
 
 # ============================================================================
 # AC-008：ResourceSystem/CultivationSystem 不可用时静默跳过
 # ============================================================================
 
-func test_apply_victory_rewards_no_crash_when_systems_missing() -> void:
-	# Act——0 奖励不应触发任何系统调用
-	cs.call("_apply_victory_rewards", {"lingshi": 0, "cultivation": 0, "cards": []})
+func test_grant_selection_no_crash_when_systems_missing() -> void:
+	# Act——先掷骰，再发放（index=-1 跳过卡牌）
+	cs.call("battle_start", {"rewards": {"lingshi": 0, "cultivation": 0, "cards": []}})
+	cs.call("_settle_result", 1)
+	var result: Dictionary = cs.call("grant_reward_selection", -1)
 
 	# Assert——不崩溃即通过
 	assert_true(true, "零奖励不应崩溃")
@@ -198,3 +209,19 @@ func test_no_regression() -> void:
 	assert_true(cs.is_battle_active(), "战斗应可激活")
 	cs.set_battle_active(false)
 	assert_false(cs.is_battle_active(), "战斗应可关闭")
+
+
+# ============================================================================
+# 新增：grant_reward_selection 幂等性测试
+# ============================================================================
+
+func test_grant_selection_idempotent() -> void:
+	# Arrange
+	cs.call("battle_start", {"rewards": {"lingshi": 10, "cultivation": 0, "cards": []}})
+	cs.call("_settle_result", 1)
+	# Act——第一次发放
+	var result1: Dictionary = cs.call("grant_reward_selection", -1)
+	# 第二次发放
+	var result2: Dictionary = cs.call("grant_reward_selection", -1)
+	# Assert
+	assert_true(bool(result2.get("no_rolled_rewards", false)), "重复调用返回 no_rolled_rewards")
