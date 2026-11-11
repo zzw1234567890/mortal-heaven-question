@@ -142,3 +142,8 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+
+# 本地临时：Claude 跑批输出与测试快捷脚本
+run_out.txt
+run_gut.ps1
+run_tests.ps1
