@@ -557,7 +557,8 @@ func _finish_pending_battle_end() -> void:
 ## [br]取数：HP 状态表全量快照（[method CombatRosterState.snapshot_all]）——
 ##   1. 交战绩累积器定格 [code]{result, outcome, turn_count, effect_entries, player, enemy}[/code]；[br]
 ##   2. 交 [code]combat_hp_carryover.gd[/code] 把 [code]side == 我方 且 known[/code]
-##      的条目写进 [code]player.character_hp[/code]。[br]
+##      的条目写进 [code]player.character_hp[/code]；[br]
+##   3. 阵亡角色标记不可用（DeploymentSystem.mark_unavailable）。[br]
 ## [br][b]回写失败要可见[/b]：持久化没写成意味着「带伤进下一场」断链——
 ## [code]push_error[/code]（不是 warning：这是功能失效，而 warning 在 Godot 里不打断
 ## 测试与 CI）。战斗结算本身照常进行，调用方不需要处理返回值。
@@ -569,7 +570,47 @@ func _build_battle_record(result: int) -> Dictionary:
 	if written == HpCarryoverScript.WRITE_UNAVAILABLE:
 		push_error("CombatSystem: 我方 HP 回写失败（无 GSM 入口）——"
 				+ "本场残血未持久化，下一场将按模板满血开局")
+	_mark_dead_characters_unavailable(entries)
 	return _get_battle_record().call(&"build", result, _turn, entries)
+
+
+## 标记阵亡角色为不可用——战斗结束时调用（GDD combat-system.md §7）。[br]
+## [br][b]调用时机[/b]：HP 回写之后，状态表清空之前（entries 尚可用）。[br]
+## [br][b]判定规则[/b]：只标记我方（side == 0）且 current_hp == 0 的角色。[br]
+## [br][b]责任边界[/b]：只负责调用 DeploymentSystem.mark_unavailable，
+## 是否复活由 DeploymentSystem / 事件系统处理（ADR-0016）。
+func _mark_dead_characters_unavailable(entries: Array) -> void:
+	var ds: Node = _get_deployment_system()
+	if ds == null or not ds.has_method(&"mark_unavailable"):
+		return
+	for raw: Variant in entries:
+		if not (raw is Dictionary):
+			continue
+		var entry: Dictionary = raw
+		if int(entry.get("side", 1)) != 0:
+			continue  # 跳过敌方
+		if int(entry.get("current_hp", 1)) != 0:
+			continue  # 跳过存活角色
+		var character_id: int = int(entry.get("character_id", -1))
+		if character_id < 0:
+			continue
+		ds.call(&"mark_unavailable", character_id, {
+			"death_turn": _turn,
+			"death_battle_id": str(_battle_serial),
+		})
+
+
+## 警告零 HP 角色——开战种子时调用（GDD combat-system.md §7）。[br]
+## [br][b]判定规则[/b]：读回 [code]current_hp == 0[/code] 时警告，提示角色处于阵亡状态。
+## [br][b]警告等级[/b]：warning 而非 error——战斗照常进行（角色上场后 HP 为 0，
+## 需由 DeploymentSystem 的不可用列表拦截）。
+func _warn_zero_hp_characters(persisted: Dictionary) -> void:
+	for character_id: Variant in persisted.keys():
+		var entry: Dictionary = persisted[character_id]
+		if not (entry is Dictionary):
+			continue
+		if int(entry.get("current_hp", 1)) == 0:
+			push_warning("CombatSystem: 角色 %d 上场时 HP 为 0（阵亡状态）——如需请先通过复活机制恢复" % int(character_id))
 
 
 ## 结算回流计数——子模块（[code]combat_on_play_effects.gd[/code] /
@@ -582,12 +623,15 @@ func _note_effect_entry() -> void:
 ## 覆盖模板值（interaction epic 的 battle_start 扩展契约；缺省走模板）。[br]
 ## [br][b]Sprint 18 结算回流[/b]：显式 [code]player_stats[/code] 缺省时，由
 ## [code]combat_hp_carryover.gd[/code] 补上上一场的残血（[code]player.character_hp[/code]）——
-## 「带伤进入下一场」据此成立；持久层没有该角色时仍回退模板 [code]base_hp[/code]（满血）。
+## 「带伤进入下一场」据此成立；持久层没有该角色时仍回退模板 [code]base_hp[/code]（满血）。[br]
+## [br][b]阵亡角色警告[/b]：读回 [code]current_hp == 0[/code] 时警告，角色后续由
+## DeploymentSystem.mark_unavailable 处理不可用逻辑。
 func _seed_roster_state(config: Dictionary) -> void:
 	var stats: Variant = config.get("player_stats", {})
 	var explicit: Dictionary = stats if stats is Dictionary else {}
-	_get_roster_state().call(&"seed", _read_player_field(),
-			_get_hp_carryover().call(&"seed_stats", _read_player_field(), explicit),
+	var persisted: Dictionary = _get_hp_carryover().call(&"seed_stats", _read_player_field(), explicit)
+	_warn_zero_hp_characters(persisted)
+	_get_roster_state().call(&"seed", _read_player_field(), persisted,
 			_battle_enemy_roster, _get_card_system())
 
 

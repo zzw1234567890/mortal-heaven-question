@@ -22,6 +22,7 @@ var cs: Node = null
 var bridge: RefCounted = null
 var _release_ids: Array = []
 var _hp_before: Dictionary = {}
+var _unavailable_before: Array = []
 
 
 func before_each() -> void:
@@ -32,6 +33,8 @@ func before_each() -> void:
 	_hp_before = GameStateManager.player.get("character_hp", {}).duplicate(true)
 	GameStateManager.player.character_hp = {}
 	_release_ids.clear()
+	_unavailable_before = DeploymentSystem.get_unavailable_characters().duplicate()
+	DeploymentSystem._unavailable_characters.clear()
 	ViewScript.clear()
 	# 真接线——本文件要验证的正是它
 	bridge = BridgeScript.new()
@@ -50,6 +53,9 @@ func after_each() -> void:
 	_release_ids.clear()
 	InputManager.clear_locks(&"combat_system")
 	GameStateManager.player.character_hp = _hp_before
+	DeploymentSystem._unavailable_characters.clear()
+	for cid: int in _unavailable_before:
+		DeploymentSystem._unavailable_characters[cid] = {"death_turn": 0, "death_battle_id": "", "revival_methods": []}
 	_clear_gsm_battle()
 	ViewScript.clear()
 
@@ -62,8 +68,8 @@ func _clear_gsm_battle() -> void:
 
 ## 开战——我方 1 人（显式 HP）+ 敌方 1 人。
 func _start(hero_hp: int, enemy_hp: int) -> void:
-	if DeploymentSystem.setup_field([CHAR_HERO], {}):
-		_release_ids.append(CHAR_HERO)
+	assert_true(DeploymentSystem.setup_field([CHAR_HERO], {}), "前置：角色上场成功")
+	_release_ids.append(CHAR_HERO)
 	cs.call("battle_start", {
 		"enemy_roster": [{"character_id": CHAR_ENEMY, "current_hp": enemy_hp,
 				"max_hp": enemy_hp, "attack": 0, "is_alive": true}],

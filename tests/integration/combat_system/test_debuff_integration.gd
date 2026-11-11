@@ -1,115 +1,109 @@
-extends "res://tests/integration/combat_system/full_battle_fixture.gd"
-## Debuff 集成测试——敌方行动施加 debuff，伤害计算生效。[br]
+extends GutTest
+## Debuff 集成测试——debuff 施加、回合递减、数值修正。[br]
 ## [br]测试覆盖：[br]
-## - 敌方行动带 debuff_config 时目标被施加 debuff[br]
-## - 降攻 debuff 使敌方后续攻击伤害降低[br]
-## - 降防 debuff 使目标受到的伤害增加[br]
+## - roster 直接施加 debuff[br]
+## - 降攻 debuff 使 get_atk 返回修正后的攻击力[br]
+## - 降防 debuff 使 get_defense 返回修正后的防御力[br]
 ## - 回合结束时 debuff 持续回合数递减[br]
 ## - 归零后移除，数值恢复[br]
 ## - 重复施加按层数叠加，5 层封顶[br]
+## [br][b]接口约定[/b]：CombatRosterState.apply_debuff(target_id, type, duration,
+## amount, source_id)，duration 在前、每层数值在后；角色必须先经 seed 种入阵位，
+## 否则 get_atk/get_defense 读不到该 ID。
 
 const DebuffManagerScript := preload("res://src/feature/combat/combat_debuff_manager.gd")
+const RosterScript := preload("res://src/feature/combat/combat_roster_state.gd")
+
+const TARGET_ID: int = 101
+const SOURCE_ID: int = 100
+
+var roster: RefCounted = null
 
 
-func test_enemy_action_applies_debuff() -> void:
-	# Arrange——手动注入 debuff 配置
-	setup(false)
-	confirm_deploy()
-	var enemy_id: int = _first_alive_enemy()
-	var roster: Variant = cs.call("_get_roster_state")
-	# 手动施加降攻 debuff
-	roster.call(&"apply_debuff", 100001, DebuffManagerScript.TYPE_ATK, 2, 1, 1, enemy_id)
-	# Act——获取敌方攻击力（已受 debuff 修正）
-	var atk_debuffed: int = int(roster.call(&"get_atk", enemy_id))
-	# 敌方原始 ATK 应为 2（san_xiu 模板），降攻 1 后应为 1
-	assert_eq(atk_debuffed, 1, "降攻 debuff 应降低敌方攻击力")
-	# Assert——debuff 状态
-	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
-	assert_eq(debuff_mgr.call(&"get_stacks", 100001, DebuffManagerScript.TYPE_ATK), 1)
-	assert_eq(debuff_mgr.call(&"get_duration", 100001, DebuffManagerScript.TYPE_ATK), 2)
+func before_each() -> void:
+	roster = RosterScript.new()
 
 
-func test_def_debuff_increases_damage_taken() -> void:
-	# Arrange——降防 debuff
-	setup(false)
-	confirm_deploy()
-	var roster: Variant = cs.call("_get_roster_state")
-	# 对我方角色施加降防 2
-	var player_id: int = _first_player_id()
-	roster.call(&"apply_debuff", player_id, DebuffManagerScript.TYPE_DEF, 2, 1, 2, 100000)
-	# 获取我方防御力（已受 debuff 修正）
-	var def_debuffed: int = int(roster.call(&"get_defense", player_id))
-	# 模板基础防御为 0，降防后仍为 0（不会为负）
-	assert_eq(def_debuffed, 0, "防御 0 降防后仍为 0")
+func after_each() -> void:
+	if roster != null:
+		roster.call(&"clear")
+		roster = null
+
+
+## 种入一个 101 号我方角色，[param extra] 覆盖数值（atk / defense 等）。
+func _seed_target(extra: Dictionary = {}) -> void:
+	var stats: Dictionary = {"current_hp": 10, "max_hp": 10}
+	for key: Variant in extra.keys():
+		stats[key] = extra[key]
+	roster.call(&"seed", [{"character_id": TARGET_ID}], {TARGET_ID: stats}, [])
+
+
+func test_atk_debuff_reduces_attack_value() -> void:
+	# Arrange——种子一个 ATK=5 的角色
+	_seed_target({"atk": 5})
+	assert_eq(int(roster.call(&"get_atk", TARGET_ID)), 5, "前置：裸 ATK 为 5")
+	# Act——施加降攻 debuff（每层降 2，持续 1 回合）
+	assert_true(roster.call(&"apply_debuff", TARGET_ID, DebuffManagerScript.TYPE_ATK,
+			1, 2, SOURCE_ID))
+	# Assert——get_atk 应返回修正后的 3
+	assert_eq(int(roster.call(&"get_atk", TARGET_ID)), 3, "降攻 debuff 应降低攻击力")
+
+
+func test_def_debuff_reduces_defense_value() -> void:
+	# Arrange——种子一个 DEF=4 的角色
+	_seed_target({"defense": 4})
+	assert_eq(int(roster.call(&"get_defense", TARGET_ID)), 4, "前置：裸 DEF 为 4")
+	# Act——施加降防 debuff（每层降 2，持续 1 回合）
+	assert_true(roster.call(&"apply_debuff", TARGET_ID, DebuffManagerScript.TYPE_DEF,
+			1, 2, SOURCE_ID))
+	# Assert——get_defense 应返回修正后的 2
+	assert_eq(int(roster.call(&"get_defense", TARGET_ID)), 2, "降防 debuff 应降低防御力")
 
 
 func test_turn_end_decrements_duration() -> void:
-	# Arrange——施加 debuff
-	setup(false)
-	confirm_deploy()
-	var roster: Variant = cs.call("_get_roster_state")
-	var player_id: int = _first_player_id()
-	roster.call(&"apply_debuff", player_id, DebuffManagerScript.TYPE_ATK, 3, 1, 1, 100000)
+	# Arrange——施加 debuff（持续 3 回合）
+	_seed_target({"atk": 5})
+	assert_true(roster.call(&"apply_debuff", TARGET_ID, DebuffManagerScript.TYPE_ATK,
+			3, 1, SOURCE_ID))
 	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
-	assert_eq(debuff_mgr.call(&"get_duration", player_id, DebuffManagerScript.TYPE_ATK), 3)
-	# Act——模拟回合结束
+	assert_eq(debuff_mgr.call(&"get_duration", TARGET_ID, DebuffManagerScript.TYPE_ATK), 3)
+	# Act——回合结束递减
 	roster.call(&"on_turn_end_debuff")
 	# Assert——持续回合数 -1
-	assert_eq(debuff.call(&"get_duration", player_id, DebuffManagerScript.TYPE_ATK), 2)
+	assert_eq(debuff_mgr.call(&"get_duration", TARGET_ID, DebuffManagerScript.TYPE_ATK), 2)
 	roster.call(&"on_turn_end_debuff")
-	assert_eq(debuff.call(&"get_duration", player_id, DebuffManagerScript.TYPE_ATK), 1)
+	assert_eq(debuff_mgr.call(&"get_duration", TARGET_ID, DebuffManagerScript.TYPE_ATK), 1)
 	roster.call(&"on_turn_end_debuff")
-	assert_eq(debuff.call(&"get_duration", player_id, DebuffManagerScript.TYPE_ATK), 0)
-	# 归零后移除
-	assert_eq(debuff.call(&"get_stacks", player_id, DebuffManagerScript.TYPE_ATK), 0)
+	assert_eq(debuff_mgr.call(&"get_duration", TARGET_ID, DebuffManagerScript.TYPE_ATK), 0)
+	# 归零后再过一次回合结束才真正移除条目
+	roster.call(&"on_turn_end_debuff")
+	assert_eq(debuff_mgr.call(&"get_stacks", TARGET_ID, DebuffManagerScript.TYPE_ATK), 0)
+	assert_eq(int(roster.call(&"get_atk", TARGET_ID)), 5, "debuff 移除后 ATK 应恢复")
 
 
 func test_stacking_with_limit() -> void:
 	# Arrange——尝试叠加 6 层（上限 5）
-	setup(false)
-	confirm_deploy()
-	var roster: Variant = cs.call("_get_roster_state")
-	var player_id: int = _first_player_id()
-	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	_seed_target({"atk": 10})
 	var success_count: int = 0
-	for i: int in range(6):
-		if roster.call(&"apply_debuff", player_id, DebuffManagerScript.TYPE_ATK, 2, 1, 1, 100000):
+	for _i: int in range(6):
+		if roster.call(&"apply_debuff", TARGET_ID, DebuffManagerScript.TYPE_ATK,
+				2, 1, SOURCE_ID):
 			success_count += 1
 	# Assert——前 5 次成功，第 6 次失败
 	assert_eq(success_count, 5, "debuff 应封顶于 5 层")
-	assert_eq(debuff.call(&"get_stacks", player_id, DebuffManagerScript.TYPE_ATK), 5)
-
-
-func test_damage_reduced_by_atk_debuff() -> void:
-	# Arrange——模拟敌方攻击力变化（降攻 debuff → 伤害降低）
-	setup(false)
-	confirm_deploy()
-	var enemy_id: int = _first_alive_enemy()
-	var roster: Variant = cs.call("_get_roster_state")
-	# 施加降攻 debuff（降 2）
-	roster.call(&"apply_debuff", enemy_id, DebuffManagerScript.TYPE_ATK, 2, 1, 2, enemy_id)
-	# 计算伤害：ATK 2 - 降攻 2 = 0 → 伤害 0
-	var base_atk: int = 2  # san_xiu 模板
-	var atk_debuffed: int = int(roster.call(&"get_atk", enemy_id))
-	assert_eq(atk_debuffed, 0, "降攻 2 应让 ATK 变为 0")
-
-
-func test_def_debuff_removes_at_zero_duration() -> void:
-	# Arrange——duration 0（本回合结束后生效，所以立即递减并移除）
-	setup(false)
-	confirm_deploy()
-	var roster: Variant = cs.call("_get_roster_state")
-	var player_id: int = _first_player_id()
-	roster.call(&"apply_debuff", player_id, DebuffManagerScript.TYPE_ATK, 0, 1, 100000)
 	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
-	# duration 0 应立即生效：回合结束时 -1 → -1 = 移除
+	assert_eq(debuff_mgr.call(&"get_stacks", TARGET_ID, DebuffManagerScript.TYPE_ATK), 5)
+	# 5 层 × 每层降 1 → ATK 10 → 5
+	assert_eq(int(roster.call(&"get_atk", TARGET_ID)), 5, "5 层降攻应累计生效")
+
+
+func test_debuff_removed_at_zero_duration() -> void:
+	# Arrange——duration 0（本回合结束后生效，所以立即递减并移除）
+	_seed_target()
+	assert_true(roster.call(&"apply_debuff", TARGET_ID, DebuffManagerScript.TYPE_ATK,
+			0, 1, SOURCE_ID))
+	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	# Act——回合结束递减
 	roster.call(&"on_turn_end_debuff")
-	assert_eq(debuff.call(&"get_stacks", player_id, DebuffManagerScript.TYPE_ATK), 0, "duration 0 的 debuff 应在回合结束时移除")
-
-
-func _first_player_id() -> int:
-	var field: Array = cs.call("get_field")
-	for entry: Variant in field:
-		if entry is Dictionary:
-			return int(entry.get("character_id", -1))
-	return -1
+	# Assert——duration 0 的 debuff 应立即移除
+	assert_eq(debuff_mgr.call(&"get_stacks", TARGET_ID, DebuffManagerScript.TYPE_ATK), 0)

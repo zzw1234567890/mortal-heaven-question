@@ -17,6 +17,7 @@ var cs: Node = null
 var _release_ids: Array = []
 var _realm_before: int = 1
 var _ai_roster_before: Array = []
+var _unavailable_before: Array = []
 
 
 func before_each() -> void:
@@ -30,6 +31,8 @@ func before_each() -> void:
 	# 快照全局单例状态——套件结束原样还原（Autoload 跨套件共享）
 	_realm_before = int(GameStateManager.player.realm)
 	_ai_roster_before = AISystem.get_enemy_roster().duplicate()
+	_unavailable_before = DeploymentSystem.get_unavailable_characters().duplicate()
+	DeploymentSystem._unavailable_characters.clear()
 
 
 func after_each() -> void:
@@ -45,6 +48,9 @@ func after_each() -> void:
 	InputManager.clear_locks(&"combat_system")
 	GameStateManager.player.realm = _realm_before
 	AISystem.set_enemy_roster(_ai_roster_before)
+	DeploymentSystem._unavailable_characters.clear()
+	for cid: int in _unavailable_before:
+		DeploymentSystem._unavailable_characters[cid] = {"death_turn": 0, "death_battle_id": "", "revival_methods": []}
 	GameStateManager.battle = null
 	GameStateManager._pending_changes.clear()
 	GameStateManager._flush_scheduled = false

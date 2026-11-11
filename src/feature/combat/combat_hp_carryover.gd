@@ -80,8 +80,11 @@ func read_one(character_id: int) -> Dictionary:
 ## 开战种子——把持久 HP 与显式 [code]player_stats[/code] 合成一张表。[br]
 ## [br][b]优先级[/b]：显式 [code]player_stats[/code] > 持久 HP（显式即「上游已裁定」）；
 ## 两者都没有的角色不出现在结果里 → [code]seed_player_field[/code] 回退模板 [code]base_hp[/code]。[br]
+## [br][b]阵亡角色警告[/b]：读回 [code]current_hp == 0[/code] 时发射警告，调用方据此处理
+## 「跳过上场」或「不可用」逻辑（GDD combat-system.md §7）。[br]
 ## [br][param player_field] [code]DeploymentSystem.get_field()[/code] 快照（取上场角色）。[br]
 ## [param explicit_stats] [code]battle_start.player_stats[/code]（可为空字典）。[br]
+## [br][b]返回[/b]：合并后的 HP 表 + 零 HP 角色列表（警告用）。
 func seed_stats(player_field: Array, explicit_stats: Dictionary) -> Dictionary:
 	var merged: Dictionary = read_all()
 	if explicit_stats.is_empty():

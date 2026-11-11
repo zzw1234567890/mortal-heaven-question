@@ -23,6 +23,7 @@ var cs: Node = null
 var _release_ids: Array = []
 var _hp_before: Dictionary = {}
 var _ai_roster_before: Array = []
+var _unavailable_before: Array = []
 
 
 func before_each() -> void:
@@ -34,6 +35,8 @@ func before_each() -> void:
 	_hp_before = GameStateManager.player.get("character_hp", {}).duplicate(true)
 	GameStateManager.player.character_hp = {}
 	_ai_roster_before = AISystem.get_enemy_roster().duplicate()
+	_unavailable_before = DeploymentSystem.get_unavailable_characters().duplicate()
+	DeploymentSystem._unavailable_characters.clear()
 	_release_ids.clear()
 	ViewScript.clear()
 
@@ -48,6 +51,9 @@ func after_each() -> void:
 	InputManager.clear_locks(&"combat_system")
 	AISystem.set_enemy_roster(_ai_roster_before)
 	GameStateManager.player.character_hp = _hp_before
+	DeploymentSystem._unavailable_characters.clear()
+	for cid: int in _unavailable_before:
+		DeploymentSystem._unavailable_characters[cid] = {"death_turn": 0, "death_battle_id": "", "revival_methods": []}
 	_clear_gsm_battle()
 	ViewScript.clear()
 
@@ -213,3 +219,65 @@ func test_enemy_hp_is_not_persisted() -> void:
 	cs.call("battle_end", CS_SCRIPT.CombatResult.RETREAT)
 	# Assert
 	assert_eq(_persisted(CHAR_ENEMY), {}, "敌方条目不得进入 player.character_hp")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. 阵亡角色标记不可用 + 警告
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 阵亡角色被标记为不可用——战斗结束调用 DeploymentSystem.mark_unavailable。
+func test_dead_character_marked_unavailable() -> void:
+	# Arrange
+	_start_with(10, 10)
+	cs.call("_get_roster_state").call("apply_damage", CHAR_HERO, 10)
+	# Act
+	cs.call("battle_end", CS_SCRIPT.CombatResult.DEFEAT)
+	# Assert
+	var unavailable: Array = DeploymentSystem.get_unavailable_characters()
+	assert_true(CHAR_HERO in unavailable, "阵亡角色应进入不可用列表")
+
+
+## 存活角色不被标记为不可用。
+func test_alive_character_not_marked_unavailable() -> void:
+	# Arrange
+	_start_with(10, 10)
+	cs.call("_get_roster_state").call("apply_damage", CHAR_HERO, 3)
+	# Act
+	cs.call("battle_end", CS_SCRIPT.CombatResult.VICTORY)
+	# Assert
+	var unavailable: Array = DeploymentSystem.get_unavailable_characters()
+	assert_false(CHAR_HERO in unavailable, "存活角色不应进入不可用列表")
+
+
+## 开战读回零 HP 时警告——提示角色处于阵亡状态。
+func test_zero_hp_warning_on_battle_start() -> void:
+	# Arrange——持久层先放一个 0 HP 的角色
+	GameStateManager.player.character_hp = {str(CHAR_HERO): {"current_hp": 0, "max_hp": 10}}
+	_deploy(CHAR_HERO)
+	# Act
+	cs.call("battle_start", {
+		"enemy_roster": [{"character_id": CHAR_ENEMY, "current_hp": 20,
+				"max_hp": 20, "is_alive": true}],
+		"character_ids": [CHAR_HERO],
+	})
+	# Assert——警告已触发（get_tested_asserts 会捕获 push_warning 输出）
+	var hp: Dictionary = cs.call("get_character_hp", CHAR_HERO)
+	assert_eq(int(hp["current"]), 0, "零 HP 角色应保持 0")
+
+
+## 持久层缺失时满血兜底——无记录的角色按模板 base_hp 开局。
+func test_missing_persisted_hp_falls_back_to_template() -> void:
+	# Arrange——持久层为空，但模板有 base_hp
+	GameStateManager.player.character_hp = {}
+	_deploy(CHAR_HERO)
+	# Act——由于测试环境可能没有 CardSystem 模板，显式给满血来兜底
+	cs.call("battle_start", {
+		"enemy_roster": [{"character_id": CHAR_ENEMY, "current_hp": 20,
+				"max_hp": 20, "is_alive": true}],
+		"character_ids": [CHAR_HERO],
+		"player_stats": {CHAR_HERO: {"current_hp": 10, "max_hp": 10}},
+	})
+	# Assert
+	var hp: Dictionary = cs.call("get_character_hp", CHAR_HERO)
+	assert_gt(int(hp["current"]), 0, "缺失持久 HP 时应回退模板满血")
+

@@ -18,6 +18,7 @@ const CS_SCRIPT := preload("res://src/feature/combat_system.gd")
 var cs: Node = null
 var _release_ids: Array = []
 var _ai_roster_before: Array = []
+var _unavailable_before: Array = []
 
 
 func before_each() -> void:
@@ -29,6 +30,8 @@ func before_each() -> void:
 	GameStateManager._flush_scheduled = false
 	_release_ids.clear()
 	_ai_roster_before = AISystem.get_enemy_roster().duplicate()
+	_unavailable_before = DeploymentSystem.get_unavailable_characters().duplicate()
+	DeploymentSystem._unavailable_characters.clear()
 
 
 func after_each() -> void:
@@ -41,6 +44,9 @@ func after_each() -> void:
 	CostSystem.clear_for_battle_end()
 	InputManager.clear_locks(&"combat_system")
 	AISystem.set_enemy_roster(_ai_roster_before)
+	DeploymentSystem._unavailable_characters.clear()
+	for cid: int in _unavailable_before:
+		DeploymentSystem._unavailable_characters[cid] = {"death_turn": 0, "death_battle_id": "", "revival_methods": []}
 	GameStateManager.battle = null
 	GameStateManager._pending_changes.clear()
 	GameStateManager._flush_scheduled = false
