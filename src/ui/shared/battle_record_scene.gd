@@ -80,7 +80,8 @@ func _hint_for_result(view: RefCounted) -> String:
 		return ""
 	if bool(view.call(&"is_victory")):
 		return "战斗胜利！奖励已计入修为与灵石，节点已标记为已清。"
-	var result: int = int(view.get("result", 0))
+	var raw: Variant = view.get(&"result")
+	var result: int = int(raw) if raw != null else ViewScript.RESULT_NONE
 	if result == ViewScript.RESULT_RETREAT:
 		return "撤退。修为保留 50%，节点未标记为已清。"
 	return "战斗失败。修为保留 50%，节点未标记为已清。"
