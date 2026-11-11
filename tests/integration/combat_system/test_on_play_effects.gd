@@ -15,6 +15,7 @@ extends GutTest
 
 const CS_SCRIPT := preload("res://src/feature/combat_system.gd")
 const EntryClass: GDScript = preload("res://src/core/card_system/effect_entry.gd")
+const DebuffManagerScript := preload("res://src/feature/combat/combat_debuff_manager.gd")
 
 ## 本文件独立的角色 ID 段——不与其它测试文件夹具冲突。
 const CHAR_CASTER: int = 7601
@@ -358,3 +359,106 @@ func test_real_kill_card_does_not_heal_before_kill() -> void:
 	# Assert
 	assert_eq(_enemy_hp(), 17, "ATK 3 × 1.0 = 3（20 → 17，未击杀）")
 	assert_eq(_caster_hp(), 8, "未击杀 → 击杀回血不落库（打出结算不含 kill 条目）")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. Debuff：出牌给敌人上 debuff（降攻/降防）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 打出 debuff 效果的卡——敌方被施加降攻 debuff，后续攻击力降低。
+func test_debuff_effect_applies_to_enemy() -> void:
+	# Arrange
+	_start_battle(8, 3)
+	_setup_card([_entry(&"debuff_atk", 1, &"single_enemy")])
+	var roster: Variant = cs.call("_get_roster_state")
+	# Act
+	assert_true(cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER), "出牌成功")
+	# Assert——敌方基础 ATK 4，降攻 1 后应为 3
+	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	assert_eq(debuff_mgr.call(&"get_stacks", CHAR_ENEMY, DebuffManagerScript.TYPE_ATK), 1, "应施加 1 层降攻 debuff")
+	assert_eq(int(roster.call(&"get_atk", CHAR_ENEMY)), 3, "敌方 ATK 应从 4 降至 3")
+
+
+## 降防 debuff 使敌方防御力降低。
+func test_debuff_def_reduces_enemy_defense() -> void:
+	# Arrange——给敌方更高的基础防御
+	cs.call("battle_start", {
+		"enemy_roster": [{"character_id": CHAR_ENEMY, "current_hp": 20,
+				"max_hp": 20, "attack": 4, "defense": 3, "is_alive": true}],
+		"character_ids": [CHAR_CASTER],
+		"player_stats": {CHAR_CASTER: {"current_hp": 8, "max_hp": 10, "atk": 3}},
+	})
+	cs.call("advance_phase")
+	cs.call("advance_phase")
+	_setup_card([_entry(&"debuff_def", 1, &"single_enemy")])
+	var roster: Variant = cs.call("_get_roster_state")
+	# Act
+	assert_true(cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER), "出牌成功")
+	# Assert——敌方基础 DEF 3，降防 1 后应为 2
+	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	assert_eq(debuff_mgr.call(&"get_stacks", CHAR_ENEMY, DebuffManagerScript.TYPE_DEF), 1, "应施加 1 层降防 debuff")
+	assert_eq(int(roster.call(&"get_defense", CHAR_ENEMY)), 2, "敌方 DEF 应从 3 降至 2")
+
+
+## debuff 持续回合数按 duration_turns 设置。
+func test_debuff_duration_respects_duration_turns() -> void:
+	# Arrange
+	_start_battle(8, 3)
+	var entry: Resource = EntryClass.new()
+	entry.effect_type = &"debuff_atk"
+	entry.value = 1
+	entry.duration_turns = 3
+	entry.target = &"single_enemy"
+	entry.trigger = EntryClass.TRIGGER_ON_PLAY
+	_setup_card([entry])
+	var roster: Variant = cs.call("_get_roster_state")
+	# Act
+	assert_true(cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER), "出牌成功")
+	# Assert
+	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	assert_eq(debuff_mgr.call(&"get_duration", CHAR_ENEMY, DebuffManagerScript.TYPE_ATK), 3, "持续回合数应为 3")
+
+
+## debuff 效果声明 self → 无自施 debuff 模型，跳过。
+func test_self_targeted_debuff_is_skipped() -> void:
+	# Arrange
+	_start_battle(8, 3)
+	_setup_card([_entry(&"debuff_atk", 1, &"self")])
+	var roster: Variant = cs.call("_get_roster_state")
+	# Act
+	cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER)
+	# Assert——不应施加任何 debuff
+	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	assert_eq(debuff_mgr.call(&"get_stacks", CHAR_ENEMY, DebuffManagerScript.TYPE_ATK), 0, "self 目标应跳过")
+
+
+## 无 debuff 效果的卡——无副作用，敌方 ATK 不变。
+func test_card_without_debuff_has_no_side_effect() -> void:
+	# Arrange
+	_start_battle(8, 3)
+	_setup_card([_entry(&"damage_multiplier", 100, &"single_enemy")])
+	var roster: Variant = cs.call("_get_roster_state")
+	# Act
+	assert_true(cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER), "出牌成功")
+	# Assert——敌方 HP 变化但无 debuff
+	assert_eq(_enemy_hp(), 17, "敌方受到伤害")
+	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	assert_eq(debuff_mgr.call(&"get_stacks", CHAR_ENEMY, DebuffManagerScript.TYPE_ATK), 0, "无 debuff")
+
+
+## 真实资产「煞气斩」——带降攻 debuff 效果。
+func test_real_sha_qi_zhan_applies_debuff() -> void:
+	# Arrange——使用真实资产 sha_qi_zhan（damage_multiplier + debuff_atk）
+	_start_battle(8, 3)
+	cs.call("set_card_instances", {CARD_ID: {"card_instance_id": CARD_ID,
+			"cost": 0, "template_id": "sha_qi_zhan"}})
+	cs.call("set_hand", [{"card_instance_id": CARD_ID, "cost": 0,
+			"template_id": "sha_qi_zhan"}])
+	var roster: Variant = cs.call("_get_roster_state")
+	# Act
+	assert_true(cs.call("play_card", CARD_ID, [CHAR_ENEMY], CHAR_CASTER), "出牌成功")
+	# Assert——敌方受到伤害（ATK 3 × 1.5 = 4.5 → 4）+ 降攻 debuff
+	assert_eq(_enemy_hp(), 16, "倍率伤害生效（20 → 16）")
+	var debuff_mgr: RefCounted = roster.call(&"get_debuff_manager")
+	assert_eq(debuff_mgr.call(&"get_stacks", CHAR_ENEMY, DebuffManagerScript.TYPE_ATK), 1, "降攻 debuff 施加成功")
+	assert_eq(int(roster.call(&"get_atk", CHAR_ENEMY)), 3, "敌方 ATK 从 4 降至 3")

@@ -13,6 +13,12 @@ focus_fire = 0.5
 front_priority = 0.8
 retreat_threshold = 0.2
 
+[sub_resource type="Resource" id="Resource_debuff_def"]
+script = ExtResource("4_debuff_config")
+debuff_type = 1
+duration = 2
+amount = 1
+
 [sub_resource type="Resource" id="Resource_strike"]
 script = ExtResource("3_skill_entry")
 skill_id = &"basic_attack"
@@ -34,6 +40,7 @@ cost = 1
 cooldown = 0
 target_type = 0
 power_multiplier = 1.8
+debuff_config = SubResource("Resource_debuff_def")
 
 [resource]
 script = ExtResource("1_enemy_template")

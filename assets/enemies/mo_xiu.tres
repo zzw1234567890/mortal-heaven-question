@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://assets/enemies/enemy_template.gd" id="1_enemy_template"]
 [ext_resource type="Script" path="res://assets/enemies/behavior_profile.gd" id="2_behavior_profile"]
 [ext_resource type="Script" path="res://assets/enemies/skill_entry.gd" id="3_skill_entry"]
-[ext_resource type="Resource" path="res://assets/enemies/rewards/mo_xiu_reward.tres" id="4_reward_config"]
+[ext_resource type="Script" path="res://assets/enemies/debuff_config.gd" id="4_debuff_config"]
+[ext_resource type="Resource" path="res://assets/enemies/rewards/mo_xiu_reward.tres" id="5_reward_config"]
 
 [sub_resource type="Resource" id="Resource_behavior"]
 script = ExtResource("2_behavior_profile")
@@ -11,6 +12,12 @@ aggression = 0.9
 focus_fire = 0.7
 front_priority = 0.5
 retreat_threshold = 0.0
+
+[sub_resource type="Resource" id="Resource_debuff_atk"]
+script = ExtResource("4_debuff_config")
+debuff_type = 0
+duration = 2
+amount = 2
 
 [sub_resource type="Resource" id="Resource_strike"]
 script = ExtResource("3_skill_entry")
@@ -33,6 +40,7 @@ cost = 2
 cooldown = 1
 target_type = 1
 power_multiplier = 0.8
+debuff_config = SubResource("Resource_debuff_atk")
 
 [resource]
 script = ExtResource("1_enemy_template")
@@ -48,4 +56,4 @@ formation_limit = 0
 front_slot = false
 behavior_profile = SubResource("Resource_behavior")
 skill_pool = [SubResource("Resource_strike"), SubResource("Resource_mo_slash")]
-reward_config = ExtResource("4_reward_config")
+reward_config = ExtResource("5_reward_config")

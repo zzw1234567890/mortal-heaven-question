@@ -46,6 +46,9 @@ const EvaluatorScript: GDScript = preload("res://src/feature/card_effect_engine/
 ## 评估快照类型。
 const SnapshotScript: GDScript = preload("res://src/feature/card_effect_engine/game_state_snapshot.gd")
 
+## Debuff 管理器类型——用于效果类型判断。
+const DebuffManagerScript: GDScript = preload("res://src/feature/combat/combat_debuff_manager.gd")
+
 ## 指向自身的条目标记——只有它才把效果落在施法者身上。
 const TARGET_SELF: String = "self"
 
@@ -95,6 +98,8 @@ func collect(card: Variant, targets: Array, caster_id: int) -> Dictionary:
 			var healing: int = _resolve_heal(data, caster_id, snapshot)
 			if healing > 0:
 				outcome["heals"].append({"character_id": caster_id, "amount": healing})
+		elif category == EvaluatorScript.EffectCategory.DEBUFF:
+			_apply_debuff_effect(data, is_self, targets, caster_id)
 		elif _is_damage(category):
 			outcome["damage_results"].append_array(
 					_damage_items(data, is_self, targets, caster_id, snapshot))
@@ -228,6 +233,37 @@ func _hp_entry(character_id: int) -> Dictionary:
 func _is_damage(category: int) -> bool:
 	return category == EvaluatorScript.EffectCategory.DAMAGE \
 		or category == EvaluatorScript.EffectCategory.DAMAGE_MULTIPLIER
+
+
+## 施加 debuff 效果——从 EffectEntry 解析 debuff 参数并施加到目标。[br]
+## [br][param data] 效果数据（含 effect_type/duration_turns/value）。[br]
+## [param is_self] 是否目标为自身（debuff 不支持自施，跳过）。[br]
+## [param targets] 目标角色 ID 列表。[br]
+## [param caster_id] 施法者角色 ID。
+func _apply_debuff_effect(data: Dictionary, is_self: bool, targets: Array, caster_id: int) -> void:
+	if is_self:
+		push_warning("CombatOnPlayEffects: debuff 条目目标为 self——无自施 debuff 模型，跳过")
+		return
+	var effect_type: String = str(data.get("effect_type", "")).to_lower()
+	var debuff_type: int = -1
+	# 从 effect_type 字符串判断 debuff 类型（与 DebuffConfig 枚举对应）
+	if effect_type.contains("atk") or effect_type.contains("攻"):
+		debuff_type = DebuffManagerScript.TYPE_ATK
+	elif effect_type.contains("def") or effect_type.contains("防"):
+		debuff_type = DebuffManagerScript.TYPE_DEF
+	else:
+		push_warning("CombatOnPlayEffects: 无法识别的 debuff 类型 %s，跳过" % effect_type)
+		return
+	var duration: int = int(data.get("duration_turns", 1))
+	var amount: int = int(data.get("value", 1))
+	if amount <= 0:
+		return
+	var roster: Variant = _roster()
+	for raw: Variant in targets:
+		var target_id: int = int(raw)
+		if target_id < 0:
+			continue
+		roster.call(&"apply_debuff", target_id, debuff_type, duration, amount, caster_id)
 
 
 ## 惰性获取效果评估器。
