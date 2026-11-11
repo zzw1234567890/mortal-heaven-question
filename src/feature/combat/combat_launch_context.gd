@@ -35,6 +35,8 @@ const KEY_PLAYER_ROSTER: String = "player_roster"
 
 ## 待消费的上下文（null/空 = 无探索侧上下文）。
 static var _pending: Dictionary = {}
+## 战斗开始的节点 ID（战斗胜利后标记已清用）。
+static var _origin_node_id: int = -1
 
 
 ## 构造上下文——从节点详情 + 到达名册 + 玩家阵容合并出四份输入。[br]
@@ -68,6 +70,7 @@ static func build(p_node_id: int, p_combat_type: StringName, p_roster: Array,
 ## [code]JSON.stringify[/code] 处静默失败，故发布时先净化。
 static func publish(context: Dictionary) -> void:
 	_pending = _sanitize(context) if context is Dictionary else {}
+	_origin_node_id = int(context.get(KEY_NODE_ID, -1))
 
 
 ## 净化——键转 String、丢弃运行时对象（对象/资源不进跨场景缓存）。[br]
@@ -111,6 +114,13 @@ static func peek() -> Dictionary:
 ## 清空上下文（测试隔离 / 放弃进入战斗）。
 static func clear() -> void:
 	_pending = {}
+	_origin_node_id = -1
+
+
+## 获取战斗开始的节点 ID（战斗胜利后标记已清用）。[br]
+## [br][b]返回[/b]: 节点 ID（-1 表示无战斗节点上下文）。
+static func get_origin_node_id() -> int:
+	return _origin_node_id
 
 
 ## 契约校验——返回空串表示可开战，否则返回可读的缺失项说明。[br]

@@ -14,11 +14,12 @@ extends Control
 ## [code]get_current_scene_id()[/code]（同 MainMenu/PauseMenu 先例，不写魔数）。[br]
 ## [br][b]文案本地化豁免[/b]：项目暂无本地化系统——全部文案集中在本文件
 ## [constant TITLES] / [constant HINTS] / [constant TEXT_RETURN_BUTTON]，本地化
-## epic 入库后替换为 key（同 S16/S17 TEXT_* 口径）。
-##
-## @experimental
+## epic 入库后替换为 key（同 S16/S17 TEXT_* 口径）。[br]
+## [br][b]战斗节点胜利标记[/b]：从战斗结算/战败返回探索时，若结果为胜利，
+## 标记战斗开始的节点为已清（GSM visited_nodes）。[br]
 ## 来源: ADR-0005（场景切换唯一仲裁）、ADR-0031（表现层基线）、
-## gate-check-presentation-layer-complete-2026-11-08 §B1（四占位场景）。
+## gate-check-presentation-layer-complete-2026-11-08 §B1（四占位场景）、
+## ADR-0014 §决策 1 状态分层模型。
 
 ## SceneManager 脚本常量——SceneID / TransitionType 单一真理来源
 ## （preload 而非 Autoload 全局名——与 identity_select / node_popup_host 同源）。
@@ -54,8 +55,8 @@ const HINTS: Dictionary = {
 	2: "卡组编辑功能正在打造中，当前对局使用初始卡组。",
 	6: "坊市交易功能正在打造中，请先继续探索。",
 	7: "此处的机缘尚未显现，请先继续探索。",
-	8: "战斗结算详情正在打造中，奖励已计入修为与灵石。",
-	9: "战败损失已结算，请重整旗鼓。",
+	8: "战斗胜利！奖励已计入修为与灵石，节点已标记为已清。",
+	9: "战斗失败/撤退。节点未标记为已清，请重整旗鼓后再试。",
 	10: "修为养成功能正在打造中，请先继续探索。",
 }
 
@@ -119,7 +120,10 @@ func _build() -> void:
 ## 返回探索——[b]唯一[/b]导航出口（ADR-0005 单一仲裁）。[br]
 ## [br][b]转场类型[/b]：COMBAT_TO_EXPLORE（音频矩阵唯一的「→探索」行，
 ## 1.0s 淡出淡入——结算/战败/商店/事件/养成共用）。[br]
-## [br][b]from 动态取当前场景[/b]：不写魔数（PauseMenu M-2 先例）。
+## [br][b]from 动态取当前场景[/b]：不写魔数（PauseMenu M-2 先例）。[br]
+## [br][b]战斗节点胜利标记[/b]：若从战斗结算/战败返回，且结果为胜利，
+## 标记战斗开始的节点为已清（GSM visited_nodes）。[br]
+## [br]来源: ADR-0005、ADR-0014 §决策 1 状态分层模型。
 func _on_return_pressed() -> void:
 	var sm: Node = _scene_manager()
 	if sm == null or not sm.has_method(&"request_scene_change"):
@@ -128,9 +132,45 @@ func _on_return_pressed() -> void:
 	var from_id: int = screen_id
 	if sm.has_method(&"get_current_scene_id"):
 		from_id = int(sm.call(&"get_current_scene_id"))
+	# 战斗胜利时标记节点为已清
+	_mark_battle_node_cleared_if_victory()
 	sm.call(&"request_scene_change", from_id,
-			SceneManagerScript.SceneID.EXPLORATION,
-			SceneManagerScript.TransitionType.COMBAT_TO_EXPLORE)
+		SceneManagerScript.SceneID.EXPLORATION,
+		SceneManagerScript.TransitionType.COMBAT_TO_EXPLORE)
+
+
+## 战斗胜利时标记节点为已清——GSM visited_nodes。[br]
+## [br][b]条件[/b]：当前场景是 RESULT_SCREEN (8) 或 DEFEAT_SCREEN (9)，[br]
+## 战斗结果为胜利，且探索侧有战斗节点上下文。[br]
+## [br][b]语义[/b]：胜利 → 节点标记为已清（加入 visited_nodes），[br]
+## 失败/撤退 → 不标记（玩家主动逃跑或战败不算通关）。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func _mark_battle_node_cleared_if_victory() -> void:
+	# 只处理战斗结算/战败场景（8 或 9）
+	if screen_id != 8 and screen_id != 9:
+		return
+	# 检查战斗结果
+	var view: RefCounted = _get_combat_result_view()
+	if view == null:
+		return
+	if not view.has_method(&"is_victory") or not bool(view.call(&"is_victory")):
+		return
+	# 获取战斗开始的节点 ID
+	var LaunchScript := preload("res://src/feature/combat/combat_launch_context.gd")
+	var node_id: int = LaunchScript.get_origin_node_id()
+	if node_id < 0:
+		return
+	# 标记节点为已清（通过 GSM）
+	var gsm: Node = get_node_or_null("/root/GameStateManager")
+	if gsm == null or not gsm.has_method(&"add_visited_node"):
+		return
+	gsm.call(&"add_visited_node", node_id)
+
+
+## 获取战斗结算对象（胜利判定用）。
+func _get_combat_result_view() -> RefCounted:
+	var view_script := preload("res://src/feature/combat/combat_result_view.gd")
+	return view_script.last()
 
 
 ## SceneManager——注入优先，否则 /root/SceneManager（测试可替换为 mock）。

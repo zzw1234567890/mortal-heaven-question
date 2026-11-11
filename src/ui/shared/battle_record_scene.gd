@@ -17,8 +17,6 @@ extends "res://src/ui/shared/placeholder_scene.gd"
 ## 构建期文案并追加一段摘要。[br]
 ## [br]来源: production/session-state/active.md（Sprint 18 结算回流）、ADR-0031。
 
-## 结算对象类型——载荷折叠与跨场景缓存的单一实现。
-const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
 
 ## 日志前缀（便于在完整日志里 grep 本类输出）。
 const LOG_PREFIX: String = "[CombatRecord]"
@@ -28,6 +26,8 @@ const TEXT_NO_RECORD: String = "本场无战绩数据"
 const TEXT_RECORDED: String = "战绩已记录"
 ## 摘要标签字号（px）。
 const BRIEF_FONT_SIZE: int = 14
+## 结算对象类型——载荷折叠与跨场景缓存的单一实现。
+const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
 
 ## 本场结算对象（null = 没有战绩数据）。
 var result_view: RefCounted = null
@@ -59,6 +59,9 @@ func _build() -> void:
 		box.move_child(brief_label, return_button.get_index())
 	for line: String in lines:
 		print("%s %s" % [LOG_PREFIX, line])
+	# 动态设置提示文案——根据战斗结果
+	if hint_label != null:
+		hint_label.text = _hint_for_result(result_view)
 
 
 ## 取占位场景的内容容器（[method PlaceholderScene._build] 里名为 "Content" 的 VBox）。
@@ -67,3 +70,17 @@ func _content_box() -> VBoxContainer:
 	if center == null:
 		return null
 	return center.get_node_or_null("Content") as VBoxContainer
+
+
+## 根据战斗结果返回提示文案。[br]
+## [br][b]胜利[/b]：奖励已计入，节点已清。[br]
+## [br][b]失败/撤退[/b]：节点未清，需重试。
+func _hint_for_result(view: RefCounted) -> String:
+	if view == null:
+		return ""
+	if bool(view.call(&"is_victory")):
+		return "战斗胜利！奖励已计入修为与灵石，节点已标记为已清。"
+	var result: int = int(view.get("result", 0))
+	if result == ViewScript.RESULT_RETREAT:
+		return "撤退。修为保留 50%，节点未标记为已清。"
+	return "战斗失败。修为保留 50%，节点未标记为已清。"
