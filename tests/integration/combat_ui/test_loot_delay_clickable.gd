@@ -705,6 +705,49 @@ func test_host_victory_with_empty_rewards_builds_no_cards() -> void:
 			"无选项时确认按钮应保持灰")
 
 
+## 宿主把本场奖励汇总行下发到面板（实得/未抽到都在面板上可见）。[br]
+func test_host_passes_reward_lines_to_panel() -> void:
+	# Arrange
+	host = HostScript.new()
+	add_child_autofree(host)
+	var combat: Node = _make_combat()
+	host.setup(combat, _make_deck(), false)
+	# Act——胜利载荷带实得灵石与未抽到的卡
+	combat.battle_ended.emit(CombatSystemScript.CombatResult.VICTORY, {
+		"lingshi": 12, "cultivation": 3,
+		"cards": [{"card_id": "pei_yuan_dan", "name": "培元丹",
+				"rarity": "白", "school": "丹药"}],
+		"cards_missed": [{"card_id": "gui_xiu_page", "name": "鬼修残页",
+				"chance": 0.2}],
+	})
+	# Assert——面板的奖励段同时含「到手」与「未抽到」
+	var text: String = host.settlement_panel.reward_lines_label.text
+	assert_true(host.settlement_panel.reward_lines_label.visible,
+			"有奖励时奖励段应可见")
+	assert_string_contains(text, "灵石 +12", "面板展示实得灵石")
+	assert_string_contains(text, "修为 +3", "面板展示修为")
+	assert_string_contains(text, "获得卡牌：培元丹（白·丹药）", "面板展示到手卡牌")
+	assert_string_contains(text, "未抽到：鬼修残页（20%）", "面板展示未抽到的卡")
+
+
+## 战败面板不显示奖励段（损失摘要已覆盖负面信息）。[br]
+func test_host_defeat_panel_hides_reward_lines() -> void:
+	host = HostScript.new()
+	add_child_autofree(host)
+	var combat: Node = _make_combat()
+	host.setup(combat, _make_deck(), false)
+	# Act
+	combat.battle_ended.emit(CombatSystemScript.CombatResult.VICTORY,
+			{"lingshi": 5})
+	assert_true(host.settlement_panel.reward_lines_label.visible,
+			"前置：胜利面板显示奖励段")
+	combat.battle_ended.emit(CombatSystemScript.CombatResult.DEFEAT, {})
+	# Assert
+	assert_eq(host.settlement_panel.get_kind(), Rules.KIND_DEFEAT, "前置：切到战败面板")
+	assert_false(host.settlement_panel.reward_lines_label.visible,
+			"战败面板不应残留上一场的奖励段")
+
+
 ## reduce_motion 在面板构建前设置也必须生效（不被子面板默认值吞掉）。[br]
 func test_host_reduce_motion_survives_panel_construction() -> void:
 	host = HostScript.new()

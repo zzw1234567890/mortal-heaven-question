@@ -35,9 +35,8 @@ const PERSISTENT_LAYER_NAME: StringName = &"PersistentLayer"
 static func mount(scene_manager: Node) -> CanvasLayer:
 	if scene_manager == null or not scene_manager.has_method(&"register_persistent"):
 		return null
-	var existing: Node = scene_manager.get_node_or_null(
-			NodePath("%s/%s" % [PERSISTENT_LAYER_NAME, HUD_NODE_NAME]))
-	if existing is CanvasLayer:
+	var existing: Node = mounted(scene_manager)
+	if existing != null:
 		return existing
 
 	var hud: CanvasLayer = HUD_SCENE.instantiate()
@@ -54,7 +53,16 @@ static func mount(scene_manager: Node) -> CanvasLayer:
 
 ## 查询当前是否已挂载（不触发挂载）。
 static func is_mounted(scene_manager: Node) -> bool:
+	return mounted(scene_manager) != null
+
+
+## 取已挂载的 HUD（未挂载返回 null——不触发挂载）。[br]
+## [br][b]为什么与 [method is_mounted] 并存[/b]：调用方除了「挂没挂」还要拿它调
+## 接口（如 [method Hud.request_notification]）；每次 `get_node_or_null` 各写一遍
+## 路径，路径一旦变化就会漏改（回探索提示 / 其他跨场景提示共用这一处）。
+static func mounted(scene_manager: Node) -> Node:
 	if scene_manager == null:
-		return false
-	return scene_manager.get_node_or_null(
-			NodePath("%s/%s" % [PERSISTENT_LAYER_NAME, HUD_NODE_NAME])) is CanvasLayer
+		return null
+	var node: Node = scene_manager.get_node_or_null(
+			NodePath("%s/%s" % [PERSISTENT_LAYER_NAME, HUD_NODE_NAME]))
+	return node if node is CanvasLayer else null

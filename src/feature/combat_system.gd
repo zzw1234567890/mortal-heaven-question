@@ -115,6 +115,9 @@ const HpCarryoverScript := preload("res://src/feature/combat/combat_hp_carryover
 ## 回合经济规则（开局手牌 / 抽牌表——纯函数，与阶段侧同一份口径）。
 const TurnEconomy := preload("res://src/feature/combat/combat_turn_economy.gd")
 
+## 战斗奖励的掷骰与发放（灵石区间 / 卡牌概率——全场唯一实现）。
+const RewardRoller := preload("res://src/feature/combat/combat_reward_roller.gd")
+
 
 # === 内部状态 ====================================================================
 
@@ -168,6 +171,28 @@ var _hand: Array = []
 
 ## 独立 RNG 实例（AC-013 牌库抽空随机返还）。
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+
+## 奖励掷骰 RNG——[b]与牌库 _rng 分开[/b]：抽牌/弃牌洗牌消耗的随机数次数随对局
+## 走向变化，与它共用一条流会让「同一掉落配置的结算结果」不可复现。[br]
+## [br]种子口径见 [method set_reward_rng_seed]；测试可注入固定种子实例。
+var _reward_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+
+## 是否已由调用方显式播种/注入奖励 RNG（true 时 [method battle_start] 不自动播种）。
+var _reward_rng_explicit: bool = false
+
+## 本进程已开战场数——自动播种的偏移量（见 [method set_reward_rng_seed]）。
+var _reward_battle_count: int = 0
+
+## 本进程的开战序号——每 [method battle_start] 递增（0 = 从未开过战）。[br]
+## [br][b]为什么不用布尔开关[/b]：同一个 CombatSystem 会连续打多场，布尔要在
+## [code]battle_start[/code] 重置，而「重置」本身又是一处可漏写的状态；用单调序号
+## 做键，换场自然失效、同场重复调用自然命中。
+var _battle_serial: int = 0
+
+## 已结算过奖励的开战序号——重复 [method battle_end] 幂等守卫。[br]
+## [br]与 [member _battle_serial] 相等即「本场已结算」；序号单调递增，
+## 因此不需要在开战时刻意清零。
+var _rewards_settled_for: int = 0
 
 ## 可注入回调——CardEffectEngine.validate_targets（Story 003 接线后替换）。[br]
 ## [br][b]桩实现[/b]：默认返回 true（认为目标始终合法）。
@@ -292,6 +317,39 @@ func set_rng_seed(seed_value: int) -> void:
 	_rng.seed = seed_value
 
 
+## 设置[b]奖励掷骰[/b]的种子（确定性测试用）。[br]
+## [br][b]与 [method set_rng_seed] 分开[/b]：洗牌流的消耗次数随对局走向变化，
+## 共用一条流会让「固定种子 → 固定掉落」不成立。[br]
+## [br][b]调用后本场及后续各场都不再自动播种[/b]（显式种子优先）；调用
+## [method set_reward_rng] 注入实例同样视为显式。[br]
+## [br][b]生产自动播种口径[/b]（[method battle_start]）：[br]
+##   [code]reward_seed = GSM.meta.seed + 本进程已开战场数[/code]——同一存档的
+##   第一场、第二场……结果各自可复现，且不会两场共用同一串随机数；
+##   GSM / meta.seed 缺失时用 [code]本进程已开战场数[/code] 起步（仍可复现，
+##   只是不再跨存档对齐）。[br]
+## [br][b]一次胜利会消耗的随机数[/b]：灵石区间掷 1 次 [code]randi_range[/code]
+## （仅当配置了 [code]lingshi_min/max[/code]）；随后每张 [code]0 < chance < 1[/code]
+## 的卡牌掷 1 次 [code]randf()[/code]，顺序与配置数组一致（[code]chance >= 1[/code] /
+## [code]<= 0[/code] 与缺 [code]chance[/code] 的条目都不消耗）。
+func set_reward_rng_seed(seed_value: int) -> void:
+	_reward_rng.seed = seed_value
+	_reward_rng_explicit = true
+
+
+## 注入奖励掷骰 RNG 实例（测试用——自行决定种子与推进方式）。[br]
+## [br]注入后 [method battle_start] 不再自动播种，直到 [method reset_reward_rng]。
+func set_reward_rng(p_rng: RandomNumberGenerator) -> void:
+	_reward_rng = p_rng if p_rng != null else RandomNumberGenerator.new()
+	_reward_rng_explicit = p_rng != null
+
+
+## 恢复自动播种（注入/显式种子之后的复位入口——测试隔离用）。
+func reset_reward_rng() -> void:
+	_reward_rng = RandomNumberGenerator.new()
+	_reward_rng_explicit = false
+	_reward_battle_count = 0
+
+
 ## 设置自动推进使能——测试时设 false 禁用 call_deferred。
 func set_auto_advance(enabled: bool) -> void:
 	_auto_advance_enabled = enabled
@@ -349,6 +407,9 @@ func battle_start(config: Dictionary) -> void:
 
 	# 回合经济规则输入快照（先手/后手——开战定格，见成员文档）
 	_battle_config = config.duplicate(true)
+	# 本场身份 + 奖励 RNG（序号递增即「换场」，同场的重复结算据此识别）
+	_battle_serial += 1
+	_seed_reward_rng()
 
 	# Sprint 18 / DEBT-CBT-018-1：种子敌我 HP 状态 + 订阅自身 character_died（阵亡清位）
 	_seed_roster_state(config)
@@ -567,26 +628,85 @@ func is_character_alive(character_id: int) -> bool:
 ## [br][b]返回[/b]: rewards Dictionary。
 func _settle_result(result: int) -> Dictionary:
 	var rewards: Dictionary = {"result": result}
-	match result:
-		CombatResult.VICTORY:
-			# 胜利奖励——灵石+修为+卡牌掉落
-			rewards["lingshi"] = _calculate_lingshi_reward()
-			rewards["cultivation"] = _calculate_cultivation_reward()
-			rewards["cards"] = _calculate_card_drops()
-			# 写入 ResourceSystem / CultivationSystem
-			_apply_victory_rewards(rewards)
-		CombatResult.DEFEAT, CombatResult.RETREAT:
-			# 失败/撤退——保留 50% 资源
-			rewards["retain_ratio"] = 0.5
+	if result != CombatResult.VICTORY:
+		# 失败/撤退——保留 50% 资源（不发奖、不掷骰）
+		rewards["retain_ratio"] = 0.5
+		return rewards
+	# 幂等守卫：同一场重复调用不再掷骰、不再发放
+	if _is_rewards_settled():
+		rewards["grant_skipped"] = true
+		return rewards
+	_mark_rewards_settled()
+	var rolled: Dictionary = RewardRoller.roll(_configured_rewards(), _reward_rng)
+	# 未命中条目也要带展示名/稀有度——结算界面要说明「没抽到什么」
+	RewardRoller.enrich(rolled.get("cards_missed", []), _get_card_system())
+	var granted: Dictionary = RewardRoller.apply(rolled, _get_resource_system(),
+			_get_cultivation_system(), _get_card_system(), _get_gsm())
+	rewards.merge(rolled, true)
+	rewards["lingshi_granted"] = bool(granted.get("lingshi_granted", true))
+	rewards["cultivation_granted"] = bool(granted.get("cultivation_granted", true))
+	# 到手卡牌用「发放后」的列表（带名称/稀有度，且只含真正入库的）；
+	# 未命中/失败保留掷骰与发放阶段的原因，供结算界面说明「没到手」。
+	rewards["cards"] = granted.get("cards", [])
+	rewards["cards_failed"] = granted.get("cards_failed", [])
 	return rewards
+
+
+## 本场是否已结算过奖励（重复 [method battle_end] 的幂等守卫）。[br]
+## [br][b]没开过战不参与守卫[/b]：序号为 0 说明没有「场」的概念（测试桩、
+## 直接调 [method battle_end] 的旧用例），重复调用照常走结算——此时掉落本身也是空的。[br]
+## [br][b]已结束的场次直接调 [method _settle_result] 也算重复[/b]：`_battle_config`
+## 在战斗结束后不清（旧口径），比对序号正是为了不让「上一场的配置」被再发一次。
+func _is_rewards_settled() -> bool:
+	return _battle_serial != 0 and _rewards_settled_for == _battle_serial
+
+
+## 标记本场已结算——记下当前开战序号；下一场 [method battle_start] 递增后自然失效。
+func _mark_rewards_settled() -> void:
+	_rewards_settled_for = _battle_serial
+
+
+## 本场奖励掷骰播种——每开一场推进一步（见 [method set_reward_rng_seed]）。[br]
+## [br][b]显式种子/注入实例优先[/b]：测试设过种子后不被开战覆盖，
+## 否则「固定种子」的口径在第二场就断了。
+func _seed_reward_rng() -> void:
+	_reward_battle_count += 1
+	if _reward_rng_explicit:
+		return
+	_reward_rng.seed = _reward_seed_base() + _reward_battle_count
+
+
+## 自动播种基数——[code]GSM.meta.seed[/code]（缺失/类型不符时为 0）。[br]
+## [br][b]为什么要全局种子参与[/b]：不同存档（不同轮次）应得到不同掉落；
+## 同一存档内按开战场数递增，保证各场互不相同且可复现。
+func _reward_seed_base() -> int:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return 0
+	var meta: Variant = gsm.get("meta")
+	if not (meta is Dictionary):
+		return 0
+	return int((meta as Dictionary).get("seed", 0))
 
 
 ## 计算灵石奖励——[b]由开战配置的 [code]rewards[/code] 决定[/b]（探索节点掉落）。[br]
 ## [br][b]为什么读配置而不是现算[/b]：掉落属于「哪一格打哪一批人、给什么」的
 ## 探索侧数据（[code]combat_launch_context.gd[/code] 在节点生成时定档）；战斗系统
-## 只负责结算，不重复一套掉落表。配置缺失时为 0（不臆造奖励）。
+## 只负责结算，不重复一套掉落表。配置缺失时为 0（不臆造奖励）。[br]
+## [br][b]这是预览值[/b]：配置了区间时返回区间中值；实得值见 [method _settle_result]
+## 掷骰后的 [code]rewards.lingshi[/code]（两者在结算面板上都有展示口径）。[br]
+## [br][b]为什么区间也要兜底[/b]：探索侧经 [code]EncounterFields[/code] 写出的配置
+## 同时带中值与区间，但手写配置可能只给区间——只读 [code]lingshi[/code] 会让预览恒为 0，
+## 与实得对不上。
 func _calculate_lingshi_reward() -> int:
-	return maxi(_configured_rewards().get("lingshi", 0), 0)
+	var rewards: Dictionary = _configured_rewards()
+	if rewards.has("lingshi"):
+		return maxi(int(rewards.get("lingshi", 0)), 0)
+	if rewards.has("lingshi_min") or rewards.has("lingshi_max"):
+		var lo: int = maxi(int(rewards.get("lingshi_min", 0)), 0)
+		var hi: int = maxi(int(rewards.get("lingshi_max", 0)), 0)
+		return int(round((float(lo) + float(hi)) * 0.5))
+	return 0
 
 
 ## 计算修为奖励——同上，读开战配置 [code]rewards.cultivation[/code]。
@@ -594,7 +714,9 @@ func _calculate_cultivation_reward() -> int:
 	return maxi(_configured_rewards().get("cultivation", 0), 0)
 
 
-## 计算卡牌掉落——同上，读开战配置 [code]rewards.cards[/code]（字典列表深拷贝）。
+## 计算卡牌掉落配置——读开战配置 [code]rewards.cards[/code]（字典列表深拷贝）。[br]
+## [br][b]返回的是配置清单，不是实得[/b]：每项 [code]{card_id, chance}[/code]
+## 是否到手由 [method _settle_result] 的掷骰决定。
 func _calculate_card_drops() -> Array:
 	var raw: Variant = _configured_rewards().get("cards", [])
 	if not (raw is Array):
@@ -608,16 +730,15 @@ func _configured_rewards() -> Dictionary:
 	return raw if raw is Dictionary else {}
 
 
-## 应用胜利奖励——通过 ResourceSystem.add_resource / CultivationSystem.gain_cultivation。[br]
-## 不可用时静默跳过。
+## 应用胜利奖励——[b]保留为公开测试接缝[/b]（旧测试直调它验证资源写入）。[br]
+## [br][b]生产路径不再走这里[/b]：结算改由 [constant RewardRoller] 统一掷骰 + 发放
+## （灵石/修为/卡牌三者在同一处），本方法只做「金额已知时发一笔」的兼容入口。
 func _apply_victory_rewards(rewards: Dictionary) -> void:
-	# 灵石——通过 ResourceSystem.add_resource(&"ling_shi", amount)
 	var lingshi: int = int(rewards.get("lingshi", 0))
 	if lingshi > 0:
 		var rs = _get_resource_system()
 		if rs != null and rs.has_method("add_resource"):
 			rs.add_resource(&"ling_shi", lingshi)
-	# 修为——通过 CultivationSystem.gain_cultivation
 	var cultivation: int = int(rewards.get("cultivation", 0))
 	if cultivation > 0:
 		var cs = _get_cultivation_system()

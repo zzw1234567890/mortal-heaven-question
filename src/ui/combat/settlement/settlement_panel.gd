@@ -71,6 +71,8 @@ var confirm_button: Button = null
 var skip_button: Button = null
 ## 战败摘要正文（与战利品网格互斥显示）。
 var defeat_lines_label: Label = null
+## 本场奖励汇总（实得 / 未抽到 / 未入库——仅胜利面板显示）。
+var reward_lines_label: Label = null
 ## 外框（[SettlementFrame.build] 返回）。
 var frame: Control = null
 
@@ -101,6 +103,7 @@ func _build() -> void:
 	hint_label = parts["hint_label"] as Label
 	loot_grid = parts["loot_grid"] as VBoxContainer
 	defeat_lines_label = parts["defeat_lines"] as Label
+	reward_lines_label = parts["reward_lines"] as Label
 	confirm_button = parts["confirm_button"] as Button
 	skip_button = parts["skip_button"] as Button
 	loot_delay_timer = parts["loot_delay_timer"] as Timer
@@ -116,8 +119,10 @@ func _build() -> void:
 ## 打开胜利结算面板。[br]
 ## [param options]: 战利品选项列表（3 项——少于/多于 3 项也按网格流式排布）。[br]
 ## [param deck_count]: 当前卡组张数（卡组满判定）。[br]
-## [param deck_limit]: 当前境界卡组上限。
-func show_victory(options: Array, deck_count: int, deck_limit: int) -> void:
+## [param deck_limit]: 当前境界卡组上限。[br]
+## [param reward_lines]: 本场奖励行（空 = 隐藏该段——旧调用方照常工作）。
+func show_victory(options: Array, deck_count: int, deck_limit: int,
+		reward_lines: Array = []) -> void:
 	kind = Rules.KIND_VICTORY
 	loot_options = options.duplicate(true)
 	selected_index = -1
@@ -127,6 +132,7 @@ func show_victory(options: Array, deck_count: int, deck_limit: int) -> void:
 	hint_label.text = Rules.victory_hint_text(false, loot_options.size())
 	hint_label.visible = true
 	defeat_lines_label.visible = false
+	View.apply_reward_lines(reward_lines_label, reward_lines)
 	loot_grid.visible = true
 	skip_button.visible = true
 	skip_button.text = Rules.TEXT_SKIP_LOOT
@@ -200,6 +206,8 @@ func show_defeat(summary: Dictionary) -> void:
 	loot_delay_timer.stop()
 	title_label.text = Rules.defeat_title()
 	hint_label.visible = false
+	# 战败没有奖励段（损失摘要已覆盖负面信息，混排会削弱可读性）
+	View.apply_reward_lines(reward_lines_label, [])
 	loot_grid.visible = false
 	_clear_loot_cards()
 	defeat_lines_label.text = "\n".join(Rules.defeat_lines(summary))

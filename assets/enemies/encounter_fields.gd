@@ -141,7 +141,17 @@ static func enemy_level(p_encounter: Dictionary, p_roster: Array,
 
 
 ## 掉落——显式配置 > 名册条目自带的 [code]rewards[/code] > 模板 reward_config 聚合。[br]
-## [br][b]灵石取区间中值[/b]：节点生成时不掷骰，保证同节点重复进入口径稳定。[br]
+## [br][b]灵石是区间，不是定值[/b]：聚合产出的 [code]lingshi_min[/code] /
+## [code]lingshi_max[/code] 交给战斗结算在[b]胜利时掷骰[/b]；[code]lingshi[/code]
+## 字段保留为[b]区间中值[/b]，只作弹窗/结算预览——它不是实得值（「掷骰唯一实现」
+## 在 [code]src/feature/combat/combat_reward_roller.gd[/code]）。[br]
+## [br][b]为什么生成期不掷骰[/b]：同一节点可能反复进入、名册也可能在生成后重算，
+## 生成期定死数值会让掉落失去随机性；而「配置了多少」与「本场拿到多少」是两件事，
+## 分属探索侧（定档）与战斗侧（结算）。[br]
+## [br][b]卡牌带 chance 原样透传[/b]：[code]{card_id, chance}[/code]——是否到手同样
+## 由结算掷骰决定；此处只聚合配置，不预抽。[br]
+## [br][b]区间合并口径[/b]：各条目区间先求和、再取一次中值（避免逐条取整的累计偏差）；
+## 固定值条目并入区间的两端，保证「固定 + 区间」混合配置也能被同一个掷骰入口消费。[br]
 ## [br][b]全零归空字典[/b]：三者都没配时返回 [code]{}[/code]（「本节点无掉落配置」），
 ## 而不是 [code]{lingshi: 0, cultivation: 0, cards: []}[/code]——后者会被下游当成
 ## 「有配置但全是 0」。[br]
@@ -150,42 +160,89 @@ static func rewards(p_encounter: Dictionary, p_roster: Array,
 	var explicit: Dictionary = sanitize_rewards(p_encounter.get(KEY_REWARDS, {}))
 	if not explicit.is_empty():
 		return explicit
-	var lingshi: int = 0
+	var fixed_lingshi: int = 0
+	var lingshi_min: int = 0
+	var lingshi_max: int = 0
+	var has_range: bool = false
 	var cultivation: int = 0
 	var cards: Array = []
 	for entry: Variant in p_roster:
 		var entry_rewards: Variant = RosterEntries.field(entry, KEY_REWARDS)
 		if entry_rewards is Dictionary:
-			lingshi += int((entry_rewards as Dictionary).get("lingshi",
-					(entry_rewards as Dictionary).get("ling_shi", 0)))
-			cultivation += int((entry_rewards as Dictionary).get("cultivation", 0))
-			_append_cards(cards, (entry_rewards as Dictionary).get("cards", []))
+			var cleaned: Dictionary = sanitize_rewards(entry_rewards)
+			if cleaned.has("lingshi_min"):
+				has_range = true
+				lingshi_min += int(cleaned["lingshi_min"])
+				lingshi_max += int(cleaned["lingshi_max"])
+			else:
+				fixed_lingshi += int(cleaned.get("lingshi", 0))
+			cultivation += int(cleaned.get("cultivation", 0))
+			_append_cards(cards, cleaned.get("cards", []))
 			continue
 		var config: Variant = RosterEntries.reward_config(entry, p_lookup)
 		if config == null:
 			continue
-		lingshi += int(round((float(int(config.get("ling_shi_min")))
-				+ float(int(config.get("ling_shi_max")))) * 0.5))
-		cultivation += int(config.get("cultivation_reward"))
+		# 模板 reward_config：ling_shi_min/max 是区间来源（0/0 视为未配）。
+		var lo: int = maxi(int(config.get("ling_shi_min")), 0)
+		var hi: int = maxi(int(config.get("ling_shi_max")), 0)
+		if hi > 0 or lo > 0:
+			has_range = true
+			lingshi_min += mini(lo, hi)
+			lingshi_max += maxi(lo, hi)
+		cultivation += maxi(int(config.get("cultivation_reward")), 0)
 		_append_cards(cards, config.get("card_drops"))
-	if lingshi <= 0 and cultivation <= 0 and cards.is_empty():
+	var result: Dictionary = {}
+	if has_range:
+		lingshi_min += fixed_lingshi
+		lingshi_max += fixed_lingshi
+		result["lingshi"] = int(round((float(lingshi_min) + float(lingshi_max)) * 0.5))
+		result["lingshi_min"] = lingshi_min
+		result["lingshi_max"] = lingshi_max
+	elif fixed_lingshi > 0:
+		result["lingshi"] = fixed_lingshi
+	result["cultivation"] = cultivation
+	result["cards"] = cards
+	if int(result.get("lingshi", 0)) <= 0 and cultivation <= 0 and cards.is_empty():
 		return {}
-	return {"lingshi": lingshi, "cultivation": cultivation, "cards": cards}
+	return result
 
 
-## 掉落载荷规范化——非字典/全零 → [code]{}[/code]；否则补齐三键。[br]
-## [code]ling_shi[/code] 是探索经济域的旧写法，读取时兼容，写出统一为 [code]lingshi[/code]。
+## 掉落载荷规范化——非字典/全零 → [code]{}[/code]；否则补齐 [code]lingshi[/code] /
+## [code]cultivation[/code] / [code]cards[/code]，有区间时额外带 [code]lingshi_min[/code]
+## / [code]lingshi_max[/code]。[br]
+## [br][code]ling_shi[/code] 是探索经济域的旧写法，读取时兼容，写出统一为 [code]lingshi[/code]。[br]
+## [br][b]区间与定值并存时区间优先[/b]：两者同时出现说明配置不自洽，取更有信息量的区间
+## （[code]lingshi[/code] 按中值重算），避免下游收到一个与区间矛盾的定值。[br]
 static func sanitize_rewards(p_raw: Variant) -> Dictionary:
 	if not (p_raw is Dictionary):
 		return {}
 	var source: Dictionary = p_raw
-	var lingshi: int = int(source.get("lingshi", source.get("ling_shi", 0)))
-	var cultivation: int = int(source.get("cultivation", 0))
+	var fixed: int = maxi(int(source.get("lingshi", source.get("ling_shi", 0))), 0)
+	var raw_min: Variant = source.get("lingshi_min", source.get("ling_shi_min"))
+	var raw_max: Variant = source.get("lingshi_max", source.get("ling_shi_max"))
+	var has_range: bool = raw_min != null and raw_max != null
+	var lo: int = maxi(int(raw_min), 0) if raw_min != null else 0
+	var hi: int = maxi(int(raw_max), 0) if raw_max != null else 0
+	if has_range and lo == 0 and hi == 0:
+		has_range = false  # 0/0 = 未配置区间，回退定值口径
+	var result: Dictionary = {}
+	if has_range:
+		if lo > hi:
+			var swap: int = lo
+			lo = hi
+			hi = swap
+		result["lingshi"] = int(round((float(lo) + float(hi)) * 0.5))
+		result["lingshi_min"] = lo
+		result["lingshi_max"] = hi
+	else:
+		result["lingshi"] = fixed
+	result["cultivation"] = maxi(int(source.get("cultivation", 0)), 0)
 	var cards: Array = []
 	_append_cards(cards, source.get("cards", []))
-	if lingshi <= 0 and cultivation <= 0 and cards.is_empty():
+	result["cards"] = cards
+	if int(result["lingshi"]) <= 0 and int(result["cultivation"]) <= 0 and cards.is_empty():
 		return {}
-	return {"lingshi": lingshi, "cultivation": cultivation, "cards": cards}
+	return result
 
 
 ## 名册派生的模板 ID 去重列表（生成器写节点时的预览口径）。[br]

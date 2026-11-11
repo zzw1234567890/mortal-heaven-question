@@ -23,6 +23,8 @@ const Retreat := preload("res://src/ui/combat/shared/retreat_rules.gd")
 const PanelScript := preload("res://src/ui/combat/settlement/settlement_panel.gd")
 const RetreatScript := preload("res://src/ui/combat/settlement/retreat_dialog.gd")
 const WarningScript := preload("res://src/ui/combat/settlement/tribulation_warning_dialog.gd")
+## 奖励文案内核——与结算场景/回探索提示共用同一份口径。
+const RewardLines := preload("res://src/feature/combat/combat_reward_lines.gd")
 
 ## === 信号（对外出口——持久写入/转场归 interaction epic）====================
 
@@ -104,14 +106,19 @@ func has_sources() -> bool:
 
 ## 战斗结束信号处理——按结果开对应面板（AC-2）。[br]
 ## [param result]: [code]CombatSystem.CombatResult[/code] 取值。[br]
-## [param rewards]: 胜利时为 [code]{lingshi, cultivation, cards}[/code]；
-## 战败/撤退为 [code]{retain_ratio}[/code]。
+## [param rewards]: 胜利时为实得奖励 [code]{lingshi, lingshi_min, lingshi_max,
+## cultivation, cards, cards_missed, cards_failed, ...}[/code]；
+## 战败/撤退为 [code]{retain_ratio}[/code]。[br]
+## [br][b]战利品 vs 奖励汇总[/b]：[code]cards[/code] / [code]lingshi[/code] 已在结算时
+## 到账，面板把它们列成「三选一」只是展示与后续选择接口的形状；「实得/未抽到/未入库」
+## 的全文由 [code]CombatRewardLines[/code] 以汇总行呈现——两处读同一份载荷。
 func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 	var kind: StringName = Rules.panel_kind_for(result)
 	if kind == Rules.KIND_VICTORY:
 		var counts: Dictionary = _deck_counts()
 		settlement_panel.show_victory(_victory_options(rewards),
-				int(counts["count"]), int(counts["limit"]))
+				int(counts["count"]), int(counts["limit"]),
+				RewardLines.reward_lines(rewards))
 	elif kind == Rules.KIND_DEFEAT:
 		settlement_panel.show_defeat(_defeat_summary(rewards))
 	# RETREAT 由撤退确认流程自行收尾（interaction epic），此处不另开面板

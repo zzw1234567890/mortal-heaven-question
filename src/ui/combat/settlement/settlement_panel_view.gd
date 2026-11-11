@@ -43,6 +43,16 @@ static func build(root: Control, frame_size: Vector2) -> Dictionary:
 	title_label.add_theme_color_override("font_color", Rules.COLOR_TITLE)
 	body_box.add_child(title_label)
 
+	# 本场奖励汇总（实得/未抽到/发放失败）——胜利面板才显示，默认隐藏。
+	# 放在标题与提示之间：玩家先看到「拿到了什么」，再看到「怎么选」。
+	var reward_lines := Label.new()
+	reward_lines.name = "RewardLines"
+	reward_lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	reward_lines.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reward_lines.add_theme_color_override("font_color", Rules.COLOR_BODY)
+	reward_lines.visible = false
+	body_box.add_child(reward_lines)
+
 	var hint_label := Label.new()
 	hint_label.name = "LootHint"
 	hint_label.custom_minimum_size = Vector2(0, HINT_HEIGHT)
@@ -93,6 +103,7 @@ static func build(root: Control, frame_size: Vector2) -> Dictionary:
 	return {
 		"frame": parts["frame"], "body_box": body_box,
 		"title_label": title_label, "hint_label": hint_label,
+		"reward_lines": reward_lines,
 		"loot_grid": loot_grid, "defeat_lines": defeat_lines,
 		"confirm_button": confirm_button, "skip_button": skip_button,
 		"loot_delay_timer": delay_timer,
@@ -106,6 +117,7 @@ static func build(root: Control, frame_size: Vector2) -> Dictionary:
 static func apply_fonts(parts: Dictionary, screen_height: int) -> void:
 	Frame.apply_font(parts.get("title_label") as Control, TITLE_BASE_SIZE, screen_height)
 	Frame.apply_font(parts.get("hint_label") as Control, HINT_BASE_SIZE, screen_height)
+	Frame.apply_font(parts.get("reward_lines") as Control, HINT_BASE_SIZE, screen_height)
 	Frame.apply_font(parts.get("defeat_lines") as Control, BODY_BASE_SIZE, screen_height)
 	Frame.apply_font(parts.get("confirm_button") as Control, BODY_BASE_SIZE, screen_height)
 	Frame.apply_font(parts.get("skip_button") as Control, BODY_BASE_SIZE, screen_height)
@@ -140,6 +152,22 @@ static func rebuild_loot_cards(grid: VBoxContainer, options: Array,
 		row.add_child(card)
 		cards.append(card)
 	return cards
+
+
+## 本场奖励汇总段内容（空数组 = 隐藏，不占版面）。[br]
+## [br][param label]: 奖励行标签（[method build] 的 [code]reward_lines[/code]）。[br]
+## [param lines]: 奖励行（[code]CombatRewardLines.reward_lines()[/code] 口径）。[br]
+## [br][b]为什么放在视图侧[/b]：与控件构建同属「把数据摆上屏」，面板只转发；
+## 也是本文件与面板之间的行数预算分担（面板已贴 300 行软上限）。
+static func apply_reward_lines(label: Label, lines: Array) -> void:
+	if label == null:
+		return
+	var safe: Array = lines if lines is Array else []
+	var parts: Array = []
+	for line: Variant in safe:
+		parts.append(str(line))
+	label.text = "\n".join(PackedStringArray(parts))
+	label.visible = not parts.is_empty()
 
 
 ## 延迟窗口提示的视觉态（等待期灰 / 就绪期正文色）。[br]

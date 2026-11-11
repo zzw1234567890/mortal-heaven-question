@@ -3,8 +3,24 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 节点图接真实数据完成（map_generated 信号 + 四类敌人模板 + 地图 ID 统一）；下一步 探索导航闭环（`get_map_list` 真实载荷、重入编排）或回 combat-ui-interaction 005 目标选择可视化
+Task: 战斗奖励真正发放 + 展示完成（探索→战斗→结算→回探索闭环）；下一步 探索导航闭环（`get_map_list` 真实载荷、重入编排）或 combat-ui-interaction 005 目标选择可视化
 <!-- /STATUS -->
+
+## Session Extract — 战斗奖励真正发放（2026-11-11）
+- 任务：闭合「探索→战斗→结算→回探索」——奖励按开战上下文结算并入账、结算界面与回探索提示展示实得、补确定性测试、全量 GUT、提交
+- **衔接断在哪**：`_settle_result` 只把配置原样抄进载荷——灵石/修为发了但卡牌**从未入收藏**（`cards` 是配置清单不是实得），且没有区间/概率掷骰（DEBT-EUI-006-4）
+- **新增 `src/feature/combat/combat_reward_roller.gd`（唯一实现）**：`roll(config, rng)`——灵石 `randi_range(min,max)` 一次、卡牌按 `cards` 顺序 `randf() < chance`；`chance>=1`/`<=0`/缺 `chance`、`min==max` 区间**不消耗随机数**；`apply()`——灵石→`ResourceSystem.add_resource`、修为→`CultivationSystem.gain_cultivation`、命中卡→`CardSystem.create_instance`+`GSM.add_card_to_collection`（先查模板，未知卡记 `cards_failed` 而非 push_error）
+- **新增 `src/feature/combat/combat_reward_lines.gd`（文案内核）**：`reward_lines()` 多行（灵石含区间标注 / 修为 / 获得卡牌（稀有度·类型）/ 未抽到（概率%）/ 未能发放（原因））+ `summary_text()` 单行 + `section()` + `notification_type()`
+- **掉落改为区间**：`EncounterFields.rewards` 聚合出 `lingshi_min/max`（`lingshi` 保留为区间中值只作预览）；`sanitize_rewards` 兼容 `lingshi_min/max` 与旧键 `ling_shi`
+- **结算**：`_settle_result` 胜利分支走 Roller（`rewards` 新增 `lingshi_min/max`、`lingshi_rolled`、`cards_missed`、`cards_failed`、`lingshi_granted`/`cultivation_granted`；`cards` 改为**已入库**的卡并带 `name/rarity/school`）；战败/撤退仍只带 `retain_ratio`
+- **幂等**：新增 `_battle_serial`（`battle_start` 递增）+ `_rewards_settled_for`——同场重复 `battle_end` 不再掷骰/发放，载荷带 `grant_skipped`；换场自然失效
+- **RNG 口径**：`_reward_rng` 与洗牌 `_rng` 分开；生产种子 `GSM.meta.seed + 开战场数`（`_seed_reward_rng`）；`set_reward_rng_seed()` / `set_reward_rng()` 显式接管后不再自动播种，`reset_reward_rng()` 复位
+- **展示**：`SettlementPanel` 新增 `RewardLines` 标签（`show_victory(..., reward_lines)`，战败面板隐藏）；`SettlementHost` 传 `CombatRewardLines.reward_lines()`；`CombatResultView.summary_lines()` 插入奖励段、新增 `reward_lines()`/`reward_summary()`
+- **回探索提示**：`CombatResultView.publish` 备好 `_pending_notice` + `take_pending_notice()`（一次性）；`ExplorationScene._ready` → `_flush_battle_reward_notice()` 经 HUD `request_notification("item", ...)` 弹出；`notify_cb` 可注入；`HudBootstrap.mounted()` 新增（与 `is_mounted` 共用路径）
+- 测试：`tests/unit/combat_system/test_combat_reward_roller.gd`（13）、`test_combat_reward_lines.gd`（17）、`tests/integration/combat_system/test_battle_reward_grant.gd`（14，真实 Autoload 断言玩家数据变了）、`tests/integration/exploration_ui/test_exploration_reward_notice.gd`（5）、`tests/integration/combat_ui/test_loot_delay_clickable.gd` +2（面板奖励段展示/战败隐藏）
+- 全量：**4085 tests / 4084 passing / 1 pending 存量 / 3 orphans 存量**（4028 → 净增 57），零回归
+- GDD：`combat-system.md` §9.1「胜利奖励的结算口径」（配置/结算/入账表 + 掷骰顺序 + 概率边界 + 种子口径 + 幂等 + 载荷字段 + 展示）；DEBT-EUI-006-4 关闭
+- **已知边界**：① 卡牌入库只写收藏，**不自动进卡组**（是否进卡组仍归战利品选择/interaction epic）；② `chance` 缺省按 1.0（旧配置「清单即必得」语义）——策划若要默认不掉需改配置；③ 结算面板的「战利品三选一」与「已到账汇总」并存（前者仍是展示+未来选择接口的形状，本次不改其语义，DEBT-CUI-008-3 仍在）；④ 回探索提示是一次性、静默降级（HUD 未挂载/无 SceneManager 时不弹）；⑤ 奖励 RNG 的自动播种依赖 `GSM.meta.seed`，该字段目前由读档/存档链路提供，新开局是否为非零值未在本轮验证
 
 ## Session Extract — 节点图读真实数据 + 敌人池四类模板（2026-11-10，commit 870b999）
 - 任务：`ExplorationSystem` 补 `map_generated` 信号、`NodeGraphScreen` 消费真实数据（stub 保留为降级）、敌人池补到 4 模板、地图 ID 命名统一 + 防回归断言、补集成测试、全量 GUT、提交

@@ -17,6 +17,9 @@ extends RefCounted
 ## [br]来源: production/session-state/active.md（Sprint 18 结算回流）、ADR-0031 §2、
 ## ADR-0008 §信号分类。
 
+## 奖励文案内核（与结算面板/回探索提示同一份口径）。
+const RewardLines := preload("res://src/feature/combat/combat_reward_lines.gd")
+
 ## 结局枚举——镜像 [code]CombatSystem.CombatResult[/code]（0 无 / 1 胜 / 2 败 / 3 撤退）。
 const RESULT_NONE: int = 0
 const RESULT_VICTORY: int = 1
@@ -62,10 +65,21 @@ var has_record: bool = false
 ## 写入口只有 [method publish]（战斗场景挂载侧），读出口 [method last]。
 static var _last: CombatResultView = null
 
+## 待展示的奖励通知文案——[method take_pending_notice] 一次性取走。[br]
+## [br][b]为什么需要单独一份[/b]：结算/战败场景展示完就退场，回探索后玩家真正
+## 面对的是节点图——奖励要有一次「已到账」的提示。发布时算好文案、探索侧取走即清，
+## 同一场不会重复弹（多次进出地图也只提示一次）。
+static var _pending_notice: String = ""
 
-## 发布本场结算对象（CombatScene 在 [signal CombatSystem.battle_ended] 时调用）。
+
+## 发布本场结算对象（CombatScene 在 [signal CombatSystem.battle_ended] 时调用）。[br]
+## [br]同时准备回探索后的一次性奖励提示（文案内核见 [code]combat_reward_lines.gd[/code]）。
 static func publish(view: CombatResultView) -> void:
 	_last = view
+	_pending_notice = ""
+	if view == null or view.rewards.is_empty():
+		return
+	_pending_notice = str(RewardLines.summary_text(view.rewards))
 
 
 ## 最近一场的结算对象——从未打过战斗时返回 null（展示端走「无战绩数据」分支）。[br]
@@ -74,9 +88,18 @@ static func last() -> CombatResultView:
 	return _last
 
 
+## 取走待展示的奖励提示（一次性——取后清空，探索场景重复进入不会重复弹）。[br]
+## [br][b]返回[/b]：空串 = 本场没有可提示的奖励（战败/撤退/空掉落）。
+static func take_pending_notice() -> String:
+	var notice: String = _pending_notice
+	_pending_notice = ""
+	return notice
+
+
 ## 清空缓存——测试隔离用（生产路径不需调用：每场战斗都会重新 publish）。
 static func clear() -> void:
 	_last = null
+	_pending_notice = ""
 
 
 ## 从 [signal CombatSystem.battle_ended] 载荷构造结算对象。[br]
@@ -140,6 +163,8 @@ func enemy_remaining_hp() -> int:
 func summary_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
 	lines.append("结局: %s (result=%d)" % [title(), result])
+	# 奖励段插在结局之后、战绩之前——玩家最关心「拿到了什么」
+	lines.append_array(PackedStringArray(reward_lines()))
 	lines.append("回合数: %d" % turn_count)
 	lines.append("触发效果条目: %d" % effect_entries)
 	lines.append("我方: 存活 %d/%d，剩余 HP %d%s" % [
@@ -149,6 +174,18 @@ func summary_lines() -> PackedStringArray:
 		int(enemy.get("alive_count", 0)), int(enemy.get("count", 0)),
 		enemy_remaining_hp(), _unknown_suffix(enemy)])
 	return lines
+
+
+## 本场奖励文案行（[code]CombatRewardLines.reward_lines()[/code] 口径——空 = 无奖励）。[br]
+## [br][b]为什么放在这里而不是场景里[/b]：胜利/战败两个场景、结算面板、回探索提示
+## 各有一条读取路径，口径只留一处（同 [method summary_lines] 的集中理由）。
+func reward_lines() -> Array:
+	return RewardLines.reward_lines(rewards)
+
+
+## 本场奖励的单行摘要（回探索提示用；空 = 无需提示）。
+func reward_summary() -> String:
+	return str(RewardLines.summary_text(rewards))
 
 
 ## 未知条目提示后缀——有读不到 HP 的角色时标注，避免把「少算」看成「打空」。

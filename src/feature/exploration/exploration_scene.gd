@@ -23,11 +23,18 @@ extends Control
 const MapSelectScreenScene := preload("res://src/ui/exploration/map_select_screen.tscn")
 ## NodeGraphScreen 场景常量——节点图主界面（story 003 主交付）。
 const NodeGraphScreenScene := preload("res://src/ui/exploration/node_graph_screen.tscn")
+## 结算对象（战斗奖励文案的跨场景缓存——回探索提示读它）。
+const ResultViewScript := preload("res://src/feature/combat/combat_result_view.gd")
+## HUD 通知入口（战斗奖励到账提示——HUD 未挂载时静默降级）。
+const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
 
 ## 地图选择界面实例（挂载子节点）。
 var map_select_screen: Control = null
 ## 节点图主界面实例（进入地图后挂载）。
 var node_graph_screen: Control = null
+## [b]测试注入[/b]：通知请求入口 [code]func(type: String, text: String) -> int[/code]。
+## 为 null 时按 SceneManager → PersistentLayer/HUD 查找（生产路径）。
+var notify_cb: Callable = Callable()
 
 
 func _ready() -> void:
@@ -36,6 +43,41 @@ func _ready() -> void:
 	# 节点图构建（story 003）：MapSelectScreen 进入意图 → 挂载 NodeGraphScreen
 	# 并触发地图加载（真实源走 enter_map / 降级源发 stub 信号）
 	map_select_screen.enter_map_requested.connect(_on_enter_map_requested)
+	# 战斗奖励回探索提示——一次性取走（取不到 = 本场无奖励/没打过战斗）
+	_flush_battle_reward_notice()
+
+
+## 战斗奖励到账提示。[br]
+## [br][b]时机[/b]：本场景每次挂载（= 从战斗/结算/战败回到探索）检查一次；
+## 文案由 [code]CombatResultView.publish[/code] 在战斗结束时备好，取走即清，
+## 因此同一场不会重复弹、反复进出地图也不会重放旧奖励。[br]
+## [br][b]为什么在探索侧弹[/b]：结算/战败场景是全屏占位界面且随即退场，玩家真正
+## 继续游玩的位置是节点图；提示落在这里才与「已到账」的认知对齐。[br]
+## [br][b]降级[/b]：HUD 未挂载 / 通知入口不可用时静默跳过（不把缺 UI 变成崩溃）。[br]
+## [br][b]返回[/b]：实际展示的文案（空串 = 没有可提示的奖励——测试断言用）。
+func _flush_battle_reward_notice() -> String:
+	var notice: String = ResultViewScript.take_pending_notice()
+	if notice.is_empty():
+		return ""
+	var sink: Callable = _notification_sink()
+	if not sink.is_valid():
+		return ""
+	# 类型固定 item（「获得/正向」语义——见 CombatRewardLines.notification_type 口径）
+	sink.call("item", notice)
+	return notice
+
+
+## 通知入口——注入优先，否则取常驻 HUD 的 [method Hud.request_notification]。
+func _notification_sink() -> Callable:
+	if notify_cb.is_valid():
+		return notify_cb
+	var sm: Node = get_node_or_null(NodePath("/root/SceneManager"))
+	if sm == null:
+		return Callable()
+	var hud: Node = HudBootstrapScript.mounted(sm)
+	if hud == null or not hud.has_method(&"request_notification"):
+		return Callable()
+	return Callable(hud, &"request_notification")
 
 
 ## 进入地图意图（[signal MapSelectScreen.enter_map_requested]）——挂载节点图主界面

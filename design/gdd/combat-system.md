@@ -203,6 +203,42 @@
 **战败后果：** 保留50%本局探索中累积获得的修为/资源（详见 `exploration-system.md §公式 11`），角色绑定卡洗回牌库（阵亡的角色转为不可用状态）
 **撤退：** 战斗中可撤退，视为战败处理，但秘境中撤退可保留已获得的非绑定物品
 
+#### 9.1 胜利奖励的结算口径（2026-11-11 实现口径）
+
+掉落由探索侧在**节点生成时定档**（配置），**胜利瞬间**由战斗侧掷骰成「本场实得」并立即入账。
+实现唯一入口：`src/feature/combat/combat_reward_roller.gd`（`roll()` 掷骰、`apply()` 发放）。
+
+| 项 | 配置来源 | 结算方式 | 入账目标 |
+|---|---|---|---|
+| 灵石 | `rewards.lingshi_min / lingshi_max`（缺区间时用定值 `lingshi`） | `randi_range(min, max)` 一次 | `ResourceSystem.add_resource(&"ling_shi", n)` |
+| 修为 | `rewards.cultivation` | 不掷骰，原值 | `CultivationSystem.gain_cultivation(n, "battle_victory")` |
+| 卡牌 | `rewards.cards[] = {card_id, chance}` | 逐张 `randf() < chance` | `CardSystem.create_instance` + `GSM.add_card_to_collection` |
+
+**掷骰顺序（口径的一部分，改动即破坏可复现性）：** 先灵石区间一次，再按 `cards` 数组顺序逐张掷。
+
+**概率边界：** `chance >= 1` 恒命中、`chance <= 0` 恒未命中、缺 `chance` 按 1.0（旧配置的「卡牌清单」语义）。
+这三种确定性情形**不消耗随机数**；区间收成一点（`min == max`）同样不掷。
+
+**RNG 与种子：**
+
+- 奖励掷骰使用**独立 RNG**（`CombatSystem._reward_rng`），与牌库洗牌流分开——
+  洗牌的消耗次数随对局走向变化，共用一条流会让「同掉落配置 → 同结果」不成立。
+- 生产自动播种：`reward_seed = GSM.meta.seed + 本进程已开战场数`——同一存档各场互不相同且各自可复现；`GSM` 或 `meta.seed` 缺失时以开战场数起步。
+- 测试/调试：`set_reward_rng_seed(n)` 或 `set_reward_rng(rng)` 显式接管，之后开战不再自动播种（`reset_reward_rng()` 恢复）。
+
+**幂等：** 同一场重复调用 `battle_end` 不再掷骰、不再发放，载荷标记 `grant_skipped`；
+守卫键是「开战序号」（`battle_start` 递增），因此下一场照常发奖。
+
+**结算载荷（`battle_ended` 的 `rewards`）**：`lingshi`（实得）、`lingshi_min/max`（区间）、
+`lingshi_rolled`、`cultivation`、`cards`（**已入库**的卡，带 `name / rarity / school`）、
+`cards_missed`（掷骰未命中，带 `chance`）、`cards_failed`（模板未知 / 收藏写入被拒，带 `reason`）、
+`lingshi_granted` / `cultivation_granted`（发放是否成功）。
+
+**展示：** 结算面板、结算/战败场景、回探索通知三处共用 `combat_reward_lines.gd` 的文案
+（`reward_lines()` 多行、`summary_text()` 单行），「到手 / 未抽到 / 未入库」都要可见。
+
+**战败与撤退：** 不发奖、不掷骰，载荷只带 `retain_ratio = 0.5`（既有契约不变）。
+
 ### 状态与转换 (States and Transitions)
 
 #### 战斗全局状态
