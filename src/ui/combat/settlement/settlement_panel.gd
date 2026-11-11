@@ -266,6 +266,11 @@ func get_loot_cell_width() -> float:
 	return View.loot_cell_width(PANEL_WIDTH)
 
 
+## 是否处于「已到账汇总」视图（三选一网格隐藏，只显示奖励汇总行）。
+func is_showing_grant_summary() -> bool:
+	return kind == Rules.KIND_VICTORY and not loot_grid.visible
+
+
 ## 外框尺寸（「不覆盖全屏」断言用）。
 func get_frame_size() -> Vector2:
 	if frame == null:

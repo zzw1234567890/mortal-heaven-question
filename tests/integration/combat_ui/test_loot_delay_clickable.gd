@@ -588,8 +588,8 @@ func test_host_opens_victory_panel_on_battle_ended_victory() -> void:
 	# Assert
 	assert_eq(host.settlement_panel.get_kind(), Rules.KIND_VICTORY,
 			"胜利信号应打开战利品面板")
-	assert_eq(host.settlement_panel.get_cards().size(), 2,
-			"1 张卡 + 1 个灵石选项 = 2 张战利品卡")
+	assert_eq(host.settlement_panel.get_cards().size(), 1,
+			"1 张卡（灵石是全局奖励不列入三选一）")
 
 
 func test_host_opens_defeat_panel_on_battle_ended_defeat() -> void:

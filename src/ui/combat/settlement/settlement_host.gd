@@ -25,6 +25,8 @@ const RetreatScript := preload("res://src/ui/combat/settlement/retreat_dialog.gd
 const WarningScript := preload("res://src/ui/combat/settlement/tribulation_warning_dialog.gd")
 ## 奖励文案内核——与结算场景/回探索提示共用同一份口径。
 const RewardLines := preload("res://src/feature/combat/combat_reward_lines.gd")
+## 数据快照与载荷构建工具（拆分自宿主——行数预算）。
+const Data := preload("res://src/ui/combat/settlement/settlement_host_data.gd")
 
 ## === 信号（对外出口——持久写入/转场归 interaction epic）====================
 
@@ -118,19 +120,34 @@ func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 	var kind: StringName = Rules.panel_kind_for(result)
 	if kind == Rules.KIND_VICTORY:
 		_current_rolled_rewards = rewards.duplicate(true)
-		var counts: Dictionary = _deck_counts()
-		settlement_panel.show_victory(_victory_options(rewards),
-				int(counts["count"]), int(counts["limit"]),
-				RewardLines.reward_lines(rewards))
+		var counts: Dictionary = Data.deck_counts(deck_system)
+		var options: Array = Data.victory_options(rewards)
+		# 候选为空时直接显示汇总（不建三选一格子）
+		if options.is_empty():
+			var lines: Array = []
+			var lingshi: int = int(rewards.get("lingshi", 0))
+			var cultivation: int = int(rewards.get("cultivation", 0))
+			if lingshi > 0:
+				lines.append("灵石 +%d" % lingshi)
+			if cultivation > 0:
+				lines.append("修为 +%d" % cultivation)
+			settlement_panel.show_victory(options, int(counts["count"]),
+					int(counts["limit"]), lines)
+			# 直接切换到汇总视图
+			settlement_panel.show_grant_summary(lines)
+		else:
+			settlement_panel.show_victory(options, int(counts["count"]),
+					int(counts["limit"]), RewardLines.reward_lines(rewards))
 	elif kind == Rules.KIND_DEFEAT:
-		settlement_panel.show_defeat(_defeat_summary(rewards))
+		settlement_panel.show_defeat(Data.defeat_summary(rewards, _dead_names,
+				_dead_binding_card_count))
 	# RETREAT 由撤退确认流程自行收尾（interaction epic），此处不另开面板
 
 
 ## 撤退按钮点击（右上角常驻按钮的点击入口——AC-9）。[br]
 ## [br]打开撤退确认弹窗；渡劫战走红框 80% 变体（AC-7）。
 func request_retreat() -> void:
-	retreat_dialog.open(is_tribulation, _binding_card_count())
+	retreat_dialog.open(is_tribulation, _dead_binding_card_count)
 
 
 ## 撤退请求信号（[signal CombatSystem.retreat_requested]）处理——
@@ -225,72 +242,8 @@ func _disconnect_source(source: Node) -> void:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 内部：数据快照（现读——不缓存）与载荷构建
+# 内部：战败上下文注入
 # ═══════════════════════════════════════════════════════════════════════════════
-
-## 卡组张数/上限（[code]get_deck_summary()[/code] 现读；缺失时 0/0）。[br]
-## [br][b]返回[/b]: [code]{count, limit}[/code]。
-func _deck_counts() -> Dictionary:
-	var ds: Node = deck_system
-	if ds == null or not ds.has_method(&"get_deck_summary"):
-		return {"count": 0, "limit": 0}
-	var summary: Dictionary = ds.call(&"get_deck_summary") as Dictionary
-	if summary == null:
-		return {"count": 0, "limit": 0}
-	return {
-		"count": int(summary.get("total", 0)),
-		"limit": int(summary.get("limit", 0)),
-	}
-
-
-## 胜利面板的战利品选项（GDD §9「卡牌正面 / 灵石图标+数值 / 消耗品」）。[br]
-## [br][b]不做战利品生成逻辑[/b]（Out of Scope）：只把战斗系统已给出的
-## [code]cards[/code] / [code]lingshi[/code] / [code]consumables[/code] 映射成选项；
-## 不足 3 项时按实际数量展示（不伪造填充项）。[br]
-## [br][b]上游缺口[/b]：`CombatSystem._settle_result()` 暂不产出 `consumables`——
-## 映射已就位，战斗系统补字段后无需改 UI（DEBT-CUI-008-3）。
-func _victory_options(rewards: Dictionary) -> Array:
-	var options: Array = _map_entries(rewards.get("cards", []), Rules.OPTION_KIND_CARD)
-	var lingshi: int = int(rewards.get("lingshi", 0))
-	if lingshi > 0:
-		options.append({"kind": Rules.OPTION_KIND_LINGSHI, "amount": lingshi})
-	options.append_array(_map_entries(rewards.get("consumables", []),
-			Rules.OPTION_KIND_CONSUMABLE))
-	return options
-
-
-## 把一类奖励列表映射成战利品选项（字典深拷贝后补 kind；字符串退化为只带 name）。[br]
-## [param entries]: 奖励列表（字典或字符串）。[br]
-## [param kind]: [constant SettlementRules.OPTION_KIND_*] 取值。
-func _map_entries(entries: Variant, kind: String) -> Array:
-	var result: Array = []
-	if not (entries is Array):
-		return result
-	for item: Variant in entries:
-		if item is Dictionary:
-			var entry: Dictionary = (item as Dictionary).duplicate(true)
-			entry["kind"] = kind
-			result.append(entry)
-		elif item is String or item is StringName:
-			result.append({"kind": kind, "name": str(item)})
-	return result
-
-
-## 战败损失摘要（AC-5）——阵亡名单与绑定卡张数由注入/载荷提供。[br]
-## [br][b]数据源优先级[/b]：[param rewards] 载荷字段 > [method set_defeat_context]
-## 注入的上下文 > 0/空（[b]不自行推算阵亡名单[/b]——角色状态归战斗系统）。
-func _defeat_summary(rewards: Dictionary) -> Dictionary:
-	var dead_names: Array = []
-	var source: Variant = rewards.get("dead_names", _dead_names)
-	if source is Array:
-		dead_names = (source as Array).duplicate()
-	var binding: int = int(rewards.get("binding_card_count", _dead_binding_card_count))
-	return {
-		"cultivation_lost": int(rewards.get("cultivation_lost", 0)),
-		"dead_names": dead_names,
-		"binding_card_count": binding,
-	}
-
 
 ## 注入战败上下文（阵亡角色名 / 绑定卡张数——单场战斗一次性下发）。[br]
 ## [br][b]时机[/b]：战斗结束前后由场景挂载侧调用（本宿主不轮询战斗状态）。
@@ -306,7 +259,8 @@ func _binding_card_count() -> int:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
-		_disconnect_source(_bound_combat_system)
+		if _bound_combat_system != null and is_instance_valid(_bound_combat_system):
+			_disconnect_source(_bound_combat_system)
 		_bound_combat_system = null
 
 
@@ -334,6 +288,11 @@ func _on_loot_skipped() -> void:
 
 ## 显示「已到账汇总」视图——三选一网格隐藏，只显示奖励汇总行。[br]
 ## [param result] grant_reward_selection 的返回值。
+func show_grant_summary(result: Dictionary) -> void:
+	_show_grant_summary(result)
+
+
+## 内部实现——生成汇总行并调用面板。
 func _show_grant_summary(result: Dictionary) -> void:
 	var lines: Array = []
 	if not bool(result.get("no_rolled_rewards", true)):
@@ -353,5 +312,11 @@ func _show_grant_summary(result: Dictionary) -> void:
 						lines.append("获得卡牌：%s（%s）" % [name, rarity])
 					else:
 						lines.append("获得卡牌：%s" % name)
+		# 跳过卡牌时添加放弃文案
+		if cards.is_empty() and not _current_rolled_rewards.get("cards", []).is_empty():
+			lines.append("未选择即放弃，卡牌不进收藏")
+	# 无任何奖励时显示提示
+	if lines.is_empty():
+		lines.append("本次战斗无奖励")
 	# 隐藏战利品网格，只显示汇总
 	settlement_panel.show_grant_summary(lines)
