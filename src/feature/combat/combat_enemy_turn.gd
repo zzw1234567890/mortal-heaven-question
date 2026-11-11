@@ -258,9 +258,9 @@ func _apply_debuff_from_action(p_action: Dictionary, p_target_id: int, p_source_
 	if not (debuff_cfg is Object):
 		return
 	var cfg: Object = debuff_cfg as Object
-	var debuff_type: int = int(cfg.debuff_type) if cfg.has_property(&"debuff_type") else -1
-	var duration: int = int(cfg.duration) if cfg.has_property(&"duration") else 0
-	var amount: int = int(cfg.amount) if cfg.has_property(&"amount") else 0
+	var debuff_type: int = int(cfg.debuff_type) if _has_property(cfg, &"debuff_type") else -1
+	var duration: int = int(cfg.duration) if _has_property(cfg, &"duration") else 0
+	var amount: int = int(cfg.amount) if _has_property(cfg, &"amount") else 0
 	if debuff_type < 0 or amount <= 0:
 		return
 	var roster: Variant = _parent.call("_get_roster_state")
@@ -272,6 +272,15 @@ func _roster_is_known(p_roster: Variant, p_character_id: int) -> bool:
 	if not (p_roster is RefCounted):
 		return false
 	return bool(p_roster.call(&"is_known", p_character_id))
+
+
+## 属性存在性判定——Resource/Object 上用 [method Object.get] 会推 engine error，
+## 故先用属性列表判定。
+static func _has_property(p_object: Object, p_name: StringName) -> bool:
+	for prop: Dictionary in p_object.get_property_list():
+		if StringName(str(prop.get("name", ""))) == p_name:
+			return true
+	return false
 
 
 # === 读取工具 ====================================================================

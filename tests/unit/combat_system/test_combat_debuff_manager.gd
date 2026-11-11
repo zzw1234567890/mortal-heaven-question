@@ -64,7 +64,7 @@ func test_multiple_debuff_types_independent() -> void:
 
 func test_atk_with_debuff() -> void:
 	var debuff: RefCounted = DebuffManagerScript.new()
-	debuff.call(&"apply", 1, DebuffManagerScript.TYPE_ATK, 2, 1, 2)  # 降攻 2
+	debuff.call(&"apply", 1, DebuffManagerScript.TYPE_ATK, 2, 2, 100)  # 降攻 2 (duration=2, amount=2)
 	assert_eq(debuff.call(&"get_atk_with_debuff", 1, 10), 8)
 	assert_eq(debuff.call(&"get_atk_with_debuff", 1, 5), 3)
 	assert_eq(debuff.call(&"get_atk_with_debuff", 1, 1), 0)  # 不能低于 0
@@ -72,7 +72,7 @@ func test_atk_with_debuff() -> void:
 
 func test_def_with_debuff() -> void:
 	var debuff: RefCounted = DebuffManagerScript.new()
-	debuff.call(&"apply", 1, DebuffManagerScript.TYPE_DEF, 2, 1, 3)  # 降防 3
+	debuff.call(&"apply", 1, DebuffManagerScript.TYPE_DEF, 2, 3, 100)  # 降防 3 (duration=2, amount=3)
 	assert_eq(debuff.call(&"get_def_with_debuff", 1, 10), 7)
 	assert_eq(debuff.call(&"get_def_with_debuff", 1, 5), 2)
 	assert_eq(debuff.call(&"get_def_with_debuff", 1, 1), 0)  # 不能低于 0
@@ -80,8 +80,8 @@ func test_def_with_debuff() -> void:
 
 func test_multiple_targets_independent() -> void:
 	var debuff: RefCounted = DebuffManagerScript.new()
-	debuff.call(&"apply", 1, DebuffManagerScript.TYPE_ATK, 2, 1, 2)
-	debuff.call(&"apply", 2, DebuffManagerScript.TYPE_ATK, 1, 1, 3)
+	debuff.call(&"apply", 1, DebuffManagerScript.TYPE_ATK, 2, 2, 100)  # 目标1降攻2
+	debuff.call(&"apply", 2, DebuffManagerScript.TYPE_ATK, 1, 3, 100)  # 目标2降攻3
 	assert_eq(debuff.call(&"get_stacks", 1, DebuffManagerScript.TYPE_ATK), 1)
 	assert_eq(debuff.call(&"get_stacks", 2, DebuffManagerScript.TYPE_ATK), 1)
 	assert_eq(debuff.call(&"get_atk_with_debuff", 1, 10), 8)

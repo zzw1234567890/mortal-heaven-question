@@ -72,8 +72,11 @@ func test_full_battle_victory_reaches_result_screen() -> void:
 	assert_eq(int(record["enemy"]["alive_count"]), 0, "敌方存活数应为 0")
 	var remaining: int = int(record["player"]["remaining_hp"])
 	assert_gt(remaining, 0, "我方应存活并保留残血")
-	assert_eq(remaining, hp_start - 2 * enemy_actions.size(),
-			"我方剩余 HP = 初始 − 每次敌方行动 2 点")
+	var total_damage: int = 0
+	for action: Dictionary in enemy_actions:
+		total_damage += int(action.get("damage", 0))
+	assert_eq(remaining, hp_start - total_damage,
+			"我方剩余 HP = 初始 − 历次敌方行动伤害总和")
 	# Assert——转场目标为结算场景
 	assert_eq(sm.requests.size(), 1, "战斗结束应发出一次转场请求")
 	assert_eq(int(sm.requests[0]["to"]), 8, "胜利应转场 RESULT_SCREEN")
