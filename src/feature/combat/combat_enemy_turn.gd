@@ -97,7 +97,7 @@ func _get_field_state() -> RefCounted:
 	return _field_state
 
 
-## 单条行动的结算——目标解析 → 伤害落库 → 发射观测信号。[br]
+## 单条行动的结算——目标解析 → 伤害落库 → debuff 施加 → 发射观测信号。[br]
 ## [br][b]返回[/b]: 载荷 [code]{enemy_id, action, target_id, damage, is_kill,
 ## known, hp_after}[/code]。
 func _resolve_action(p_action: Dictionary) -> Dictionary:
@@ -116,6 +116,8 @@ func _resolve_action(p_action: Dictionary) -> Dictionary:
 		return _emit_result(enemy_id, ACTION_NONE, -1, 0, false, true, 0)
 	var damage: int = _damage_of(p_action.get("enemy_id"), target_id, p_action)
 	var outcome: Dictionary = _apply_damage(target_id, damage)
+	# 施加 debuff（敌方行动带 debuff_config 时）
+	_apply_debuff_from_action(p_action, target_id, enemy_id)
 	return _emit_result(enemy_id, ACTION_SKILL, target_id, damage,
 			bool(outcome.get("died", false)), bool(outcome.get("known", false)),
 			int(outcome.get("current_hp", 0)))
@@ -146,6 +148,13 @@ func _apply_damage(p_target_id: int, p_damage: int) -> Dictionary:
 ## 载荷里的 [code]known[/code] 会如实反映「没打成」）。
 func _damage_of(p_enemy: Variant, p_target_id: int, p_action: Dictionary) -> int:
 	var atk: int = _attack_of(p_enemy)
+	# 降攻 debuff——攻击力按状态表读（已含 debuff 修正）
+	var enemy_id: int = _enemy_id_of(p_enemy)
+	if enemy_id >= 0:
+		var roster: Variant = _parent.call("_get_roster_state")
+		var debuffed_atk: int = int(roster.call(&"get_atk", enemy_id))
+		if debuffed_atk > 0 or _roster_is_known(roster, enemy_id):
+			atk = debuffed_atk
 	if atk <= 0:
 		return 0
 	# 威力系数——AI 侧传递 power_multiplier，缺省 1.0
@@ -172,10 +181,10 @@ func _attack_of(p_enemy: Variant) -> int:
 ## 目标防御——读战斗状态表（[code]CombatRosterState[/code] 的 [code]defense[/code]）。
 ## [br][b]默认 0[/b]：未注入 [code]player_stats.defense[/code] 的角色按 0 处理，
 ## 不臆造防御数字；[b]未知角色[/b]的 [code]read_hp[/code] 同样返回 0。
+## 防御力已受降防 debuff 修正（debuff → 防御减免 → 减伤比例）。
 func _defense_of(p_target_id: int) -> int:
 	var roster: Variant = _parent.call("_get_roster_state")
-	var info: Dictionary = roster.call(&"read_hp", p_target_id)
-	return int(info.get("defense", 0))
+	return int(roster.call(&"get_defense", p_target_id))
 
 
 ## 目标是否已在本次结算中被击杀——只在 [code]known=true[/code] 时判死，
@@ -236,6 +245,33 @@ func _emit_result(p_enemy_id: int, p_action: StringName, p_target_id: int,
 	}
 	_parent.call("_emit_safe", &"enemy_action_resolved", [payload])
 	return payload
+
+
+## 施加 debuff——从敌方行动载荷中解析 debuff_config 并施加到目标。[br]
+## [br][param p_action] AI 行动载荷（含 debuff_config）。[br]
+## [param p_target_id] 目标角色 ID。[br]
+## [param p_source_id] 施加者角色 ID（敌方）。
+func _apply_debuff_from_action(p_action: Dictionary, p_target_id: int, p_source_id: int) -> void:
+	var debuff_cfg: Variant = p_action.get("debuff_config")
+	if debuff_cfg == null:
+		return
+	if not (debuff_cfg is Object):
+		return
+	var cfg: Object = debuff_cfg as Object
+	var debuff_type: int = int(cfg.debuff_type) if cfg.has_property(&"debuff_type") else -1
+	var duration: int = int(cfg.duration) if cfg.has_property(&"duration") else 0
+	var amount: int = int(cfg.amount) if cfg.has_property(&"amount") else 0
+	if debuff_type < 0 or amount <= 0:
+		return
+	var roster: Variant = _parent.call("_get_roster_state")
+	roster.call(&"apply_debuff", p_target_id, debuff_type, duration, amount, p_source_id)
+
+
+## 查询角色是否有可信 HP 数据（用于判断是否按状态表读 ATK）。
+func _roster_is_known(p_roster: Variant, p_character_id: int) -> bool:
+	if not (p_roster is RefCounted):
+		return false
+	return bool(p_roster.call(&"is_known", p_character_id))
 
 
 # === 读取工具 ====================================================================

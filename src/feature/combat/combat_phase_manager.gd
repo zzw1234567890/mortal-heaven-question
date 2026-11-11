@@ -99,12 +99,14 @@ func enter_phase(phase: int) -> void:
 			_reset_cost_for_turn()
 			# 3. DeploymentSystem.clear_standby_state
 			_clear_standby_state()
-			# 4. 战斗结束检查（Sprint 18：真实现——敌我全灭判定，GDD §9）
+			# 4. Debuff 持续回合数递减（回合结束时 -1，归零则移除）
+			_decrement_debuffs()
+			# 5. 战斗结束检查（Sprint 18：真实现——敌我全灭判定，GDD §9）
 			#    判定命中即停在此阶段：advance_phase 簿记后由父节点收尾 battle_end，
 			#    不再调度下一回合（否则已结束的战斗会先绕回 PREPARATION）。
 			if _check_battle_end():
 				return
-			# 5. 未结束 → 调度下一回合
+			# 6. 未结束 → 调度下一回合
 			_schedule_auto_advance()
 
 
@@ -185,6 +187,14 @@ func _clear_standby_state() -> void:
 	var ds = _get_deployment_system()
 	if ds != null and ds.has_method("clear_standby_state"):
 		ds.clear_standby_state()
+
+
+## Debuff 持续回合数递减——回合结束时调用一次。[br]
+## [br]所有 debuff 持续回合数 -1，归零的 debuff 条目被移除。
+func _decrement_debuffs() -> void:
+	var roster: Variant = _parent.call("_get_roster_state")
+	if roster != null and roster.has_method(&"on_turn_end_debuff"):
+		roster.call(&"on_turn_end_debuff")
 
 
 ## 战斗结束检查——委托父节点（判定内核 + 名册快照都归 CombatSystem）。

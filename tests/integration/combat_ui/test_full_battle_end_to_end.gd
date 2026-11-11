@@ -144,7 +144,8 @@ func test_full_battle_defeat_reaches_defeat_screen() -> void:
 	var max_damage: int = 0
 	for action: Dictionary in enemy_actions:
 		max_damage = maxi(max_damage, int(action.get("damage", 0)))
-	assert_gt(max_damage, 0, "魔修行动应造成伤害")`n	assert_true(max_damage <= 9, "魔修伤害不应超过裸 ATK 9（群攻技能威力 0.8）")
+	assert_gt(max_damage, 0, "魔修行动应造成伤害")
+	assert_true(max_damage <= 9, "魔修伤害不应超过裸 ATK 9（群攻技能威力 0.8）")
 	# Assert——转场目标为战败场景，且场景消费了战绩
 	assert_eq(sm.requests.size(), 1, "战斗结束应发出一次转场请求")
 	assert_eq(int(sm.requests[0]["to"]), 9, "战败应转场 DEFEAT_SCREEN")

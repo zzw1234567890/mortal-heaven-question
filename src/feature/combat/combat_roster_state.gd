@@ -32,6 +32,9 @@ const ENEMY_ID_STRIDE: int = 10000
 ## （本表即真理来源）。
 var _states: Dictionary = {}
 
+## Debuff 管理器——降攻/降防 debuff 状态管理。
+var _debuff: RefCounted = null
+
 
 ## 敌方角色 ID 派生——[b]单一来源[/b]：开战种子与战斗 UI 建卡必须落在同一键上，
 ## 否则 UI 读到的永远是 0/0。[br]
@@ -56,6 +59,8 @@ static func enemy_is_front(entry: Variant) -> bool:
 ## 清空全部状态——开战重种子与战斗结束共用。
 func clear() -> void:
 	_states.clear()
+	if _debuff != null:
+		_debuff.call(&"clear")
 
 
 ## 用我方阵位 + 敌方阵容重建状态表（开战快照）。[br]
@@ -166,10 +171,55 @@ func read_hp(character_id: int) -> Dictionary:
 
 
 ## 攻击力读取——出牌伤害倍率的取数入口（[code]ATK × 倍率[/code] 的 ATK）。[br]
+## 攻击力已受降攻 debuff 修正（debuff → 防御减免 → 减伤比例）。[br]
 ## 未知角色返回 0（调用方据此判定「拿不到攻击力」，不臆造伤害）。
 func get_atk(character_id: int) -> int:
 	var state: Dictionary = _states.get(character_id, {})
-	return int(state.get("atk", 0)) if not state.is_empty() else 0
+	var base_atk: int = int(state.get("atk", 0)) if not state.is_empty() else 0
+	if _debuff != null:
+		return int(_debuff.call(&"get_atk_with_debuff", character_id, base_atk))
+	return base_atk
+
+
+## 防御力读取——伤害结算的取数入口（防御减免）。[br]
+## 防御力已受降防 debuff 修正（debuff → 防御减免 → 减伤比例）。[br]
+## 未知角色返回 0（不臆造防御数字）。
+func get_defense(character_id: int) -> int:
+	var state: Dictionary = _states.get(character_id, {})
+	var base_def: int = int(state.get("defense", 0)) if not state.is_empty() else 0
+	if _debuff != null:
+		return int(_debuff.call(&"get_def_with_debuff", character_id, base_def))
+	return base_def
+
+
+## 施加 debuff——目标收到 debuff。[br]
+## [br][param p_target_id] 目标角色 ID。[br]
+## [param p_type] DebuffType（STAT_DOWN_ATK / STAT_DOWN_DEF）。[br]
+## [param p_duration] 持续回合数（0 = 本回合结束后生效）。[br]
+## [param p_amount] 每层降低的数值（DebuffConfig.amount）。[br]
+## [param p_source_id] 施加者角色 ID（可选）。[br]
+## [b]返回[/b]：是否成功施加（层数已满则失败）。
+func apply_debuff(p_target_id: int, p_type: int, p_duration: int, p_amount: int,
+		p_source_id: int = -1) -> bool:
+	if _debuff == null:
+		_debuff = preload("res://src/feature/combat/combat_debuff_manager.gd").new()
+	return _debuff.call(&"apply", p_target_id, p_type, p_duration, p_amount, p_source_id)
+
+
+## 回合结束递减 debuff——调用一次，所有 debuff 持续回合数 -1。[br]
+## [br]归零的 debuff 条目会被移除。[br]
+## [b]返回[/b]：被移除的 debuff 数量（用于日志/统计）。
+func on_turn_end_debuff() -> int:
+	if _debuff == null:
+		return 0
+	return _debuff.call(&"on_turn_end")
+
+
+## 获取 debuff 管理器——用于测试断言 / UI 显示。
+func get_debuff_manager() -> RefCounted:
+	if _debuff == null:
+		_debuff = preload("res://src/feature/combat/combat_debuff_manager.gd").new()
+	return _debuff
 
 
 ## 全表快照——结算回流用（Sprint 18）：逐角色一条
