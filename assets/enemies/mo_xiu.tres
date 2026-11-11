@@ -17,10 +17,22 @@ script = ExtResource("3_skill_entry")
 skill_id = &"basic_attack"
 display_name = "魔气斩"
 skill_type = 0
-base_weight = 50
+base_weight = 35
 cost = 0
 cooldown = 0
 target_type = 0
+power_multiplier = 1.0
+
+[sub_resource type="Resource" id="Resource_mo_slash"]
+script = ExtResource("3_skill_entry")
+skill_id = &"mo_slash"
+display_name = "魔斩八方"
+skill_type = 0
+base_weight = 65
+cost = 2
+cooldown = 1
+target_type = 1
+power_multiplier = 0.8
 
 [resource]
 script = ExtResource("1_enemy_template")
@@ -35,5 +47,5 @@ base_defense = 0
 formation_limit = 0
 front_slot = false
 behavior_profile = SubResource("Resource_behavior")
-skill_pool = [SubResource("Resource_strike")]
+skill_pool = [SubResource("Resource_strike"), SubResource("Resource_mo_slash")]
 reward_config = ExtResource("4_reward_config")

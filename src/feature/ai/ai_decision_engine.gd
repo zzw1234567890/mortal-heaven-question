@@ -85,12 +85,20 @@ func _decide_boss_action(enemy, field_state: Dictionary) -> Dictionary:
 
 
 ## 技能评估——加权分数 + 修正系数 → 选 top 1~2 技能（AC-003~005/009/010）。[br]
-## [br][b]返回[/b]: Dictionary——{skill_id: StringName, cost: int, target_type: int, skill_type: int}。[br]
-## 全技能冷却/费用不足 → basic_attack 兜底。
+## [br][b]返回[/b]: Dictionary——{skill_id: StringName, cost: int, target_type: int, skill_type: int,
+## power_multiplier: float, debuff_config: Resource}。[br]
+## 全技能冷却/费用不足 → basic_attack 兜底（power_multiplier=1.0, debuff_config=null）。[br]
+## [br]增强：缺 skills 配置时回退平A 并警告（Story 敌人技能池补齐）。
 func _evaluate_skills(enemy, field_state: Dictionary) -> Dictionary:
 	var template = enemy.template
 	# 优先使用实例级 runtime_skill_pool（Boss 阶段转换后修改），回退到模板
 	var skill_pool: Array = enemy.runtime_skill_pool if not (enemy.runtime_skill_pool as Array).is_empty() else (template.skill_pool as Array)
+	# 空技能池 → 回退平A 并警告（仅警告一次）
+	if skill_pool.is_empty():
+		if not enemy.has_meta("warned_empty_skill_pool"):
+			push_warning("AI: 敌人 '%s' 技能池为空，回退平A" % template.template_id)
+			enemy.set_meta("warned_empty_skill_pool", true)
+		return {"skill_id": &"basic_attack", "cost": 0, "target_type": _SkillEntry.TargetType.SINGLE_ENEMY, "skill_type": _SkillEntry.SkillType.ATTACK, "power_multiplier": 1.0, "debuff_config": null}
 	var available_budget: int = int(field_state.get("enemy_cost_budget", 3))
 	var scored: Array = []
 	for skill in skill_pool:
@@ -104,11 +112,11 @@ func _evaluate_skills(enemy, field_state: Dictionary) -> Dictionary:
 		scored.append({"skill": skill, "score": score})
 	# AC-009/010：无可用技能 → basic_attack 兜底
 	if scored.is_empty():
-		return {"skill_id": &"basic_attack", "cost": 0, "target_type": _SkillEntry.TargetType.SINGLE_ENEMY, "skill_type": _SkillEntry.SkillType.ATTACK}
+		return {"skill_id": &"basic_attack", "cost": 0, "target_type": _SkillEntry.TargetType.SINGLE_ENEMY, "skill_type": _SkillEntry.SkillType.ATTACK, "power_multiplier": 1.0, "debuff_config": null}
 	# 按分数降序排序
 	scored.sort_custom(_Helpers.compare_by_score_desc)
 	var best = scored[0]
-	return {"skill_id": best.skill.skill_id, "cost": best.skill.cost, "target_type": best.skill.target_type, "skill_type": best.skill.skill_type}
+	return {"skill_id": best.skill.skill_id, "cost": best.skill.cost, "target_type": best.skill.target_type, "skill_type": best.skill.skill_type, "power_multiplier": best.skill.power_multiplier, "debuff_config": best.skill.debuff_config}
 
 
 ## 计算技能分数——base_weight × modifier（AC-003/004）。

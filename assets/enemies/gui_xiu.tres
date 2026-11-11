@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://assets/enemies/enemy_template.gd" id="1_enemy_template"]
 [ext_resource type="Script" path="res://assets/enemies/behavior_profile.gd" id="2_behavior_profile"]
 [ext_resource type="Script" path="res://assets/enemies/skill_entry.gd" id="3_skill_entry"]
-[ext_resource type="Resource" path="res://assets/enemies/rewards/gui_xiu_reward.tres" id="4_reward_config"]
+[ext_resource type="Script" path="res://assets/enemies/debuff_config.gd" id="4_debuff_config"]
+[ext_resource type="Resource" path="res://assets/enemies/rewards/gui_xiu_reward.tres" id="5_reward_config"]
 
 [sub_resource type="Resource" id="Resource_behavior"]
 script = ExtResource("2_behavior_profile")
@@ -17,10 +18,29 @@ script = ExtResource("3_skill_entry")
 skill_id = &"basic_attack"
 display_name = "鬼爪"
 skill_type = 0
-base_weight = 55
+base_weight = 40
 cost = 0
 cooldown = 0
 target_type = 0
+power_multiplier = 1.0
+
+[sub_resource type="Resource" id="Resource_debuff_atk"]
+script = ExtResource("4_debuff_config")
+debuff_type = 0
+duration = 2
+amount = 1
+
+[sub_resource type="Resource" id="Resource_soul_drain"]
+script = ExtResource("3_skill_entry")
+skill_id = &"soul_drain"
+display_name = "吸魂"
+skill_type = 0
+base_weight = 60
+cost = 1
+cooldown = 2
+target_type = 0
+power_multiplier = 1.2
+debuff_config = SubResource("Resource_debuff_atk")
 
 [resource]
 script = ExtResource("1_enemy_template")
@@ -35,5 +55,5 @@ base_defense = 2
 formation_limit = 0
 front_slot = false
 behavior_profile = SubResource("Resource_behavior")
-skill_pool = [SubResource("Resource_strike")]
-reward_config = ExtResource("4_reward_config")
+skill_pool = [SubResource("Resource_strike"), SubResource("Resource_soul_drain")]
+reward_config = ExtResource("5_reward_config")

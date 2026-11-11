@@ -132,6 +132,8 @@ func _apply_damage(p_target_id: int, p_damage: int) -> Dictionary:
 
 
 ## 伤害取数——[code]max(0, 技能威力/攻击力 − 目标防御)[/code]。[br]
+## [br][b]增强[/b]：支持威力系数 [code]power_multiplier[/code]——
+## 技能实际伤害 = attack × power_multiplier（Story 敌人技能池补齐）。[br]
 ## [br][b]与攻击声明路径的区别[/b]：本路径按下限 0 结算（允许高防完全免伤），
 ## 攻击声明路径保留 [code]max(1, ...)[/code] 保底；两套口径并存的原因写在
 ## [code]combat_defense_rules.gd[/code] 与 GDD §公式「玩家防御字段」。[br]
@@ -146,10 +148,13 @@ func _damage_of(p_enemy: Variant, p_target_id: int, p_action: Dictionary) -> int
 	var atk: int = _attack_of(p_enemy)
 	if atk <= 0:
 		return 0
-	# 技能自带威力（AI 侧给了就以它为准，缺省回退攻击力）
+	# 威力系数——AI 侧传递 power_multiplier，缺省 1.0
+	var power_mult: float = float(p_action.get("power_multiplier", 1.0))
+	var base: int = int(atk * power_mult)
+	# 技能自带威力（AI 侧给了就以它为准，缺省回退攻击力 × 威力系数）
 	var declared: int = int(p_action.get("damage", 0))
-	var base: int = declared if declared > 0 else atk
-	return DefenseRules.apply_flat(base, _defense_of(p_target_id))
+	var final_base: int = declared if declared > 0 else base
+	return DefenseRules.apply_flat(final_base, _defense_of(p_target_id))
 
 
 ## 敌方攻击力——优先读对象自带的 [code]attack[/code]（[code]EnemyBattleState[/code]），

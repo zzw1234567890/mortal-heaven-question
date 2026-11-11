@@ -53,3 +53,19 @@ enum TargetType {
 
 ## 关联的 EffectTemplate ID。
 @export var effect_template_ids: Array[StringName] = []
+
+## 威力系数——伤害倍率 [0.5, 3.0]。[br]
+## 1.0 = 基础攻击力；技能实际伤害 = attack × power_multiplier。[br]
+## [br]来源: Story 敌人技能池补齐。
+@export var power_multiplier: float = 1.0
+
+## Debuff 配置——技能施加的减益效果（仅可执行类别）。[br]
+## [b]类型为 Resource[/b]——DebuffConfig extends Resource。[br]
+## null = 无 debuff。[br]
+## [br]当前可执行类别：[br]
+## - [code]STAT_DOWN_ATK[/code]：降低目标攻击一档（持续 N 回合）[br]
+## - [code]STAT_DOWN_DEF[/code]：降低目标防御一档（持续 N 回合）[br]
+## [br]不可执行类别（技术债）：眩晕、沉默、束缚、冰冻、中毒等——[br]
+## 见 tech-debt-register.md DEBT-AI-001。[br]
+## [br]来源: Story 敌人技能池补齐 §Debuff。
+@export var debuff_config: Resource
