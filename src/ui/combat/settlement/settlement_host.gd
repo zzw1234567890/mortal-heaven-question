@@ -55,8 +55,8 @@ var deck_system: Node = null
 var is_tribulation: bool = false
 ## 减少动态偏好（三面板统一）。
 var reduce_motion: bool = false
-	## 当前战斗的掷骰奖励缓存（用于发放后刷新汇总视图）。
-	var _current_rolled_rewards: Dictionary = {}
+## 当前战斗的掷骰奖励缓存（用于发放后刷新汇总视图）。
+var _current_rolled_rewards: Dictionary = {}
 
 ## === 子面板 ===============================================================
 
