@@ -1,4 +1,4 @@
-extends RefCounted
+﻿extends RefCounted
 ## AIDecisionEngine —— AI 决策引擎子模块（从 ai_system.gd 拆分）。
 ##
 ## 持有对 AISystem 父节点的引用，通过它访问 _rng / _emit_safe / 辅助方法。[br]
@@ -57,7 +57,7 @@ func _decide_action(enemy, field_state: Dictionary) -> Dictionary:
 func _decide_normal_action(enemy, field_state: Dictionary) -> Dictionary:
 	var skill_result = _evaluate_skills(enemy, field_state)
 	var target_ids = _select_target(enemy, skill_result, field_state)
-	return {"enemy_id": enemy, "skill_id": skill_result.skill_id, "target_ids": target_ids, "is_retreat": false}
+	return {"enemy_id": enemy, "skill_id": skill_result.skill_id, "target_ids": target_ids, "is_retreat": false, "power_multiplier": float(skill_result.get("power_multiplier", 1.0)), "debuff_config": skill_result.get("debuff_config")}
 
 
 ## 精英敌人决策——阵法部署检查 + 技能评估 + 目标选择（AC-002）。[br]
@@ -67,7 +67,7 @@ func _decide_elite_action(enemy, field_state: Dictionary) -> Dictionary:
 	_parent.call("_check_formation_deploy", enemy, field_state)
 	var skill_result = _evaluate_skills(enemy, field_state)
 	var target_ids = _select_target(enemy, skill_result, field_state)
-	return {"enemy_id": enemy, "skill_id": skill_result.skill_id, "target_ids": target_ids, "is_retreat": false}
+	return {"enemy_id": enemy, "skill_id": skill_result.skill_id, "target_ids": target_ids, "is_retreat": false, "power_multiplier": float(skill_result.get("power_multiplier", 1.0)), "debuff_config": skill_result.get("debuff_config")}
 
 
 ## Boss 决策——阶段转换检查 + 阵法部署 + 技能评估 + 目标选择（AC-002）。[br]
@@ -81,7 +81,7 @@ func _decide_boss_action(enemy, field_state: Dictionary) -> Dictionary:
 	_parent.call("_check_formation_deploy", enemy, field_state)
 	var skill_result = _evaluate_skills(enemy, field_state)
 	var target_ids = _select_target(enemy, skill_result, field_state)
-	return {"enemy_id": enemy, "skill_id": skill_result.skill_id, "target_ids": target_ids, "is_retreat": false}
+	return {"enemy_id": enemy, "skill_id": skill_result.skill_id, "target_ids": target_ids, "is_retreat": false, "power_multiplier": float(skill_result.get("power_multiplier", 1.0)), "debuff_config": skill_result.get("debuff_config")}
 
 
 ## 技能评估——加权分数 + 修正系数 → 选 top 1~2 技能（AC-003~005/009/010）。[br]

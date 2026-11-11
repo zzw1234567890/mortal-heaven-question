@@ -1,4 +1,4 @@
-extends GutTest
+﻿extends GutTest
 ## 敌人技能池补齐验收测试——威力系数、权重抽取、debuff 递减恢复、缺配置回退平A。
 ##
 ## 覆盖 Story 敌人技能池补齐的 4 条验收标准：
@@ -141,8 +141,8 @@ func test_different_rng_seeds_produce_different_selections() -> void:
 
 	# Assert: 不同种子产生不同选择（概率空间足够时）
 	# 注：若权重差异极大，仍可能相同，但本例 40/60 足够随机
-	var sid1 := action1.get("skill_id")
-	var sid2 := action2.get("skill_id")
+	var sid1: Variant = action1.get("skill_id")
+	var sid2: Variant = action2.get("skill_id")
 	# 允许相同（概率极低），但期望不同
 	assert_true(sid1 != sid2 or sid1 == sid1, "不同种子应大概率产生不同选择")
 
@@ -186,7 +186,7 @@ func test_default_power_multiplier_is_1_0() -> void:
 
 func test_debuff_config_passed_to_action_payload() -> void:
 	# Arrange: 带降低攻击 debuff 的技能
-	var debuff := _make_debuff(DebuffConfig.DebuffType.STAT_DOWN_ATK, 2, 1)
+	var debuff: Object = _make_debuff(DebuffConfig.DebuffType.STAT_DOWN_ATK, 2, 1)
 	var debuff_skill := _make_skill(&"soul_drain", SkillEntry.SkillType.ATTACK, 60, 1, 2, SkillEntry.TargetType.SINGLE_ENEMY, 1.2, debuff)
 	var template := _make_template(&"gui_xiu", 38, 11, 2, [debuff_skill])
 	var enemy := _make_enemy(template)
@@ -198,7 +198,7 @@ func test_debuff_config_passed_to_action_payload() -> void:
 
 	# Assert: debuff_config 传递到行动载荷
 	assert_not_null(action.get("debuff_config"), "debuff_config 应传递到行动载荷")
-	var dc := action.get("debuff_config")
+	var dc: Variant = action.get("debuff_config")
 	assert_eq(dc.debuff_type, DebuffConfig.DebuffType.STAT_DOWN_ATK, "debuff 类型应正确")
 	assert_eq(dc.duration, 2, "debuff 持续回合应正确")
 	assert_eq(dc.amount, 1, "debuff 档位数值应正确")
