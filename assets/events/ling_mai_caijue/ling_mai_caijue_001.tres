@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="EventDef" format=3]
+
+[ext_resource type="Script" path="res://assets/events/event_def.gd" id="1_event_def"]
+[ext_resource type="Script" path="res://assets/events/event_def_option.gd" id="2_event_def_option"]
+[ext_resource type="Script" path="res://assets/events/event_def_effect.gd" id="3_event_def_effect"]
+
+[sub_resource type="Resource" id="Effect_caijue_safe"]
+script = ExtResource("3_event_def_effect")
+kind = 0
+amount = 30
+
+[sub_resource type="Resource" id="Option_safe"]
+script = ExtResource("2_event_def_option")
+text = "只采外围灵石，见好就收"
+result_text = "你沿着灵脉外围小心敲下几块灵石原矿，灵气虽薄，胜在安稳。掌心传来温润的灵气波动——三十枚灵石到手。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_caijue_safe")])
+
+[sub_resource type="Resource" id="Effect_caijue_deep_lingshi"]
+script = ExtResource("3_event_def_effect")
+kind = 0
+use_range = true
+min_amount = 50
+max_amount = 120
+
+[sub_resource type="Resource" id="Effect_caijue_deep_damage"]
+script = ExtResource("3_event_def_effect")
+kind = 2
+amount = -10
+
+[sub_resource type="Resource" id="Option_deep"]
+script = ExtResource("2_event_def_option")
+text = "深入灵脉腹地，赌一把大的"
+result_text = "你催动护体灵光钻入灵脉深处。灵石矿晶在幽暗中层层叠叠，你贪心地多敲了几块——归途中灵脉震怒，逸散的灵气如刀锋刮过经脉。收获颇丰，却也挂了彩。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_caijue_deep_lingshi"), SubResource("Effect_caijue_deep_damage")])
+
+[sub_resource type="Resource" id="Effect_caijue_sit"]
+script = ExtResource("3_event_def_effect")
+kind = 1
+amount = 20
+
+[sub_resource type="Resource" id="Option_sit"]
+script = ExtResource("2_event_def_option")
+text = "盘坐脉眼，吐纳灵气修为"
+result_text = "你不取一石，只盘坐于脉眼之上吐纳。浓郁灵气顺着周身穴窍缓缓流转，一炷香后，丹田中的灵力凝实了几分。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_caijue_sit")])
+
+[resource]
+script = ExtResource("1_event_def")
+event_id = "ling_mai_caijue_001"
+title = "荒谷灵脉"
+body = "山谷深处，一道灵脉如巨龙盘卧于地底。脉眼处灵气氤氲成雾，外围散落着裸露的灵石原矿。采掘灵脉可获灵石，但灵脉有灵，取之过甚恐遭反噬——修仙界因此丧命者，不知凡几。"
+options = Array[ExtResource("2_event_def_option")]([SubResource("Option_safe"), SubResource("Option_deep"), SubResource("Option_sit")])

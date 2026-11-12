@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="EventDef" format=3]
+
+[ext_resource type="Script" path="res://assets/events/event_def.gd" id="1_event_def"]
+[ext_resource type="Script" path="res://assets/events/event_def_option.gd" id="2_event_def_option"]
+[ext_resource type="Script" path="res://assets/events/event_def_effect.gd" id="3_event_def_effect"]
+
+[sub_resource type="Resource" id="Effect_fangshi_cost"]
+script = ExtResource("3_event_def_effect")
+kind = 0
+amount = -60
+
+[sub_resource type="Resource" id="Effect_fangshi_card"]
+script = ExtResource("3_event_def_effect")
+kind = 3
+card_id = "pei_yuan_dan"
+
+[sub_resource type="Resource" id="Option_buy"]
+script = ExtResource("2_event_def_option")
+text = "花六十灵石，买下那枚培元丹"
+result_text = "你与摊主讨价还价半晌，最终以六十灵石成交。培元丹入手温润如玉，丹香内敛——危急时刻，它能续你一命。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_fangshi_cost"), SubResource("Effect_fangshi_card")])
+
+[sub_resource type="Resource" id="Effect_fangshi_ting"]
+script = ExtResource("3_event_def_effect")
+kind = 1
+amount = 15
+
+[sub_resource type="Resource" id="Option_listen"]
+script = ExtResource("2_event_def_option")
+text = "不买了，蹲在茶摊听听修仙界的传闻"
+result_text = "你买了一碗灵茶，听散修们吹嘘各处秘闻。哪座山头出了剑仙、哪条灵脉被人采空、哪种功法最忌双修……听得多了，竟也悟出几分道理。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_fangshi_ting")])
+
+[resource]
+script = ExtResource("1_event_def")
+event_id = "fang_shi_jiaoyi_001"
+title = "坊市地摊"
+body = "坊市角落，一个獐头鼠目的散修摊主压低声音招呼你：「道友，上好的培元丹，别处八十灵石起，我只收你六十。」旁边的灵茶摊上，几个老散修正聊得唾沫横飞。"
+options = Array[ExtResource("2_event_def_option")]([SubResource("Option_buy"), SubResource("Option_listen")])

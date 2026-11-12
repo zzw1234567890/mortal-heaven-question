@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="EventDef" format=3]
+
+[ext_resource type="Script" path="res://assets/events/event_def.gd" id="1_event_def"]
+[ext_resource type="Script" path="res://assets/events/event_def_option.gd" id="2_event_def_option"]
+[ext_resource type="Script" path="res://assets/events/event_def_effect.gd" id="3_event_def_effect"]
+
+[sub_resource type="Resource" id="Effect_dongfu_lingshi"]
+script = ExtResource("3_event_def_effect")
+kind = 0
+use_range = true
+min_amount = 80
+max_amount = 150
+
+[sub_resource type="Resource" id="Option_stone"]
+script = ExtResource("2_event_def_option")
+text = "取左侧玉匣——满满一匣灵石"
+result_text = "玉匣开启，灵光扑面。匣中灵石成色上佳，粗粗一数竟有近百枚。你将灵石尽数收入储物袋，退出洞府时，那株灵芝在你身后悄然枯萎。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_dongfu_lingshi")])
+
+[sub_resource type="Resource" id="Effect_dongfu_cult"]
+script = ExtResource("3_event_def_effect")
+kind = 1
+amount = 60
+
+[sub_resource type="Resource" id="Option_zuo"]
+script = ExtResource("2_event_def_option")
+text = "取右侧蒲团——坐忘一刻钟"
+result_text = "你于蒲团上盘膝入定。蒲团下埋着的聚灵阵残枢将百年灵气尽数渡入你体内，丹田灵力如潮水般涨了一截。起身时，玉匣已化作齑粉。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_dongfu_cult")])
+
+[sub_resource type="Resource" id="Effect_dongfu_hp"]
+script = ExtResource("3_event_def_effect")
+kind = 2
+amount = 25
+
+[sub_resource type="Resource" id="Option_leave"]
+script = ExtResource("2_event_def_option")
+text = "两样都不取，替洞府主人上一炷香"
+result_text = "你在香案前肃立上香，恭恭敬敬行了三礼。香火燃尽的刹那，一缕温润灵气自梁上垂落，抚过你周身旧伤——竟似故人回礼。你空手离开，却觉得血肉都温养了几分。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_dongfu_hp")])
+
+[resource]
+script = ExtResource("1_event_def")
+event_id = "dong_fu_qiyu_001"
+title = "无名洞府"
+body = "你在山壁裂缝中发现一座前人坐化的小洞府。石案上并排放着一只玉匣与一方蒲团，匣中灵石隐现宝光，蒲团上灵气氤氲未散——显然是洞府主人留下的机缘，只是二者互斥，取其一，另一件便会随阵法一同湮灭。香案上还立着一块无字木牌，似在等人祭拜。"
+options = Array[ExtResource("2_event_def_option")]([SubResource("Option_stone"), SubResource("Option_zuo"), SubResource("Option_leave")])

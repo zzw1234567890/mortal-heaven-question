@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="EventDef" format=3]
+
+[ext_resource type="Script" path="res://assets/events/event_def.gd" id="1_event_def"]
+[ext_resource type="Script" path="res://assets/events/event_def_option.gd" id="2_event_def_option"]
+[ext_resource type="Script" path="res://assets/events/event_def_effect.gd" id="3_event_def_effect"]
+
+[sub_resource type="Resource" id="Effect_sharen_card"]
+script = ExtResource("3_event_def_effect")
+kind = 3
+card_id = "sha_qi_zhan"
+
+[sub_resource type="Resource" id="Effect_sharen_hp"]
+script = ExtResource("3_event_def_effect")
+kind = 2
+amount = -20
+
+[sub_resource type="Resource" id="Option_kill"]
+script = ExtResource("2_event_def_option")
+text = "痛下杀手，夺他储物袋中的杀伐之术"
+result_text = "你剑出如虹。重伤的修士拼死一搏，一记掌心雷轰在你胸口——但他终究伤重不支。你从他储物袋中搜出一部杀气凛然的战技残卷，胸口却隐隐作痛。修仙界从不同情弱者，可夜路走多了，总会遇到鬼。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_sharen_card"), SubResource("Effect_sharen_hp")])
+
+[sub_resource type="Resource" id="Effect_sharen_save"]
+script = ExtResource("3_event_def_effect")
+kind = 1
+amount = 40
+
+[sub_resource type="Resource" id="Option_save"]
+script = ExtResource("2_event_def_option")
+text = "渡他一缕真元，救他一命"
+result_text = "你渡出真元护住他的心脉，又喂下一枚疗伤丹。修士悠悠转醒，长揖到地：「大恩不言谢。我观道友根骨，卡在关窍处的正是这一缕杀伐果断之意——破关如破敌，犹豫则败。」一语惊醒梦中人，你于道途之上又进了一步。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_sharen_save")])
+
+[sub_resource type="Resource" id="Effect_sharen_rob"]
+script = ExtResource("3_event_def_effect")
+kind = 0
+use_range = true
+min_amount = 30
+max_amount = 80
+
+[sub_resource type="Resource" id="Option_rob"]
+script = ExtResource("2_event_def_option")
+text = "不杀也不救，只捡走他跌落时散出的灵石"
+result_text = "你既不愿沾血，也不愿耗损真元，只在遍地翻滚的灵石中拾了几枚成色好的，转身离去。身后传来微弱的呻吟——你没有回头。修仙界的水，从来不清。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_sharen_rob")])
+
+[resource]
+script = ExtResource("1_event_def")
+event_id = "sha_ren_duo_bao_001"
+title = "重伤的修士"
+body = "山道转角处，一名修士倚着古松瘫坐，胸前血迹斑斑，储物袋滑落在手边，隐有宝光外泄。他看见你，挣扎着想站起来，却只咳出一口血。杀了他，宝物唾手可得；救他，要耗损自身真元；或者……什么都不做，只拿走散落一地的灵石。"
+options = Array[ExtResource("2_event_def_option")]([SubResource("Option_kill"), SubResource("Option_save"), SubResource("Option_rob")])

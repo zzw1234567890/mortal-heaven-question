@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="EventDef" format=3]
+
+[ext_resource type="Script" path="res://assets/events/event_def.gd" id="1_event_def"]
+[ext_resource type="Script" path="res://assets/events/event_def_option.gd" id="2_event_def_option"]
+[ext_resource type="Script" path="res://assets/events/event_def_effect.gd" id="3_event_def_effect"]
+
+[sub_resource type="Resource" id="Effect_chain_card"]
+script = ExtResource("3_event_def_effect")
+kind = 3
+card_id = "lin_yuan"
+
+[sub_resource type="Resource" id="Effect_chain_hp"]
+script = ExtResource("3_event_def_effect")
+kind = 2
+amount = -15
+
+[sub_resource type="Resource" id="Option_take"]
+script = ExtResource("2_event_def_option")
+text = "伸手取剑，硬闯剑冢"
+result_text = "你握住剑柄的刹那，冢中万剑齐鸣如龙吟。剑气纵横间，一柄古朴长剑认你为主——可你的双臂也被剑气割得血痕累累。临渊剑，到手了。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_chain_card"), SubResource("Effect_chain_hp")])
+
+[sub_resource type="Resource" id="Effect_chain_cult"]
+script = ExtResource("3_event_def_effect")
+kind = 1
+amount = 30
+
+[sub_resource type="Resource" id="Option_observe"]
+script = ExtResource("2_event_def_option")
+text = "不取剑，静观剑意流转"
+result_text = "你盘坐冢外三日，看万剑随罡风起落明灭。虽未得一剑，剑意却在你识海中留下了残影——出剑时快了半分，也稳了半分。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_chain_cult")])
+
+[resource]
+script = ExtResource("1_event_def")
+event_id = "chain_001"
+title = "剑冢遗蜕"
+body = "山腹深处藏着一座古修剑冢，万千断剑倒插于石台之上，剑气凝而不散，隐隐织成一座剑阵。阵眼处一柄无鞘长剑仍在轻鸣，似在等一个有缘人。守冢的剑灵残识警告：取剑者，需承万剑之锋。"
+options = Array[ExtResource("2_event_def_option")]([SubResource("Option_take"), SubResource("Option_observe")])

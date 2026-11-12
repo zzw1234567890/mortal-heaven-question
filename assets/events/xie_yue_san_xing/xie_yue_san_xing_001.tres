@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="EventDef" format=3]
+
+[ext_resource type="Script" path="res://assets/events/event_def.gd" id="1_event_def"]
+[ext_resource type="Script" path="res://assets/events/event_def_option.gd" id="2_event_def_option"]
+[ext_resource type="Script" path="res://assets/events/event_def_effect.gd" id="3_event_def_effect"]
+
+[sub_resource type="Resource" id="Effect_xingmen_cult"]
+script = ExtResource("3_event_def_effect")
+kind = 1
+amount = 60
+
+[sub_resource type="Resource" id="Option_knock"]
+script = ExtResource("2_event_def_option")
+text = "整肃衣冠，上前叩门求道"
+result_text = "你三叩石门，门竟无声洞开。洞府深处无人，唯有一方石台，台上灵光凝成经文，明灭如呼吸。你跪坐台下听讲半日，只觉灵力如江河奔涌，关窍隐隐松动。出门时回望，石门已闭，仿佛从未开启。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_xingmen_cult")])
+
+[sub_resource type="Resource" id="Effect_xingmen_sit"]
+script = ExtResource("3_event_def_effect")
+kind = 1
+amount = 25
+
+[sub_resource type="Resource" id="Option_sit"]
+script = ExtResource("2_event_def_option")
+text = "不敢惊扰，只在洞外静悟"
+result_text = "你不敢叩门，只在洞外青石上盘坐。洞中灵气自门缝丝丝渗出，你如饥似渴地吐纳了三日。虽未得真传，一身灵力也凝实了不少。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_xingmen_sit")])
+
+[sub_resource type="Resource" id="Effect_xingmen_herb"]
+script = ExtResource("3_event_def_effect")
+kind = 0
+amount = 25
+
+[sub_resource type="Resource" id="Option_herb"]
+script = ExtResource("2_event_def_option")
+text = "只采洞府外崖壁上的几株灵草"
+result_text = "你压下叩门的冲动，攀上洞侧崖壁，采下几株沐着灵光的百年灵草。下山后寻坊市药铺折成了灵石——机缘虽好，也要有命消受才行。"
+effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_xingmen_herb")])
+
+[resource]
+script = ExtResource("1_event_def")
+event_id = "xie_yue_san_xing_001"
+title = "斜月三星洞"
+body = "灵雾深处，一座石门半掩于藤萝之间，门楣上以古篆刻着「斜月三星洞」五字。洞前灵气浓郁得几乎凝成实质，青石阶上不见一片落叶。此地必有主人，且修为远在你之上——是福是祸，只在一步之间。"
+options = Array[ExtResource("2_event_def_option")]([SubResource("Option_knock"), SubResource("Option_sit"), SubResource("Option_herb")])

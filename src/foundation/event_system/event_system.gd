@@ -60,6 +60,13 @@ const MAX_CHAIN_DEPTH: int = 3
 ## 条件判定引擎（RefCounted——由本 Autoload 持有）。
 var _condition_checker: RefCounted = null
 
+## 探索事件节点资源脚本（EventDef）——与本系统的 EventTemplate 共驻
+## [code]assets/events/[/code]。[method _register_template] 加载时静默跳过
+## （不注册、不报错）——EventDef 由探索侧 [code]exploration_event_system.gd[/code]
+## 的注册表加载。用脚本引用比对而非 class_name：避免 Foundation 层硬依赖
+## assets 侧全局类的解析顺序。
+const EVENT_DEF_SCRIPT: GDScript = preload("res://assets/events/event_def.gd")
+
 ## 连锁事件处理器（RefCounted——由本 Autoload 持有）。
 var _chain_handler: RefCounted = null
 
@@ -197,6 +204,9 @@ func _recursive_load(dir: DirAccess, base_path: String) -> void:
 ## 加载单个模板文件并注册到 [member templates]。
 func _register_template(path: String) -> void:
 	var res := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REUSE)
+	# EventDef（探索事件节点资源）共驻本目录——静默跳过，不算加载错误。
+	if res != null and res.get_script() == EVENT_DEF_SCRIPT:
+		return
 	if not is_instance_of(res, EventTemplate):
 		push_error("EventSystem._load_templates: 文件 '%s' 不是 EventTemplate 类型" % path)
 		return
