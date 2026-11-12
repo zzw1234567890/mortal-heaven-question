@@ -41,6 +41,7 @@ var reduce_motion_override: Variant = null
 
 ## NodeGraphLoadSource 脚本常量——数据源选择与加载编排（真实 enter_map / stub 降级）。
 const NodeGraphLoadSourceScript := preload("res://src/ui/exploration/node_graph_load_source.gd")
+const EventNodePresenterScript := preload("res://src/ui/exploration/event_node_presenter.gd")
 ## 交互组件挂载器（移动/教程/弹窗）。
 const NodeGraphInteractionMountScript := preload(
 		"res://src/ui/exploration/node_graph_interaction_mount.gd")
@@ -92,6 +93,8 @@ var _pending_map_id: StringName = &""
 var _interaction_mount: RefCounted = null
 ## 六态重算 + 逐层展开动画（见 [NodeGraphRevealAnimator]）。
 var _reveal_animator: RefCounted = null
+## 事件节点弹出器（见 [EventNodePresenter]）。
+var _event_presenter: RefCounted = null
 
 
 func _ready() -> void:
@@ -103,6 +106,7 @@ func _ready() -> void:
 	_load_source.call(&"resolve", es, self, _on_map_generated)
 	back_button.pressed.connect(_on_back_pressed)
 	_mount_interaction_components(es)
+	_mount_event_presenter(es)
 	# 宿主先 add_child 再调 trigger_map_load 时，本次 _ready 已消费该请求；
 	# 反之（先赋值再 add_child）留待宿主调用。
 	if _pending_map_id != &"":
@@ -173,6 +177,15 @@ func _mount_interaction_components(es: Node) -> void:
 			_read_reduce_motion(), forward,
 			get_node_or_null(NodePath("/root/SceneManager")),
 			get_node_or_null(NodePath("/root/RealmSystem")))
+
+
+## 挂事件节点弹出通道——事件节点不走 [NodeInteractionPopupHost]（AC-9 防双面板），
+## 独立由 [EventNodePresenter] 监听 event_node_reached 弹面板。
+func _mount_event_presenter(es: Node) -> void:
+	if es == null or not es.has_signal(&"event_node_reached"):
+		return
+	_event_presenter = EventNodePresenterScript.new()
+	_event_presenter.call(&"attach", es, self)
 
 
 ## 读取减少动态偏好——注入覆盖优先，否则读 SettingsStore 画面分类。
