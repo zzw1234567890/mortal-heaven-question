@@ -40,6 +40,7 @@ effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_xingmen_
 [resource]
 script = ExtResource("1_event_def")
 event_id = "xie_yue_san_xing_001"
+min_realm = 2
 title = "斜月三星洞"
 body = "灵雾深处，一座石门半掩于藤萝之间，门楣上以古篆刻着「斜月三星洞」五字。洞前灵气浓郁得几乎凝成实质，青石阶上不见一片落叶。此地必有主人，且修为远在你之上——是福是祸，只在一步之间。"
 options = Array[ExtResource("2_event_def_option")]([SubResource("Option_knock"), SubResource("Option_sit"), SubResource("Option_herb")])

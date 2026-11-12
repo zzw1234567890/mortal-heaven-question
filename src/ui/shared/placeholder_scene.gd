@@ -4,7 +4,7 @@ extends Control
 ##
 ## [b]职责[/b]：闭合 [constant SceneManager.SCENE_PATHS] 中尚无对应 story 交付的
 ## 场景路径——深色底 + 场景标题 + 「尚未开放」状态 + 「返回探索」按钮。核心循环
-## 转场（探索→商店/事件、战斗→结算/战败、HUD→卡组编辑/修为养成）不再落到
+## 转场（探索→商店、战斗→结算/战败、HUD→卡组编辑/修为养成）不再落到
 ## [code]scene_transition.gd[/code] 的「目标场景缺失 → 回退 MAIN_MENU」失败路径。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不读不写任何游戏状态——只承载标题文案与
 ## 一次导航请求。[br]
@@ -41,10 +41,11 @@ const TEXT_FALLBACK_TITLE: String = "占位场景"
 
 ## SceneID → 标题（键为 SceneManager.SceneID 字面值——const Dictionary 不可引用
 ## 脚本常量，镜像口径同 hud.gd SCENE_VISIBILITY / state_transition_matrix.gd）。
+## 事件面板（7）已不在表中——Sprint 18 起事件走探索层 overlay
+## （event_panel.tscn 挂真实 EventPanelScreen 脚本）。
 const TITLES: Dictionary = {
 	2: "卡组编辑",    # SceneID.DECK_EDITING
 	6: "坊市",        # SceneID.SHOP
-	7: "事件",        # SceneID.EVENT_PANEL
 	8: "战斗结算",    # SceneID.RESULT_SCREEN
 	9: "战败",        # SceneID.DEFEAT_SCREEN
 	10: "修为养成",   # SceneID.CULTIVATION
@@ -54,7 +55,6 @@ const TITLES: Dictionary = {
 const HINTS: Dictionary = {
 	2: "卡组编辑功能正在打造中，当前对局使用初始卡组。",
 	6: "坊市交易功能正在打造中，请先继续探索。",
-	7: "此处的机缘尚未显现，请先继续探索。",
 	8: "战斗胜利！奖励已计入修为与灵石，节点已标记为已清。",
 	9: "战斗失败/撤退。节点未标记为已清，请重整旗鼓后再试。",
 	10: "修为养成功能正在打造中，请先继续探索。",

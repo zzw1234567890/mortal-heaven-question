@@ -41,17 +41,13 @@ var reduce_motion_override: Variant = null
 
 ## NodeGraphLoadSource 脚本常量——数据源选择与加载编排（真实 enter_map / stub 降级）。
 const NodeGraphLoadSourceScript := preload("res://src/ui/exploration/node_graph_load_source.gd")
-const EventNodePresenterScript := preload("res://src/ui/exploration/event_node_presenter.gd")
-## 交互组件挂载器（移动/教程/弹窗）。
-const NodeGraphInteractionMountScript := preload(
-		"res://src/ui/exploration/node_graph_interaction_mount.gd")
+## 子组件装配编排（交互组件 + 事件弹出通道）——挂载细节在装配器，屏幕只持引用。
+const ComponentAssemblyScript := preload(
+		"res://src/ui/exploration/node_graph_component_assembly.gd")
 
 ## 六态重算 + 逐层展开动画。
 const NodeGraphRevealAnimatorScript := preload(
 		"res://src/ui/exploration/node_graph_reveal_animator.gd")
-
-## SettingsStore 脚本常量——reduce_motion 偏好读取（审查 H5；GFX_KEY_* 单一真理来源）。
-const SettingsStoreScript := preload("res://src/ui/main_menu/settings_store.gd")
 
 ## 固定 UI 词条（项目暂无本地化系统——S16-1 TEXT_* 同源豁免注记）。
 const TEXT_AP_PREFIX: String = "AP"
@@ -105,8 +101,7 @@ func _ready() -> void:
 	_load_source = NodeGraphLoadSourceScript.new()
 	_load_source.call(&"resolve", es, self, _on_map_generated)
 	back_button.pressed.connect(_on_back_pressed)
-	_mount_interaction_components(es)
-	_mount_event_presenter(es)
+	_mount_components(es)
 	# 宿主先 add_child 再调 trigger_map_load 时，本次 _ready 已消费该请求；
 	# 反之（先赋值再 add_child）留待宿主调用。
 	if _pending_map_id != &"":
@@ -155,46 +150,13 @@ func _connect_signals() -> void:
 		es.node_moved.connect(_on_node_moved)
 
 
-## 挂载交互组件（移动/教程/弹窗）——挂载与接线细节在 [NodeGraphInteractionMount]，
-## 屏幕只提供转发回调（依赖注入——测试可经 exploration_system 成员先注入 mock
-## 再 add_child）。[br]
-## [b]reduce_motion[/b]（审查 H5）：从 SettingsStore 读取用户无障碍偏好注入。
-func _mount_interaction_components(es: Node) -> void:
-	_interaction_mount = NodeGraphInteractionMountScript.new()
-	var forward: Dictionary = {
-		NodeGraphInteractionMountScript.KEY_MOVE_FEEDBACK: _on_move_feedback,
-		NodeGraphInteractionMountScript.KEY_KEYBOARD_FOCUS: _on_keyboard_focus_changed,
-		NodeGraphInteractionMountScript.KEY_COMBAT_ARRIVAL:
-			func(roster: Array, ctype: StringName) -> void:
-				combat_arrival_forwarded.emit(roster, ctype),
-		NodeGraphInteractionMountScript.KEY_BOSS_ARRIVAL:
-			func(data: Dictionary) -> void: boss_arrival_forwarded.emit(data),
-		NodeGraphInteractionMountScript.KEY_NODE_INTERACTION:
-			func(nid: int, itype: StringName, payload: Dictionary) -> void:
-				node_interaction_forwarded.emit(nid, itype, payload),
-	}
-	_interaction_mount.call(&"mount", self, renderer(), viewport, es,
-			_read_reduce_motion(), forward,
-			get_node_or_null(NodePath("/root/SceneManager")),
-			get_node_or_null(NodePath("/root/RealmSystem")))
-
-
-## 挂事件节点弹出通道——事件节点不走 [NodeInteractionPopupHost]（AC-9 防双面板），
-## 独立由 [EventNodePresenter] 监听 event_node_reached 弹面板。
-func _mount_event_presenter(es: Node) -> void:
-	if es == null or not es.has_signal(&"event_node_reached"):
-		return
-	_event_presenter = EventNodePresenterScript.new()
-	_event_presenter.call(&"attach", es, self)
-
-
-## 读取减少动态偏好——注入覆盖优先，否则读 SettingsStore 画面分类。
-func _read_reduce_motion() -> bool:
-	if reduce_motion_override != null:
-		return bool(reduce_motion_override)
-	var store: RefCounted = SettingsStoreScript.new()
-	var gfx: Dictionary = store.load_graphics_category()
-	return bool(gfx.get(SettingsStoreScript.GFX_KEY_REDUCE_MOTION, false))
+## 挂载全部子组件——挂载与接线细节在 [NodeGraphComponentAssembly]
+## （交互三组件 + 事件弹出通道 + 转发回调表构建），屏幕只持引用防提前释放。
+func _mount_components(es: Node) -> void:
+	var parts: Dictionary = ComponentAssemblyScript.assemble(self, renderer(),
+			viewport, es, reduce_motion_override)
+	_interaction_mount = parts.get("interaction_mount")
+	_event_presenter = parts.get("event_presenter")
 
 
 ## 键盘焦点转发——渲染器绘制松石青焦点环（ADR-0031 §4 双焦点双视觉）。

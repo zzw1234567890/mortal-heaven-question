@@ -83,6 +83,27 @@ func test_every_option_has_text_result_and_effect() -> void:
 						"效果种类越界：%s" % str(kind))
 
 
+# === 境界门槛 ==================================================================
+
+func test_every_event_min_realm_within_realm_table_bounds() -> void:
+	_system.call(&"load_events")
+	for raw: Variant in _system.call(&"event_ids"):
+		var def: Variant = _system.call(&"get_event", str(raw))
+		assert_between(int(def.get(&"min_realm")), 1, 5,
+				"min_realm 应落在境界表 [1, 5]：%s" % str(raw))
+
+
+func test_at_least_one_event_gated_above_lianqi() -> void:
+	# 境界筛选的实证前提：生产数据存在 min_realm > 1 的事件——全为 1 时筛选是死代码。
+	_system.call(&"load_events")
+	var gated: int = 0
+	for raw: Variant in _system.call(&"event_ids"):
+		var def: Variant = _system.call(&"get_event", str(raw))
+		if int(def.get(&"min_realm")) > 1:
+			gated += 1
+	assert_gt(gated, 0, "应存在高境界限定事件（min_realm > 1）")
+
+
 # === 取事件 ====================================================================
 
 func test_pick_by_index_is_stable_in_range() -> void:

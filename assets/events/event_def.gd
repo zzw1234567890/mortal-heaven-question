@@ -12,7 +12,7 @@ extends Resource
 ## [code]_register_template[/code] 对非 EventTemplate 文件会静默跳过 EventDef
 ## （不 push_error），避免共驻冲突。[br]
 ## [br][b]字段[/b]：[member event_id] 全局唯一；[member options] 为
-## [EventDefOption] 列表（2~3 个）。[br]
+## [EventDefOption] 列表（2~3 个）；[member min_realm] 为最低出现境界（缺省 1）。[br]
 ## [br]来源: 探索事件节点需求、ADR-0014 §决策 3（事件节点走 event_node_reached）、
 ## ADR-0003（事件资源 .tres 模式先例）。
 
@@ -22,6 +22,13 @@ extends Resource
 ## 事件 ID——全局唯一，用作加载注册表的键。
 ## 命名约定：[code]{分类}_{序号}[/code]，例如 [code]"ling_mai_caijue_001"[/code]。
 @export var event_id: String = ""
+
+# === 出现条件 =================================================================
+
+@export_group("出现条件")
+## 最低玩家境界——低于此境界的事件不进入事件节点候选池（1=炼气 … 5=化神，
+## 与 [code]RealmSystem.realm_table[/code] 层级一致）。缺省 1：炼气期即可遇到。
+@export var min_realm: int = 1
 
 # === 显示文本 =================================================================
 

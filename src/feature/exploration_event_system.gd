@@ -2,10 +2,12 @@ class_name ExplorationEventSystem
 extends RefCounted
 ## ExplorationEventSystem —— 探索事件节点的加载与结算。
 ##
-## 职责（只做两件事）：
+## 职责（三件事）：
 ## [br]1. 扫描 [code]res://assets/events/[/code] 下的 [EventDef] 资源，按
 ## [member EventDef.event_id] 建注册表；
-## [br]2. 结算玩家选择的选项——把 [EventDefEffect] 落到 GSM/资源系统，并给出
+## [br]2. 事件节点取事件——[method pick_for_node] 按玩家境界筛候选后取一个
+## （选取策略在 [ExplorationEventSelector]）；
+## [br]3. 结算玩家选择的选项——把 [EventDefEffect] 落到 GSM/资源系统，并给出
 ## 可直接显示的文案行。
 ##
 ## [b]不持有状态[/b]：所有落库都委托给注入的依赖（GSM / ResourceSystem /
@@ -20,6 +22,9 @@ extends RefCounted
 const EVENT_ROOT: String = "res://assets/events"
 
 const CardSerializer := preload("res://src/core/card_system/card_serializer.gd")
+
+## 选取策略子模块——按境界筛选 + 随机取一（见 [ExplorationEventSelector]）。
+const EventSelectorScript := preload("res://src/feature/exploration_event_selector.gd")
 
 ## 效果种类——与 [code]EventDefEffect.Kind[/code] 的导出枚举顺序保持一致。
 const KIND_LING_SHI: int = 0
@@ -118,6 +123,16 @@ func pick_by_index(p_index: int) -> EventDef:
 	ids.sort()
 	var idx: int = posmod(p_index, ids.size())
 	return get_event(String(ids[idx]))
+
+
+## 事件节点取事件——委托 [ExplorationEventSelector]：按玩家境界（下限按炼气期
+## 兜底）筛出候选后取一个，有 [param p_rng] 时随机、无 rng 时按 [param p_node_id]
+## 取模（确定性，可复现）。[br]
+## [br]候选为空（如玩家境界低于全部事件的 [member EventDef.min_realm]）时返回
+## [code]null[/code]——调用方据此不弹面板、不报错。
+func pick_for_node(p_node_id: int, p_player_realm: int,
+		p_rng: RandomNumberGenerator = null) -> EventDef:
+	return EventSelectorScript.pick_for_node(self, p_node_id, p_player_realm, p_rng)
 
 
 # === 结算 =====================================================================

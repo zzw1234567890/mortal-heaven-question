@@ -34,6 +34,7 @@ effects = Array[ExtResource("3_event_def_effect")]([SubResource("Effect_chain_cu
 [resource]
 script = ExtResource("1_event_def")
 event_id = "chain_001"
+min_realm = 2
 title = "剑冢遗蜕"
 body = "山腹深处藏着一座古修剑冢，万千断剑倒插于石台之上，剑气凝而不散，隐隐织成一座剑阵。阵眼处一柄无鞘长剑仍在轻鸣，似在等一个有缘人。守冢的剑灵残识警告：取剑者，需承万剑之锋。"
 options = Array[ExtResource("2_event_def_option")]([SubResource("Option_take"), SubResource("Option_observe")])

@@ -8,6 +8,9 @@ extends GutTest
 const PresenterScript := preload("res://src/ui/exploration/event_node_presenter.gd")
 const PanelScript := preload("res://src/ui/event_panel/event_panel_screen.gd")
 
+## min_realm = 2 的生产事件——炼气期（realm=1）不应遇到（境界筛选实证样本）。
+const HIGH_REALM_EVENTS: Array = ["chain_001", "xie_yue_san_xing_001"]
+
 var _host: Control = null
 var _presenter: RefCounted = null
 var _exploration: Node = null
@@ -70,6 +73,41 @@ func test_no_panel_before_signal() -> void:
 	assert_null(_host.get_node_or_null(NodePath("EventPanel")),
 			"信号未到时不应有面板")
 	assert_false(bool(_presenter.call(&"is_panel_open")))
+
+
+# === 境界筛选与缺事件降级 ======================================================
+
+## 桩事件源——pick_for_node 恒 null，模拟「候选为空」（如玩家境界低于全部事件）。
+class EmptyPicker extends RefCounted:
+	func pick_for_node(_p_node_id: int, _p_player_realm: int,
+			_p_rng: RandomNumberGenerator = null) -> Variant:
+		return null
+
+
+func test_lianqi_realm_never_opens_high_realm_event() -> void:
+	_presenter.call(&"attach", _exploration, _host)
+	_exploration.emit_signal(&"event_node_reached", [], 1)
+	var panel: Variant = _host.get_node_or_null(NodePath("EventPanel"))
+	assert_not_null(panel, "炼气期仍有可选事件，面板应弹出")
+	var shown: String = str(panel.call(&"displayed_event_id"))
+	for high: String in HIGH_REALM_EVENTS:
+		assert_ne(shown, high, "炼气期不应弹出高境界事件：%s" % high)
+
+
+func test_no_eligible_event_skips_panel_without_error() -> void:
+	_presenter.call(&"attach", _exploration, _host)
+	var real_events: RefCounted = _presenter.get(&"_events")
+	_presenter.set(&"_events", EmptyPicker.new())
+	# Act：候选为空的到达——不弹面板、不报错
+	_exploration.emit_signal(&"event_node_reached", [], 1)
+	assert_null(_host.get_node_or_null(NodePath("EventPanel")),
+			"缺可用事件时不应弹面板")
+	assert_false(bool(_presenter.call(&"is_panel_open")))
+	# 空到达不占节点名额——换回真实事件源后同一节点可再弹
+	_presenter.set(&"_events", real_events)
+	_exploration.emit_signal(&"event_node_reached", [], 1)
+	assert_not_null(_host.get_node_or_null(NodePath("EventPanel")),
+			"补回可用事件后同节点应能弹出（名额未被空到达占用）")
 
 
 # === 面板本身 ==================================================================
