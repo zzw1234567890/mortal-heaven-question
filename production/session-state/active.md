@@ -978,3 +978,16 @@ Task: 战斗奖励真正发放 + 展示完成（探索→战斗→结算→回�
 - 全量：**3670 tests / 3669 passing / 1 pending 存量 / 3 orphans 存量**，零回归
 - 已按审查意见**未采纳**的一项：把实际增量下沉到 `combat_roster_state.apply_damage()` 返回值（加 `delta` 键、消掉 `_apply` 的 `delta_is_actual` 双布尔参数）——方向合理但会改动攻击结算的既有返回契约，超出本次范围，留作后续重构；同理 `combat_layout.gd` 的拆分与出牌伤害 `damage_reduced` 未在本次处理
 - Next recommended: combat-ui-interaction 001/003/005（出牌手势 + 目标选择），落地后把施法者改成玩家选中的角色；或继续迁移其余 36 张扁平卡到 `effects`
+
+## Session Extract — 探索事件境界筛选 + 事件面板场景补链（2026-11-12）
+- 任务：① 事件节点按玩家境界筛事件 + 可注入 rng 随机（此前 Presenter 只按节点 id 调 pick_by_index，无境界过滤、无随机）；② event_panel.tscn 从占位脚本换挂真实 EventPanelScreen（事件已走探索层 overlay，占位成死路径）
+- EventDef 新增 `min_realm`（缺省 1=炼气，导出组「出现条件」）；「剑冢遗蜕 chain_001」「斜月三星洞 xie_yue_san_xing_001」设 2（筑基起）——炼气候选 7→5
+- 新增 `src/feature/exploration_event_selector.gd`（47 行 static 纯函数）：`eligible_ids`（境界下限 1 兜底 + id 稳定排序）+ `pick_for_node`（有 rng 候选内均匀随机 / 无 rng 按节点 id 取模）；`ExplorationEventSystem.pick_for_node(node_id, realm, rng)` 薄转发（系统 297 行贴 300 上限）
+- EventNodePresenter：`_on_event_node_reached` 消费 player_realm → `_pick_event` 走 pick_for_node；候选空 → 不弹面板不报错且不占 `_shown_nodes` 名额（补回事件后同节点可再弹）
+- rng 注入：NodeGraphScreen 生产路径注入 `RandomNumberGenerator.new()`（GDD §10 防 SL「到达时才确定」）；测试 attach 缺省 null → 确定性取模可复现
+- NodeGraphScreen 拆出 `node_graph_component_assembly.gd`（交互三组件 + 事件 Presenter + 转发回调表 + reduce_motion 读取统一进装配器）——屏幕 318→279 行回软上限内
+- event_panel.tscn 根节点改挂 `event_panel_screen.gd`（删 screen_id=7 与 mouse_filter=2——后者会覆盖 _init 的 STOP 使遮罩穿透）；placeholder TITLES/HINTS 删 7 号条目；test_placeholder_scenes 的 CASES 移除该行并新增「挂真实脚本」断言（未删未改名任何既有测试）
+- 测试：新增 `tests/unit/exploration_event/test_event_selection.gd`（11 例）；loading 补 min_realm 边界 2 例；presenter 补境界筛选 + 缺事件降级 2 例
+- 全量：4169 tests / 4167 passing / 1 pending 存量 / 3 orphans 存量；唯一失败 `cost_system::test_ac008_batch_updated_payload_contains_cost_paths`（old=0 实得 2——GSM battle 域跨测试状态泄漏；三轮全量均同此例，隔离跑 cost_system 14/14 全过）为**存量**：stash 本轮改动跑 HEAD 基线同样红（4154/4152，同用例同断言）——与本轮改动域零交集（cost_system 按目录序先于本轮全部新增测试执行），零回归（4154 → 4169，净增 15 全过）
+- 已知边界：① `map_pool` 信号载荷仍未消费——本轮是「全局注册表 + min_realm + rng」近似，GDD §10 按地图池加权（select_event(map_pool)）仍归 Foundation EventSystem 规划态；② 转场到 SceneID.EVENT_PANEL(7) 会得到无事件空面板——全库无该转场请求，路径仅为 SceneManager 自检保留；③ `_shown_nodes` 瞬态不进存档，重进地图同节点会再弹；④ run_tests.ps1 在 Git Bash 下用 `>` 重定向会丢 Godot 控制台输出（只剩 banner），改 `2>&1 |` 管道可完整捕获——三轮全量 = 直跑脚本内同款 godot 命令 ×1 + run_tests.ps1 管道 ×2
+- Next recommended: 其余 5 事件按策划意图补 min_realm 分层；EventSystem 按地图池加权落地后把 Presenter 切到 map_pool 口径
