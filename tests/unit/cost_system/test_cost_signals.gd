@@ -181,8 +181,11 @@ func test_ac007_gsm_set_battle_cost_writes_battle_fields() -> void:
 # ============================================================================
 
 func test_ac008_batch_updated_payload_contains_cost_paths() -> void:
-	# 初始化 battle
+	# 初始化 battle，并先把费用归零再等帧末落地——否则前序用例遗留的
+	# current_cost/max_cost 会让本用例读到的 old 不是 0。
 	GameStateManager.battle_start({})
+	GameStateManager._set_battle_cost(0, 0)
+	await get_tree().process_frame
 
 	# 订阅 batch_updated
 	var received: Array = []
