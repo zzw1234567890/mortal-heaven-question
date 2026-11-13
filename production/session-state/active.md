@@ -991,3 +991,18 @@ Task: 战斗奖励真正发放 + 展示完成（探索→战斗→结算→回�
 - 全量：4169 tests / 4167 passing / 1 pending 存量 / 3 orphans 存量；唯一失败 `cost_system::test_ac008_batch_updated_payload_contains_cost_paths`（old=0 实得 2——GSM battle 域跨测试状态泄漏；三轮全量均同此例，隔离跑 cost_system 14/14 全过）为**存量**：stash 本轮改动跑 HEAD 基线同样红（4154/4152，同用例同断言）——与本轮改动域零交集（cost_system 按目录序先于本轮全部新增测试执行），零回归（4154 → 4169，净增 15 全过）
 - 已知边界：① `map_pool` 信号载荷仍未消费——本轮是「全局注册表 + min_realm + rng」近似，GDD §10 按地图池加权（select_event(map_pool)）仍归 Foundation EventSystem 规划态；② 转场到 SceneID.EVENT_PANEL(7) 会得到无事件空面板——全库无该转场请求，路径仅为 SceneManager 自检保留；③ `_shown_nodes` 瞬态不进存档，重进地图同节点会再弹；④ run_tests.ps1 在 Git Bash 下用 `>` 重定向会丢 Godot 控制台输出（只剩 banner），改 `2>&1 |` 管道可完整捕获——三轮全量 = 直跑脚本内同款 godot 命令 ×1 + run_tests.ps1 管道 ×2
 - Next recommended: 其余 5 事件按策划意图补 min_realm 分层；EventSystem 按地图池加权落地后把 Presenter 切到 map_pool 口径
+
+## Session Extract — 商店节点 + 回复节点最小可用交互（2026-11-13）
+- 任务：闭合两类节点「确认之后」的断路——商店真能买（扣灵石 + 入收藏）、回复点真能回血（走 GSM，夹上限），并用集成测试盖住四条点名断言
+- **两处断链（第 1 项调研的产出）**：① 商店——`ExplorationDAGBuilder._fill_node_content` 调 `generate_shop_inventory_cb`，但 `ExplorationBootstrap.mount()` 从未注入它 → 真实 `enter_map` 的商店节点 `inventory` 恒为 `{}`；且 `NodeInteractionPopupHost` 对商店只弹固定文案确认框、确认时仅发 `shop_opened` 信号，**无任何界面接手**。② 回复——`resolve_node` 对 REST 发的 payload 是空字典；宿主调 `NodePopupServices.rest_party()` 找的 `ExplorationSystem.rest_at_node()` 根本不存在 → push_warning + 返回 0
+- **新增 4 个生产文件**：`exploration_rest.gd`（163 行，回复结算）、`exploration_shop_inventory.gd`（124 行，默认货架 + `make_for_realm` 一级入口）、`exploration_shop.gd`（298 行，货架 + 购买结算）、`shop_panel_screen.gd`（251 行，纯代码 overlay）、`shop_node_presenter.gd`（239 行，消费 `shop_opened`/`rest_used`/`popup_closed`）
+- **回复口径**：读 `CombatHpCarryover.read_all` → `plan` → `write_back`（经 GSM `_set_player_character_hp`），**不另开第二条 HP 通路**。总额度一次算（`heal_for(total_lost)`）再按角色 ID 升序逐角色取 `min(缺口, 剩余额度)`——逐角色各 floor 会掉零头，`total_heal == heal_for(total_lost)` 恒成立。阵亡（`current_hp<=0`）不计入也不复活；越界存档值按上限参与
+- **商店口径**：先建卡实例再扣费，入收藏失败则原价退回灵石（「失败不半完成」）；拒绝路径（越界/售罄/余额不足/系统不可用）全在扣费之前；售罄状态由 `stock` 单一推导（不另存「已售」）
+- **InputManager 锁栈的真实缺陷（本轮实测）**：`InputManager._on_tree_changed()` → `input_lock_stack.on_tree_changed()` 会**整体清空锁栈**；`tree_changed` 每帧至多一次、面板入树即触发——同帧 `push_lock` 的锁被立刻抹掉（实测 `is_input_allowed` 仍返回 true）。**MODAL 输入锁不能用于面板期间冻结**，改用 `NodePopupStage`（普通字段）+ `NodeMoveInteractor.set_process_unhandled_key_input(bool)`
+- **冻结时机约束（自查发现）**：`NodeInteractionPopupHost._on_confirmed` 顺序是 `shop_opened.emit()` → `close_popup()`（后者触发舞台解冻）。若在 `shop_opened` 里冻结，舞台保存的「原值」已是冻结态 → 商店关闭后节点图**永久锁死**。修复：新增 `_on_popup_closed` 处理，等弹窗关闭再接管冻结；舞台用**自建**实例（不复用弹窗宿主那份，避免两侧争抢基线）
+- **公式单一来源**：`NodeInteractionRules.rest_heal_amount` 改为转发 `ExplorationRest.heal_for`（此前两处各写一遍 `floor(lost × 0.5)`）
+- **测试**：新增 `test_shop_and_rest_node_flow.gd`（7 例端到端：到达弹面板/买一件扣钱加货/钱不够给提示不扣/结算层二次拒绝/回复不超上限/满队无恙/冻结与解冻）、`test_exploration_rest.gd`（11 例公式与边缘）、bootstrap +2 例货架装配；拆出 `shop_rest_node_fixture.gd`（199 行，装置与存档还原）与 `card_template_primer.gd`（40 行，CardSystem 异步加载的同步推进，两个用例文件共用）让各文件回 300 行内
+- **商店节点是随机产物**：`_assign_node_types` 按权重随机（shop 15/100），单张图不保证有商店——bootstrap 的货架用例改为按 `entry_count` 扫描至多 12 次（seed 固定 → 扫到哪张图确定）
+- 全量：**4193 tests / 4192 passing / 1 pending 存量 / 3 orphans 存量**，零失败、零回归（4173 → 净增 20，全过）
+- 已知边界（见下方「遗留」段）：`NodeInteractionRules.rest_heal_amount` 与 `ExplorationRest.heal_for` 已合并为转发，但 `NodeInteractionRules` 仍留一层包装（既有测试锁定该 API，未删）；`ExplorationSystem` 686 行（既有超限，本轮 +22）；商店面板商品行无键盘/手柄导航（焦点停留首行）；`stock` 每次重进地图重置；`NodePopupStage` 与商店各持一份冻结基线（弹窗在商店期间开合的语义已在文档说明但无测试覆盖）
+- Next recommended: 商店面板的键盘/手柄导航（UI 规则要求所有交互元素双输入）；回复点/商店的结算写入是否要进存档快照口径核对；`ExplorationSystem` 拆分（686 行，超 300 软上限）
