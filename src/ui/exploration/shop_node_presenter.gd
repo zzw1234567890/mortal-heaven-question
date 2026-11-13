@@ -161,7 +161,11 @@ func _on_shop_opened(p_node_id: int, p_inventory: Dictionary) -> void:
 
 ## 确认弹窗关闭——确认为商店时接管冻结（面板在场则冻，否则不冻）。[br]
 ## [br][b]不按弹窗种类过滤[/b]：商店面板是否在场才是「要不要冻结」的唯一依据——
-## 取消路径（弹窗关闭但没进商店）时面板为 null，自然不会冻。
+## 取消路径（弹窗关闭但没进商店）时面板为 null，自然不会冻。[br]
+## [br][b]为什么要重放冻结[/b]：弹窗的舞台与商店的舞台是两个实例，但交互组件的
+## 键盘开关[b]只有一个[/b]——弹窗关闭时弹窗那侧的配对会把它打开。商店还在场就得
+## 再关一次，故这里直接调 [method _apply_freeze]（该方法的守卫只看回调是否注入，
+## 不看 [member _frozen]——正是「已冻但开关被弹窗打开」这一种情况要重放）。
 func _on_popup_closed(_p_node_id: int, _p_kind: StringName) -> void:
 	if not is_panel_open():
 		return
@@ -199,11 +203,16 @@ func _refresh(p_message: String) -> void:
 # 冻结（节点图在商店面板期间不吃输入——GDD §4c）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 冻结节点图（幂等——已在冻结态时直接返回）。[br]
+## 冻结节点图。[br]
+## [br][b]不按 [member _frozen] 短路[/b]：该标志只回答「本类是冻结态」，不足以
+## 回答「节点图现在是冻结态」——交互组件的键盘开关是弹窗与商店[b]共享[/b]的
+## 一个开关，弹窗关闭时弹窗那侧会把它打开（见 [method _on_popup_closed]）。
+## 舞台自身的 [method NodePopupStage.freeze] 幂等（不覆盖已保存的原值），
+## 故重放只把键盘开关再关一次，代价为零。[br]
 ## [br][b]未注入回调[/b]（headless 单测 / 宿主未提供舞台）：静默跳过——面板自身的
-## 全屏遮罩仍拦住鼠标，不把缺回调变成崩溃。
+## 全屏遮罩仍拦住鼠标，不把缺回调变成崩溃；[member _frozen] 如实保持 false。
 func _apply_freeze() -> void:
-	if _frozen or not _freeze.is_valid():
+	if not _freeze.is_valid():
 		return
 	_frozen = true
 	_freeze.call()

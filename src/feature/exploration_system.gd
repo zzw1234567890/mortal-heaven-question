@@ -1,161 +1,29 @@
-extends Node
-## ExplorationSystem —— 探索系统 Autoload（ADR-0014 #19）。
-##
-## Feature 层 Autoload。程序化 DAG 地图生成 + 节点导航 + 子系统委托调度。[br]
+extends "res://src/feature/exploration/exploration_system_ops.gd"
+## ExplorationSystem —— 探索系统 Autoload（ADR-0014 #19）——[b]编排面[/b]。[br]
+## [br]Feature 层 Autoload。程序化 DAG 地图生成 + 节点导航 + 子系统委托调度。[br]
 ## DAG 生成算法委托给 [ExplorationDAGBuilder]（RefCounted 子模块），[br]
 ## 经济计算委托给 [ExplorationEconomy]（RefCounted 子模块）。[br]
 ## [br][b]已注册进 project.godot[/b]——Autoload #19（ExplorationSystem）。[br]
+## [br][b]本文件的职责[/b]：地图生成与进入（[method generate_map] /
+## [method enter_map]）、节点导航（[method move_to_node]）、节点交互分发
+## （[method resolve_node]）、Autoload 生命周期钩子（[method _ready]）——
+## 也就是「编排」这一件事。[br]
+## [br][b]继承链[/b]（`exploration_system.gd` 686 行 → 三段各守 300 行内，
+## 成员名与访问路径逐字不变——机械拆分、行为零改动）：[br]
+##   1. [code]exploration_system_base.gd[/code]——枚举 / 常量 / 状态 / 注入点 /
+##      子模块句柄 / 通用助手；[br]
+##   2. [code]exploration_system_ops.gd[/code]——Cat 2b 信号表 / 子模块转发 /
+##      只读查询 / DAG 缓存生命周期 / 测试桩；[br]
+##   3. 本文件——编排面（也是 project.godot 注册的那份脚本）。[br]
+## [br][b]为什么钩子在这一层[/b]：Godot 只调最派生类的 [code]_ready[/code]
+## （实测父类的不会自动链式执行），故生命周期钩子统一放链尾，只此一份。[br]
 ## [br]来源: ADR-0014 §决策 2 程序化 DAG 生成 / GDD exploration-system.md §2-3。[br]
 ## [br]Sprint 8 Story 8-9：DAG 生成 + 经济计算拆分到子模块。
 
 
-# === 枚举 ========================================================================
-
-## 节点类型枚举——DAG 节点的类型标识。
-enum NodeType {
-	ENTRY = 0,         ## 入口——第 0 层固定
-	COMBAT = 1,        ## 普通战斗
-	ELITE = 2,         ## 精英战斗
-	BOSS = 3,          ## Boss——末层固定
-	EVENT = 4,         ## 事件
-	SHOP = 5,          ## 商店
-	TELEPORT = 6,      ## 传送——不消耗行动力
-	ACTION_SPRING = 7, ## 行动力泉——回复全部行动力
-	REST = 8,          ## 回复点——全体回复 50% 已损失 HP
-	TRIBULATION = 9,   ## 渡劫台——修为已满时触发渡劫
-}
-
-## 地图难度枚举。
-enum MapDifficulty {
-	LOW = 0,       ## 低——4 层，2-3 节点/层
-	MEDIUM = 1,    ## 中——5 层，2-4 节点/层
-	HIGH = 2,      ## 高——5 层，3-4 节点/层
-	VERY_HIGH = 3, ## 极高——6 层，3-4 节点/层
-}
-
-## 探索结束原因枚举。
-enum EndReason {
-	BOSS_DEFEATED,  ## Boss 击败——通关奖励结算
-	BATTLE_LOST,    ## 战斗失败——修为保留 50%
-	AP_DEPLETED,    ## 行动力耗尽——全额保留
-	PLAYER_QUIT,    ## 玩家主动退出——全额保留
-}
-
-
-# === 内部状态 ====================================================================
-
-## DAG 邻接表——{node_id: [child_ids]}。
-var _node_graph: Dictionary = {}
-
-## 节点详情——{node_id: {type, layer, idx, ...}}。
-var _node_details: Dictionary = {}
-
-## 可达性缓存——{node_id: bool}。
-var _reachable_cache: Dictionary = {}
-
-## 当前地图配置快照。
-var _map_config: Dictionary = {}
-
-## DAG 缓存就绪标志——_ready() 末尾设为 true，公共方法入口守卫（ADR-0014 R7）。
-var _dag_ready: bool = false
-
-## 独立 RNG 实例——确定性 DAG 生成。
-var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-
-## 可注入回调——获取地图配置（桩阶段返回默认配置）。
-var get_map_config_cb: Callable = Callable()
-
-## 可注入回调——生成敌人阵容（桩阶段返回空 Array）。
-var generate_enemy_roster_cb: Callable = Callable()
-
-## 可注入回调——获取事件池（桩阶段返回空 Array）。
-var get_event_pool_cb: Callable = Callable()
-
-## 可注入回调——生成商店库存（桩阶段返回空 Dictionary）。
-var generate_shop_inventory_cb: Callable = Callable()
-
-## 可注入回调——按模板 ID 查 EnemyTemplate（[code]func(template_id) -> Resource[/code]）。[br]
-## [b]用途[/b]：DAG 生成时按 [code]reward_config[/code] 聚合节点掉落；空 = 走
-## Autoload AISystem 的 [code]get_template[/code]（单测可注入桩，不依赖场景树）。
-var enemy_template_lookup_cb: Callable = Callable()
-
-## 可注入回调——获取 RNG seed（桩阶段返回 42）。
-var get_seed_cb: Callable = Callable()
-
-
-# === 常量（保留在主文件——测试通过 es.get 访问）==============================
-
-## 默认地图难度配置表——按 MapDifficulty 枚举索引。[br]
-## [br][code]enemy_realm[/code] 是节点敌人强度的定档基准（GDD「回旧地图」§7：
-## 敌人强度按地图本身境界设定，不随玩家境界上涨）。缺键的地图配置会回退玩家
-## 境界并警告一次——生产配置由 [code]exploration_map_catalog.gd[/code] 提供，
-## 本表只是难度档位的通用兜底（境界取难度档位的默认值 1~4）。[br]
-const DIFFICULTY_CONFIGS: Array = [
-	{  # LOW
-		"layers": 4, "min_nodes": 2, "max_nodes": 3,
-		"elite_count": 1, "shop_count": 1, "event_count": 2, "enemy_realm": 1,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
-	},
-	{  # MEDIUM
-		"layers": 5, "min_nodes": 2, "max_nodes": 4,
-		"elite_count": 2, "shop_count": 1, "event_count": 3, "enemy_realm": 2,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
-	},
-	{  # HIGH
-		"layers": 5, "min_nodes": 3, "max_nodes": 4,
-		"elite_count": 2, "shop_count": 2, "event_count": 3, "enemy_realm": 3,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
-	},
-	{  # VERY_HIGH
-		"layers": 6, "min_nodes": 3, "max_nodes": 4,
-		"elite_count": 3, "shop_count": 2, "event_count": 4, "enemy_realm": 4,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
-	},
-]
-
-## 入口节点 ID——DAG 编码 [code]layer * 100 + idx[/code]，第 0 层 0 号。
-const ENTRY_NODE_ID: int = 0
-
-## AP=0 豁免节点类型集合——不消耗行动力且行动力不足时仍可移动。
-const AP_EXEMPT_TYPES: Array = [NodeType.TELEPORT, NodeType.ACTION_SPRING, NodeType.BOSS]
-
-## 永久免费地图列表——每个境界 1 张，重入始终免费（GDD §1 经济安全阀）。
-const PERMANENT_FREE_MAPS: Dictionary = {
-	&"qing_yun_jian_zong": 1,   # 青云剑宗（炼气）
-	&"sui_xing_wai_huan": 2,    # 碎星外环（筑基）
-	&"xi_yu_gu_lin": 3,         # 西域古林（金丹）
-	&"mu_lan_cao_yuan": 4,      # 慕兰草原（元婴）
-	&"gui_xu_fu_yun_lu": 5,     # 归墟·浮云陆（化神）
-}
-
-## 重入费用基价表——按 MapDifficulty 枚举索引（GDD §公式 10）。
-const REENTRY_BASE_COSTS: Array = [30, 60, 100, 150]  # LOW/MEDIUM/HIGH/VERY_HIGH
-
-## 通关奖励基价表——按 MapDifficulty 枚举索引（GDD §公式 5）。
-const CLEAR_REWARDS: Array = [
-	{"ling_shi": 50,  "cultivation": 50},   # LOW
-	{"ling_shi": 100, "cultivation": 80},   # MEDIUM
-	{"ling_shi": 200, "cultivation": 120},  # HIGH
-	{"ling_shi": 300, "cultivation": 150},  # VERY_HIGH
-]
-
-
-# === 子模块实例 ===================================================================
-
-## DAG 生成器子模块。
-var _dag_builder: RefCounted = null
-
-## 经济计算子模块。
-var _economy: RefCounted = null
-
-## 结算刷新子模块（Sprint 12 Story 011 拆分）。
-var _map_flush: RefCounted = null
-
-## 回复点结算子模块（GDD §公式 7——全队回复 50% 已损失 HP）。
-var _rest: RefCounted = null
-
-
-# === DAG 生成（委托给 ExplorationDAGBuilder）===================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# DAG 生成（委托给 ExplorationDAGBuilder）
+# ═══════════════════════════════════════════════════════════════════════════════
 
 ## 程序化生成 DAG 地图——委托给 _dag_builder 子模块。[br]
 ## [br][param map_id] 地图 ID。[br]
@@ -166,44 +34,9 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 	return _get_dag_builder().generate_map(map_id, player_realm, entry_count)
 
 
-# === 节点导航（Story 003）=====================================================
-
-## Cat 2b 信号——探索结束（ADR-0014 §决策 5）。
-signal exploration_ended(reason: int, summary: Dictionary)
-
-## Cat 2b 信号——DAG 生成完成（ADR-0014 §决策 3 信号表）。[br]
-## [br][b]载荷[/b]：[code]map_data[/code] 为渲染快照——
-## [code]{graph, nodes, visited, current_node, ap_remaining, layers, boss_node_id,
-## path_count, map_id}[/code]。前五项与 [NodeGraphScreen] 的消费契约同构
-## （[code]visited[/code] / [code]current_node[/code] / [code]ap_remaining[/code]
-## 在 [method enter_map] 里按 GSM 实际写入值补齐——不是「推测值」）。[br]
-## [br][b]何时发射[/b]：仅 [method enter_map]（含读档重建后的首次进入）——
-## [method generate_map] 是纯生成、不写导航状态，不发信号（单测直调它不会
-## 惊动 UI）。[br]
-## [br][b]监听方[/b]：探索 UI（节点图主界面）、音频系统。[br]
-## [br]来源: ADR-0014 §决策 3 信号表、GDD exploration-system.md §信号定义。
-signal map_generated(map_id: StringName, map_data: Dictionary)
-
-## Cat 2b 信号——节点移动完成（ADR-0007 / ADR-0014 §决策 3）。
-signal node_moved(from_node: int, to_node: int, ap_remaining: int)
-
-## Cat 2b 信号——到达事件节点，委托 EventSystem（ADR-0014 §决策 3）。
-signal event_node_reached(map_pool: Array, player_realm: int)
-
-## Cat 2b 信号——到达战斗/精英节点，委托 CombatSystem（ADR-0014 §决策 3）。
-signal combat_node_reached(enemy_roster: Array, combat_type: StringName)
-
-## Cat 2b 信号——到达 Boss 节点，委托 CombatSystem（ADR-0014 §决策 3）。
-signal boss_node_reached(boss_data: Dictionary)
-
-## Cat 2b 信号——到达商店/回复/灵泉/渡劫台/传送节点，UI 按 interaction_type 分发（ADR-0014 §决策 3）。
-signal node_interaction_triggered(node_id: int, interaction_type: StringName, payload: Dictionary)
-
-## Cat 2b 信号——节点被标记为已访问（统一入口 [method mark_node_visited] 的唯一出口）。[br]
-## [br][b]载荷[/b]：[code]node_id[/code]；[code]is_new[/code] 是否首次标记
-## ——[code]false[/code] 即幂等确认（到达已标记后再由战斗/事件确认）。[br]
-## [br]来源: ADR-0014 §决策 3 信号表。
-signal node_marked_visited(node_id: int, is_new: bool)
+# ═══════════════════════════════════════════════════════════════════════════════
+# 节点导航与交互分发
+# ═══════════════════════════════════════════════════════════════════════════════
 
 ## 节点导航——从 from_node 移动到 to_node。[br]
 ## [br][b]验证链路[/b]（短路求值）：可达性 → 已访问 → 行动力。[br]
@@ -269,51 +102,6 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 	return result
 
 
-## 统一标记入口——把一个节点记为已访问，并发 [signal node_marked_visited]。[br]
-## [br][b]三种节点共用[/b]：移动到达（资源/事件/战斗节点一致）、战斗胜利确认、
-## 事件结算确认——口径只有这一处，别在别处直接调 gsm.add_visited_node。[br]
-## [br][param node_id] 节点 ID。[br]
-## [br][b]返回[/b]：[code]true[/code] 首次标记，[code]false[/code] 幂等重复。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型 + §决策 3 信号表。
-func mark_node_visited(node_id: int) -> bool:
-	if node_id < 0:
-		return false
-	var gsm: Node = _get_gsm()
-	if gsm == null or not gsm.has_method(&"add_visited_node"):
-		return false
-	var visited: Array = gsm.get(&"exploration").get("visited_nodes", []) if gsm.get(&"exploration") != null else []
-	var is_new: bool = not visited.has(node_id)
-	gsm.call(&"add_visited_node", node_id)
-	_emit_safe(&"node_marked_visited", [node_id, is_new])
-	return is_new
-
-
-## 只读查询——验证从 from_node 是否可移动到 to_node。[br]
-## [br][b]不修改任何状态[/b]——与 move_to_node() 分离（查询 vs 命令，ADR-0014 §关键接口）。[br]
-## [br][param from_node] 起始节点 ID。[br]
-## [br][param to_node] 目标节点 ID。[br]
-## [br][b]返回[/b]: [code]true[/code] 可移动，[code]false[/code] 不可移动。[br]
-## [br]来源: ADR-0014 §关键接口 can_move_to。
-func can_move_to(from_node: int, to_node: int) -> bool:
-	# _dag_ready 守卫（ADR-0014 R7）
-	if not _dag_ready:
-		return false
-	if not _is_reachable(from_node, to_node):
-		return false
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return false
-	var visited: Array = gsm.exploration.get("visited_nodes", [])
-	if visited.has(to_node):
-		return false
-	var ap: int = int(gsm.exploration.get("action_points", 0))
-	var to_type: int = _get_node_type(to_node)
-	var is_exempt: bool = AP_EXEMPT_TYPES.has(to_type)
-	if ap < 1 and not is_exempt:
-		return false
-	return true
-
-
 ## 节点交互分发——按节点类型发射 Cat 2b 委托信号。[br]
 ## [br][param node_id] 节点 ID。[br]
 ## [br][b]分发规则[/b]（ADR-0014 §决策 3）:[br]
@@ -362,61 +150,9 @@ func resolve_node(node_id: int) -> void:
 			pass  # 入口无交互
 
 
-## 只读查询——当前地图总层数，从 DAG 缓存推导（hud Story 006 LP 跨域
-## 预协调 2026-10-20 APPROVED WITH CONDITIONS）。[br]
-## [br][b]数据源[/b]：节点 ID 编码 [code]layer * 100 + idx[/code]
-## （exploration_dag_builder.gd L46-50），故总层数 =
-## [code]max(_node_details.keys()) / 100 + 1[/code]。每次调用现算不缓存——
-## O(n) max() 无性能问题，勿加失效逻辑（LP 明示）。[br]
-## [br][b]守卫链[/b]（先例 move_to_node / can_move_to / resolve_node——
-## ADR-0014 R7；get_node_graph 为无守卫测试桩、非先例）:[br]
-##   1. [code]_dag_ready[/code] 未就绪 → push_warning + 返回安全默认 1[br]
-##   2. [code]_node_details[/code] 空集（_ready 有三条 _dag_ready=true 但缓存
-##      空的路径——LP 条件①）→ push_warning + 返回安全默认 1[br]
-## [br][b]只读[/b]：不修改任何状态——HUD 展示「层 x/总层数」的唯一许可入口
-## （HUD 禁止调用 get_node_graph()/get_node_details() 测试桩取层数——LP 条件③）。[br]
-## [br][b]返回[/b]: 总层数（≥1；空缓存/未就绪时返回 1——显示「层 x/1」的
-## 占位语义，UI 侧不做额外分支）。[br]
-## [br]来源: ADR-0014 R7 + hud Story 006（2026-10-20 QL 复核 GAP-1 + LP 条件②④⑤）。
-func get_total_layers() -> int:
-	# _dag_ready 守卫（ADR-0014 R7——先例 resolve_node L274）
-	if not _dag_ready:
-		push_warning("ExplorationSystem.get_total_layers: DAG 缓存未就绪，返回安全默认值 1")
-		return 1
-	# 空集防御（LP 条件①——_ready 有三条 _dag_ready=true 但缓存空的路径）
-	if _node_details.is_empty():
-		push_warning("ExplorationSystem.get_total_layers: 节点详情缓存为空，返回安全默认值 1")
-		return 1
-	# 节点 ID 编码 layer*100+idx → 最大 ID 整除 100 即最大层索引（0 基），+1 转 1 基
-	return int(_node_details.keys().max()) / 100 + 1
-
-
-## 检查 from→to 是否邻接（graph[from] 包含 to）。
-func _is_reachable(from_node: int, to_node: int) -> bool:
-	if not _node_graph.has(from_node):
-		return false
-	return _node_graph[from_node].has(to_node)
-
-
-## 获取节点类型——从 _node_details 读取。
-func _get_node_type(node_id: int) -> int:
-	var detail: Dictionary = _node_details.get(node_id, {})
-	return int(detail.get("type", NodeType.COMBAT))
-
-
-## 通过 GSM._emit_signal_safe 路由 Cat 2b 信号（ADR-0007）。
-func _emit_safe(signal_name: StringName, args: Array) -> void:
-	var gsm: Node = _get_gsm()
-	if gsm != null and gsm.has_method("_emit_signal_safe"):
-		gsm._emit_signal_safe(self, signal_name, args)
-		return
-	push_warning("ExplorationSystem: GSM 不可用，%s 信号绕过 _emit_signal_safe 路由" % signal_name)
-	var call_args: Array = [signal_name]
-	call_args.append_array(args)
-	callv("emit_signal", call_args)
-
-
-# === 导航状态 GSM 主存储（Story 002）===========================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# 进入地图（导航状态 GSM 主存储——Story 002）
+# ═══════════════════════════════════════════════════════════════════════════════
 
 ## 进入地图——生成 DAG + 初始化 GSM exploration.* 导航状态 + 广播 map_generated。[br]
 ## [br][param map_id] 地图 ID。[br]
@@ -471,7 +207,9 @@ func enter_map(map_id: StringName, player_realm: int = 1, max_ap: int = 10) -> D
 	return map_data
 
 
-# === DAG 缓存重建（Story 004）=================================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# Autoload 生命周期
+# ═══════════════════════════════════════════════════════════════════════════════
 
 ## Autoload 就绪——检测读档后是否有活跃地图，重建 DAG 缓存。[br]
 ## [br][b]流程[/b]（ADR-0014 §决策 1 状态分层模型 + R7）:[br]
@@ -479,6 +217,8 @@ func enter_map(map_id: StringName, player_realm: int = 1, max_ap: int = 10) -> D
 ## [br]2. 非空 → 从 map_states 读取 graph/nodes 快照 → rebuild_dag_cache[br]
 ## [br]3. 为空 → 跳过重建[br]
 ## [br]4. 末尾设 _dag_ready = true（保护 UI 早期调用）[br]
+## [br][b]为什么在本层[/b]：Godot 只调最派生类的 [code]_ready[/code]（实测父类的
+## 不会自动链式执行）——钩子分散在两处会出现「一半没跑」的静默故障。[br]
 ## [br]来源: ADR-0014 §决策 1 + R7。
 func _ready() -> void:
 	var gsm: Node = _get_gsm()
@@ -504,183 +244,3 @@ func _ready() -> void:
 			push_warning("ExplorationSystem._ready: current_map=%s 但 map_states 无 graph/nodes 快照" % current_map)
 
 	_dag_ready = true
-
-
-## 从已有数据重建 DAG 缓存——不重新生成，直接填充内部成员。[br]
-## [br][param map_id] 地图 ID。[br]
-## [br][param map_data] 含 graph/nodes/layers/boss_node_id/path_count 的 Dictionary。[br]
-## [br][b]用途[/b]：读档后从 map_states 快照重建 + 探索→战斗→探索往返恢复。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
-func rebuild_dag_cache(map_id: StringName, map_data: Dictionary) -> void:
-	_node_graph = (map_data.get("graph", {}) as Dictionary).duplicate(true)
-	_node_details = (map_data.get("nodes", {}) as Dictionary).duplicate(true)
-	_map_config = {}
-	_dag_ready = true
-
-
-## 清理 DAG 缓存——重置所有内部状态。[br]
-## [br][b]用途[/b]：end_exploration 后清理 + 测试清理。[br]
-## [br]来源: ADR-0014 §决策 5 探索结束结算。
-func clear_dag_cache() -> void:
-	_node_graph.clear()
-	_node_details.clear()
-	_reachable_cache.clear()
-	_map_config.clear()
-	_dag_ready = false
-
-
-## 获取当前地图的进入次数——从 GSM exploration.map_states 读取。[br]
-## [br][param map_id] 地图 ID。[br]
-## [br][b]返回[/b]: 进入次数（0 表示从未进入）。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
-func _get_entry_count(map_id: StringName) -> int:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return 0
-	var map_states: Dictionary = gsm.exploration.get("map_states", {})
-	var state: Dictionary = map_states.get(map_id, {})
-	return int(state.get("entry_count", 0))
-
-
-## 获取 GSM 引用——通过 SceneTree Autoload。[br]
-## [br][b]返回[/b]: GSM 节点或 null（未注册时）。[br]
-## [br]来源: ADR-0014 §决策 1 ExplorationSystem 作为 Autoload。
-func _get_gsm() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null:
-		return null
-	return tree.root.get_node_or_null("/root/GameStateManager")
-
-
-## 获取地图配置——优先注入回调，回退到难度配置表。
-func _get_map_config(map_id: StringName, player_realm: int) -> Dictionary:
-	if get_map_config_cb.is_valid():
-		var cfg = get_map_config_cb.call(map_id, player_realm)
-		if cfg is Dictionary and not cfg.is_empty():
-			return cfg
-	# 回退：默认中难度配置
-	var difficulty: int = int(player_realm) - 1
-	if difficulty < 0 or difficulty >= DIFFICULTY_CONFIGS.size():
-		difficulty = 1  # MEDIUM
-	return DIFFICULTY_CONFIGS[difficulty]
-
-
-## 获取 RNG seed——优先注入回调，回退到默认 42。
-func _get_seed() -> int:
-	if get_seed_cb.is_valid():
-		return int(get_seed_cb.call())
-	return 42
-
-
-# === 测试桩 API ==================================================================
-
-## 设置 RNG seed（确定性测试用）。
-func set_rng_seed(seed_value: int) -> void:
-	_rng.seed = seed_value
-
-## 返回当前 DAG 图（测试桩）。
-func get_node_graph() -> Dictionary:
-	return _node_graph
-
-## 返回当前节点详情（测试桩）。
-func get_node_details() -> Dictionary:
-	return _node_details
-
-
-# === 经济计算（委托给 ExplorationEconomy）=======================================
-
-## 计算地图重入传送费——委托给 _economy 子模块。
-func calculate_reentry_cost(map_id: StringName) -> int:
-	return _get_economy().calculate_reentry_cost(map_id)
-
-
-## 计算地图通关奖励——委托给 _economy 子模块。
-func calculate_map_clear_rewards(map_id: StringName, is_first_clear: bool, player_realm: int, map_max_realm: int) -> Dictionary:
-	return _get_economy().calculate_map_clear_rewards(map_id, is_first_clear, player_realm, map_max_realm)
-
-
-## 境界差额惩罚系数——委托给 _economy 子模块。
-func realm_gap_penalty(player_L: int, map_max_L: int) -> float:
-	return _get_economy().realm_gap_penalty(player_L, map_max_L)
-
-
-## 收集资源——委托给 _map_flush 子模块（Sprint 12 Story 011 拆分）。
-func collect_resource(resource_type: StringName, amount: int) -> void:
-	_get_map_flush().collect_resource(resource_type, amount)
-
-
-# === 回复点结算（委托给 ExplorationRest）=====================================
-
-## 回复点结算——全队回复 50% 已损失 HP（GDD §公式 7），返回实际回复量。[br]
-## [br][b]唯一入口[/b]：UI 侧 [code]NodePopupServices.rest_party[/code] 调本方法，
-## 面板只显示返回值（UI 零数值计算）。效果实现见 [ExplorationRest]。[br]
-## [br][param p_node_id] 回复点节点 ID（透传——实现侧只用于日志）。[br]
-## [br][b]返回[/b]：实际回复总量（全队满血 / 无角色登记 HP / GSM 写回入口缺失时为 0）。[br]
-## [br]来源: GDD exploration-system.md §公式 7 + §8 边界、exploration-ui-system.md §4c。
-func rest_at_node(p_node_id: int) -> int:
-	return int(_get_rest().call(&"rest_at_node", p_node_id))
-
-
-## 将 map_states[map_id] 中的 collected_* 转移到 GSM player.* 域——委托给 _map_flush 子模块。
-func _flush_map_state(map_id: StringName) -> void:
-	_get_map_flush()._flush_map_state(map_id)
-
-
-## 战败结算——委托给 _map_flush 子模块。
-func _flush_map_state_half_cultivation(map_id: StringName) -> void:
-	_get_map_flush()._flush_map_state_half_cultivation(map_id)
-
-
-## 探索结束结算——委托给 _map_flush 子模块（Sprint 12 Story 011 拆分）。
-func end_exploration(reason: int) -> Dictionary:
-	return _get_map_flush().end_exploration(reason)
-
-
-## 检查地图是否已通关——委托给 _map_flush 子模块。
-func _is_map_cleared(map_id: StringName) -> bool:
-	return _get_map_flush()._is_map_cleared(map_id)
-
-
-## 标记地图通关——委托给 _map_flush 子模块。
-func _mark_map_cleared(map_id: StringName) -> void:
-	_get_map_flush()._mark_map_cleared(map_id)
-
-
-## 获取玩家境界——委托给 _map_flush 子模块。
-func _get_player_realm() -> int:
-	return _get_map_flush()._get_player_realm()
-
-
-## 获取地图最高允许境界——委托给 _map_flush 子模块。
-func _get_map_max_realm(map_id: StringName) -> int:
-	return _get_map_flush()._get_map_max_realm(map_id)
-
-
-# === 子模块获取（惰性初始化）===================================================
-
-## 获取 DAG 生成器子模块实例。
-func _get_dag_builder() -> RefCounted:
-	if _dag_builder == null:
-		_dag_builder = preload("res://src/feature/exploration/exploration_dag_builder.gd").new(self)
-	return _dag_builder
-
-
-## 获取经济计算子模块实例。
-func _get_economy() -> RefCounted:
-	if _economy == null:
-		_economy = preload("res://src/feature/exploration/exploration_economy.gd").new(self)
-	return _economy
-
-
-## 获取结算刷新子模块实例（Sprint 12 Story 011 拆分）。
-func _get_map_flush() -> RefCounted:
-	if _map_flush == null:
-		_map_flush = preload("res://src/feature/exploration/exploration_map_flush.gd").new(self)
-	return _map_flush
-
-
-## 获取回复点结算子模块实例（GDD §公式 7——全队回复 50% 已损失 HP）。
-func _get_rest() -> RefCounted:
-	if _rest == null:
-		_rest = preload("res://src/feature/exploration/exploration_rest.gd").new(self)
-	return _rest

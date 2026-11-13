@@ -3,8 +3,22 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 战斗奖励真正发放 + 展示完成（探索→战斗→结算→回探索闭环）；下一步 探索导航闭环（`get_map_list` 真实载荷、重入编排）或 combat-ui-interaction 005 目标选择可视化
+Task: 商店面板键盘/手柄导航 + 冻结时序测试 + ExplorationSystem 拆分（686 → 246）；下一步 其余 5 事件按策划意图补 min_realm 分层，或探索导航闭环（`get_map_list` 真实载荷、重入编排）
 <!-- /STATUS -->
+
+## Session Extract — 商店面板双输入导航 + 冻结时序 + ExplorationSystem 拆分（2026-11-13）
+- 任务：补上轮自己登记的缺口——① 商店面板键盘/手柄导航（上下选行 / 确认购买 / Esc 关闭，焦点可见）+ 一条「商店开合与节点图冻结/解冻」时序测试；② `exploration_system.gd`（686 行）机械拆到 300 行以内；硬性约束：不重复声明 signal、单文件 ≤300 行、不删/不改名既有测试、全量 GUT 全绿
+- **事件层级实测（关键，三轮探针）**：焦点落在 `Button` 上时，引擎内置焦点导航在 **GUI 阶段**就吃掉方向键，`_unhandled_key_input`/`_unhandled_input` **收不到**——只有 `_input` 能拦住（消费 = `get_viewport().set_input_as_handled()`）。第二探针：`Control.grab_focus()` 对 `disabled` 的 `Button` **仍然生效**（`disabled_button_focusable=true`）→ 跳过禁用行必须由游标自己做。第三探针：`_input` 按树序**倒序**派发，场景节点先于先入树的 Autoload（`input_order=["scene"]`）→ 商店能抢在 `InputManager` 之前吃掉 Esc，不会顺带弹暂停菜单
+- **新增 `src/ui/exploration/shop_panel_navigator.gd`（135）**：纯逻辑游标，只声明一个 `focus_changed`；`reset()` 落到首个可选行、`move()` 跳过禁用行且不环绕、`activate()` 对禁用行/无游标返回 false 不发意图、`handle_event()` 只吃 `ui_up/ui_down/ui_accept/ui_cancel`（四个默认动作键鼠+手柄都有绑定 → 一条实现覆盖两种设备）
+- **新增 `src/ui/exploration/shop_panel_layout.gd`（190）**：控件树构建 + 配色（`build` / `add_item_row` / `apply_focus_ring` / `focus_stylebox` / `rarity_name`），无 signal 声明（用 `p_panel.emit_signal(&"leave_requested")` 转发）。焦点环走 `focus` stylebox——引擎只在获得焦点时绘制，**焦点可见随焦点自动跟随**，面板零轮询
+- **重写 `shop_panel_screen.gd`（240）**：改 `_input` + `set_input_as_handled()`；新增查询口 `focused_index()` / `is_item_focused()`（读 `Button.has_focus()`——焦点可见的实证，不只读游标内部状态）；对外契约（`present`/`press_item`/`press_leave`/`item_texts`…）逐字保留
+- **冻结时序真缺陷（自查发现）**：弹窗的舞台与商店的舞台是两个实例，但交互组件的键盘开关**只有一个**——弹窗关闭时弹窗那侧的解冻配对会把它打开，商店还在场就出现「遮罩还在、键盘却能走位」。修复：`_apply_freeze()` 去掉 `_frozen` 短路（该标志只回答「本类是冻结态」，不足以回答「节点图现在是冻结态」），`_on_popup_closed` 直接重放冻结；`NodePopupStage.freeze()` 自身幂等（不覆盖已保存原值），重放代价为零
+- **`exploration_system.gd` 拆法（686 → 246）**：**必须保留所有成员名**——测试与子模块用 `es.get("DIFFICULTY_CONFIGS")` / `es.set("_dag_ready", true)` / `_parent.call("_get_map_config")` / `_parent.NodeType.SHOP` 访问。探针实测 `Object.get/set/call` 与 `_parent.Enum.X` **都沿继承链解析**（而 RefCounted 子模块做不到，那得给每个成员补转发器 = 真改行为面）→ 用**继承链**：`exploration_system_base.gd`（258，枚举/常量/状态/注入点/子模块句柄/通用助手）→ `exploration_system_ops.gd`（260，Cat 2b 信号表/子模块转发/只读查询/DAG 缓存生命周期/测试桩）→ `exploration_system.gd`（246，编排面：`generate_map`/`move_to_node`/`resolve_node`/`enter_map`/`_ready`）。第二探针确认 Godot **只调最派生类的 `_ready`**（父类不自动链式）→ 钩子统一放链尾，只此一份
+- **signal 只声明一处**：8 个 Cat 2b 信号全部落在 `exploration_system_ops.gd`，父层与链尾层不再重复声明（重复声明会被当成两个不同信号，`_emit_safe` 发的和外部连的静默失联）
+- 测试：新增 `tests/unit/exploration_ui/test_shop_panel_navigator.gd`（15，复位/移动/确认）+ `test_shop_panel_navigator_events.gd`（8，事件翻译/焦点信号，两者共用新夹具 `shop_navigator_fixture.gd` 66）；新增 `tests/integration/exploration_ui/test_shop_panel_navigation.gd`（8，真实按键事件走完整链路 + Esc 不泄漏到暂停菜单）；`test_shop_and_rest_node_flow.gd` +1（`test_shop_panel_stays_frozen_while_popup_opens_and_closes_over_it`——商店存活期间弹窗开合的冻结时序，此前只在类文档写了语义）
+- 全量：**4225 tests / 4224 passing / 1 pending 存量 / 3 orphans 存量**，零失败、零回归
+- **已知边界**：① `shop_panel_layout.gd` 的 `FOCUS_BG_COLOR` 已接进 `focus_stylebox()` 的 `bg_color`（原为透明底）；② 游标「不环绕」是刻意选择（首尾相接会让「已到底」不可观测），与引擎内置焦点导航同语义；③ 新增的 3 个 `_input` 级消费只针对面板存活期间，面板释放后 `InputManager` 的 Esc → 暂停菜单不受影响；④ 集成用例报 2 个 `Button` orphan（与既有 `test_shop_and_rest_node_flow` 的 1 个同源——面板重建时旧行 `queue_free` 未及回收），非本轮引入、非失败
+- Next recommended: 其余 5 事件按策划意图补 min_realm 分层；`src/feature/combat_system.gd`（1670）/ `save_load_system.gd`（799）/ `binding_manager.gd`（732）仍超 300 行软上限
 
 ## Session Extract — 战斗奖励真正发放（2026-11-11）
 - 任务：闭合「探索→战斗→结算→回探索」——奖励按开战上下文结算并入账、结算界面与回探索提示展示实得、补确定性测试、全量 GUT、提交

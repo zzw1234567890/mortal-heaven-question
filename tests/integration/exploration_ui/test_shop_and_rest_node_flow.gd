@@ -59,6 +59,37 @@ func test_shop_panel_freezes_node_graph_input() -> void:
 	assert_true(_interactor().is_processing_unhandled_key_input(), "关闭后键盘走位应恢复")
 
 
+func test_shop_panel_stays_frozen_while_popup_opens_and_closes_over_it() -> void:
+	# 时序语义（此前只在 shop_node_presenter.gd 类文档里写了，无测试）：
+	# 商店面板与确认弹窗各持一份冻结基线，但交互组件的键盘开关[b]只有一个[/b]——
+	# 弹窗关闭时会把它打开。商店仍在场就必须重新关上，否则遮罩还在、键盘却已能走位。
+	# Arrange——商店已开（同时打开了弹窗确认框）
+	_set_ling_shi(100)
+	_reach(SHOP_NODE, &"shop", _shop_payload(CARD_PRICE, 1))
+	_confirm()
+	assert_true(bool(_presenter().call(&"is_node_graph_frozen")), "前置：商店期间节点图已冻")
+	assert_false(_interactor().is_processing_unhandled_key_input(),
+			"前置：商店期间键盘走位已关")
+	# Act——商店还开着时，另一个节点又弹了一次确认框，随后取消关掉它
+	_reach(REST_NODE, &"rest", {})
+	assert_true(bool(_popup_host().call(&"is_popup_open")), "前置：弹窗已打开")
+	_popup_host().call(&"close_popup")
+	# Assert——商店仍在场，冻结不得被弹窗那侧的解冻配对掀掉
+	assert_true(bool(_presenter().call(&"is_panel_open")), "商店面板应仍在场")
+	assert_false(bool(_interactor().is_processing_unhandled_key_input()),
+			"弹窗关闭后商店仍在场，键盘走位必须保持关闭")
+	assert_true(bool(_viewport().get(&"input_frozen")), "视口应保持冻结")
+	assert_eq(_renderer().mouse_filter, Control.MOUSE_FILTER_IGNORE,
+			"节点图应保持不接收点击")
+	# Act——再从商店离开
+	_panel().call(&"press_leave")
+	# Assert——两侧配对都走完，节点图彻底解冻
+	assert_false(bool(_presenter().call(&"is_node_graph_frozen")), "关闭商店后应解冻")
+	assert_true(_interactor().is_processing_unhandled_key_input(), "关闭商店后键盘走位应恢复")
+	assert_eq(_renderer().mouse_filter, Control.MOUSE_FILTER_STOP, "鼠标过滤应还原")
+	assert_false(bool(_viewport().get(&"input_frozen")), "视口冻结应还原")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. 买一件 → 扣灵石 + 进收藏 + 售罄
 # ═══════════════════════════════════════════════════════════════════════════════
