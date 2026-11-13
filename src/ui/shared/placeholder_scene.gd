@@ -160,7 +160,11 @@ func _mark_battle_node_cleared_if_victory() -> void:
 	var node_id: int = LaunchScript.get_origin_node_id()
 	if node_id < 0:
 		return
-	# 标记节点为已清（通过 GSM）
+	# 标记节点为已清——统一走 ExplorationSystem.mark_node_visited（与到达标记同一口径）
+	var exploration: Node = get_node_or_null("/root/ExplorationSystem")
+	if exploration != null and exploration.has_method(&"mark_node_visited"):
+		exploration.call(&"mark_node_visited", node_id)
+		return
 	var gsm: Node = get_node_or_null("/root/GameStateManager")
 	if gsm == null or not gsm.has_method(&"add_visited_node"):
 		return

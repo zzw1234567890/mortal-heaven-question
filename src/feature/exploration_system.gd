@@ -196,6 +196,12 @@ signal boss_node_reached(boss_data: Dictionary)
 ## Cat 2b 信号——到达商店/回复/灵泉/渡劫台/传送节点，UI 按 interaction_type 分发（ADR-0014 §决策 3）。
 signal node_interaction_triggered(node_id: int, interaction_type: StringName, payload: Dictionary)
 
+## Cat 2b 信号——节点被标记为已访问（统一入口 [method mark_node_visited] 的唯一出口）。[br]
+## [br][b]载荷[/b]：[code]node_id[/code]；[code]is_new[/code] 是否首次标记
+## ——[code]false[/code] 即幂等确认（到达已标记后再由战斗/事件确认）。[br]
+## [br]来源: ADR-0014 §决策 3 信号表。
+signal node_marked_visited(node_id: int, is_new: bool)
+
 ## 节点导航——从 from_node 移动到 to_node。[br]
 ## [br][b]验证链路[/b]（短路求值）：可达性 → 已访问 → 行动力。[br]
 ## [br][b]AP=0 豁免[/b]：传送/行动力泉/Boss 节点不消耗 AP，行动力不足时仍可移动。[br]
@@ -245,7 +251,7 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 	var to_layer: int = to_node / 100
 	var to_idx: int = to_node % 100
 	gsm.set_exploration_position(to_layer, to_idx)
-	gsm.add_visited_node(to_node)
+	mark_node_visited(to_node)
 	gsm.set_exploration_ap(new_ap, int(gsm.exploration.get("max_action_points", 0)))
 
 	result["success"] = true
@@ -258,6 +264,25 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 	resolve_node(to_node)
 
 	return result
+
+
+## 统一标记入口——把一个节点记为已访问，并发 [signal node_marked_visited]。[br]
+## [br][b]三种节点共用[/b]：移动到达（资源/事件/战斗节点一致）、战斗胜利确认、
+## 事件结算确认——口径只有这一处，别在别处直接调 gsm.add_visited_node。[br]
+## [br][param node_id] 节点 ID。[br]
+## [br][b]返回[/b]：[code]true[/code] 首次标记，[code]false[/code] 幂等重复。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型 + §决策 3 信号表。
+func mark_node_visited(node_id: int) -> bool:
+	if node_id < 0:
+		return false
+	var gsm: Node = _get_gsm()
+	if gsm == null or not gsm.has_method(&"add_visited_node"):
+		return false
+	var visited: Array = gsm.get(&"exploration").get("visited_nodes", []) if gsm.get(&"exploration") != null else []
+	var is_new: bool = not visited.has(node_id)
+	gsm.call(&"add_visited_node", node_id)
+	_emit_safe(&"node_marked_visited", [node_id, is_new])
+	return is_new
 
 
 ## 只读查询——验证从 from_node 是否可移动到 to_node。[br]

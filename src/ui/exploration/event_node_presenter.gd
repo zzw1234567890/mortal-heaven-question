@@ -120,8 +120,21 @@ func _open_panel(p_def: Variant) -> void:
 func _on_option_chosen(p_event_id: String, p_option_index: int) -> void:
 	_last_result = _events.call(&"resolve_option", p_event_id, p_option_index,
 			_build_deps(), _rng)
+	_confirm_node_visited()
 	if is_panel_open():
 		_panel.call(&"show_result", _last_result)
+
+
+## 事件结算后把当前节点确认为已访问——与移动到达、战斗胜利同一口径
+## （ExplorationSystem.mark_node_visited 幂等）。
+func _confirm_node_visited() -> void:
+	var exploration: Node = _autoload(&"ExplorationSystem")
+	if exploration == null or not exploration.has_method(&"mark_node_visited"):
+		return
+	var node_id: int = _current_node_id()
+	if node_id < 0:
+		return
+	exploration.call(&"mark_node_visited", node_id)
 
 
 func _build_deps() -> Dictionary:
