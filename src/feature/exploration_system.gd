@@ -151,6 +151,9 @@ var _economy: RefCounted = null
 ## 结算刷新子模块（Sprint 12 Story 011 拆分）。
 var _map_flush: RefCounted = null
 
+## 回复点结算子模块（GDD §公式 7——全队回复 50% 已损失 HP）。
+var _rest: RefCounted = null
+
 
 # === DAG 生成（委托给 ExplorationDAGBuilder）===================================
 
@@ -606,6 +609,18 @@ func collect_resource(resource_type: StringName, amount: int) -> void:
 	_get_map_flush().collect_resource(resource_type, amount)
 
 
+# === 回复点结算（委托给 ExplorationRest）=====================================
+
+## 回复点结算——全队回复 50% 已损失 HP（GDD §公式 7），返回实际回复量。[br]
+## [br][b]唯一入口[/b]：UI 侧 [code]NodePopupServices.rest_party[/code] 调本方法，
+## 面板只显示返回值（UI 零数值计算）。效果实现见 [ExplorationRest]。[br]
+## [br][param p_node_id] 回复点节点 ID（透传——实现侧只用于日志）。[br]
+## [br][b]返回[/b]：实际回复总量（全队满血 / 无角色登记 HP / GSM 写回入口缺失时为 0）。[br]
+## [br]来源: GDD exploration-system.md §公式 7 + §8 边界、exploration-ui-system.md §4c。
+func rest_at_node(p_node_id: int) -> int:
+	return int(_get_rest().call(&"rest_at_node", p_node_id))
+
+
 ## 将 map_states[map_id] 中的 collected_* 转移到 GSM player.* 域——委托给 _map_flush 子模块。
 func _flush_map_state(map_id: StringName) -> void:
 	_get_map_flush()._flush_map_state(map_id)
@@ -662,3 +677,10 @@ func _get_map_flush() -> RefCounted:
 	if _map_flush == null:
 		_map_flush = preload("res://src/feature/exploration/exploration_map_flush.gd").new(self)
 	return _map_flush
+
+
+## 获取回复点结算子模块实例（GDD §公式 7——全队回复 50% 已损失 HP）。
+func _get_rest() -> RefCounted:
+	if _rest == null:
+		_rest = preload("res://src/feature/exploration/exploration_rest.gd").new(self)
+	return _rest

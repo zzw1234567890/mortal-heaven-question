@@ -21,6 +21,10 @@ extends RefCounted
 
 ## 战斗预览内核（敌人摘要 / 正文行 / 推荐上场数——本文件保留转发入口）。
 const CombatPreview := preload("res://src/ui/exploration/node_combat_preview_rules.gd")
+## 回复点结算（[method rest_heal_amount] 的公式来源——Feature 层实现）。
+## [br][b]UI → Feature 的只读依赖[/b]：本文件只调它的静态纯函数 [code]heal_for[/code]，
+## 不碰 HP 读写——与 [method spring_restore_all] 的只读包装同源口径。
+const RestScript := preload("res://src/feature/exploration/exploration_rest.gd")
 
 ## === 弹窗种类（kind）=======================================================
 
@@ -225,11 +229,12 @@ static func spring_restore_all(current_ap: int, max_ap: int) -> int:
 
 
 ## 回复点治疗量——GDD 公式 7（floor(lost_hp_total × 0.5)，仅存活角色计入）。[br]
-## [b]用途[/b]：交叉校验系统 API 返回值（UI 不自行应用）。
+## [b]用途[/b]：交叉校验系统 API 返回值（UI 不自行应用）。[br]
+## [b]公式单一来源[/b]：转发到 [code]ExplorationRest.heal_for[/code]（Feature 层
+## 的实际结算实现）——两侧各写一遍必然漂移（同为「UI 零数值计算」，
+## 参见 [method spring_restore_all] 的只读包装口径）。
 static func rest_heal_amount(lost_hp_total: int) -> int:
-	if lost_hp_total <= 0:
-		return 0
-	return int(floor(float(lost_hp_total) * 0.5))
+	return RestScript.heal_for(lost_hp_total)
 
 
 ## 弹窗位置——节点附近弹出并夹入视口（GDD §4「不覆盖全屏」）。[br]

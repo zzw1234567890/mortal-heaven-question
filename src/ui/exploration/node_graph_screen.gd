@@ -91,6 +91,8 @@ var _interaction_mount: RefCounted = null
 var _reveal_animator: RefCounted = null
 ## 事件节点弹出器（见 [EventNodePresenter]）。
 var _event_presenter: RefCounted = null
+## 商店 overlay / 回复提示接线（见 [ShopNodePresenter]——消费弹窗宿主的确认信号）。
+var _shop_presenter: RefCounted = null
 
 
 func _ready() -> void:
@@ -114,6 +116,13 @@ func _ready() -> void:
 ## 未进树（_ready 未跑）时为 false——此时还没有数据源可选。
 func is_using_stub_source() -> bool:
 	return _load_source != null and bool(_load_source.get(&"using_stub"))
+
+
+## 商店/回复接线组件（见 [ShopNodePresenter]）——未挂载时为 null。[br]
+## [b]公开入口[/b]：集成测试与后续 story 经此断言/驱动商店 overlay，
+## 不依赖私有成员名。
+func shop_presenter() -> Variant:
+	return _shop_presenter
 
 
 ## 触发地图加载。[br]
@@ -151,12 +160,14 @@ func _connect_signals() -> void:
 
 
 ## 挂载全部子组件——挂载与接线细节在 [NodeGraphComponentAssembly]
-## （交互三组件 + 事件弹出通道 + 转发回调表构建），屏幕只持引用防提前释放。
+## （交互三组件 + 事件弹出通道 + 商店/回复接线 + 转发回调表构建），
+## 屏幕只持引用防提前释放。
 func _mount_components(es: Node) -> void:
 	var parts: Dictionary = ComponentAssemblyScript.assemble(self, renderer(),
 			viewport, es, reduce_motion_override)
 	_interaction_mount = parts.get("interaction_mount")
 	_event_presenter = parts.get("event_presenter")
+	_shop_presenter = parts.get("shop_presenter")
 
 
 ## 键盘焦点转发——渲染器绘制松石青焦点环（ADR-0031 §4 双焦点双视觉）。

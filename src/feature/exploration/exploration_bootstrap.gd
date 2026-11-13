@@ -1,11 +1,11 @@
 class_name ExplorationBootstrap
 extends RefCounted
-## ExplorationBootstrap —— 探索系统的生产装配（地图配置 + 敌人池注入）。[br]
+## ExplorationBootstrap —— 探索系统的生产装配（地图配置 + 敌人池 + 商店货架注入）。[br]
 ## [br][b]为什么在启动层装配而不是系统内部硬编码[/b]：[code]ExplorationSystem[/code]
 ## 的回调字段（[code]get_map_config_cb[/code] / [code]generate_enemy_roster_cb[/code]
-## / [code]enemy_template_lookup_cb[/code]）是[b]注入点[/b]——单测用桩替换、
-## 生产由启动层接真实实现。把数据目录与敌人池直接写进系统内部，等于让「哪些
-## 地图、哪些敌人」与「DAG 怎么长」耦合，也让单测无法替换。[br]
+## / [code]enemy_template_lookup_cb[/code] / [code]generate_shop_inventory_cb[/code]）
+## 是[b]注入点[/b]——单测用桩替换、生产由启动层接真实实现。把数据目录与敌人池直接
+## 写进系统内部，等于让「哪些地图、哪些敌人」与「DAG 怎么长」耦合，也让单测无法替换。[br]
 ## [br][b]装配时机[/b]：主菜单 [code]_ready()[/code]（进程第一个场景，与
 ## [code]HudBootstrap[/code] 同源）——此时 [code]AISystem[/code] 已就绪
 ## （Autoload 顺序在它之前），模板注册表可查。[br]
@@ -22,6 +22,9 @@ extends RefCounted
 const CatalogScript := preload("res://src/feature/exploration/exploration_map_catalog.gd")
 ## 敌人池（按地图配置生成名册）。
 const PoolScript := preload("res://src/feature/exploration/exploration_enemy_pool.gd")
+## 商店货架默认生成器（价格按模板稀有度定档）。
+const ShopInventoryScript := preload(
+		"res://src/feature/exploration/exploration_shop_inventory.gd")
 
 
 ## 装配探索系统（幂等）。[br]
@@ -46,6 +49,10 @@ static func mount(p_exploration: Node, p_ai: Node = null) -> bool:
 	# 模板查询——掉落聚合（EncounterFields.rewards）与名册共用同一注册表
 	if _has_property(p_exploration, &"enemy_template_lookup_cb"):
 		p_exploration.set(&"enemy_template_lookup_cb", _lookup_of(p_ai))
+	# 商店货架——DAG 生成期按玩家境界生成（此前无生产注入点，商店节点恒空货架）
+	if _has_property(p_exploration, &"generate_shop_inventory_cb"):
+		p_exploration.set(&"generate_shop_inventory_cb",
+				Callable(ShopInventoryScript, &"make_for_realm"))
 	return true
 
 

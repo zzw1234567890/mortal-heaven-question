@@ -8,18 +8,28 @@ extends GutTest
 ##   1. 装配后真实 [code]enter_map[/code] 产出的战斗节点名册非空，条目可读；[br]
 ##   2. 节点等级取地图配置的 [code]enemy_realm[/code]，不随玩家境界上涨；[br]
 ##   3. 地图配置缺 [code]enemy_realm[/code] 时回退玩家境界且告警可观测；[br]
-##   4. 生成器产出的节点能直接过开战校验（模板 ID / 等级 / 掉落齐备）。[br]
+##   4. 生成器产出的节点能直接过开战校验（模板 ID / 等级 / 掉落齐备）；[br]
+##   5. 装配后商店节点有真实货架（[code]generate_shop_inventory_cb[/code] 的生产注入）。[br]
 ##
-## 来源: GDD exploration-system.md §3 步骤⑥/§7、ADR-0014 §决策 2/3、
+## 来源: GDD exploration-system.md §3 步骤⑥/⑦、§4 节点交互表、ADR-0014 §决策 2/3、
 ## DEBT-EUI-006-3、DEBT-EUI-006-5。
 
 const ES_SCRIPT := preload("res://src/feature/exploration_system.gd")
 const BootstrapScript := preload("res://src/feature/exploration/exploration_bootstrap.gd")
 const CatalogScript := preload("res://src/feature/exploration/exploration_map_catalog.gd")
 const ContextScript := preload("res://src/feature/combat/combat_launch_context.gd")
+const ShopInventoryScript := preload(
+		"res://src/feature/exploration/exploration_shop_inventory.gd")
+## 卡牌模板就位助手（异步加载的同步推进）。
+const PrimerScript := preload("res://tests/integration/exploration_ui/card_template_primer.gd")
 
 ## 玩家出战阵容（测试注入——避开 GSM 角色位）。
 const PLAYER_ROSTER: Array = [3, 5]
+
+## 炼气（境界 1）货架候选池的首件——模板就位的判定锚点（价格档 10）。
+const SHELF_CARD_ID: StringName = &"pei_yuan_dan"
+## 找商店节点的最大进入次数（商店权重 15/100，12 次几乎必然命中）。
+const SHOP_SCAN_LIMIT: int = 12
 
 var es: Node = null
 var ai: Node = null
@@ -161,6 +171,42 @@ func test_mount_is_idempotent_and_survives_missing_ai() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 5. 商店货架 —— generate_shop_inventory_cb 的生产注入
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_real_enter_map_shop_nodes_carry_non_empty_inventory() -> void:
+	# Arrange——生产装配（此前该回调没有注入点，商店节点恒为空货架）+ 模板就位
+	assert_true(BootstrapScript.mount(es, ai), "装配应成功")
+	_prepare_card_templates()
+	# Act——真实进入地图（商店节点是加权随机分配的结果，按 entry_count 扫描到第一张
+	# 含商店节点的图；seed 固定 → 扫到的是哪一张图也是确定的）
+	var shops: Array = _scan_for_shop_nodes()
+	# Assert——货架非空，条目带卡牌 ID 与正价格（面板据此上架）
+	assert_true(shops.size() > 0, "连续进入该地图应至少产出一个商店节点")
+	for detail: Dictionary in shops:
+		var inventory: Dictionary = detail.get("inventory", {})
+		var items: Array = inventory.get("items", [])
+		assert_true(items.size() > 0, "真实 enter_map 的商店节点货架不得为空")
+		for entry: Variant in items:
+			var item: Dictionary = entry
+			assert_false(str(item.get("card_id", "")).is_empty(), "货架条目应带卡牌 ID")
+			assert_true(int(item.get("price", 0)) > 0, "货架条目应带正价格")
+			assert_true(int(item.get("stock", 0)) > 0, "货架条目应有库存")
+
+
+func test_generated_shop_inventory_items_are_real_card_templates() -> void:
+	# 货架上的卡必须是真模板——否则面板点下去建不出实例（买不成）
+	_prepare_card_templates()
+	var inventory: Dictionary = ShopInventoryScript.make_for_realm(1)
+	var items: Array = inventory.get("items", [])
+	assert_true(items.size() >= 2, "低境界货架至少 2 件（ITEM_COUNT_LOW）")
+	for entry: Variant in items:
+		var card_id: StringName = StringName(str((entry as Dictionary).get("card_id", "")))
+		assert_true(CardSystem.has_template(card_id),
+				"货架卡牌 '%s' 应在 CardSystem 注册表中" % card_id)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 内部
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -186,6 +232,45 @@ func _combat_details(p_result: Dictionary) -> Array:
 		if ntype == 1 or ntype == 2:  # COMBAT / ELITE
 			details.append(detail)
 	return details
+
+
+## 地图结果里的商店节点详情（按节点 ID 升序）。
+func _shop_details(p_result: Dictionary) -> Array:
+	var nodes: Dictionary = p_result.get("nodes", {})
+	var ids: Array = nodes.keys()
+	ids.sort()
+	var details: Array = []
+	for node_id: int in ids:
+		var detail: Dictionary = nodes[node_id]
+		if int(detail.get("type", -1)) == 5:  # NodeType.SHOP
+			details.append(detail)
+	return details
+
+
+## 反复进入地图直到某一张图产出商店节点，返回那一张图的商店详情。[br]
+## [br][b]为什么要扫[/b]：商店节点是加权随机的产物（权重 15/100），单张图不保证
+## 有商店——而 [code]enter_map[/code] 每次都会把 [code]entry_count[/code] 递增并写入
+## GSM，seed 随之加扰，连进多次自然遍历不同图。seed 固定 → 扫到哪一张是确定的，
+## 用例可复现。[br]
+## [br]扫描上限 [constant SHOP_SCAN_LIMIT] 次；一次都没扫到时返回空数组（断言失败
+## 而非静默通过）。
+func _scan_for_shop_nodes() -> Array:
+	for _attempt: int in range(SHOP_SCAN_LIMIT):
+		var result: Dictionary = es.call("enter_map", &"qing_yun_jian_zong", 1, 5)
+		var shops: Array = _shop_details(result)
+		if not shops.is_empty():
+			return shops
+	return []
+
+
+## 推进 CardSystem 的异步模板加载，直到货架候选池的首件可查（驱动逻辑见
+## [CardTemplatePrimer]——多个用例文件共用）。[br]
+## [br][b]为什么必须在 enter_map 之前[/b]：货架的 [code]price[/code] 由模板稀有度
+## 定档，生成期查不到模板的候选会被剔除——模板没就位时货架是空的（这正是被断言
+## 的行为，所以不能让它假通过）。
+func _prepare_card_templates() -> void:
+	assert_true(PrimerScript.prime(CardSystem, SHELF_CARD_ID),
+			"卡牌模板 %s 应能就位（否则货架必然为空，断言无意义）" % SHELF_CARD_ID)
 
 
 ## 第一个战斗节点的等级（无战斗节点时返回 -1）。
