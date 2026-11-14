@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"pill_hui_chun_dan"
+name = "回春丹"
+type = 4
+rarity = 2
+cost = 1
+description = "回复目标角色 4 点生命。"
+flavor_text = "丹炉初开的第一炉，最寻常也最救命。"
+effect_type = &"heal"
+effect_value = 4
+target_type = &"single_ally"
+stack_limit = 3

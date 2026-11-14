@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"artifact_shang_pin_fa_qi"
+name = "上品法器"
+type = 2
+rarity = 4
+cost = 1
+description = "绑定后角色攻击 +6、防御 +5。"
+flavor_text = "器成有灵，认主而鸣。"
+effect_type = &"buff"
+effect_value = 6
+stack_limit = 3

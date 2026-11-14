@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"pill_tian_luo_dan"
+name = "天罗丹"
+type = 4
+rarity = 4
+cost = 1
+description = "回复全体角色 6 点生命，并驱散全部负面效果。"
+flavor_text = "天罗为网，网住这一队人的命。"
+effect_type = &"heal"
+effect_value = 6
+target_type = &"all_allies"
+stack_limit = 3

@@ -151,6 +151,12 @@ func resolve_node(node_id: int) -> void:
 			var entries: Array = _get_harvest().call(&"entries_at", node_id)
 			_emit_safe(&"node_interaction_triggered",
 					[node_id, &"harvest", {"entries": entries}])
+		NodeType.ALCHEMY, NodeType.FORGE:
+			# 炼丹台/炼器台——载荷带可炼清单（同采集点口径：到达即上架，
+			# 面板不必再查一次）。清单由配方资源现算，不进 DAG 快照。
+			var kind: StringName = &"forge" if ntype == NodeType.FORGE else &"alchemy"
+			_emit_safe(&"node_interaction_triggered",
+					[node_id, kind, {"entries": _get_craft().call(&"entries", kind)}])
 		NodeType.ACTION_SPRING:
 			_emit_safe(&"node_interaction_triggered", [node_id, &"action_spring", {}])
 		NodeType.TELEPORT:

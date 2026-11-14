@@ -84,11 +84,10 @@ var _load_source: RefCounted = null
 ## 补触发一次（场景编排先 add_child 后调 trigger_map_load 是既有顺序）。
 var _pending_map_id: StringName = &""
 ## 装配结果——[code]{interaction_mount, event_presenter, shop_presenter,
-## teleport_presenter, harvest_presenter}[/code]（见 [NodeGraphComponentAssembly]）。[br]
-## [br][b]为什么整块存字典而不逐个声明字段[/b]：屏幕只负责「持有引用防 RefCounted
-## 提前释放」与对外暴露访问器；逐个照抄一遍等于把装配器的返回契约写两处，
-## 加一个组件要改两个文件（且本文件已贴上限）。子组件实例同样经此路由访问
-## （[method _sub_component]——headless 动态加载下不依赖 class_name 解析）。
+## teleport_presenter, harvest_presenter, craft_presenter}[/code]
+## （见 [NodeGraphComponentAssembly]，装配细节不在此重复）。[br]
+## [b]为什么整块存字典[/b]：屏幕只负责「持引用防提前释放」+ 对外访问器；
+## 逐个声明等于把返回契约写两处。子组件经 [method _sub_component] 访问。
 var _components: Dictionary = {}
 ## 六态重算 + 逐层展开动画（见 [NodeGraphRevealAnimator]）。
 var _reveal_animator: RefCounted = null
@@ -118,22 +117,25 @@ func is_using_stub_source() -> bool:
 
 
 ## 商店/回复接线组件（见 [ShopNodePresenter]）——未挂载时为 null。[br]
-## [b]公开入口[/b]：集成测试与后续 story 经此断言/驱动商店 overlay，
-## 不依赖私有成员名。
+## [br][b]以下四个访问器同口径[/b]：公开入口，集成测试与后续 story 经此断言/驱动
+## 各类 overlay，不依赖私有成员名。
 func shop_presenter() -> Variant:
 	return _components.get("shop_presenter")
 
 
-## 传送选层接线组件（见 [TeleportNodePresenter]）——未挂载时为 null
-## （公开入口口径同 [method shop_presenter]）。
+## 传送选层接线组件（见 [TeleportNodePresenter]）。
 func teleport_presenter() -> Variant:
 	return _components.get("teleport_presenter")
 
 
-## 采集接线组件（见 [HarvestNodePresenter]）——未挂载时为 null
-## （公开入口口径同 [method shop_presenter]）。
+## 采集接线组件（见 [HarvestNodePresenter]）。
 func harvest_presenter() -> Variant:
 	return _components.get("harvest_presenter")
+
+
+## 炼丹台/炼器台接线组件（见 [CraftNodePresenter]——两个台子共用一份，靠 kind 区分）。
+func craft_presenter() -> Variant:
+	return _components.get("craft_presenter")
 
 
 ## 触发地图加载。[br]

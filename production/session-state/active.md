@@ -3,8 +3,25 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 采集节点（灵草/矿脉）入背包 + 战斗前置信息补「我方出战上限」；下一步 采集材料接炼丹/炼器消耗端，或其余 5 事件按策划意图补 min_realm 分层
+Task: 炼丹台/炼器台消耗端最小闭环（配方清单 + 扣料入库）；下一步 其余 5 事件按策划意图补 min_realm 分层
 <!-- /STATUS -->
+
+## Session Extract — 炼丹台/炼器台消耗端最小闭环（2026-11-14）
+- 任务：① 炼丹台/炼器台节点——到达列出可炼配方（读既有配方资源）、每行显示所需材料与持有量、材料不足行禁用 + 中文原因；② 炼成扣料 + 产物入收藏（走 GSM 原子写入口），失败（材料不足/收藏已满）不改任何状态 + 中文提示；③ 测试覆盖成功扣料入库 / 材料不足拒绝且状态不变 / 已满拒绝 / 重复炼制计数 / 配方清单与配方资源一致
+- **配方源不硬编码**：`AlchemyRecipes.ALCHEMY_RECIPES` / `ARTIFACT_RECIPES` 是唯一真理来源（`get_all_pill_recipes()` / `get_all_artifact_recipes()` 注入 `recipe_id`）。**配方不进 DAG 快照**——写进 map_states 等于把同一份数据复制进存档，改配方后旧档还揣着过期清单
+- **补上的资产缺口（关键）**：`AlchemyRecipes` 引用了 8 个 `template_id`（`pill_hui_chun_dan` / `artifact_ji_chu_fa_qi` 等），但 `assets/cards/templates/` 里**一个都不存在** → `CardSystem.create_instance` 会 push_error + 返回 null，收藏写入静默不发生。本轮补齐 8 个 `.tres`（数据驱动，类型 PILL=4 / ARTIFACT=2，效果类型限定在既有 `_category_for` 词表内的 `heal` / `buff`）
+- **`craft_pill` 的「已扣料却建不出卡」缺陷**：它第 5 步在卡牌系统为 null 时**返回 SUCCESS 且材料已扣**；第 3 步的失败（INSUFFICIENT_MATERIALS）发生在扣减之前但第 5/6 步不是。故 `ExplorationCraft` 在调它之前把六项前置条件（配方存在 / 等级够 / 材料足 / 卡牌系统可用 / 模板已就位 / 收藏未满）先验完，让它的三条失败路径**不可能被走到**；`_refund()` 按配方表退回已扣灵材作为第二道保险（同商店「钱没了卡也没到」的处置口径）
+- **不重复扣减**：`ExplorationCraft` 从不自己调 `spend_resource`——`craft_pill` 是唯一扣减者，两边不会各扣一次
+- **「收藏已满」口径**：GDD §边界只说「收藏池允许同名多张」、未给上限，而 AC 要求「已满时拒绝」。定为 `COLLECTION_CAP = 300`（覆盖全图鉴 215~250 张的会话级上限），与 `ExplorationHarvest.LING_CAI_CAP = 99` 同一处置方式——设计未定处取一个可测口径并显式登记（类文档「已知边界」）
+- **新增 Feature 层两件**：`exploration_craft_list.gd`（169，只读半边——配方→行文案与禁用原因，纯查表可 GUT 直调）、`exploration_craft.gd`（227，写半边——校验→扣料→建实例→入收藏）。`exploration_system_forward.gd` 加 `craft_entries` / `craft_at_node` / `craft_balance` 三个转发
+- **三个 300 行超限处分拆**：① `exploration_system_base.gd`（原已 300+）拆出 `exploration_system_helpers.gd`（常量表 / 助手 / 子模块句柄）；② `exploration_dag_builder.gd` 306 → 179，节点内容填充（遭遇/事件池/货架/采集载荷/标签）拆到 `exploration_dag_content.gd`（174）；③ `node_graph_screen.gd` 收 300 行内（访问器注释合并）
+- **新增 UI 三件**：`craft_panel_layout.gd`（81，委托 `ShopLayoutScript.build()`）、`craft_panel_screen.gd`（267，`_input` 级导航复用 `ShopPanelNavigator`）、`craft_node_presenter.gd`（251，消费转发里的 `alchemy` / `forge`，**两个台子共用一份**靠 `kind` 区分标题与配方源）
+- **炼制为什么不进 `DISPATCH_TABLE`**：与采集/传送同源——到达即上架可炼清单，中间再插确认框等于让玩家为同一件事点两次。`node_interaction_rules.gd` **只加文档说明，未加键**（宿主收到 `alchemy`/`forge` 直接返回，不开空弹窗）
+- **顺带修掉一处测试隔离缺陷（本轮发现的既有问题）**：`tests/unit/event_system/test_check_condition.gd` / `test_event_trigger.gd` 把 `player.resources.ling_cai` 写成**扁平 int 0**（旧格式）且 `after_each` 不还原；目录序上它们先于 `exploration_system/`，导致 `test_dag_cache_rebuild` 的 `enter_map → move_to_node → resolve_node` 走到采集结算时，在 `ResourceSystem._get_ling_cai_by_quality` 上抛「Invalid access to property or key 'low'」。**这是存量缺陷**（HEAD 上同样红，已验证），本轮在 `test_dag_cache_rebuild` 里自备 player 域快照 + 规范化（不改既有测试、不动其它文件）——「测试不得依赖执行顺序」
+- 测试：新增 `tests/unit/exploration_system/test_exploration_craft.gd`（10，扣料入库/炼器/连炼两次/材料不足/收藏已满/越界/境界不足禁用/清单与资源一致/持有量来自 ResourceSystem/未知种类）、`tests/integration/exploration_ui/craft_node_fixture.gd`（188，共享装置）+ `test_craft_node_flow.gd`（164，11 例端到端：到达上架/无确认弹窗/冻结/炼器台标题/禁用行不发意图/行文本带所需与持有/点击扣料入库并转禁用/炼器入库/连炼计数/收藏已满/离开解冻不回退）
+- 全量：**4327 tests / 4325 passing / 2 risky-pending 存量 / 3 orphans 存量**，零失败、零回归（4316 → 净增 11，全过；净增数小于新增用例数因拆分后文件计数口径变化）
+- 遗留：① 化神期「丹道大成」（本局首次必升品）无持久化状态位——恒传 false；② 品质加成恒 0（万象真人 +0.15 与材料品质溢出 +0.10 未接线）；③ 炼器产出法宝白值 `forge_artifact_stat` 未写进卡实例（`CardTemplate` 无法宝攻防字段）；④ `craft_pill` 第 6 步写卡组一次，卡组满时只留 push_warning；⑤ 品质重掷（`apply_reroll`）UI 未接
+- Next recommended: 其余 5 事件按策划意图补 min_realm 分层；品质加成与丹道大成接线；法宝白值进卡实例
 
 ## Session Extract — 采集节点（灵草/矿脉）+ 战斗预览出战上限（2026-11-14）
 - 任务：① 资源采集节点——到达按节点载荷给出可采列表、采集真的入背包（GSM 原子写入口）、同节点每资源只采一次且持久化、提示中文；② 战斗节点进入前预览敌方信息（阵容名/数量/等级/我方出战上限），确认才进战斗；③ 测试覆盖采集入库+重复失败、背包上限夹紧、预览与遭遇配置一致、取消不改状态

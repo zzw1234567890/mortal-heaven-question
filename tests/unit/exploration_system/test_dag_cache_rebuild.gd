@@ -14,9 +14,20 @@ const ES_SCRIPT := preload("res://src/feature/exploration_system.gd")
 
 var es: Node = null
 var gsm: Node = null
+## 用例前的 player 域快照——见 [method before_each] 的隔离说明。
+var _player_before: Dictionary = {}
 
 
+## [b]为什么快照 player 域[/b]：本文件的用例会走到 [code]enter_map[/code] →
+## [code]move_to_node[/code] → [code]resolve_node[/code]，而采集/炼制的结算路径要读
+## [code]player.resources.ling_cai[/code]（嵌套字典）。若前一个测试文件把它写成了
+## 扁平 int（历史格式），这里就会在 [code]ResourceSystem._get_ling_cai_by_quality[/code]
+## 上抛「Invalid access to property or key 'low'」。测试不得依赖执行顺序
+## （.claude/rules/test-standards.md「隔离性」）——故本文件自备快照与规范化。
 func before_each() -> void:
+	_player_before = (GameStateManager.player as Dictionary).duplicate(true)
+	GameStateManager.player.resources.ling_cai = {
+		"low": 0, "medium": 0, "high": 0, "top": 0}
 	es = ES_SCRIPT.new()
 	es.call("set_rng_seed", 42)
 	es.set("get_map_config_cb", Callable(func(_mid, _r):
@@ -43,6 +54,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	GameStateManager.player = _player_before
 	if es != null:
 		es.free()
 		es = null

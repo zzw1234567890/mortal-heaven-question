@@ -2,23 +2,25 @@ class_name NodeIconAtlas
 extends RefCounted
 ## NodeIconAtlas —— 节点类型 → 图标图集映射（exploration-ui Story 001 stub）。
 ##
-## [b]纯函数静态类[/b]（ADR-0031 Logic 内核模式）：11 类节点类型的颜色/词条/
+## [b]纯函数静态类[/b]（ADR-0031 Logic 内核模式）：13 类节点类型的颜色/词条/
 ## 图集 region 判定——UI 节点只消费映射结果。[br]
-## [br][b]stub 图标[/b]：程序化生成单一图集（352×32，11 格×32px）——
+## [br][b]stub 图标[/b]：程序化生成单一图集（416×32，13 格×32px）——
 ## ADR-0031 §5「UI 图标统一使用 AtlasTexture，禁止独立纹理逐图标渲染」的直接
 ## 兑现。真实图标美术归资产管线 story（替换点：[method _build_atlas]——
 ## hud TD-011 emoji 占位同源技债，届时一并替换）。[br]
 ## [br][b]类型 ID 对齐[/b]：与 [code]ExplorationSystem.NodeType[/code] 枚举值
-## 一一对应（0=入口 … 9=渡劫台，10=采集点）——语义来源 GDD exploration-ui-system.md
-## §公式 1 node_type_to_icon，采集点为本轮新增节点类型的同源扩展。[br]
+## 一一对应（0=入口 … 10=采集点，11=炼丹台，12=炼器台）——语义来源
+## GDD exploration-ui-system.md §公式 1 node_type_to_icon，采集点/炼丹台/炼器台
+## 为近两轮新增节点类型的同源扩展。[br]
 ##
 ## [br]来源: ADR-0031 §5、design/gdd/exploration-ui-system.md §公式 1、
-## exploration-ui Story 001（R-05 行为关卡）、GDD resource-system.md §资源表（灵材）。
+## exploration-ui Story 001（R-05 行为关卡）、GDD resource-system.md §资源表（灵材）、
+## GDD alchemy-crafting-system.md §4 炼制位置。
 
 ## 单元格边长（px）——节点图标 region 尺寸基准。
 const CELL: int = 32
-## 图集列数（11 类节点各占一格）。
-const ATLAS_COLS: int = 11
+## 图集列数（13 类节点各占一格）。
+const ATLAS_COLS: int = 13
 
 ## 节点类型规格——GDD node_type_to_icon 映射（id ↔ NodeType 枚举值）。
 ## color 为节点类型主色；glyph 为 stub 图标内白色图形标识（真实图标入库后废弃）。
@@ -34,6 +36,8 @@ const TYPE_SPECS: Dictionary = {
 	8: {"label": "回复点", "color": Color("#44CC66"), "glyph": "cross"},
 	9: {"label": "渡劫台", "color": Color("#FFAA00"), "glyph": "bolt"},
 	10: {"label": "采集点", "color": Color("#7FA85C"), "glyph": "leaf"},
+	11: {"label": "炼丹台", "color": Color("#C06A9E"), "glyph": "furnace"},
+	12: {"label": "炼器台", "color": Color("#9A7B4F"), "glyph": "anvil"},
 }
 
 ## 图集缓存——单实例跨全部节点共享（合批前提：同纹理才能合批）。
@@ -118,6 +122,18 @@ static func _glyph_pixel(glyph: String, x: float, y: float) -> bool:
 			var lx: float = (x - 0.5) / 0.16
 			var ly: float = (y - 0.50) / 0.26
 			return lx * lx + ly * ly <= 1.0 and absf(x - 0.5) > 0.02
+		"furnace":
+			# 丹炉：炉身梯形 + 炉口横线（炼丹台——与商店三角/灵泉水滴区分）
+			if y >= 0.34 and y <= 0.70 and absf(cx) <= 0.16 + (y - 0.34) * 0.55:
+				return true
+			return y >= 0.26 and y <= 0.32 and absf(cx) <= 0.26
+		"anvil":
+			# 铁砧：上宽台面 + 下窄腰（炼器台——与方/菱形区分）
+			if y >= 0.30 and y <= 0.40 and absf(cx) <= 0.30:
+				return true
+			if y > 0.40 and y <= 0.52 and absf(cx) <= 0.14:
+				return true
+			return y > 0.52 and y <= 0.68 and absf(cx) <= 0.26
 	return false
 
 

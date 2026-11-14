@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"artifact_tong_tian_ling_bao"
+name = "通天灵宝"
+type = 2
+rarity = 5
+cost = 1
+description = "绑定后角色攻击 +10、防御 +8。"
+flavor_text = "此宝一出，天地失色——传闻而已，见过的人都死了。"
+effect_type = &"buff"
+effect_value = 10
+stack_limit = 2

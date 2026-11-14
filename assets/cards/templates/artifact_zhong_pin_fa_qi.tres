@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"artifact_zhong_pin_fa_qi"
+name = "中品法器"
+type = 2
+rarity = 3
+cost = 1
+description = "绑定后角色攻击 +4、防御 +3。"
+flavor_text = "灵纹初成，剑鸣如磬。"
+effect_type = &"buff"
+effect_value = 4
+stack_limit = 3

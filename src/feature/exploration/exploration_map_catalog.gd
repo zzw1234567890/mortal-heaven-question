@@ -266,10 +266,11 @@ static func _difficulty_of_realm(p_player_realm: int) -> int:
 
 ## 难度档位 → 配置副本（含战斗权重表——与 ExplorationSystem 默认档位一致）。[br]
 ## [br][param p_difficulty] 档位索引；越界时按 MEDIUM 处理（不崩溃）。[br]
-## [br][b]权重表与 [code]exploration_system_base.gd[/code] 的
+## [br][b]权重表与 [code]exploration_system_helpers.gd[/code] 的
 ## [code]DIFFICULTY_CONFIGS[/code] 逐字同源[/b]——两处都是「按难度给权重」的
 ## 真理来源之一（本处服务登记地图，那里服务未注入回调的兜底路径），改一处必须
-## 同改另一处；[code]harvest[/code] 为本轮新增节点类型的权重。
+## 同改另一处；[code]harvest[/code] 为上轮、[code]alchemy[/code] / [code]forge[/code]
+## 为本轮新增节点类型的权重。
 static func _difficulty_defaults(p_difficulty: int) -> Dictionary:
 	var index: int = p_difficulty
 	if index < 0 or index >= DIFFICULTY_DEFAULTS.size():
@@ -277,5 +278,5 @@ static func _difficulty_defaults(p_difficulty: int) -> Dictionary:
 	var config: Dictionary = (DIFFICULTY_DEFAULTS[index] as Dictionary).duplicate(true)
 	config["difficulty"] = index
 	config["weights"] = {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-			"harvest": 10, "elite": 5}
+			"harvest": 10, "alchemy": 8, "forge": 8, "elite": 5}
 	return config

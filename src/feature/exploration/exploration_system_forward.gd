@@ -126,3 +126,36 @@ func harvest_entries(p_node_id: int) -> Array:
 ## ADR-0019 §关键接口、[ExplorationHarvest]。
 func harvest_at_node(p_node_id: int, p_slot: int) -> Dictionary:
 	return _get_harvest().call(&"harvest_at_node", p_node_id, p_slot)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 炼丹台 / 炼器台（委托给 _craft 子模块）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 可炼配方列表——[b]只读[/b]，不修改任何状态。[br]
+## [br][param p_kind] 配方种类（[code]alchemy[/code] 丹药 / [code]forge[/code] 法宝）。[br]
+## [br][b]返回[/b]：条目数组（[code]{index, recipe_id, name, rarity, rarity_name,
+## cost_text, costs, locked, lock_reason, full, affordable, enabled, reason}[/code]）；
+## 未知种类时空数组（面板显示「无方可炼」而非空白）。[br]
+## [br][b]配方来自既有配方资源[/b]：[code]AlchemyRecipes[/code] 是唯一真理来源
+## ——本方法只是它的读取面（UI 零数值计算，不自行拼装配方表）。[br]
+## [br]来源: design/gdd/alchemy-crafting-system.md §1a/§2a/§4、[ExplorationCraft]。
+func craft_entries(p_kind: StringName) -> Array:
+	return _get_craft().call(&"entries", p_kind)
+
+
+## 炼制第 [param p_index] 道配方——扣灵材 + 产卡入收藏（走 GSM 原子写入口）。[br]
+## [br][param p_kind] 配方种类（[code]alchemy[/code] / [code]forge[/code]）。[br]
+## [param p_index] 行号（取 [method craft_entries] 条目里的 [code]index[/code]）。[br]
+## [br][b]返回[/b]：[code]{success, reason, message, recipe_id, card_instance_id,
+## final_rarity}[/code]——[code]message[/code] 为面向玩家的中文提示（面板原样显示）。[br]
+## [br][b]拒绝路径[/b]：行号越界 / 等级不足 / 收藏已满 / 灵材不足 / 系统不可用
+## → 不改任何状态（见 [ExplorationCraft] 的「失败不半完成」）。[br]
+## [br]来源: design/gdd/alchemy-crafting-system.md AC-1/AC-13、ADR-0028 §craft_pill。
+func craft_at_node(p_kind: StringName, p_index: int) -> Dictionary:
+	return _get_craft().call(&"craft", p_kind, p_index)
+
+
+## 各品质档位的灵材持有量（面板顶部摘要——只读 ResourceSystem）。
+func craft_balance() -> Dictionary:
+	return _get_craft().call(&"balance")

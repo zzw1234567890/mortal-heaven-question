@@ -1,4 +1,4 @@
-extends "res://src/feature/exploration/exploration_system_base.gd"
+extends "res://src/feature/exploration/exploration_system_helpers.gd"
 ## ExplorationSystemOps —— 探索系统的[b]对外契约面[/b]：Cat 2b 信号表 / 子模块转发 /
 ## 只读查询 / DAG 缓存生命周期 / 测试桩。[br]
 ## [br][b]为什么单独一层[/b]：[code]exploration_system.gd[/code] 超 300 行软上限，

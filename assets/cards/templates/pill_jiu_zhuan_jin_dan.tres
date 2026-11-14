@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"pill_jiu_zhuan_jin_dan"
+name = "九转金丹"
+type = 4
+rarity = 5
+cost = 1
+description = "目标角色永久 +1 最大生命，并回复满血（背包中使用）。"
+flavor_text = "九转九还，丹成之日，天雷阻之。"
+target_type = &"single_ally"
+stack_limit = 1

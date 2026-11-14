@@ -39,6 +39,10 @@ const TeleportNodePresenterScript := preload(
 ## HarvestNodePresenter 脚本常量（采集 overlay——到达即给可采列表的独立通道）。
 const HarvestNodePresenterScript := preload(
 		"res://src/ui/exploration/harvest_node_presenter.gd")
+## CraftNodePresenter 脚本常量（炼丹台/炼器台 overlay——到达即给可炼配方清单，
+## 与采集同为独立通道）。
+const CraftNodePresenterScript := preload(
+		"res://src/ui/exploration/craft_node_presenter.gd")
 ## NodePopupStage 脚本常量（商店面板期间的节点图冻结——独立实例，见挂载方法）。
 const NodePopupStageScript := preload("res://src/ui/exploration/node_popup_stage.gd")
 ## SettingsStore 脚本常量——reduce_motion 偏好读取（GFX_KEY_* 单一真理来源）。
@@ -73,6 +77,8 @@ static func assemble(p_screen: Control, p_renderer: Control, p_viewport: Control
 		"teleport_presenter": _mount_teleport_presenter(p_screen, p_renderer, p_viewport,
 				p_es, interaction_mount.get(&"interactor")),
 		"harvest_presenter": _mount_harvest_presenter(p_screen, p_renderer, p_viewport,
+				p_es, interaction_mount.get(&"interactor")),
+		"craft_presenter": _mount_craft_presenter(p_screen, p_renderer, p_viewport,
 				p_es, interaction_mount.get(&"interactor")),
 	}
 
@@ -134,6 +140,24 @@ static func _mount_harvest_presenter(p_host: Control, p_renderer: Control,
 	var stage: RefCounted = NodePopupStageScript.new()
 	stage.call(&"bind", p_host, p_renderer, p_viewport)
 	var presenter: RefCounted = HarvestNodePresenterScript.new()
+	presenter.call(&"attach", p_es, p_interactor, p_host, _notification_sink(p_host),
+			_freeze_of(stage, p_interactor, true), _freeze_of(stage, p_interactor, false))
+	return presenter
+
+
+## 炼丹台/炼器台 overlay 接线挂载——[CraftNodePresenter] 消费交互组件的到达转发里的
+## [code]alchemy[/code] / [code]forge[/code]（到达即上架可炼配方清单——与采集同形态）。[br]
+## [br][b]为什么挂屏幕自身[/b]：与商店/采集/传送 overlay 同层（都是全屏覆盖层）；
+## [b]冻结来源[/b]同样用自建 [NodePopupStage]（保存的基线是「炼制面板打开前」）。[br]
+## [br][b]键盘路径[/b]：由面板自己的 [code]_input[/code] 消费方向键/确认/取消，
+## 冻结只需挡住节点图的键盘走位。
+static func _mount_craft_presenter(p_host: Control, p_renderer: Control,
+		p_viewport: Control, p_es: Node, p_interactor: Variant) -> RefCounted:
+	if p_interactor == null or not (p_interactor is Control):
+		return null
+	var stage: RefCounted = NodePopupStageScript.new()
+	stage.call(&"bind", p_host, p_renderer, p_viewport)
+	var presenter: RefCounted = CraftNodePresenterScript.new()
 	presenter.call(&"attach", p_es, p_interactor, p_host, _notification_sink(p_host),
 			_freeze_of(stage, p_interactor, true), _freeze_of(stage, p_interactor, false))
 	return presenter
