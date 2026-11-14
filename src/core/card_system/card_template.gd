@@ -88,6 +88,10 @@ enum Rarity {
 ## 基础攻击力。
 @export var base_attack: int = 0
 
+## 基础防御力——战斗中作为我方角色的防御值种子（伤害先减防御再乘减伤）。
+## 默认 0：旧模板不写此字段时行为与引入前一致；境界表不提供防御加成。
+@export var base_defense: int = 0
+
 ## 原生天赋效果 ID——引用 card-effect-engine 的效果类型。
 @export var innate_skill: StringName = &""
 

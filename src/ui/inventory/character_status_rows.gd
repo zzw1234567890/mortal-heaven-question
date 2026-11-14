@@ -31,6 +31,7 @@ const DETAIL_LABELS: Array = [
 	["rarity_name", "稀有度"],
 	["cost", "灵能消耗"],
 	["base_attack", "攻击"],
+	["base_defense", "防御"],
 	["base_hp", "基础生命"],
 	["hp_text", "当前生命"],
 	["status_text", "出战状态"],

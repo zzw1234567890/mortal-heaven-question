@@ -1,4 +1,4 @@
-extends RefCounted
+﻿extends RefCounted
 ## CombatRosterSeeding —— 战斗状态表的[b]建表半边[/b]（名册 → 状态表，纯函数）。[br]
 ## [br][b]为什么拆出来[/b]：[code]combat_roster_state.gd[/code] 同时持「怎么建表」与
 ## 「怎么读/写表」两件事，加上战斗内法宝增益的落点后越过 300 行软上限
@@ -92,7 +92,7 @@ static func build_player_states(field: Array, stats: Dictionary,
 		else:
 			max_hp = read_template_field(card_system, character_id, "base_hp")
 			hp = max_hp
-			# 卡牌模板暂无 base_defense 字段；模板回退读到 0 = 「无数据」，不臆造。
+			# 模板 base_defense 缺省 0 = 「未配置」，防御不加成也不臆造。
 			defense = read_template_field(card_system, character_id, "base_defense")
 		if atk <= 0:
 			atk = read_template_field(card_system, character_id, "base_attack")
