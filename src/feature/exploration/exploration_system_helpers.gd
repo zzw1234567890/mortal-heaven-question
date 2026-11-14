@@ -27,38 +27,50 @@ const ApRules := preload("res://src/feature/exploration/exploration_ap_rules.gd"
 ## 结果（确定性仍在，只是每张图长得不一样）。[br]
 ## [br][b]alchemy / forge 为本轮新增[/b]：炼丹台与炼器台的权重各 8——与采集点
 ## （10）同一量级，「探索路上偶遇一座丹炉」是偶发事件而非每图必得。[br]
+## [br][b]action_spring（灵泉）为本轮新增[/b]：权重同 8——同上口径，「探索路上
+## 遇见一眼灵泉」是偶发事件；真正的稀缺由「每图限次」保证
+## （[code]action_spring_count[/code]，见下），不是由权重保证。[br]
 ## [br][b]ap_cost[/b]：本档每次移动的行动力开销（GDD action-point-system.md
 ## §调优参数「每格消耗 1，安全范围 1-2」）——出厂全档为 1，与
 ## [code]exploration_map_catalog.gd[/code] 的 [code]DIFFICULTY_DEFAULTS[/code]
 ## 同源；解析见 [code]exploration_ap_rules.gd[/code]。[br]
+## [br][b]action_spring_count[/b]：本档灵泉的每图限次（GDD action-point-system.md
+## §调优参数「行动力泉每图限次 1次（范围 1-2）」）——同样是「按地图配置读」而不是
+## 硬编码常量，单独的地图可覆盖它；读取侧见
+## [code]exploration_action_spring.gd[/code] 的 [code]limit_of[/code]，
+## 生成侧与结算侧共用那一份判据。
 const DIFFICULTY_CONFIGS: Array = [
 	{  # LOW
 		"layers": 4, "min_nodes": 2, "max_nodes": 3,
 		"elite_count": 1, "shop_count": 1, "event_count": 2, "enemy_realm": 1,
-		"ap_cost": 1,
+		"ap_cost": 1, "action_spring_count": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
+				"elite": 5, "action_spring": 8},
 	},
 	{  # MEDIUM
 		"layers": 5, "min_nodes": 2, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 1, "event_count": 3, "enemy_realm": 2,
-		"ap_cost": 1,
+		"ap_cost": 1, "action_spring_count": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
+				"elite": 5, "action_spring": 8},
 	},
 	{  # HIGH
 		"layers": 5, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 2, "event_count": 3, "enemy_realm": 3,
-		"ap_cost": 1,
+		"ap_cost": 1, "action_spring_count": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
+				"elite": 5, "action_spring": 8},
 	},
 	{  # VERY_HIGH
 		"layers": 6, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 3, "shop_count": 2, "event_count": 4, "enemy_realm": 4,
-		"ap_cost": 1,
+		"ap_cost": 1, "action_spring_count": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
+				"elite": 5, "action_spring": 8},
 	},
 ]
 

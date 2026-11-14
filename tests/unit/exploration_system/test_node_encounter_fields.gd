@@ -20,6 +20,10 @@ const Rules := preload("res://src/ui/exploration/node_interaction_rules.gd")
 const EnemyTemplateScript := preload("res://assets/enemies/enemy_template.gd")
 const RewardConfigScript := preload("res://assets/enemies/reward_config.gd")
 
+## 扫描战斗节点的最大进入次数——[code]entry_count[/code] 参与 seed 加扰，逐张图不同；
+## 战斗权重 40/132，12 张内几乎必然命中。
+const COMBAT_SCAN_LIMIT: int = 12
+
 var es: Node = null
 
 
@@ -83,13 +87,20 @@ func _warnings_containing(p_text: String) -> Array:
 	return found
 
 
-## 生成一张图并返回第一个战斗类节点的详情（找不到返回空字典）。
-func _first_combat_detail(p_result: Dictionary) -> Dictionary:
-	var nodes: Dictionary = p_result.get("nodes", {})
-	for node_id: int in nodes.keys():
-		var ntype: int = int((nodes[node_id] as Dictionary).get("type", -1))
-		if ntype == 1 or ntype == 2:  # COMBAT / ELITE
-			return nodes[node_id]
+## 生成地图并返回第一个战斗类节点的详情（扫不到返回空字典，由调用方断言）。[br]
+## [br][b]为什么要扫[/b]：节点类型由权重随机决定（战斗 40/132），单张图不保证有战斗
+## 节点——固定写死一个 [code]entry_count[/code] 的用例会在权重表调整后失稳（本轮新增
+## [code]action_spring[/code] 键即撞上：同一 seed 从 3 个战斗节点变成 0 个）。
+## [code]entry_count[/code] 参与 seed 加扰，逐张图不同，口径同
+## [code]test_action_spring_map_limit.gd[/code] 的 SPRING_SCAN_LIMIT。
+func _first_combat_detail(p_map_id: StringName, p_realm: int) -> Dictionary:
+	for entry_count: int in range(1, COMBAT_SCAN_LIMIT + 1):
+		var nodes: Dictionary = (es.call("generate_map", p_map_id, p_realm,
+				entry_count) as Dictionary).get("nodes", {})
+		for node_id: int in nodes.keys():
+			var ntype: int = int((nodes[node_id] as Dictionary).get("type", -1))
+			if ntype == 1 or ntype == 2:  # COMBAT / ELITE
+				return nodes[node_id]
 	return {}
 
 
@@ -106,8 +117,7 @@ func test_generator_writes_encounter_level_and_rewards() -> void:
 		{"template_id": "san_xiu", "name": "散修", "realm": 1},
 	])
 	# Act
-	var result: Dictionary = es.call("generate_map", &"enc_map", 2, 1)
-	var detail: Dictionary = _first_combat_detail(result)
+	var detail: Dictionary = _first_combat_detail(&"enc_map", 2)
 	# Assert——三字段齐备，且子字典/顶层同值
 	assert_false(detail.is_empty(), "地图应至少产出一个战斗节点")
 	assert_true(detail.has("encounter"), "节点详情应含 encounter 子字典")
@@ -134,8 +144,7 @@ func test_generator_uses_map_realm_when_roster_has_no_realm() -> void:
 	_inject_other_cbs()
 	_inject_roster([{"template_id": "san_xiu"}])
 	# Act——玩家境界 3（高于 MEDIUM 档的地图境界 2）
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"realm_fallback_map", 3, 1))
+	var detail: Dictionary = _first_combat_detail(&"realm_fallback_map", 3)
 	# Assert——等级按地图配置定档，不随玩家境界上涨（GDD §7 回旧地图）
 	assert_eq(int(detail.get("enemy_level", 0)), 2,
 			"名册无境界时用地图配置的 enemy_realm 定档")
@@ -149,8 +158,7 @@ func test_generator_falls_back_to_player_realm_when_config_lacks_enemy_realm() -
 	_inject_other_cbs()
 	_inject_roster([{"template_id": "san_xiu"}])
 	# Act——玩家境界 3
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"legacy_map", 3, 1))
+	var detail: Dictionary = _first_combat_detail(&"legacy_map", 3)
 	# Assert——回退玩家境界，且告警可观测（只一条、点名缺的键）
 	assert_eq(int(detail.get("enemy_level", 0)), 3,
 			"缺 enemy_realm 时回退玩家境界（旧配置兼容）")
@@ -166,8 +174,7 @@ func test_generator_ignores_player_realm_on_high_level_return() -> void:
 	_inject_other_cbs()
 	_inject_roster([{"template_id": "san_xiu", "name": "散修", "realm": 1}])
 	# Act
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"low_return_map", 3, 1))
+	var detail: Dictionary = _first_combat_detail(&"low_return_map", 3)
 	# Assert——节点等级不随玩家上涨（「碾压的回味」靠柔性压制，不靠敌人变强）
 	assert_eq(int(detail.get("enemy_level", 0)), 1,
 			"高境界玩家回低境界地图，节点等级仍取地图境界")
@@ -179,8 +186,7 @@ func test_generator_leaves_zero_rewards_as_empty_dictionary() -> void:
 	_inject_other_cbs()
 	_inject_roster([{"template_id": "san_xiu", "realm": 1}])
 	# Act
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"no_reward_map", 1, 1))
+	var detail: Dictionary = _first_combat_detail(&"no_reward_map", 1)
 	# Assert——缺省语义：{} 而不是 {lingshi: 0, ...}
 	assert_eq(detail.get("rewards", null), {}, "未配置掉落应为空字典（非 0 掉落）")
 	assert_eq((detail["encounter"] as Dictionary).get("rewards", null), {},
@@ -200,8 +206,7 @@ func test_generated_node_is_accepted_by_launch_context() -> void:
 	es.set("enemy_template_lookup_cb",
 			Callable(func(tid: StringName) -> Variant:
 				return template if tid == &"san_xiu" else null))
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"launch_map", 1, 1))
+	var detail: Dictionary = _first_combat_detail(&"launch_map", 1)
 	# Act——把生成器写出的节点直接喂给开战上下文
 	var context: Dictionary = ContextScript.build(101, &"combat",
 			detail.get("enemy_roster", []), [3, 5], detail)
@@ -223,8 +228,7 @@ func test_generated_encounter_id_and_title_are_stable() -> void:
 	_inject_config()
 	_inject_other_cbs()
 	_inject_roster([{"template_id": "mo_xiu", "name": "魔修", "realm": 1}])
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"stable_map", 1, 1))
+	var detail: Dictionary = _first_combat_detail(&"stable_map", 1)
 	# Act
 	var first: Dictionary = ContextScript.build(101, &"combat", [], [1], detail)
 	var second: Dictionary = ContextScript.build(101, &"combat", [], [1], detail)
@@ -245,8 +249,7 @@ func test_missing_roster_produces_readable_failure() -> void:
 	_inject_config()
 	_inject_other_cbs()
 	es.set("generate_enemy_roster_cb", Callable())
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"no_roster_map", 1, 1))
+	var detail: Dictionary = _first_combat_detail(&"no_roster_map", 1)
 	# Act
 	var context: Dictionary = ContextScript.build(101, &"combat", [], [2], detail)
 	var problem: String = ContextScript.validate(context)
@@ -261,8 +264,7 @@ func test_missing_player_roster_produces_readable_failure() -> void:
 	_inject_config()
 	_inject_other_cbs()
 	_inject_roster([{"template_id": "san_xiu", "realm": 1}])
-	var detail: Dictionary = _first_combat_detail(
-			es.call("generate_map", &"no_player_map", 1, 1))
+	var detail: Dictionary = _first_combat_detail(&"no_player_map", 1)
 	# Act
 	var context: Dictionary = ContextScript.build(101, &"combat",
 			detail.get("enemy_roster", []), [], detail)

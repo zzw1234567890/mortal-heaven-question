@@ -20,19 +20,23 @@ extends RefCounted
 ## [br][b]ap_cost[/b]：本档地图每次移动的行动力开销（GDD action-point-system.md
 ## §调优参数「每格消耗 1，安全范围 1-2」——出厂全档为 1，键存在的意义是
 ## 「按地图配置扣」走的是配置读取而不是硬编码常量；单独的地图可覆盖它）。[br]
+## [br][b]action_spring_count[/b]：本档灵泉的每图限次（GDD action-point-system.md
+## §调优参数「行动力泉每图限次 1次（范围 1-2）」——同上：键存在是为了让
+## 「每图限次」走配置读取，单独的地图可覆盖；读取侧是
+## [code]exploration_action_spring.gd[/code] 的 [code]limit_of[/code]）。[br]
 const DIFFICULTY_DEFAULTS: Array = [
 	{"layers": 4, "min_nodes": 2, "max_nodes": 3, "elite_count": 1, "shop_count": 1,
 		"enemy_realm": 1, "enemy_count_min": 1, "enemy_count_max": 2, "elite_bonus": 1,
-		"ap_cost": 1},
+		"ap_cost": 1, "action_spring_count": 1},
 	{"layers": 5, "min_nodes": 2, "max_nodes": 4, "elite_count": 2, "shop_count": 1,
 		"enemy_realm": 2, "enemy_count_min": 2, "enemy_count_max": 3, "elite_bonus": 1,
-		"ap_cost": 1},
+		"ap_cost": 1, "action_spring_count": 1},
 	{"layers": 5, "min_nodes": 3, "max_nodes": 4, "elite_count": 2, "shop_count": 2,
 		"enemy_realm": 3, "enemy_count_min": 2, "enemy_count_max": 3, "elite_bonus": 1,
-		"ap_cost": 1},
+		"ap_cost": 1, "action_spring_count": 1},
 	{"layers": 6, "min_nodes": 3, "max_nodes": 4, "elite_count": 3, "shop_count": 2,
 		"enemy_realm": 4, "enemy_count_min": 3, "enemy_count_max": 4, "elite_bonus": 1,
-		"ap_cost": 1},
+		"ap_cost": 1, "action_spring_count": 1},
 ]
 
 ## 敌人池——四类出厂模板（[code]assets/enemies/*.tres[/code]）：
@@ -277,7 +281,7 @@ static func _difficulty_of_realm(p_player_realm: int) -> int:
 ## [code]DIFFICULTY_CONFIGS[/code] 逐字同源[/b]——两处都是「按难度给权重」的
 ## 真理来源之一（本处服务登记地图，那里服务未注入回调的兜底路径），改一处必须
 ## 同改另一处；[code]harvest[/code] 为上轮、[code]alchemy[/code] / [code]forge[/code]
-## 为本轮新增节点类型的权重。
+## / [code]action_spring[/code] 为本轮新增节点类型的权重。
 static func _difficulty_defaults(p_difficulty: int) -> Dictionary:
 	var index: int = p_difficulty
 	if index < 0 or index >= DIFFICULTY_DEFAULTS.size():
@@ -285,5 +289,6 @@ static func _difficulty_defaults(p_difficulty: int) -> Dictionary:
 	var config: Dictionary = (DIFFICULTY_DEFAULTS[index] as Dictionary).duplicate(true)
 	config["difficulty"] = index
 	config["weights"] = {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-			"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5}
+			"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
+			"elite": 5, "action_spring": 8}
 	return config

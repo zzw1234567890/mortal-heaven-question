@@ -22,6 +22,14 @@ extends RefCounted
 ## 的阶段，一律按标识升序取第一个符合条件者，出手选择 UI 落地后这里换成显式传入。[br]
 ## [br][b]阵亡不复活[/b]：[code]current_hp <= 0[/code] 的角色既不是治疗对象，也不会被
 ## 顺带复活（复活是 [code]DeploymentSystem.revive_character[/code] 的职责）。[br]
+## [br][b]两类效果、两条结算路径[/b]：本模块先按治疗类解释模板
+## （[code]CardEffectEvaluator[/code] 的 [code]healing[/code]）；给不出治疗量时再看它
+## 是不是[b]回复行动力[/b]类——那条路径的数值读法与写入口都在探索域，整体委托
+## [InventoryPillAp]（含它自己的「先写、再取出、失败回滚」顺序）。两条路径共用同一个
+## [code]{ok, consumed, healed, message}[/code] 返回契约与「失败不半完成」的取舍。[br]
+## [br][b]为什么不合并成一段连写[/b]：治疗写 [code]player.character_hp[/code]、
+## 行动力写 [code]exploration.action_points[/code]——两个域、两套回滚原值，连写会让
+## 任一半失败时的回滚范围变得含糊。[br]
 ## [br][b]失败不半完成[/b]：[b]先写血、再取出丹药[/b]；取出失败则按原值回滚血量。
 ## 反过来的顺序（先取丹药）一旦写入失败就找不回那枚丹——丹药是有限资源，宁可
 ## 丢掉一次回血也不能凭空吞掉玩家的物品。[br]
@@ -31,8 +39,8 @@ extends RefCounted
 ## [br][b]文案本地化豁免[/b]：与 inventory_catalog / inventory_screen 同源口径。[br]
 ##
 ## 来源: design/gdd/alchemy-crafting-system.md §1c 丹药效果定义（使用时机「战斗中或背包」）
-## / §边界、ADR-0006 §GSM 集成合约、ADR-0031 §2、先例
-## [code]exploration_rest.gd[/code]（读 → 计划 → 写回）、
+## / §边界、design/gdd/action-point-system.md §3、ADR-0006 §GSM 集成合约、ADR-0031 §2、
+## 先例 [code]exploration_rest.gd[/code]（读 → 计划 → 写回）、
 ## [code]combat_caster_rules.gd[/code]（无目标选择时的取值先例）。
 
 ## 分类表（非丹药提示文案的唯一来源）。
@@ -43,6 +51,8 @@ const CarryoverScript := preload("res://src/feature/combat/combat_hp_carryover.g
 const EvaluatorScript := preload("res://src/feature/card_effect_engine/card_effect_evaluator.gd")
 ## 评估快照（纯数据容器——丹药不在场，快照里没有目标也无妨，见 [method _heal_amount]）。
 const SnapshotScript := preload("res://src/feature/card_effect_engine/game_state_snapshot.gd")
+## 回复行动力的读取与结算半边（探索域丹药——见 [InventoryPillAp] 类文档）。
+const ApScript := preload("res://src/feature/inventory/inventory_pill_ap.gd")
 
 ## [code]CardTemplate.CardType.PILL[/code] 的字面值（不引那个类——模板系统未加载时
 ## 本条路径也要能判「这不是丹药」，同 [code]InventoryCatalog.CATEGORIES[/code] 的注记）。
@@ -102,8 +112,12 @@ func use_entry(p_entry: Dictionary) -> Dictionary:
 
 	var heal: int = _heal_amount(template)
 	if heal <= 0:
-		# 模板存在却给不出治疗量 = 效果类型未建模（如九转金丹的「永久 +1 最大生命」）
-		# 或该条目不是治疗类——一律如实说「用不了」，不拿 0 点回血冒充成功。
+		# 模板存在却给不出治疗量——先看它是不是[b]回复行动力[/b]类（另一条域：
+		# 数值读法与写入口都不同，见 [InventoryPillAp]）；仍不是则如实说「用不了」，
+		# 不拿 0 点回血冒充成功（如九转金丹的「永久 +1 最大生命」，效果类型未建模）。
+		if ApScript.amount_of(template) > 0:
+			return ApScript.use_pill(_resolve_gsm(), template, int(instance_ids[0]),
+					Callable(self, &"_consume"))
 		return _failed(TEXT_EFFECT_UNKNOWN)
 
 	var carryover: RefCounted = _resolve_carryover()
