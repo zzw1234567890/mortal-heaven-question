@@ -20,6 +20,14 @@ const EncounterFields := preload("res://assets/enemies/encounter_fields.gd")
 
 ## 普通战斗/精英提示（GDD §4 线框「推荐战力」行——B3 裁决采用角色数版本）。
 const TEXT_RECOMMENDED_PREFIX: String = "推荐上场角色："
+## 我方出战人数上限后缀——GDD §4 线框「推荐战力：至少2个角色上场」的对照面：
+## 推荐数是「至少几人」，后缀是「最多几人」。两者都读真实配置（境界上限来自
+## RealmSystem、推荐数来自地图配置），不硬编码。[br]
+## [br][b]为什么并进推荐行而不是新开一行[/b]：既有单测锁定了正文行数
+## （无境界时恰为 2 行：[敌人行, 推荐行]）——把上限做成独立行会改变这个契约，
+## 而「上限」本身就是推荐数的上界（[method recommended_deploy] 用的就是它），
+## 并排展示比分成两行更贴近「至少 N、最多 M」的读法。
+const TEXT_DEPLOY_CAP_SUFFIX: String = "（我方出战上限 %d）"
 
 ## 境界等级 → 中文名表（1 炼气 … 5 化神）。
 const REALM_NAMES: Dictionary = {
@@ -58,7 +66,8 @@ static func lines(p_enemy_roster: Array, p_max_deploy: int,
 ## 遭遇配置，再回退到名册——文案与 [code]CombatLaunchContext[/code] 同源。[br]
 ## [br][param p_encounter] 规范化遭遇配置（[code]EncounterFields.make/of_detail[/code]）。[br]
 ## [param p_roster] 到达名册（可为空——数量退化为模板 ID 数）。[br]
-## [param p_max_deploy] 当前境界上场上限。[br]
+## [param p_max_deploy] 当前境界上场上限（[code]RealmSystem[/code] 查询值——
+## 同时是推荐数的上界与正文展示的上限，两者读同一个数，不各算一份）。[br]
 ## [param p_recommended_override] 地图配置显式推荐值（≤0 = 未配置）。
 static func lines_for_encounter(p_encounter: Dictionary, p_roster: Array,
 		p_max_deploy: int, p_recommended_override: int = 0) -> Array:
@@ -86,9 +95,25 @@ static func lines_for_encounter(p_encounter: Dictionary, p_roster: Array,
 		realm = int(summary["realm"])
 	if realm > 0:
 		lines.append(realm_name(realm))
-	lines.append(TEXT_RECOMMENDED_PREFIX + "≥%d"
-			% recommended_deploy(count, p_max_deploy, p_recommended_override))
+	lines.append(recommend_line(count, p_max_deploy, p_recommended_override))
 	return lines
+
+
+## 推荐行文案——「至少 N 人 + 我方出战上限 M」（GDD §4 线框「推荐战力」）。[br]
+## [br][b]单一来源[/b]：推荐数与上限的关系只在这里措辞一次——弹窗与任何
+## 交叉校验都取本方法，不各拼一遍字符串。[br]
+## [br][b]上限未初始化[/b]（[param p_max_deploy] ≤0，RealmSystem 与快照都缺）：
+## 不臆造数字，退化为只报推荐数——正文里出现「上限 1」会是错的信息。[br]
+## [br][param p_enemy_count] 敌人数量。[br]
+## [param p_max_deploy] 我方出战人数上限。[br]
+## [param p_recommended_override] 地图配置显式推荐值（≤0 = 未配置）。
+static func recommend_line(p_enemy_count: int, p_max_deploy: int,
+		p_recommended_override: int = 0) -> String:
+	var text: String = TEXT_RECOMMENDED_PREFIX + "≥%d" % recommended_deploy(
+			p_enemy_count, p_max_deploy, p_recommended_override)
+	if p_max_deploy > 0:
+		text += TEXT_DEPLOY_CAP_SUFFIX % p_max_deploy
+	return text
 
 
 ## 推荐上场角色数——[b]数据驱动[/b]：配置值优先，缺失时按敌人数对等推定

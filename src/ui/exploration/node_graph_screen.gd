@@ -83,18 +83,15 @@ var _load_source: RefCounted = null
 ## 待加载地图 ID——[method trigger_map_load] 在进树前被调用时记下，[method _ready]
 ## 补触发一次（场景编排先 add_child 后调 trigger_map_load 是既有顺序）。
 var _pending_map_id: StringName = &""
-## 交互组件挂载器（移动/教程/弹窗——见 [NodeGraphInteractionMount]）。[br]
-## 子组件实例经通用路由访问（[code]_interaction_mount.get(&"interactor")[/code]
-## ——headless 动态加载下不依赖 class_name 解析）。
-var _interaction_mount: RefCounted = null
+## 装配结果——[code]{interaction_mount, event_presenter, shop_presenter,
+## teleport_presenter, harvest_presenter}[/code]（见 [NodeGraphComponentAssembly]）。[br]
+## [br][b]为什么整块存字典而不逐个声明字段[/b]：屏幕只负责「持有引用防 RefCounted
+## 提前释放」与对外暴露访问器；逐个照抄一遍等于把装配器的返回契约写两处，
+## 加一个组件要改两个文件（且本文件已贴上限）。子组件实例同样经此路由访问
+## （[method _sub_component]——headless 动态加载下不依赖 class_name 解析）。
+var _components: Dictionary = {}
 ## 六态重算 + 逐层展开动画（见 [NodeGraphRevealAnimator]）。
 var _reveal_animator: RefCounted = null
-## 事件节点弹出器（见 [EventNodePresenter]）。
-var _event_presenter: RefCounted = null
-## 商店 overlay / 回复/灵泉提示接线（见 [ShopNodePresenter]——消费弹窗宿主的确认信号）。
-var _shop_presenter: RefCounted = null
-## 传送选层 overlay 接线（见 [TeleportNodePresenter]——B5 裁决下传送不进弹窗分发表）。
-var _teleport_presenter: RefCounted = null
 
 
 func _ready() -> void:
@@ -124,14 +121,19 @@ func is_using_stub_source() -> bool:
 ## [b]公开入口[/b]：集成测试与后续 story 经此断言/驱动商店 overlay，
 ## 不依赖私有成员名。
 func shop_presenter() -> Variant:
-	return _shop_presenter
+	return _components.get("shop_presenter")
 
 
-## 传送选层接线组件（见 [TeleportNodePresenter]）——未挂载时为 null。[br]
-## [b]公开入口[/b]：集成测试与后续 story 经此断言/驱动传送 overlay，
-## 不依赖私有成员名。
+## 传送选层接线组件（见 [TeleportNodePresenter]）——未挂载时为 null
+## （公开入口口径同 [method shop_presenter]）。
 func teleport_presenter() -> Variant:
-	return _teleport_presenter
+	return _components.get("teleport_presenter")
+
+
+## 采集接线组件（见 [HarvestNodePresenter]）——未挂载时为 null
+## （公开入口口径同 [method shop_presenter]）。
+func harvest_presenter() -> Variant:
+	return _components.get("harvest_presenter")
 
 
 ## 触发地图加载。[br]
@@ -172,12 +174,8 @@ func _connect_signals() -> void:
 ## （交互三组件 + 事件弹出通道 + 商店/回复接线 + 转发回调表构建），
 ## 屏幕只持引用防提前释放。
 func _mount_components(es: Node) -> void:
-	var parts: Dictionary = ComponentAssemblyScript.assemble(self, renderer(),
+	_components = ComponentAssemblyScript.assemble(self, renderer(),
 			viewport, es, reduce_motion_override)
-	_interaction_mount = parts.get("interaction_mount")
-	_event_presenter = parts.get("event_presenter")
-	_shop_presenter = parts.get("shop_presenter")
-	_teleport_presenter = parts.get("teleport_presenter")
 
 
 ## 键盘焦点转发——渲染器绘制松石青焦点环（ADR-0031 §4 双焦点双视觉）。
@@ -283,9 +281,10 @@ func _reveal() -> RefCounted:
 ## [b]用字典读取而非类型化字段[/b]：子组件由 [NodeGraphInteractionMount] 持有，
 ## 屏幕不重复声明（避免两处各记一份）；headless 下单测也可能没走过挂载。
 func _sub_component(p_key: StringName) -> Variant:
-	if _interaction_mount == null:
+	var mount: Variant = _components.get("interaction_mount")
+	if mount == null:
 		return null
-	return _interaction_mount.get(p_key)
+	return mount.get(p_key)
 
 
 ## 获取探索系统——注入对象优先，否则回退 Autoload。

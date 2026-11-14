@@ -98,3 +98,31 @@ func _get_map_max_realm(map_id: StringName) -> int:
 ## [br]来源: GDD exploration-system.md §公式 7 + §8 边界、exploration-ui-system.md §4c。
 func rest_at_node(p_node_id: int) -> int:
 	return int(_get_rest().call(&"rest_at_node", p_node_id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 采集点（委托给 _harvest 子模块）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 采集点可采列表——[b]只读[/b]，不修改任何状态。[br]
+## [br][param p_node_id] 采集节点 ID。[br]
+## [br][b]返回[/b]：条目数组（[code]{slot, name, kind, kind_name, quality,
+## quality_name, amount, harvested, room}[/code]）；节点无载荷时空数组。[br]
+## [br][b]唯一入口[/b]：UI 侧的面板与弹窗都走这里，不自行拼装材料列表
+## （UI 零数值计算）。[br]
+## [br]来源: design/gdd/resource-system.md §资源表（灵材）、[ExplorationHarvest]。
+func harvest_entries(p_node_id: int) -> Array:
+	return _get_harvest().call(&"entries_at", p_node_id)
+
+
+## 采集一个槽位——材料经 [code]ResourceSystem.add_resource[/code] 入背包，
+## 并把这个节点的这个槽位记为已采（随探索域持久化）。[br]
+## [br][param p_node_id] 采集节点 ID。[br]
+## [param p_slot] 材料槽位（[method harvest_entries] 条目里的 [code]slot[/code]）。[br]
+## [br][b]返回[/b]：[code]{success, reason, message, gained, quality}[/code]
+## ——[code]message[/code] 为面向玩家的中文提示（面板原样显示）。[br]
+## [br][b]拒绝路径[/b]：槽位越界 / 重复采集 / 背包已满 → 不改任何状态。[br]
+## [br]来源: design/gdd/resource-system.md §资源表 / §边界（AC-19）、
+## ADR-0019 §关键接口、[ExplorationHarvest]。
+func harvest_at_node(p_node_id: int, p_slot: int) -> Dictionary:
+	return _get_harvest().call(&"harvest_at_node", p_node_id, p_slot)

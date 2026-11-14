@@ -12,6 +12,8 @@ extends RefCounted
 const Fields := preload("res://assets/enemies/encounter_fields.gd")
 ## 图骨架算法（边连接 / 交叉边 / 独立路径计数）。
 const Graph := preload("res://src/feature/exploration/exploration_dag_graph.gd")
+## 采集点材料载荷表（按地图 + 境界给产出——生成期写入节点详情）。
+const HarvestTable := preload("res://src/feature/exploration/exploration_harvest_table.gd")
 
 ## 地图配置里敌人基准境界的键（缺键 = 旧配置，回退玩家境界并警告一次）。
 const KEY_ENEMY_REALM: String = "enemy_realm"
@@ -112,7 +114,7 @@ func _repair_paths(p_graph: Dictionary, p_nodes_per_layer: Array, p_total_layers
 
 ## 加权随机分配节点类型——排除超限类型后重新加权。
 func _assign_node_types(all_nodes: Array, nodes_per_layer: Array, config: Dictionary, total_layers: int) -> Dictionary:
-	var weights: Dictionary = config.get("weights", {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5})
+	var weights: Dictionary = config.get("weights", {"combat": 40, "event": 30, "shop": 15, "rest": 10, "harvest": 10, "elite": 5})
 	var max_elite: int = int(config.get("elite_count", 2))
 	var max_shop: int = int(config.get("shop_count", 1))
 	var elite_assigned: int = 0
@@ -166,6 +168,7 @@ func _string_to_node_type(type_str: String) -> int:
 		"event": return _parent.NodeType.EVENT
 		"shop": return _parent.NodeType.SHOP
 		"rest": return _parent.NodeType.REST
+		"harvest": return _parent.NodeType.HARVEST
 		"elite": return _parent.NodeType.ELITE
 		_: return _parent.NodeType.COMBAT
 
@@ -279,6 +282,11 @@ func _fill_node_content(all_nodes: Array, node_types: Dictionary,
 					detail["inventory"] = {}
 			_parent.NodeType.REST:
 				detail["label"] = "回复点"
+			_parent.NodeType.HARVEST:
+				# 采集点——材料载荷在生成期定死（确定性：同图同境界恒同批），
+				# 已采状态由 [ExplorationHarvest] 写在 map_states 里。
+				detail["label"] = "采集点"
+				detail["materials"] = HarvestTable.payload_for(map_id, player_realm)
 			_parent.NodeType.ACTION_SPRING:
 				detail["label"] = "行动力泉"
 			_parent.NodeType.TELEPORT:

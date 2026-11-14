@@ -3,8 +3,27 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 商店面板键盘/手柄导航 + 冻结时序测试 + ExplorationSystem 拆分（686 → 246）；下一步 其余 5 事件按策划意图补 min_realm 分层，或探索导航闭环（`get_map_list` 真实载荷、重入编排）
+Task: 采集节点（灵草/矿脉）入背包 + 战斗前置信息补「我方出战上限」；下一步 采集材料接炼丹/炼器消耗端，或其余 5 事件按策划意图补 min_realm 分层
 <!-- /STATUS -->
+
+## Session Extract — 采集节点（灵草/矿脉）+ 战斗预览出战上限（2026-11-14）
+- 任务：① 资源采集节点——到达按节点载荷给出可采列表、采集真的入背包（GSM 原子写入口）、同节点每资源只采一次且持久化、提示中文；② 战斗节点进入前预览敌方信息（阵容名/数量/等级/我方出战上限），确认才进战斗；③ 测试覆盖采集入库+重复失败、背包上限夹紧、预览与遭遇配置一致、取消不改状态
+- **背包口径调研结论**：全库没有独立「材料域」——既有背包就是 `GameStateManager.player.resources.ling_cai` 四档品质（low/medium/high/top），写入口是 `ResourceSystem.add_resource(&"ling_cai", 数量, 品质)` → GSM `_set_resource_ling_cai`（ADR-0019 §关键接口）。本轮直接复用，不新建第二条通路
+- **避开的延迟陷阱**：`ExplorationMapFlush.collect_resource()` 只累积到 `map_states[map_id].collected_*`，要等 `end_exploration` 才转进背包（GDD §公式 11 结算节奏）。采集要求「采了就到手」，故直接走 `ResourceSystem.add_resource`——延迟入包会让「采集成功」提示与实际背包不符
+- **新增 `exploration_harvest_table.gd`（134）**：材料载荷数据表。`POOLS_BY_REALM` 4 个境界档 × 2 变体，每变体 1 灵草 + 1 矿脉（故每个采集点恒两条）；`payload_for(map_id, realm)` 用 `hash(map_id) % variants.size()` 选变体——同图同境界恒同批（确定性，可 SL 防护）
+- **新增 `exploration_harvest.gd`（279）**：结算。已采状态写 `map_states[map_id]["harvested"]` = `{node_id: [slot,...]}`（整块写入，因 `update_exploration_map_state` 在顶层键做合并覆盖），随探索域持久化。拒绝路径（slot 越界/重复/背包满）**全在写包之前**；部分入库时 `gained` = 实际入库量，提示里的数字就是真实到手数
+- **容量语义拆两个纯函数（首次跑测试抓到的缺陷）**：初版 `entries_for` 把 `room` 算成 `room_for(current, amount)` = `min(剩余容量, amount)`，对数量 1 的材料返回 1 而非 99 → 测试红。正确语义：`remaining(current, cap)` = 纯背包剩余容量（`entries_for` 用它，面板据此禁用行），`room_for(current, amount, cap)` = `min(remaining, amount)`（`harvest_at_node` 用它算真实入库量）
+- **背包上限**：`LING_CAI_CAP = 99` 定为采集入库容量。GDD resource-system.md §边界写「灵材无硬上限，超过 99 时 UI 显示 99+」——本轮把 99 当硬容量（超额部分不入包并提示「背包已满」），歧义已记在类文档「已知边界」
+- **节点类型新增**：`NodeType.HARVEST = 10`；权重表两处同源加上 `"harvest": 10`（`exploration_system_base.gd` 的 `DIFFICULTY_CONFIGS` + `exploration_map_catalog.gd` 的 `_difficulty_defaults`）+ DAG 生成器回退权重。**副作用**：新键改变 `_weighted_random` 的 `total` → 所有种子的 DAG 重排（确定性仍在，每张图长得不一样）；既有 DAG 断言只锁区间/上限（战斗占比 0.25–0.55、精英 ≤1、商店 ≤1），全量跑完无 DAG 测试红
+- **图标图集**：`node_icon_atlas.gd` 的 `ATLAS_COLS` 10 → 11，新增类型 10（`label: 采集点`、`color: #7FA85C`、`glyph: leaf`）+ `_glyph_pixel` 的叶形分支（椭圆 + 中脉留白）。既有 `test_node_graph_render.gd:105` 的 `for type_id in 10` 只覆盖 0..9，无枚举大小断言 → 未被破坏
+- **新增 UI 三件**：`harvest_panel_layout.gd`（84，委托 `ShopLayoutScript.build()` 保持控件树/尺寸/焦点环同一处）、`harvest_panel_screen.gd`（249，`_input` 级导航复用 `ShopPanelNavigator`）、`harvest_node_presenter.gd`（252，消费交互组件转发里的 `harvest`，其余类型原样放行给弹窗宿主）
+- **采集为什么不进 `DISPATCH_TABLE`**：与传送（B5 裁决）同源——到达即上架可采列表，中间再插确认框等于让玩家为同一件事点两次。`node_interaction_rules.gd` 加了文档说明，**未添加键**（宿主收到 `harvest` 直接返回，不开空弹窗）
+- **战斗预览「我方出战上限」**：`TEXT_DEPLOY_CAP_SUFFIX` 并进推荐行（`推荐上场角色：≥N（我方出战上限 M）`），**不新开一行**——既有单测锁定了正文行数（无境界时恰 2 行），且上限本就是推荐数的夹取上界（`recommended_deploy` 用的就是它），并排展示更贴「至少 N、最多 M」。`max_deploy ≤ 0` 时省略后缀（不臆造数字）。数值来自既有的 `NodePopupServices.max_deploy()` → `RealmSystem.get_realm_property(realm_id, &"max_deploy")`，非硬编码
+- **`node_graph_screen.gd` 回 300 行内（307 → 298）**：4 个 presenter 字段合并为一个 `_components: Dictionary`（装配器返回契约不再照抄第二遍，加组件只改一个文件）；访问器 `shop_presenter()` / `teleport_presenter()` / `harvest_presenter()` 与 `_sub_component()` 契约逐字不变
+- 测试：新增 `tests/unit/exploration_system/test_exploration_harvest.gd`（12，载荷读取/入库/重复拒绝/上限夹紧/部分入库/满包拒绝/持久化/确定性）、`tests/integration/exploration_ui/test_harvest_node_flow.gd`（7，真实 `node_graph_screen.tscn` + 真实 Autoload 的端到端：到达上架/无确认弹窗/冻结/点击入库并刷新/重复拒绝/取消保留结果/另一槽位仍可用）、`tests/unit/exploration_ui/test_combat_preview_deploy_cap.gd`（8，上限出现在推荐行/未知时省略/跟随 max_deploy/推荐数 ≤ 上限/超限覆盖被夹/遭遇配置驱动/不重复 ×N/文案单一来源）
+- 全量：**4306 tests / 4304 passing / 2 risky-pending 存量 / 3 orphans 存量**，零失败、零回归（既有 4306 基线中的 1 个 `cost_system` 跨测试泄漏失败本轮未复现）
+- 遗留：① 灵材采集是否该在 99 处封顶（vs GDD「无硬上限」只在 UI 截断）待策划裁定；② 采集无确认步骤是否要加（现与传送同口径）；③ `harvested` 状态进存档已随探索域，但跨存档迁移未验证
+- Next recommended: 采集材料接炼丹/炼器消耗端（材料目前只能进不能出）；其余 5 事件按策划意图补 min_realm 分层
 
 ## Session Extract — 商店面板双输入导航 + 冻结时序 + ExplorationSystem 拆分（2026-11-13）
 - 任务：补上轮自己登记的缺口——① 商店面板键盘/手柄导航（上下选行 / 确认购买 / Esc 关闭，焦点可见）+ 一条「商店开合与节点图冻结/解冻」时序测试；② `exploration_system.gd`（686 行）机械拆到 300 行以内；硬性约束：不重复声明 signal、单文件 ≤300 行、不删/不改名既有测试、全量 GUT 全绿

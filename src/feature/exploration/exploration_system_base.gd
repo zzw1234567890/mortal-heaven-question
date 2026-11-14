@@ -38,6 +38,7 @@ enum NodeType {
 	ACTION_SPRING = 7, ## 行动力泉——回复全部行动力
 	REST = 8,          ## 回复点——全体回复 50% 已损失 HP
 	TRIBULATION = 9,   ## 渡劫台——修为已满时触发渡劫
+	HARVEST = 10,      ## 采集点——灵草/矿脉，按节点载荷采材料入背包
 }
 
 ## 地图难度枚举。
@@ -104,27 +105,31 @@ var get_seed_cb: Callable = Callable()
 ## [br][code]enemy_realm[/code] 是节点敌人强度的定档基准（GDD「回旧地图」§7：
 ## 敌人强度按地图本身境界设定，不随玩家境界上涨）。缺键的地图配置会回退玩家
 ## 境界并警告一次——生产配置由 [code]exploration_map_catalog.gd[/code] 提供，
-## 本表只是难度档位的通用兜底（境界取难度档位的默认值 1~4）。[br]
+## 本表只是难度档位的通用兜底。[br]
+## [br][b]权重表两处同源[/b]：[code]exploration_map_catalog.gd[/code] 的
+## [code]_difficulty_defaults[/code] 必须与本表一致；新增键会改变
+## [code]_weighted_random[/code] 的 [code]total[/code] 从而重排所有种子的 DAG
+## 结果（确定性仍在，只是每张图长得不一样）。
 const DIFFICULTY_CONFIGS: Array = [
 	{  # LOW
 		"layers": 4, "min_nodes": 2, "max_nodes": 3,
 		"elite_count": 1, "shop_count": 1, "event_count": 2, "enemy_realm": 1,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
+		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "harvest": 10, "elite": 5},
 	},
 	{  # MEDIUM
 		"layers": 5, "min_nodes": 2, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 1, "event_count": 3, "enemy_realm": 2,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
+		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "harvest": 10, "elite": 5},
 	},
 	{  # HIGH
 		"layers": 5, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 2, "event_count": 3, "enemy_realm": 3,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
+		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "harvest": 10, "elite": 5},
 	},
 	{  # VERY_HIGH
 		"layers": 6, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 3, "shop_count": 2, "event_count": 4, "enemy_realm": 4,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "elite": 5},
+		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10, "harvest": 10, "elite": 5},
 	},
 ]
 
@@ -177,6 +182,9 @@ var _teleport: RefCounted = null
 
 ## 地图选择列表载荷组装子模块（探明表 × GSM → 卡片条目）。
 var _map_list: RefCounted = null
+
+## 采集点结算子模块（GDD §资源表——材料入背包 + 已采状态持久化）。
+var _harvest: RefCounted = null
 
 
 # === 通用助手 ====================================================================
@@ -265,6 +273,13 @@ func _get_rest() -> RefCounted:
 	if _rest == null:
 		_rest = preload("res://src/feature/exploration/exploration_rest.gd").new(self)
 	return _rest
+
+
+## 获取采集点结算子模块实例（材料入背包 + 已采状态持久化）。
+func _get_harvest() -> RefCounted:
+	if _harvest == null:
+		_harvest = preload("res://src/feature/exploration/exploration_harvest.gd").new(self)
+	return _harvest
 
 
 ## 获取行动力泉结算子模块实例（GDD §节点类型一览——回复全部行动力）。

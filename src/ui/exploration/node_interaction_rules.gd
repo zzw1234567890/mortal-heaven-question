@@ -45,7 +45,11 @@ const ACTION_REST: StringName = &"rest"
 const ACTION_ENTER_TRIBULATION: StringName = &"enter_tribulation"
 
 ## === 分发表（GDD §4c——interaction_type → 三元组）==========================
-## 未列出的类型（event / teleport / 空串）→ [constant KIND_NONE]（无弹窗）。
+## 未列出的类型（event / teleport / harvest / 空串）→ [constant KIND_NONE]（无弹窗）。
+## [br][b]harvest 为什么不在表内[/b]：采集点的交互形态是「到达即给可采列表并直接
+## 采集」，中间再插一层确认框等于让玩家为同一件事点两次；故与传送同走独立通道
+## （[code]harvest_node_presenter.gd[/code] 消费同一转发信号里的 [code]harvest[/code]），
+## 本表显式排除——宿主收到它会直接返回，不会开出空弹窗。
 const DISPATCH_TABLE: Dictionary = {
 	&"combat": KIND_COMBAT,
 	&"elite": KIND_COMBAT,

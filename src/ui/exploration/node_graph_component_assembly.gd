@@ -14,7 +14,10 @@ extends RefCounted
 ##     ——「确认之后」的接线）；[br]
 ##   - [TeleportNodePresenter]——传送节点的选层 overlay（消费交互组件的
 ##     [code]node_interaction_forwarded[/code] 里的 [code]teleport[/code]——
-##     传送被 B5 裁决排除在弹窗分发表之外，故走独立通道）。[br]
+##     传送被 B5 裁决排除在弹窗分发表之外，故走独立通道）；[br]
+##   - [HarvestNodePresenter]——采集点（灵草/矿脉）的采集 overlay（消费同一
+##     转发里的 [code]harvest[/code]——到达即给可采列表，比「确认框再点一次」
+##     更贴合「走到就采」的读法）。[br]
 ##
 ## [b]不持有游戏状态[/b]：只建组件与连信号，状态全在快照里（ADR-0031 §2）。
 ##
@@ -33,6 +36,9 @@ const ShopNodePresenterScript := preload(
 ## TeleportNodePresenter 脚本常量（传送选层 overlay——B5 排除弹窗后的独立通道）。
 const TeleportNodePresenterScript := preload(
 		"res://src/ui/exploration/teleport_node_presenter.gd")
+## HarvestNodePresenter 脚本常量（采集 overlay——到达即给可采列表的独立通道）。
+const HarvestNodePresenterScript := preload(
+		"res://src/ui/exploration/harvest_node_presenter.gd")
 ## NodePopupStage 脚本常量（商店面板期间的节点图冻结——独立实例，见挂载方法）。
 const NodePopupStageScript := preload("res://src/ui/exploration/node_popup_stage.gd")
 ## SettingsStore 脚本常量——reduce_motion 偏好读取（GFX_KEY_* 单一真理来源）。
@@ -51,7 +57,7 @@ const SCENE_MANAGER_PATH: StringName = &"/root/SceneManager"
 ## [param p_es] 探索系统（信号源，可空——stub 降级时仍挂 UI 组件）。[br]
 ## [param p_reduce_motion_override] 测试注入的减少动态偏好（null 时读 SettingsStore）。[br]
 ## [b]返回[/b]：[code]{interaction_mount, event_presenter, shop_presenter,
-## teleport_presenter}[/code]——屏幕持有引用防 RefCounted 提前释放。
+## teleport_presenter, harvest_presenter}[/code]——屏幕持有引用防 RefCounted 提前释放。
 static func assemble(p_screen: Control, p_renderer: Control, p_viewport: Control,
 		p_es: Node, p_reduce_motion_override: Variant) -> Dictionary:
 	var interaction_mount: RefCounted = NodeGraphInteractionMountScript.new()
@@ -65,6 +71,8 @@ static func assemble(p_screen: Control, p_renderer: Control, p_viewport: Control
 		"shop_presenter": _mount_shop_presenter(p_screen, p_renderer, p_viewport, p_es,
 				interaction_mount.get(&"popup_host"), interaction_mount.get(&"interactor")),
 		"teleport_presenter": _mount_teleport_presenter(p_screen, p_renderer, p_viewport,
+				p_es, interaction_mount.get(&"interactor")),
+		"harvest_presenter": _mount_harvest_presenter(p_screen, p_renderer, p_viewport,
 				p_es, interaction_mount.get(&"interactor")),
 	}
 
@@ -108,6 +116,24 @@ static func _mount_teleport_presenter(p_host: Control, p_renderer: Control,
 	var stage: RefCounted = NodePopupStageScript.new()
 	stage.call(&"bind", p_host, p_renderer, p_viewport)
 	var presenter: RefCounted = TeleportNodePresenterScript.new()
+	presenter.call(&"attach", p_es, p_interactor, p_host, _notification_sink(p_host),
+			_freeze_of(stage, p_interactor, true), _freeze_of(stage, p_interactor, false))
+	return presenter
+
+
+## 采集 overlay 接线挂载——[HarvestNodePresenter] 消费交互组件的到达转发里的
+## [code]harvest[/code]（到达即上架可采列表——不是「确认框再点一次」的形态）。[br]
+## [br][b]为什么挂屏幕自身[/b]：与商店/传送 overlay 同层（都是全屏覆盖层）；
+## [b]冻结来源[/b]同样用自建 [NodePopupStage]（保存的基线是「采集面板打开前」）。[br]
+## [br][b]键盘路径[/b]：由面板自己的 [code]_input[/code] 消费方向键/确认/取消，
+## 冻结只需挡住节点图的键盘走位。
+static func _mount_harvest_presenter(p_host: Control, p_renderer: Control,
+		p_viewport: Control, p_es: Node, p_interactor: Variant) -> RefCounted:
+	if p_interactor == null or not (p_interactor is Control):
+		return null
+	var stage: RefCounted = NodePopupStageScript.new()
+	stage.call(&"bind", p_host, p_renderer, p_viewport)
+	var presenter: RefCounted = HarvestNodePresenterScript.new()
 	presenter.call(&"attach", p_es, p_interactor, p_host, _notification_sink(p_host),
 			_freeze_of(stage, p_interactor, true), _freeze_of(stage, p_interactor, false))
 	return presenter

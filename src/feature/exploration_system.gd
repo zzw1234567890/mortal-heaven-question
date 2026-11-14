@@ -145,6 +145,12 @@ func resolve_node(node_id: int) -> void:
 			_emit_safe(&"node_interaction_triggered", [node_id, &"shop", payload])
 		NodeType.REST:
 			_emit_safe(&"node_interaction_triggered", [node_id, &"rest", {}])
+		NodeType.HARVEST:
+			# 可采列表随载荷下发——已采状态由系统按当前地图的 map_states 判定，
+			# UI 不必再调一次查询同一件事（同 TELEPORT 的 targets 口径）。
+			var entries: Array = _get_harvest().call(&"entries_at", node_id)
+			_emit_safe(&"node_interaction_triggered",
+					[node_id, &"harvest", {"entries": entries}])
 		NodeType.ACTION_SPRING:
 			_emit_safe(&"node_interaction_triggered", [node_id, &"action_spring", {}])
 		NodeType.TELEPORT:
