@@ -64,6 +64,21 @@ const LING_CAI_QUALITY_RARITY: Dictionary = {
 ## 稀有度 int → 中文名（与 shop_panel_layout.RARITY_NAMES 同口径）。
 const RARITY_NAMES: Dictionary = {1: "白", 2: "蓝", 3: "紫", 4: "金", 5: "暗金"}
 
+## 卡牌类型 int → 中文类别名。[br]
+## [br][b]键是 [code]CardTemplate.CardType[/code] 的字面值[/b]（同 [constant CATEGORIES]
+## 的 [code]card_type[/code] 注记：不引用那个类，模板系统未加载时本表也要能解析）。[br]
+## [br]未登记的取值回退空串——不臆造词条（面板据此不显示这一行）。
+const CARD_TYPE_NAMES: Dictionary = {
+	0: "角色", 1: "功法", 2: "法宝", 3: "阵法", 4: "丹药", 5: "符箓",
+}
+
+## 「这一条不能直接用」的提示——[b]非丹药条目的统一点击反馈[/b]。[br]
+## [br][b]为什么是「该物品」而不是逐类措辞[/b]：灵材、法宝、功法在行囊里都不能直接
+## 使用，逐类写一句话只会让这一条路径分叉成三条（而它们的行为完全相同）；
+## 玩家要知道的只有「点了没用」，原因归各自的系统去解释。[br]
+## [br]文案放在分类表这处（与空态文案同源），面板与结算层都引它——两处各写一份必然漂移。
+const TEXT_NOT_A_PILL: String = "该物品不能直接使用"
+
 ## 境界属性键 → 中文标签（面板按此展示 [code]RealmSystem.realm_table[/code] 的条目）。[br]
 ## [br][b]只做标签，不做数值[/b]：数值一律现查境界表——本表多一个数就是第二条真理来源。[br]
 ## [br][b]未登记的键[/b]：走 [method attribute_label] 回退为键名本身，不隐藏——境界表
@@ -133,6 +148,11 @@ static func attribute_label(p_key: String) -> String:
 ## 稀有度中文名（未知档位返回空串，不臆造）。
 static func rarity_name(p_rarity: int) -> String:
 	return str(RARITY_NAMES.get(p_rarity, ""))
+
+
+## 卡牌类型 int → 中文类别名（未知取值返回空串，不臆造词条）。
+static func card_type_name(p_card_type: int) -> String:
+	return str(CARD_TYPE_NAMES.get(p_card_type, ""))
 
 
 ## 条目排序比较器——[b]稀有度降序 → 名称升序[/b]。[br]

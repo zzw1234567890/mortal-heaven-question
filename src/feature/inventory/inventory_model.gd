@@ -23,6 +23,11 @@ extends RefCounted
 ## 分类表 + 排序 + 中文词条（单一真理来源）。
 const CatalogScript := preload("res://src/feature/inventory/inventory_catalog.gd")
 
+## 「这条不是可使用的卡片」的 [code]card_type[/code] 取值（灵材行用）。[br]
+## [br]取 -1 而不是 0：0 是 [code]CardTemplate.CardType.CHARACTER[/code] 的合法值
+## ——拿 0 当哨兵会让「角色卡」与「非卡片」在判据上撞车。
+const NON_CARD_TYPE: int = -1
+
 ## 依赖注入（测试用桩；null 时按 Autoload 查找——先例 DeployRosterReader 的注入式签名）。
 var gsm: Node = null
 var card_system: Node = null
@@ -46,9 +51,15 @@ func set_dependencies(p_gsm: Node, p_card_system: Node) -> void:
 
 ## 取某分类的全部条目——已按 [method InventoryCatalog.sort_desc_by_rarity] 排序。[br]
 ## [br][b]返回[/b]：[code]Array[Dictionary][/code]，每条
-## [code]{name, rarity, rarity_name, count, detail, key}[/code]；越界分类或没东西 → 空数组。[br]
+## [code]{name, rarity, rarity_name, count, detail, key, card_type, template_id,
+## instance_ids}[/code]；越界分类或没东西 → 空数组。[br]
 ## [br][code]count[/code] 为该行持有数量（恒 ≥ 1——0 的行不产出）；[code]detail[/code]
-## 是副标题（灵材写品质、卡片写类别），[code]key[/code] 是合并用的稳定标识。
+## 是副标题（灵材写品质、卡片写类别），[code]key[/code] 是合并用的稳定标识。[br]
+## [br][b]后三个键是「使用」侧要的[/b]：合并行只告诉玩家「有几张」，而使用一枚丹药
+## 要知道「这张是什么类型、哪个模板、动哪几个实例」——[code]card_type[/code] 判能不能
+## 直接用，[code]template_id[/code] 查效果，[code]instance_ids[/code] 定位要移除的实例。[br]
+## [br][b]灵材行也给这三个键[/b]（值为「非卡片」）：使用侧不必先判「有没有这个键」
+## 再判类型——一个 [code]card_type != PILL[/code] 就覆盖了灵材与法宝两条路。
 func category_entries(p_category_index: int) -> Array:
 	var category: Dictionary = CatalogScript.category_at(p_category_index)
 	if category.is_empty():
@@ -105,6 +116,11 @@ func _ling_cai_entries() -> Array:
 			"rarity_name": "",
 			"count": amount,
 			"detail": "灵材",
+			# 灵材不是卡片——三个「使用」侧键给出明确的「非卡片」值（见
+			# [method category_entries] 注记：一个 card_type 判据覆盖灵材与法宝两条路）。
+			"card_type": NON_CARD_TYPE,
+			"template_id": "",
+			"instance_ids": [],
 		})
 	return out
 
@@ -157,9 +173,21 @@ func _collection_entries(p_card_type: int) -> Array:
 				"rarity_name": CatalogScript.rarity_name(int(template.get("rarity"))),
 				"count": 0,
 				"detail": _type_name(p_card_type),
+				# 「使用」侧要的三个键——模板 ID 与类型取自模板（不是从存档条目里抄，
+				# 那条路径的字段名有过 instance_id / card_instance_id 两种写法）。
+				"card_type": int(template.get("type")),
+				"template_id": key,
+				"instance_ids": [],
 			}
 			order.append(key)
-		(merged[key] as Dictionary)["count"] += 1
+		var bucket: Dictionary = merged[key]
+		bucket["count"] += 1
+		# 实例 ID 逐个记下：使用一枚丹药要移除的正是其中一张（同名多张时只少一张）。
+		# 缺 ID 的脏条目（旧存档 / 手改）不进列表——它指不到可移除的对象。
+		var instance_id: int = int(instance.get("card_instance_id",
+				instance.get("instance_id", -1)))
+		if instance_id > 0:
+			(bucket["instance_ids"] as Array).append(instance_id)
 	var out: Array = []
 	for key: Variant in order:
 		var entry: Dictionary = merged[key]

@@ -28,8 +28,8 @@ extends RefCounted
 
 ## 属性标签表（数值一律现查境界表——本模块只借用词条）。
 const CatalogScript := preload("res://src/feature/inventory/inventory_catalog.gd")
-## 名册读取器（角色位 → 模板快照，含 is_dead）。
-const RosterReaderScript := preload("res://src/ui/combat/deploy/deploy_roster_reader.gd")
+## 角色名册的读取与详情投影（角色那一整块，见该文件类文档）。
+const RosterScript := preload("res://src/feature/inventory/character_roster.gd")
 ## HP 持久化的唯一读侧。
 const HpScript := preload("res://src/feature/combat/combat_hp_carryover.gd")
 
@@ -149,24 +149,11 @@ func attributes_source() -> Dictionary:
 
 ## 全部角色位角色——[code]Array[{character_id, name, slot_index, current_hp, max_hp,
 ## hp_text, hp_known, attack, is_dead, status_text}][/code]。[br]
-## [br]按角色位顺序（0-5）输出——界面上的次序与备战面板一致，玩家不必重新找位置。[br]
-## [br][b]阵亡角色照实列出[/b]（不隐藏）：GDD combat-system.md §7 要求死亡跨场保持，
-## 玩家必须看得到「谁倒了」；[code]status_text[/code] 即下文的中文标记。[br]
-## [br][b]生命回退[/b]：无 [code]player.character_hp[/code] 记录时用模板 [code]base_hp[/code]
-## 作分子分母（[code]hp_known = false[/code] 标明这是基准值而非记账值）。[br]
-## [br]阵亡角色的 [code]current_hp[/code] 若为 0 则显示 0——[code]CombatHpCarryover[/code]
-## 明确「阵亡照实写 0，不夹到 1 冒充存活」，本模块依此展示。
+## [br]读法与投影在 [code]CharacterRoster[/code]（本模块只负责解析依赖与降级）。
 func characters() -> Array:
-	var out: Array = []
-	var roster: Array = RosterReaderScript.read(_resolve_gsm(),
-			_resolve_card_system(), _resolve_deployment_system(),
-			_resolve_binding_manager())
-	var hp_table: Dictionary = _resolve_hp_carryover().read_all()
-	for raw: Variant in roster:
-		if not (raw is Dictionary):
-			continue
-		out.append(_character_entry(raw, hp_table))
-	return out
+	return RosterScript.entries(_resolve_gsm(), _resolve_card_system(),
+			_resolve_deployment_system(), _resolve_binding_manager(),
+			_resolve_hp_carryover().read_all())
 
 
 ## 阵亡角色数（面板顶部摘要用——与 [method characters] 同一判据）。
@@ -178,34 +165,40 @@ func dead_count() -> int:
 	return count
 
 
-## 名册条目 + HP 表 → 界面条目。[br]
-## [br][b]投影到此的文件正是「角色状态」的全部数值口径[/b]：名字与攻击来自卡牌模板、
-## 生命来自 HP 持久化、阵亡来自 DeploymentSystem——三者都不在本模块推算。
-func _character_entry(p_raw: Dictionary, p_hp_table: Dictionary) -> Dictionary:
-	var character_id: int = int(p_raw.get("character_id", -1))
-	var is_dead: bool = bool(p_raw.get("is_dead", false))
-	var base_hp: int = maxi(int(p_raw.get("hp", 0)), 0)
-	var recorded: Dictionary = p_hp_table.get(character_id, {})
-	var hp_known: bool = not recorded.is_empty()
-	var current_hp: int = int(recorded.get("current_hp", base_hp)) if hp_known else base_hp
-	var max_hp: int = int(recorded.get("max_hp", base_hp)) if hp_known else base_hp
-	return {
-		"character_id": character_id,
-		"name": str(p_raw.get("display_name", "")),
-		"slot_index": int(p_raw.get("slot_index", -1)),
-		"current_hp": current_hp,
-		"max_hp": max_hp,
-		"hp_text": "%d / %d" % [current_hp, max_hp],
-		"hp_known": hp_known,
-		"attack": int(p_raw.get("attack", 0)),
-		"is_dead": is_dead,
-		"status_text": "已阵亡（不可出战）" if is_dead else "可出战",
-	}
+## 单个角色的详情——名册条目（生命/出战态）+ 卡牌模板字段的原样投影。[br]
+## [br][b]为什么在模型里而不是面板里[/b]：详情里的每个数都来自别人的地盘（模板、
+## HP 账本、阵亡名单），面板若自己去查就是第二处「谁读了存档」的现场；本方法把它们
+## 收在一处，面板只负责把值写成句子（[code]CharacterStatusRows.detail_rows[/code]）。[br]
+## [br][b]找不到该角色[/b]：返回空字典（面板据此不发详情，不臆造一行）。
+func character_detail(p_character_id: int) -> Dictionary:
+	var base: Dictionary = _roster_entry(p_character_id)
+	if base.is_empty():
+		return {}
+	return RosterScript.detail(base, _template_by_instance(p_character_id))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 内部辅助
 # ═══════════════════════════════════════════════════════════════════════════════
+
+## 名册里某个角色的条目（不在名册里返回空字典——调用方走「查无此人」分支）。[br]
+## [br]复用 [method characters] 的投影（而不是自己再读一遍名册与 HP 账本）：
+## 「谁在名册上」与「血量怎么算」的口径只有一处，详情页与列表页因此不可能给出
+## 两个不同的生命值。
+func _roster_entry(p_character_id: int) -> Dictionary:
+	for raw: Variant in characters():
+		if raw is Dictionary and int((raw as Dictionary).get("character_id", -1)) == p_character_id:
+			return raw
+	return {}
+
+
+## 按实例 ID 取卡牌模板——卡牌系统缺失 / 实例不在收藏里时返回 null（不臆造字段）。
+func _template_by_instance(p_character_id: int) -> Variant:
+	var system: Node = _resolve_card_system()
+	if system == null or not system.has_method(&"get_template_by_instance_id"):
+		return null
+	return system.call(&"get_template_by_instance_id", p_character_id)
+
 
 ## 值 → 展示文本（见 [method attributes] 注记）。
 static func _format_value(p_value: Variant) -> String:

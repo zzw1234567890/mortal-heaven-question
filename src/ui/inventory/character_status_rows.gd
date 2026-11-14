@@ -22,21 +22,48 @@ const SECTION_CHARACTERS: StringName = &"characters"
 
 ## 角色行里「生命未记过账」的加注——让「满血」与「没数据」可区分。
 const TEXT_HP_BASELINE: String = "（生命为模板基准）"
+## 详情区里「模板查不到」的加注（字段值无从谈起——不拿 0 冒充攻击力）。
+const TEXT_TEMPLATE_UNKNOWN: String = "卡牌模板暂不可查——只能看到角色位上的记录。"
+## 详情区各字段的标签（与模板字段一一对应，顺序即显示顺序）。
+const DETAIL_LABELS: Array = [
+	["name", "名称"],
+	["type_name", "类型"],
+	["rarity_name", "稀有度"],
+	["cost", "灵能消耗"],
+	["base_attack", "攻击"],
+	["base_hp", "基础生命"],
+	["hp_text", "当前生命"],
+	["status_text", "出战状态"],
+]
 
 
-## 按小节取行——[b]返回 Array[String][/b]（空数组 = 该节没有可展示的内容）。[br]
+## 按小节取行——[b]返回 Array[Dictionary][/b]，每项
+## [code]{text: String, payload: Dictionary}[/code]。[br]
+## [br][b]为什么要连载荷一起给[/b]：角色行是可确认的（确认后看这条角色的详情），
+## 面板要能拿回「这一行是哪个角色」——载荷随行一起产出，面板就不必维护
+## 「下标 → 角色 ID」的第二份副本（刷新会换一批控件，副本必然与控件错位）。[br]
+## [br][b]载荷为空 = 这一行不可确认[/b]：境界与属性行只是信息（点了没有下一步动作），
+## 空载荷让面板把它们渲染成不可聚焦的文本行——不做一个点了没反应的按钮。[br]
 ## [br]未知小节 id 返回空数组（面板走空态分支，不臆造一行）。
 static func rows_for(p_section_id: String, p_model: RefCounted) -> Array:
 	if p_model == null:
 		return []
 	match p_section_id:
 		"realm":
-			return realm_rows(p_model)
+			return _texts_to_rows(realm_rows(p_model))
 		"attributes":
-			return attribute_rows(p_model)
+			return _texts_to_rows(attribute_rows(p_model))
 		"characters":
 			return character_rows(p_model)
 	return []
+
+
+## 纯文本行 → 无载荷行（见 [method rows_for] 注记）。
+static func _texts_to_rows(p_texts: Array) -> Array:
+	var rows: Array = []
+	for text: Variant in p_texts:
+		rows.append({"text": str(text), "payload": {}})
+	return rows
 
 
 ## 境界节：境界名 / 修为与上限 / 是否已至最高 / 是否陨落。[br]
@@ -71,12 +98,12 @@ static func attribute_rows(p_model: RefCounted) -> Array:
 	return rows
 
 
-## 角色节：每个角色一行（名字 · 生命 · 攻击 · 出战态）。[br]
+## 角色节：每个角色一行（名字 · 生命 · 攻击 · 出战态），载荷为该角色的 ID。[br]
 ## [br][b]阵亡标记写进文本[/b]（模型给的「已阵亡（不可出战）」）：不靠颜色单独承载
 ## 信息（.claude/rules/ui-code.md 色盲可读），且阵亡角色[b]照实列出而非隐藏[/b]——
 ## 玩家必须看得到谁倒了（GDD combat-system.md §7 的死亡跨场持久）。[br]
-## [br][b]生命未记账时加注「模板基准」[/b]：那是模板 [code]base_hp[/code] 而不是本局
-## 账本，标注让「满血」与「没数据」可区分。
+## [br][b]生命的来源由模型保证[/b]：[code]hp_text[/code] 已是「账本值或模板基准」的
+## 最终结果，本模块只在未记账时加注「模板基准」——数值口径不在这里重算。
 static func character_rows(p_model: RefCounted) -> Array:
 	var rows: Array = []
 	for raw: Variant in p_model.call(&"characters"):
@@ -91,5 +118,38 @@ static func character_rows(p_model: RefCounted) -> Array:
 		]
 		if not bool(entry.get("hp_known", false)):
 			line += TEXT_HP_BASELINE
-		rows.append(line)
+		rows.append({
+			"text": line,
+			"payload": {"character_id": int(entry.get("character_id", -1))},
+		})
 	return rows
+
+
+## 角色详情区的行（选中某角色后显示）——标签与值逐字来自模型给的投影。[br]
+## [br][b]只列模板确实有的字段[/b]：值为空串的字段跳过（如稀有度未登记），
+## 界面因此不会出现「类型 · 」这种半行。[br]
+## [br][b]模板查不到时只给一行提示[/b]：此时 [code]type_name[/code] 等键根本不存在，
+## 逐字段列会变成一片空白——不如直接说清楚为什么看不到。[br]
+## [br][b]返回[/b]：Array[String]（空数组 = 没有可展示的详情，面板收起详情区）。
+static func detail_rows(p_model: RefCounted, p_character_id: int) -> Array:
+	if p_model == null:
+		return []
+	var detail: Dictionary = p_model.call(&"character_detail", p_character_id)
+	if detail.is_empty():
+		return []
+	if not bool(detail.get("template_known", false)):
+		return [TEXT_TEMPLATE_UNKNOWN]
+	var rows: Array = []
+	for pair: Variant in DETAIL_LABELS:
+		var field: String = str((pair as Array)[0])
+		var label: String = str((pair as Array)[1])
+		var value: String = str(detail.get(field, ""))
+		if value.strip_edges().is_empty():
+			continue
+		rows.append("%s · %s" % [label, value])
+	if not str(detail.get("description", "")).strip_edges().is_empty():
+		rows.append("描述 · %s" % str(detail.get("description")))
+	if not bool(detail.get("hp_known", false)):
+		rows.append("生命说明 · 尚无战斗记录，显示的是模板基准值")
+	return rows
+

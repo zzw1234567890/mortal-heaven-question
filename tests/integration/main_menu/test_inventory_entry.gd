@@ -123,3 +123,20 @@ func test_overlay_close_leaves_menu_usable() -> void:
 	assert_eq(overlay.get_parent(), menu, "关闭后应留树（复用式单例）")
 	assert_true(menu.inventory_button.pressed.is_connected(menu._on_inventory_pressed),
 			"关闭不得破坏入口按钮的接线")
+
+
+func test_overlay_is_wired_with_the_pill_use_settlement_layer() -> void:
+	## [b]回归用例[/b]：主菜单装配覆盖层时把「用丹药」的结算层也接上。[br]
+	## [br][b]为什么值得单测[/b]：漏接这条依赖不会报错——背包页的确认会静默落进
+	## 「谁也没接」的空档（玩家点一枚丹药什么也不发生，且日志干净）。这类
+	## 「装配点漏接线」的缺陷本仓库有先例（角色状态的阵亡标记），故在这里钉住。
+	# Arrange + Act
+	menu._on_inventory_pressed()
+	# Assert
+	var overlay: Control = menu._inventory_screens
+	assert_not_null(overlay, "前置：点击后应创建界面")
+	if overlay == null:
+		return
+	assert_not_null(overlay.pill_use, "装配点应把丹药结算层交给覆盖层")
+	assert_true(overlay.pill_use.has_method(&"use_entry"),
+			"结算层应具备 use_entry 入口")

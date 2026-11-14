@@ -96,6 +96,8 @@ const InventoryScreensHostScript := preload("res://src/ui/inventory/inventory_sc
 ## 两页的只读模型——主菜单在装配时把 Autoload 接进去（面板不直连 Autoload）。
 const InventoryModelScript := preload("res://src/feature/inventory/inventory_model.gd")
 const StatusModelScript := preload("res://src/feature/inventory/character_status_model.gd")
+## 背包内「使用丹药」的结算层——背包页只发意图，由宿主持有它去结算。
+const PillUseScript := preload("res://src/feature/inventory/inventory_pill_use.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -376,6 +378,13 @@ func _on_inventory_pressed() -> void:
 		_inventory_screens.status_model = StatusModelScript.new(
 				get_node_or_null(NodePath("/root/GameStateManager")),
 				get_node_or_null(NodePath("/root/RealmSystem")))
+		# 丹药结算层也在这里接线（背包页的确认 → 用丹药走它）。它自己也会去找
+		# Autoload，但显式接上与其余依赖同口径——装配点漏接这类依赖不会报错，
+		# 只会让功能静默失效（先例见 test_character_status_flow 的阵亡标记用例）。
+		var pill_use: RefCounted = PillUseScript.new(
+				get_node_or_null(NodePath("/root/GameStateManager")),
+				get_node_or_null(NodePath("/root/CardSystem")))
+		_inventory_screens.pill_use = pill_use
 		add_child(_inventory_screens)
 	_inventory_screens.open()
 

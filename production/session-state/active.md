@@ -3,8 +3,25 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 背包 + 角色状态界面最小可用版（主菜单「行囊与道友」入口，两页签）；下一步 两界面的手柄适配与战斗内快捷入口
+Task: 背包与角色状态界面的可操作性（条目可聚焦 + 丹药直接用 + 角色详情展开）；下一步 两界面的手柄适配与战斗内快捷入口
 <!-- /STATUS -->
+
+## Session Extract — 背包与角色状态界面的可操作性（2026-11-14）
+- 任务：把上一轮的只读两界面变成能用的——① 背包条目可聚焦（上下选行、行内高亮、切分类游标回首行、点条目不崩）；② 丹药在背包里直接使用（读模板效果走既有结算层），用掉数量减一；非丹药给中文提示；③ 角色状态页选中角色行、确认看模板详情摘要（名称/类型/攻击/灵能…），不可出战的也能看且标注；④ 测试覆盖以上四点
+- **三处新生产文件**：`inventory_pill_use.gd`（286，用丹药结算）、`character_roster.gd`（103，角色名册读取 + 详情投影，从 model 拆出以回 300 内）、`paged_panel_navigator.gd`（82，两面板共用的「左右切页 + 上下选行」输入翻译，此前两处逐字重复）
+- **丹药效果不新造规则**：治疗量经 `CardEffectEvaluator.evaluate_effects(template, 0, GameStateSnapshot.new({}))` 取 `healing`（读 `effects` 列表或扁平 `effect_type`/`effect_value`，两种卡都吃）；写血经 `CombatHpCarryover.read_all`/`write_back`（该模块自述为 `player.character_hp` 唯一读侧，内部走 GSM 第二层原子写）；消耗经 `GSM.remove_card_from_collection`。**本模块一个数值都没写死**
+- **目标选择是「解释既有字段」而非新规则**：`target_type == all_allies` 治全队可治者，其余治首个需要的人（角色 ID 升序）——依据是既有先例 `CombatCasterRules.resolve_caster`（无目标选择 UI 时按标识升序取首个，出手 UI 落地后换成显式传入，已写进类文档）
+- **「谁需要治」的口径与回复点一致**：账本里无记录 ≠ 零血（那是从没受伤），阵亡（`current_hp <= 0`）不治也不复活（复活归 `DeploymentSystem.revive_character`），满血无缺口不治。三条都跳过
+- **失败不半完成**：先写血再取丹；取丹失败按账本原值回滚血量。反过来（先取丹）一旦写入失败就找不回那枚丹——丹药是有限资源，宁可丢一次回血也不凭空吞玩家物品。同理写血不可用（`write_back` 返回 -1）时根本不碰收藏
+- **实测抓到一个真 bug**：`_healed_total` 原实现内部再调一次 `read_all` 拿「写前」原值——但 `write_back` 是**就地生效**的，写完再读拿到的已是新值，「新减旧」恒为 0，界面永远报「回复 0 点生命」（集成用例只断言了血量与数量，是单元用例的 `healed` 断言抓出来的）。改为由调用方把**写前**那份账本传进去，并在函数文档里写明原因
+- **行控件从 Label 改成 Button**：`ShopPanelNavigator` 只认 `Button.disabled` 判可选性，Label 行一律被跳过（上轮「游标恒为 -1」的成因）。改 Button 后键盘上下可选中、焦点环随焦点绘制、鼠标可点（`pressed` 与游标确认走同一个 `_activate_row` 出口——只接键盘等于给鼠标玩家一个点了没反应的按钮）
+- **条目载荷挂在行控件元数据上**（`set_meta`），不维护「下标 → 条目」的第二份副本（刷新会换一批控件，副本必然错位）。角色状态页的详情同理：`detail_box` 独立在列表外（把它挤进列表会改变行数与游标下标）
+- **两面板共用同一套布局骨架**：`inventory_panel_layout` 新增 `add_rows`（有载荷 → Button / 无载荷 → Label，判据只此一处）、`fill_detail`、`clear_box`（先 `remove_child` 再 `queue_free`——只 queue_free 的话同帧内 `get_child_count` 仍数得到它，「刷新后行数」断言会看到上一批行）
+- **结算在宿主不在面板**：面板只发 `item_use_requested`，`InventoryScreensHost._on_item_use_requested` 调结算层后回填文案（`consumed` 为真才 `refresh`——无谓刷新会把游标弹回首行）。与商店「面板发意图、Presenter 调系统」同源。主菜单装配点同时接上 `pill_use`（漏接不报错、只会静默失效，已加回归用例钉住）
+- **测试**：新增 4 个文件 —— 单元 `test_inventory_pill_use.gd`（11 例数值/目标/消耗回滚）+ `test_inventory_pill_use_refusal.gd`（9 例拒绝路径与文案）+ 集成 `test_inventory_item_use_flow.gd`（12 例游标/用丹/非丹提示/空列表）+ `test_character_detail_flow.gd`（10 例详情字段与模板一致、切小节收起、空名册不崩）；新增装置 `inventory_pill_use_fixture.gd`（全桩，`evaluate_effects` 真跑）；主菜单入口 +1 例接线回归。既有测试零改名零删除
+- 全量：**4482 tests / 4481 passing / 1 pending 存量 / 3 orphans 存量**，零失败；stash 本轮改动跑 HEAD 基线为 4442/4441（同 1 pending、同 3 orphans）——净增 40 全过，零回归
+- 已知边界：① 丹药目标选择是「升序取首个」（无出手 UI，见上）；② 「永久 +1 最大生命」类丹药（九转金丹）效果未建模，界面如实说「效用尚未参透」而不是给 0 点回血；③ 背包详情区目前恒空（骨架已就位，本轮没有「查看法宝说明」的需求）；④ 角色属性只到模板基础值，未叠功法/法宝/本命加成；⑤ 防御力仍无数据来源（`CardTemplate` 无 `base_defense`），界面不显示也不冒充
+- Next recommended: 两界面的手柄适配核对（`ui_*` 动作已覆盖，但无手柄实机验证）；战斗内快捷入口（GDD 写明丹药可在战斗中或背包使用，本轮只做了背包侧）；`InventoryScreensHost`（305 行，已略超 300 软上限）拆分
 
 ## Session Extract — 背包与角色状态界面最小可用版（2026-11-14）
 - 任务：主菜单可打开「背包（灵材/丹药/法宝，读真实存档不硬编码，数量为 0 不显示）+ 角色状态（境界/修为与上限/生命与上限/各属性按境界配置表算/阵亡标记）」两个界面，有返回、方向键切分类、空态给中文；测试覆盖分类过滤与排序、数值与境界配置一致、阵亡标记、空态文案、返回不掉状态

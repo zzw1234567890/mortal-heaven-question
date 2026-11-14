@@ -13,20 +13,28 @@ extends Control
 ## [br][b]输入锁用 InputManager.push_lock[/b]（与设置面板同一把）：本宿主的面板是
 ## 只读的，不需要节点图那种「冻结舞台」语义；锁的作用是让 Esc 的语义在本层收敛，
 ## 释放走 [code]_exit_tree[/code] 兜底（防「面板被外部释放、锁留在栈上」）。[br]
+## [br][b]为什么结算（用丹药）在这里而不在面板里[/b]：面板只发
+## [signal InventoryScreen.item_use_requested]（「玩家确认了这一行」），由本宿主
+## 交给 [code]InventoryPillUse[/code] 结算，再把系统给的文案回填给面板——与
+## 商店面板（[code]ShopPanelScreen[/code] 发 [code]purchase_requested[/code]、
+## [code]ShopNodePresenter[/code] 调系统）是同一处拆分：面板一旦直调系统，就会
+## 长成第二处「谁改了存档」的现场（ADR-0031 §2）。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：本宿主不持有任何玩法数据——每次
 ## [method open] 都让两页现读（存档在面板关闭期间可能已经变了）。[br]
 ## [br][b]文案本地化豁免[/b]：与 inventory_screen / character_status_screen 同源口径。
 ##
 ## 来源: ADR-0031 §1/§2、.claude/rules/ui-code.md、
 ## 先例 [code]settings_panel.gd[/code]（主菜单内覆盖层 + 输入锁）、
+## [code]shop_node_presenter.gd[/code]（面板发意图、宿主调系统）、
 ## [code]inventory_screen.gd[/code] / [code]character_status_screen.gd[/code]。
 
-## 页签切换的合集（宿主级：背包与角色状态各自还有自己的输入处理）。[br]
-## [br][b]本模块不 preload 任何模型[/b]：两个模型都是外部注入的 RefCounted
-## （装配点在主菜单 / 测试装置）——宿主自己 new 一个模型等于绕开注入、
-## 在无 Autoload 的环境里静默走降级分支。
+## 两页的脚本（宿主只负责挂载与接线——见上）。[br]
+## [br][b]两个模型不经 preload[/b]：它们是外部注入的 RefCounted（装配点在主菜单 /
+## 测试装置）——宿主自己 new 一个模型等于绕开注入、在无 Autoload 的环境里静默走降级分支。
 const InventoryScript := preload("res://src/ui/inventory/inventory_screen.gd")
 const StatusScript := preload("res://src/ui/inventory/character_status_screen.gd")
+## 背包内使用丹药的结算层（本宿主是它在生产路径上的唯一调用方）。
+const PillUseScript := preload("res://src/feature/inventory/inventory_pill_use.gd")
 
 ## 锁来源标识——与设置面板同一把锁（同一时刻只该有一个全覆盖层）。
 const LOCK_SOURCE: StringName = &"inventory_screens"
@@ -41,6 +49,8 @@ const TEXT_TAB_HINT: String = "   （Tab 换页）"
 var inventory_model: RefCounted = null
 var status_model: RefCounted = null
 var input_manager: Node = null
+## 丹药结算层（null 时本地 new——它自己去找 Autoload，全缺时其写入返回失败）。
+var pill_use: RefCounted = null
 
 var _tab_button: Button = null
 var _tab_index: int = 0
@@ -185,15 +195,42 @@ func _build() -> void:
 	_add_page(StatusScript.new(), status_model, "StatusPage")
 
 
-## 挂一页并接上它的「返回」出口（返回 = 关闭整个界面，两页同一语义）。
+## 挂一页并接上它的「返回」出口（返回 = 关闭整个界面，两页同一语义）。[br]
+## [br][b]背包页另外接上「使用条目」出口[/b]（见类文档「为什么结算在这里」）：
+## 角色状态页没有这个信号，故用 [method Node.has_signal] 判一下再连——宿主不该
+## 假设每一页都有同一套信号。
 func _add_page(p_page: Control, p_model: RefCounted, p_name: String) -> void:
 	p_page.name = p_name
 	if p_model != null and p_page.has_method(&"set_model"):
 		p_page.call(&"set_model", p_model)
 	p_page.visible = false
 	p_page.connect(&"back_requested", close)
+	if p_page.has_signal(&"item_use_requested"):
+		p_page.connect(&"item_use_requested", _on_item_use_requested)
 	add_child(p_page)
 	_pages.append(p_page)
+
+
+## 背包页请求使用某一条目——交给结算层，然后把结果文案回填给面板。[br]
+## [br][b]面板不参与判断[/b]：用得成用不成、为什么用不成，全是结算层给的
+## [code]message[/code]；本宿主只做两件事——把句子显示出来、在真的消耗掉时刷新
+## （[code]consumed[/code] 为真才刷新：无谓的刷新会把玩家的游标弹回首行）。[br]
+## [br][b]先取文案再刷新[/b]：刷新会重置提示文案（模型缺失/空态都会改写它），
+## 顺序反了玩家就看不到系统给的那句话。
+func _on_item_use_requested(p_entry: Dictionary) -> void:
+	var page: Control = page(0)
+	var result: Dictionary = _resolve_pill_use().call(&"use_entry", p_entry)
+	var message: String = str(result.get("message", ""))
+	if bool(result.get("consumed", false)):
+		page.call(&"refresh")
+	page.call(&"show_message", message)
+
+
+## 丹药结算层——注入优先，否则本地 new（它自己去找 Autoload）。
+func _resolve_pill_use() -> RefCounted:
+	if pill_use != null:
+		return pill_use
+	return PillUseScript.new()
 
 
 ## 把宿主当前持有的模型交给某一页。[br]
