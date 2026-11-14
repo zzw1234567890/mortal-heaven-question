@@ -64,6 +64,8 @@ var launch_context_override: Dictionary = {}
 
 ## 结算回流接线（battle_ended → CombatResultView——结算/战败场景据此取数）。
 var result_bridge: RefCounted = null
+## 行囊挂载（底部条入口 + 面板 + 出牌输入冻结——退场时 unbind）。
+var bag_mount: RefCounted = null
 ## 探索侧开战上下文（[method _ready] 一次性取走——空 = 无上下文，开战给可读失败）。
 var launch: RefCounted = null
 ## 开战被拒的可读失败文案（空串 = 未失败；UI/测试据此展示原因）。
@@ -75,11 +77,16 @@ var interaction_wiring: RefCounted = null
 var exits: RefCounted = null
 
 
-## 退场先断开结算发布器——信号源是常驻 Autoload，不断开会让旧容器继续发布。
+## 退场先断开结算发布器——信号源是常驻 Autoload，不断开会让旧容器继续发布。[br]
+## [br][b]行囊也要退订[/b]：它接的是底部条按钮（场景内节点）与出牌输入开关；
+## 不关面板就退场会把交互层留在「停用」态，下一次进战斗点不动牌。
 func _exit_tree() -> void:
 	if result_bridge != null:
 		result_bridge.call(&"unbind")
 	result_bridge = null
+	if bag_mount != null:
+		bag_mount.call(&"unbind")
+	bag_mount = null
 	if interaction_wiring != null:
 		interaction_wiring.call(&"unbind")
 	interaction_wiring = null
@@ -91,12 +98,13 @@ func _ready() -> void:
 	_consume_launch_context()
 	exits = ExitsScript.new()
 	exits.call(&"setup", _combat(), _scene_manager())
-	# 六组表现层接线（音频 / 面板 / 备战 / 反馈 / 结算回流 / 出牌交互）
+	# 七组表现层接线（音频 / 面板 / 备战 / 反馈 / 结算回流 / 出牌交互 / 行囊）
 	var mounting: RefCounted = MountingScript.new(self, combat_root)
 	var wired: Dictionary = mounting.call(&"wire_all", _on_deploy_confirmed,
 			_on_deploy_back, _on_retreat_confirmed, _on_defeat_confirmed)
 	result_bridge = wired.get("result_bridge")
 	interaction_wiring = wired.get("interaction_wiring")
+	bag_mount = wired.get("bag_mount")
 	combat_root.call(&"play_entrance", _read_reduce_motion())
 
 

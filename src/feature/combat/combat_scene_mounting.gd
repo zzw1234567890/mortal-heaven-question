@@ -15,6 +15,8 @@ extends RefCounted
 const ResultBridgeScript := preload("res://src/ui/combat/shared/combat_result_bridge.gd")
 ## 出牌交互接线（输入层 + 手牌供给）。
 const InteractionScript := preload("res://src/feature/combat/combat_scene_interaction.gd")
+## 行囊装配（条目 → 结算 → 面板 + 入口按钮 + 出牌输入冻结）。
+const BagScript := preload("res://src/feature/combat/combat_scene_bag.gd")
 
 ## 容器场景（[code]combat_scene.gd[/code]——只经公开成员与公开方法交互）。
 var _scene: Control = null
@@ -33,17 +35,21 @@ func _init(p_scene: Control, p_root: Control) -> void:
 ## [param p_deploy_back] 备战面板「返回」处理器。[br]
 ## [param p_retreat] 结算宿主「撤退确认」处理器。[br]
 ## [param p_defeat] 结算宿主「战败确认」处理器。[br]
-## [br][b]返回[/b]：[code]{result_bridge, interaction_wiring}[/code]——容器持有这两个
-## 句柄用于 [code]_exit_tree[/code] 退订（任一可空）。
+## [br][b]返回[/b]：[code]{result_bridge, interaction_wiring, bag_mount}[/code]——容器持有
+## 这三个句柄用于 [code]_exit_tree[/code] 退订（任一可空）。
+## [br][b]行囊最后挂[/b]：它的面板要盖住手牌区与出牌输入层（[method wire_interaction]
+## 已经把输入层挂好了），顺序反了面板会被输入层压在下面——看得见点不着。
 func wire_all(p_deploy_confirmed: Callable, p_deploy_back: Callable,
 		p_retreat: Callable, p_defeat: Callable) -> Dictionary:
 	wire_audio()
 	wire_panels()
 	wire_deployment(p_deploy_confirmed, p_deploy_back, p_retreat, p_defeat)
 	wire_feedback()
+	var interaction: RefCounted = wire_interaction()
 	return {
 		"result_bridge": wire_result_bridge(),
-		"interaction_wiring": wire_interaction(),
+		"interaction_wiring": interaction,
+		"bag_mount": wire_bag(interaction),
 	}
 
 
@@ -136,6 +142,18 @@ func wire_interaction() -> RefCounted:
 	var wiring: RefCounted = InteractionScript.new()
 	wiring.call(&"wire", _root, _combat(), _autoload(&"CostSystem"), _reduce_motion())
 	return wiring
+
+
+## 行囊——条目（读真实收藏）/ 效果 / 结算 / 面板四层一次接齐（实现见
+## [code]combat_scene_bag.gd[/code]）。[br]
+## [br][param p_interaction] 出牌交互接线（开面板时冻结出牌输入）。[br]
+## [br][b]取数一律在本层完成[/b]（见 [code]combat_scene_bag.gd[/code] 类文档）：
+## 装配点漏接依赖不会报错、只会静默降级，故 Autoload 查表集中在这里，一眼可核。[br]
+## [br][b]返回[/b]：挂载模块（退场时 unbind；战场根缺失时为 null）。
+func wire_bag(p_interaction: RefCounted) -> RefCounted:
+	return BagScript.new().call(&"wire", _root, _combat(), p_interaction,
+			_autoload(&"GameStateManager"), _autoload(&"CardSystem"),
+			_autoload(&"CostSystem")) as RefCounted
 
 
 ## === 容器取数转发 ===========================================================

@@ -3,8 +3,28 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 背包与角色状态界面的可操作性（条目可聚焦 + 丹药直接用 + 角色详情展开）；下一步 两界面的手柄适配与战斗内快捷入口
+Task: 战斗内「行囊」入口（战斗回合内用丹药与法宝）；下一步 两界面的手柄实机核对 + 行囊条目的键盘/鼠标双路径实机验证
 <!-- /STATUS -->
+
+## Session Extract — 战斗内使用丹药与法宝（行囊面板）（2026-11-14）
+- 任务：① 战斗界面加「行囊」入口（回合内可开，列真实收藏里的丹药与法宝，打开冻结出牌输入、关闭解冻）；② 用丹药按模板效果走既有结算层（治疗/减益），扣掉该卡实例、按既有规则计费（走 `CostSystem` 扣灵力，不新增「行动点」）、给中文提示、目标可显式选择；③ 法宝同理走攻击/增益；不可用条目禁用并写明原因（已用尽/灵能不足）；④ 测试覆盖五条点名断言
+- **五处新生产文件（结算链，`src/feature/combat/`）**：`combat_bag_rules.gd`（158，判据与中文文案**单点**——`reason_for` 六道门的裁词、`row_text` 行文案、`effect_text` 效果措辞）、`combat_bag_entries.gd`（268，对**真实收藏**的只读投影：条目字段 + 判据结论 + 候选池 `targets(is_pill)`）、`combat_bag_effect.gd`（128，落效果半边：丹药逐人 `CombatDamageSettlement.apply_heal`、法宝逐人 `CombatRosterState.apply_bonus`）、`combat_bag_use.gd`（263，结算层六道门 + 扣实物 + 扣灵力）、`combat_bag_host.gd`（158，编排：按钮 → 面板 → 结算 → 回填）
+- **四处新 UI 文件（`src/ui/combat/bag/`）**：`combat_bag_button.gd`（72，入口按钮位，仅阶段 2 可见——与「结束出牌」同生共死）、`combat_bag_layout.gd`（131，复用商店骨架 + 目标栏 + 可灰显行）、`combat_bag_targets.gd`（137，候选池/下标/全体判定）、`combat_bag_screen.gd`（298，面板本体）、`combat_bag_readout.gd`（112，读数层）
+- **装配两处**：`combat_scene_bag.gd`（87，装配行囊依赖链，Autoload 查表集中在一处）、`combat_bag_mount.gd`（72，`class_name` 独立类——行囊依赖要等场景挂载注入完才能建，生命周期与其余七组不同）；`combat_scene_mounting.gd` 的 `wire_all` 加第七组 `wire_bag`，**行囊最后挂**（面板要盖住手牌区与出牌输入层）
+- **冻结走交互层的普通字段，不走 `InputManager` 的锁**：`InputManager._on_tree_changed` 会在每次 `tree_changed` 时**清空整个锁栈**，而面板入树即触发——同帧 push 的锁立刻被抹掉（实测 `is_input_allowed` 仍返回 true，面板开着照样点穿）。改用 `CombatSceneInteraction.set_enabled` → `CombatLayoutInteractionMount` → `CombatInputLayer`，本面板在宿主 `open()` / `close()` 里开关
+- **退订必须先关再置空手柄**：`CombatBagHost.unbind` 把 `_set_input` 清空后**再也解不了冻**；若退场时面板还开着，输入层会带着「停用」状态活到下一次进战斗（输入层挂在常驻 Autoload 的同一条链路上），表现为「进了战斗却点不动牌」。故 `unbind` 第一句是 `close()`（未打开时是一次幂等的解冻）
+- **不新增「行动点」**：计费走既有 `CostSystem`（`can_afford` / `spend`），与出牌同一本灵力账（集成用例断言「用药扣的与出牌扣的是同一本账」）；用药**不推进阶段也不推进回合**（阶段/回合由战斗系统既有节奏驱动，本链路连它们的句柄都没有）
+- **法宝属性增益建了新存储 `combat_stat_bonus.gd`（61）**：与既有 debuff **刻意分家**（debuff 拒绝非正数、按回合过期；增益相反——合成一处会让 `amount` 的符号承担两种含义）。`CombatRosterState` 新增 `_bonus` 字段，读侧在 `get_atk` / `get_defense` 里叠加，外部取数口径一字未改
+- **顺手拆 `CombatRosterState`（278→…）与 `InventoryScreensHost`（305→279）**：前者把「名册 → 状态表」的建表半边拆成 `combat_roster_seeding.gd`（149），敌方 ID 编码约定与 `enemy_id_of` 仍由 `CombatRosterState` **转发**同一实现（外部既有引用点一字未改）；后者把输入锁的申请/释放/兜底拆成 `inventory_input_lock.gd`（82），`input_manager` 字段改成背后字段 + setter 转发（生产路径在 `_init` 之后才赋值，只认构造那一刻的注入会让锁永远拿不到管理器）
+- **`CombatBagScreen` 从 303 降回 298**：读数层 `combat_bag_readout.gd` 收走「行数/行文本/禁用态/游标/目标栏」这族只读结论（读的是控件本身，不是第二份缓存，读数因此不可能与渲染分叉）
+- **两处真 bug（都是测试抓出来的）**：① `outcome.get("stat_changes", {})` —— `EffectEvaluation` 是 Resource/Object，`Object.get()` **只接受 1 个参数**，带默认值的写法会让整个脚本**解析失败**（同一错误也在 `combat_bag_entries` / `combat_bag_effect` 各一处）；② `CombatBagScreen._build_layout` 原本又连了一次「返回」按钮到 `_request_close`，而布局已经把 `&"closed"` 交给骨架转发——`closed` 发两次，宿主开关两次（面板开了又立刻关）
+- **集成装置的真坑**：`CostSystem` 是常驻 Autoload，`cost_changed` 会在下一场战斗的 `init_for_battle` 时发射；夹具**不退订**就会让上一轮已 free 的场景句柄被回调到——表现为**别的测试文件**里报 `Cannot call method 'get' on a previously freed instance`（`test_combat_click_play_end_to_end` 被连带判红）。`teardown` 里 `bag.unbind()` → `interaction.unbind()` 必须在 `_host.free()` 之前
+- **另一处工程细节**：新 `class_name` 后必须跑一次 `godot --headless --import` 刷新 `.godot/global_script_class_cache.cfg`，否则测试脚本里 `as CombatBagButton` 之类的类型标注会报 `Could not find type ... in the current scope`
+- 测试：新增单元 `tests/unit/combat_bag/`（5 文件 92 例：判据各分支 / 条目投影 / 结算六道门与拒绝路径 / 面板渲染与游标 / 宿主冻结与回填）+ 集成 `tests/integration/combat_ui/test_combat_bag_battle_flow.gd`（20 例，真实战斗 + 真实存档 + 真实面板：打开冻结/关闭解冻/面板排在输入层之后/用药回血且实例减少/法宝加攻不动 HP/灵力不足灰显且不扣费/用完回合照常推进/空行囊空态/入口随真实阶段信号显隐）；装置 `combat_bag_fixture.gd`（190，桩存档+桩费用+**真跑**状态表与落库）与 `combat_bag_battle_fixture.gd`（273，真实 `CombatRoot.tscn` + 独立战斗系统实例 + GSM 三域快照还原）。既有测试零改名零删除
+- 全量：**4592 tests / 4591 passing / 1 pending 存量 / 3 orphans 存量**，零失败；stash 本轮改动跑 HEAD 基线为 4482/4481（同 1 pending、同 3 orphans）——净增 110 全过，零回归（其中 `src/` 侧无一条既有测试改名/删除/跳过）
+- **全量里唯一飘的一条**：`tests/unit/formation_system/test_aura_bonus_query.gd` 的两条性能用例（`get_aura_bonus ×1000 < 20ms`）在机器负载高时实测 22ms 而判红——隔离跑 20/20 全过、HEAD 基线全量也全过，与本轮改动域零交集（formation 系统一行未碰）。属**存量脆弱用例**（绝对毫秒阈值 + 无预热），已在「遗留」段记录
+- 已知边界：① 用法宝不选目标时取「ID 升序首个存活者」，与丹药同口径（无出手目标 UI 时的既有先例）；② 增量为 0 的歪模板会「消耗了但没生效」——`consumed` 为真而 `ok` 为假，面板据此仍刷新（如实报「未能加身」，不吞掉实物也不谎报成功）；③ 行囊条目**按模板合并成一行**（同名多张显示 ×N），用掉的是实例列表里的第一张——玩家无法在面板上挑「用哪一张」（同模板实例目前无差异字段）；④ 行囊只在**出牌阶段**可见可开（其余阶段玩家没有可支配的灵力，开一个不能用的面板只会让人以为坏了）；⑤ `CombatBottombar` 的 `bag_button` 宽度在极窄窗口下会被压（有上限保护，无实测分辨率核对）
+- Next recommended: 行囊与背包两界的实机键盘/手柄核对（`ui_*` 已覆盖，无实机验证）；`CombatSystem`（1689 行）与 `combat_roster_state` 的进一步拆分；法宝的「选哪一张实例」若将来实例间有差异（强化/词条）需补选择 UI
 
 ## Session Extract — 背包与角色状态界面的可操作性（2026-11-14）
 - 任务：把上一轮的只读两界面变成能用的——① 背包条目可聚焦（上下选行、行内高亮、切分类游标回首行、点条目不崩）；② 丹药在背包里直接使用（读模板效果走既有结算层），用掉数量减一；非丹药给中文提示；③ 角色状态页选中角色行、确认看模板详情摘要（名称/类型/攻击/灵能…），不可出战的也能看且标注；④ 测试覆盖以上四点

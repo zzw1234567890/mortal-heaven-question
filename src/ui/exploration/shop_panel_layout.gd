@@ -179,6 +179,31 @@ static func apply_focus_ring(p_button: Button) -> void:
 	p_button.add_theme_stylebox_override(&"focus", focus_stylebox())
 
 
+## 把一行控件插到[b]标题与条目列表之间[/b]（分类栏 / 目标栏这类横向操作条）。[br]
+## [br][b]为什么按父子关系定位而不是数层级[/b]：[code]item_box[/code] 上溯到
+## [code]PanelContainer[/code] 隔了四层（VBox → Scroll → VBox → Margin → Panel），
+## 数错了就会拿到 [VBoxContainer] 并在赋值时报类型错——用「列表的父容器」是构建
+## 细节里最稳的一跳。[br]
+## [br][param p_parts] [method build] 的返回值（须含 [code]item_box[/code]）。[br]
+## [br][b]返回[/b]：插入的控件（引用由调用方持有，本模块不缓存）。
+static func insert_before_list(p_parts: Dictionary, p_bar: Control) -> Control:
+	var scroll: Node = (p_parts["item_box"] as Node).get_parent()
+	var column: Node = scroll.get_parent()
+	column.add_child(p_bar)
+	column.move_child(p_bar, scroll.get_index())
+	return p_bar
+
+
+## 把一行控件插到[b]条目列表与提示文案之间[/b]（详情区这类跟随列表的块）。[br]
+## [br]定位口径同 [method insert_before_list]——用列表的兄弟下标，不写字符串路径。
+static func insert_after_list(p_parts: Dictionary, p_block: Control) -> Control:
+	var scroll: Node = (p_parts["item_box"] as Node).get_parent()
+	var column: Node = scroll.get_parent()
+	column.add_child(p_block)
+	column.move_child(p_block, scroll.get_index() + 1)
+	return p_block
+
+
 ## 焦点环样式（松石青粗边 + 极淡底色——两通道标记「选中」，不只靠颜色）。[br]
 ## [br]底色是 [constant FOCUS_BG_COLOR] 的半透明白，叠在按钮自身的常态/悬停样式
 ## 之上（引擎把 [code]focus[/code] 样式画在其余状态之后），既提亮当前行又不遮蔽文案。

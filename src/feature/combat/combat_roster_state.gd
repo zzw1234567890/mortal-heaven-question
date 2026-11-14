@@ -7,53 +7,56 @@ extends RefCounted
 ## 没有任何地方保存我方角色的 [code]current_hp[/code]——[code]DeploymentSystem._field[/code]
 ## 只存阵位与状态（ADR-0016 §阵位数据模型），[code]battle.player_field[/code] 尚无写入端。
 ## 本模块是战斗内的单一 HP 真理来源，开战快照一次、结算写回、战斗结束清空。[br]
+## [br][b]建表半边已拆出[/b]（见 [code]combat_roster_seeding.gd[/code]）：「名册 → 状态表」
+## 是一次性无状态换算，与「谁在读、谁在写」无交集；拆出后本类只管表的生命期与读写。
+## [constant ENEMY_ID_BASE] 一族的编码约定与 [method enemy_id_of] 仍由本类[b]转发[/b]
+## 同一实现——外部既有引用点（战斗 UI 建卡、敌方行动播报）一字未改。[br]
 ## [br][b]信息不足原则[/b]（同 [code]combat_end_check.gd[/code]）：读不到 HP 的角色标记为
 ## [code]known=false[/code]，伤害不落库、不据此判死——由调用方回退到载荷里的
 ## [code]is_kill[/code]，避免「读不到数据」把角色误杀。[br]
-## [br][b]敌方 ID 编码[/b]：[code]EnemyBattleState[/code] 自身不持有 character_id，
-## 绑定注册侧以「实例索引 × 10000 + 100000」派生（[code]ai_roster_factory.gd[/code]
-## §register_preconfigured_bindings）。本模块按同一约定落键，条目自带
-## [code]character_id[/code] 时以条目为准。[br]
 ## [br]来源: ADR-0008 §Phase 4/§Phase 6、ADR-0016 §阵亡清位、GDD combat-system.md §3/§9、
 ## tech-debt DEBT-CBT-018-1。
 
-## 阵营枚举（镜像 [signal CombatSystem.character_died] 的 side 参数——0 己方 / 1 敌方）。
-const SIDE_PLAYER: int = 0
-const SIDE_ENEMY: int = 1
+## 建表半边（名册 → 状态表；敌方 ID 编码与条目字段读取的唯一实现处）。
+const SeedingScript := preload("res://src/feature/combat/combat_roster_seeding.gd")
 
-## 敌方角色 ID 编码基数（与 ai_roster_factory 的绑定 ID 同源）。
-const ENEMY_ID_BASE: int = 100000
-## 敌方角色 ID 步长（每实例一段，避免同模板多实例 ID 冲突）。
-const ENEMY_ID_STRIDE: int = 10000
+## 阵营枚举（镜像 [signal CombatSystem.character_died] 的 side 参数——0 己方 / 1 敌方）。
+const SIDE_PLAYER: int = SeedingScript.SIDE_PLAYER
+const SIDE_ENEMY: int = SeedingScript.SIDE_ENEMY
+
+## 敌方角色 ID 编码基数 / 步长（与 ai_roster_factory 的绑定 ID 同源）。
+const ENEMY_ID_BASE: int = SeedingScript.ENEMY_ID_BASE
+const ENEMY_ID_STRIDE: int = SeedingScript.ENEMY_ID_STRIDE
+
+## 属性增益存储（战斗内直用法宝）。
+const BonusScript := preload("res://src/feature/combat/combat_stat_bonus.gd")
+## Debuff 管理器——降攻/降防 debuff 状态管理。
+const DebuffScript := preload("res://src/feature/combat/combat_debuff_manager.gd")
 
 ## 状态表——[code]{character_id: {side, current_hp, max_hp, atk, defense, is_alive,
 ## known, ref}}[/code]。我方 [code]defense[/code] 来自 [code]player_stats.defense[/code]，
-## 缺省 0（不臆造）。[code]ref[/code] 为外部持有者（敌方阵容条目）；我方条目为 null
-## （本表即真理来源）。
+## 缺省 0（不臆造）。[code]ref[/code] 为外部持有者（敌方阵容条目）；我方条目为 null。
 var _states: Dictionary = {}
 
 ## Debuff 管理器——降攻/降防 debuff 状态管理。
 var _debuff: RefCounted = null
 
+## 属性增益存储——战斗内直用法宝的落点（与 debuff 对称：一个减、一个加）。[br]
+## [br][b]为什么与 debuff 分家[/b]：两者的写入契约不同（debuff 拒绝非正数、按回合过期；
+## 增益相反）——合成一处会让「amount 的符号」承担两种含义（见
+## [code]combat_stat_bonus.gd[/code] 类文档）。读侧在本模块叠加，外部只经
+## [method get_atk] / [method get_defense] 取数。
+var _bonus: RefCounted = null
 
-## 敌方角色 ID 派生——[b]单一来源[/b]：开战种子与战斗 UI 建卡必须落在同一键上，
-## 否则 UI 读到的永远是 0/0。[br]
-## [param entry] 阵容条目（自带 character_id 时优先——测试/预配置阵容可显式指定）。[br]
-## [param index] 阵容下标（无显式 ID 时按约定派生）。
+
+## 敌方角色 ID 派生（转发建表模块——见类文档「建表半边已拆出」）。
 static func enemy_id_of(entry: Variant, index: int) -> int:
-	var explicit: int = _entry_int_static(entry, "character_id", -1)
-	return explicit if explicit >= 0 else ENEMY_ID_BASE + index * ENEMY_ID_STRIDE
+	return SeedingScript.enemy_id_of(entry, index)
 
 
-## 敌方条目的前后排判定——条目自带阵位信息时以其为准，缺省视为前排
-## （敌方阵容快照通常不带阵位，UI 侧统一摆前排，不做无依据的臆测）。
+## 敌方条目的前后排判定（转发——同 [method enemy_id_of]）。
 static func enemy_is_front(entry: Variant) -> bool:
-	var raw: Variant = _entry_raw_static(entry, "is_front_row")
-	if raw == null:
-		raw = _entry_raw_static(entry, "is_front")
-	if raw is bool:
-		return raw
-	return true
+	return SeedingScript.enemy_is_front(entry)
 
 
 ## 清空全部状态——开战重种子与战斗结束共用。
@@ -61,13 +64,13 @@ func clear() -> void:
 	_states.clear()
 	if _debuff != null:
 		_debuff.call(&"clear")
+	if _bonus != null:
+		_bonus.call(&"clear")
 
 
 ## 用我方阵位 + 敌方阵容重建状态表（开战快照）。[br]
-## [br][param player_field] [code]DeploymentSystem.get_field()[/code] 快照。[br]
 ## [param player_stats] 可选的 [code]{character_id: {current_hp, max_hp}}[/code]
 ## （interaction epic 的 battle_start config 扩展；缺省时回退卡牌模板 base_hp）。[br]
-## [param enemy_roster] 敌方阵容快照（EnemyBattleState 对象或 Dictionary）。[br]
 ## [param card_system] 卡牌系统 Autoload——模板 HP 回退来源，可为 null。
 func seed(player_field: Array, player_stats: Dictionary, enemy_roster: Array,
 		card_system: Node = null) -> void:
@@ -76,57 +79,15 @@ func seed(player_field: Array, player_stats: Dictionary, enemy_roster: Array,
 	seed_player_field(player_field, player_stats, card_system)
 
 
-## 种子敌方阵容——条目自带 character_id 时优先，否则按 AI 绑定 ID 约定派生。[br]
-## [br][b]写回目标[/b]：对象条目直接改其 [code]current_hp[/code]/[code]is_alive[/code]；
-## Dictionary 条目原地改键（[b]浅拷贝的数组仍共享同一 Dictionary[/b]，改动对
-## END 判定可见）。[br]
+## 种子敌方阵容（建表委托 [code]combat_roster_seeding.gd[/code]）。
 func seed_enemy_roster(roster: Array) -> void:
-	for idx: int in range(roster.size()):
-		var entry: Variant = roster[idx]
-		if entry == null:
-			continue
-		var character_id: int = enemy_id_of(entry, idx)
-		var max_hp: int = _entry_int(entry, "max_hp", 0)
-		var hp: int = _entry_int(entry, "current_hp", max_hp)
-		var known: bool = max_hp > 0
-		_states[character_id] = _make_state(SIDE_ENEMY, hp, max_hp,
-				_entry_int(entry, "attack", 0),
-				_entry_int(entry, "defense", 0),
-				bool(_entry_int(entry, "is_alive", 1)) and (hp > 0 or not known), known, entry)
+	_states.merge(SeedingScript.build_enemy_states(roster), true)
 
 
-## 种子我方阵位——HP/ATK 来源优先级：注入 stats > 卡牌模板基础值 > 未知。[br]
-## [br][param stats] 可带 [code]atk[/code] / [code]attack[/code]（任选其一）作为攻击力覆盖；
-## 缺省回退模板 [code]base_attack[/code]（与战斗 UI 的 ATK 取数同源）。[br]
+## 种子我方阵位（建表委托同 [method seed_enemy_roster]）。
 func seed_player_field(field: Array, stats: Dictionary,
 		card_system: Node = null) -> void:
-	for entry: Variant in field:
-		var character_id: int = _entry_int(entry, "character_id", -1)
-		if character_id < 0:
-			continue
-		var injected: Variant = stats.get(character_id, {})
-		var max_hp: int = 0
-		var hp: int = 0
-		var atk: int = 0
-		var defense: int = 0
-		if injected is Dictionary and not (injected as Dictionary).is_empty():
-			max_hp = int((injected as Dictionary).get("max_hp", 0))
-			hp = int((injected as Dictionary).get("current_hp",
-					(injected as Dictionary).get("hp", max_hp)))
-			atk = int((injected as Dictionary).get("atk",
-					(injected as Dictionary).get("attack", 0)))
-			defense = int((injected as Dictionary).get("defense",
-					(injected as Dictionary).get("def", 0)))
-		else:
-			max_hp = _read_template_field(card_system, character_id, "base_hp")
-			hp = max_hp
-			# 卡牌模板暂无 base_defense 字段；模板回退读到 0 = 「无数据」，不臆造。
-			defense = _read_template_field(card_system, character_id, "base_defense")
-		if atk <= 0:
-			atk = _read_template_field(card_system, character_id, "base_attack")
-		var known: bool = max_hp > 0 or hp > 0
-		_states[character_id] = _make_state(SIDE_PLAYER, hp, max_hp, atk, defense,
-				hp > 0 or not known, known, null)
+	_states.merge(SeedingScript.build_player_states(field, stats, card_system), true)
 
 
 ## 查询角色是否拥有可信 HP 数据（未知时不回写、不据此判死）。
@@ -143,7 +104,7 @@ func is_alive(character_id: int) -> bool:
 
 
 ## HP 读取契约——战斗 UI 的 [code]hp_reader_cb[/code] 期望
-## [code]{current, max}[/code]；未知角色返回 0/0（UI 侧已有除零守卫）。[br]
+## [code]{current, max}[/code]；未知角色返回 0/0（UI 侧已有除零守卫）。
 func get_hp(character_id: int) -> Dictionary:
 	var state: Dictionary = _states.get(character_id, {})
 	if state.is_empty():
@@ -171,39 +132,72 @@ func read_hp(character_id: int) -> Dictionary:
 
 
 ## 攻击力读取——出牌伤害倍率的取数入口（[code]ATK × 倍率[/code] 的 ATK）。[br]
-## 攻击力已受降攻 debuff 修正（debuff → 防御减免 → 减伤比例）。[br]
-## 未知角色返回 0（调用方据此判定「拿不到攻击力」，不臆造伤害）。
+## 已叠加战斗内法宝增益（[method apply_bonus]），再受降攻 debuff 修正。[br]
+## 未知角色返回 0（不臆造伤害）——[b]增益也一并不可见[/b]：[method apply_bonus] 对未知
+## 角色根本不记，故这里读到的必然是 0。[br]
+## [b]叠加顺序[/b]：先加增益再减 debuff（[code]max(基础 + 增益 − 降攻, 0)[/code]）——
+## 降攻是对「当前攻击力」的削减，若先减后加，一个降 5 攻的 debuff 会被后加的增益
+## 悄悄抵消掉一部分，与 [code]CombatDebuffManager[/code] 文档写的
+## 「ATK 受降攻 debuff 调整后，再算防御减免」同一方向。
 func get_atk(character_id: int) -> int:
 	var state: Dictionary = _states.get(character_id, {})
-	var base_atk: int = int(state.get("atk", 0)) if not state.is_empty() else 0
+	if state.is_empty():
+		return 0
+	var with_bonus: int = int(state.get("atk", 0)) \
+			+ _read_bonus(character_id, BonusScript.STAT_ATK)
 	if _debuff != null:
-		return int(_debuff.call(&"get_atk_with_debuff", character_id, base_atk))
-	return base_atk
+		return int(_debuff.call(&"get_atk_with_debuff", character_id, with_bonus))
+	return with_bonus
 
 
-## 防御力读取——伤害结算的取数入口（防御减免）。[br]
-## 防御力已受降防 debuff 修正（debuff → 防御减免 → 减伤比例）。[br]
+## 防御力读取——伤害结算的取数入口（防御减免）。叠加口径同 [method get_atk]。[br]
 ## 未知角色返回 0（不臆造防御数字）。
 func get_defense(character_id: int) -> int:
 	var state: Dictionary = _states.get(character_id, {})
-	var base_def: int = int(state.get("defense", 0)) if not state.is_empty() else 0
+	if state.is_empty():
+		return 0
+	var with_bonus: int = int(state.get("defense", 0)) \
+			+ _read_bonus(character_id, BonusScript.STAT_DEF)
 	if _debuff != null:
-		return int(_debuff.call(&"get_def_with_debuff", character_id, base_def))
-	return base_def
+		return int(_debuff.call(&"get_def_with_debuff", character_id, with_bonus))
+	return with_bonus
 
 
-## 施加 debuff——目标收到 debuff。[br]
-## [br][param p_target_id] 目标角色 ID。[br]
-## [param p_type] DebuffType（STAT_DOWN_ATK / STAT_DOWN_DEF）。[br]
-## [param p_duration] 持续回合数（0 = 本回合结束后生效）。[br]
-## [param p_amount] 每层降低的数值（DebuffConfig.amount）。[br]
-## [param p_source_id] 施加者角色 ID（可选）。[br]
+## 施加属性增益（战斗内直用法宝）——见 [code]combat_stat_bonus.gd[/code] 的取舍注记。[br]
+## [br][b]未知角色不记[/b]：状态表里没有可信数值的角色（未种子 / 已阵亡清位）加上去
+## 只会得到一个永远读不到的条目（[method get_atk] 对未知角色直接返回 0）。[br]
+## [b]返回[/b]：是否真的记了一笔。
+func apply_bonus(character_id: int, p_stat: String, p_amount: int) -> bool:
+	if not is_known(character_id):
+		return false
+	return bool(_get_bonus().call(&"apply", character_id, p_stat, p_amount))
+
+
+## 获取属性增益存储——用于测试断言 / UI 显示。
+func get_bonus_manager() -> RefCounted:
+	return _get_bonus()
+
+
+## 读某属性的增益总量——未知角色一律 0（同 [method get_atk] 的守卫）。
+func _read_bonus(character_id: int, p_stat: String) -> int:
+	if _bonus == null:
+		return 0
+	return int(_bonus.call(&"get_bonus", character_id, p_stat))
+
+
+## 惰性创建增益存储。
+func _get_bonus() -> RefCounted:
+	if _bonus == null:
+		_bonus = BonusScript.new()
+	return _bonus
+
+
+## 施加 debuff——目标收到 debuff（[param p_type] 为 [code]DebuffManager.TYPE_*[/code]）。[br]
 ## [b]返回[/b]：是否成功施加（层数已满则失败）。
 func apply_debuff(p_target_id: int, p_type: int, p_duration: int, p_amount: int,
 		p_source_id: int = -1) -> bool:
-	if _debuff == null:
-		_debuff = preload("res://src/feature/combat/combat_debuff_manager.gd").new()
-	return _debuff.call(&"apply", p_target_id, p_type, p_duration, p_amount, p_source_id)
+	return _get_debuff().call(&"apply", p_target_id, p_type, p_duration, p_amount,
+			p_source_id)
 
 
 ## 回合结束递减 debuff——调用一次，所有 debuff 持续回合数 -1。[br]
@@ -217,8 +211,13 @@ func on_turn_end_debuff() -> int:
 
 ## 获取 debuff 管理器——用于测试断言 / UI 显示。
 func get_debuff_manager() -> RefCounted:
+	return _get_debuff()
+
+
+## 惰性创建 debuff 管理器。
+func _get_debuff() -> RefCounted:
 	if _debuff == null:
-		_debuff = preload("res://src/feature/combat/combat_debuff_manager.gd").new()
+		_debuff = DebuffScript.new()
 	return _debuff
 
 
@@ -257,11 +256,12 @@ func get_state(character_id: int) -> Dictionary:
 ## 应用一次伤害并回写防御方状态（负值 = 治疗，与 UI 的 damage 符号约定同源）。[br]
 ## [br][b]返回[/b]：[code]{known, died, side, current_hp, max_hp}[/code]。[br]
 ##   - [code]known=false[/code] → 未落库，调用方回退到载荷的 is_kill；[br]
-##   - [code]died=true[/code] → 本次调用让角色由存活转为阵亡（幂等——已阵亡不再为真）。[br]
+##   - [code]died=true[/code] → 本次调用让角色由存活转为阵亡（幂等——已阵亡不再为真）。
 func apply_damage(character_id: int, damage: int) -> Dictionary:
 	var state: Variant = _states.get(character_id)
 	if not (state is Dictionary) or not bool((state as Dictionary).get("known", false)):
-		return {"known": false, "died": false, "side": SIDE_PLAYER, "current_hp": 0, "max_hp": 0}
+		return {"known": false, "died": false, "side": SIDE_PLAYER,
+				"current_hp": 0, "max_hp": 0}
 	var st: Dictionary = state
 	var was_alive: bool = bool(st["is_alive"])
 	var max_hp: int = int(st["max_hp"])
@@ -282,22 +282,6 @@ func apply_damage(character_id: int, damage: int) -> Dictionary:
 	}
 
 
-# === 内部 ========================================================================
-
-func _make_state(side: int, hp: int, max_hp: int, atk: int, defense: int,
-		is_alive: bool, known: bool, ref: Variant) -> Dictionary:
-	return {
-		"side": side,
-		"current_hp": maxi(hp, 0),
-		"max_hp": maxi(max_hp, 0),
-		"atk": maxi(atk, 0),
-		"defense": maxi(defense, 0),
-		"is_alive": is_alive,
-		"known": known,
-		"ref": ref,
-	}
-
-
 ## 回写外部持有者——对象走 set()，Dictionary 原地改键（共享引用，END 判定可见）。
 func _write_back(st: Dictionary, hp: int, alive: bool) -> void:
 	var ref: Variant = st.get("ref")
@@ -308,39 +292,3 @@ func _write_back(st: Dictionary, hp: int, alive: bool) -> void:
 	elif ref is Dictionary:
 		(ref as Dictionary)["current_hp"] = hp
 		(ref as Dictionary)["is_alive"] = alive
-
-
-## 卡牌模板字段回退——CardSystem/模板不可用时返回 0（= 未知）。[br]
-## [br][param key] 模板字段名（[code]base_hp[/code] / [code]base_attack[/code]）。
-func _read_template_field(card_system: Node, character_id: int, key: String) -> int:
-	if card_system == null or not card_system.has_method(&"get_template_by_instance_id"):
-		return 0
-	var template: Variant = card_system.call(&"get_template_by_instance_id", character_id)
-	if template == null:
-		return 0
-	var raw: Variant = template.get(key)
-	return maxi(int(raw), 0) if raw != null else 0
-
-
-## 条目整数字段读取——兼容 Dictionary 与 Object（EnemyBattleState）。
-func _entry_int(entry: Variant, key: String, fallback: int) -> int:
-	return _entry_int_static(entry, key, fallback)
-
-
-## 条目整数字段读取的静态变体（[method enemy_id_of] 等无实例入口复用）。
-static func _entry_int_static(entry: Variant, key: String, fallback: int) -> int:
-	if entry is Dictionary:
-		return int((entry as Dictionary).get(key, fallback))
-	if entry is Object and (entry as Object).has_method(&"get"):
-		var raw: Variant = (entry as Object).get(key)
-		return int(raw) if raw != null else fallback
-	return fallback
-
-
-## 条目任意字段读取——读不到时返回 null（区别于「读到 0」）。
-static func _entry_raw_static(entry: Variant, key: String) -> Variant:
-	if entry is Dictionary:
-		return (entry as Dictionary).get(key)
-	if entry is Object and (entry as Object).has_method(&"get"):
-		return (entry as Object).get(key)
-	return null

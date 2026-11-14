@@ -1,12 +1,15 @@
 class_name CombatBottombar
 extends Control
-## CombatBottombar —— 底部条三组件组装器（combat-ui-layout Story 005）。
+## CombatBottombar —— 底部条四组件组装器（combat-ui-layout Story 005 / 本轮行囊入口）。
 ##
 ## [b]职责[/b]：将费用栏（[CostBar]）+ 牌库/弃牌计数（[DeckCounter]）+
-## 「结束出牌」按钮位（[EndTurnButton]）组装进 Story 001 的 BottomBar 容器，
-## 并完成信号接线（phase_changed 驱动按钮显示/隐藏；cost_changed 驱动费用栏）。[br]
-## [br][b]横向顺序[/b]（GDD §4）：费用栏（左）→ 牌库/弃牌计数（中）→
+## 行囊入口（[CombatBagButton]）+「结束出牌」按钮位（[EndTurnButton]）组装进 Story 001
+## 的 BottomBar 容器，并完成信号接线（phase_changed 驱动后两个按钮的显示/隐藏；
+## cost_changed 驱动费用栏）。[br]
+## [br][b]横向顺序[/b]（GDD §4）：费用栏（左）→ 牌库/弃牌计数（中）→ 行囊 →
 ## 结束出牌按钮（右端）。[br]
+## [br][b]为什么行囊挨着结束出牌[/b]：两者都只在出牌阶段出现（同生共死），摆在一起
+## 玩家一眼就知道「这段回合里我能做这两件事」；夹在费用栏与牌库之间会与常驻信息混在一处。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：本组装器只做信号路由 + 组件引用，
 ## 费用/计数/阶段数据均由各组件持渲染快照，经系统信号驱动。[br]
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——纯信号驱动。[br]
@@ -16,7 +19,7 @@ extends Control
 ##
 ## @experimental
 ## 来源: ADR-0031、ADR-0008、ADR-0015、design/gdd/combat-ui-system.md §4/§569、
-## combat-ui-layout Story 005。
+## combat-ui-layout Story 005、design/gdd/alchemy-crafting-system.md §1c。
 
 ## === 布局常量（1920×1080 基准 anchor 比例——非像素硬编码）====================
 
@@ -24,15 +27,22 @@ extends Control
 const COST_WIDTH_RATIO: float = 160.0 / 1920.0
 ## 牌库计数宽比例（130/1920）。
 const DECK_WIDTH_RATIO: float = 130.0 / 1920.0
+## 行囊按钮宽比例（88/1920——与按钮自身的 custom_minimum_size 同档）。
+const BAG_BUTTON_WIDTH_RATIO: float = 88.0 / 1920.0
 ## 结束出牌按钮宽比例（120/1920）。
 const END_BUTTON_WIDTH_RATIO: float = 120.0 / 1920.0
 ## 组件间距（12/1920）。
 const GAP_RATIO: float = 12.0 / 1920.0
 
+## 行囊入口组件脚本（与本文件同目录的 button 位）。
+const BagButtonScript: GDScript = preload(
+		"res://src/ui/combat/bag/combat_bag_button.gd")
+
 ## === 子组件引用 ==============================================================
 
 var cost_bar: CostBar = null
 var deck_counter: DeckCounter = null
+var bag_button: Control = null
 var end_turn_button: EndTurnButton = null
 
 
@@ -40,7 +50,7 @@ func _init() -> void:
 	_build()
 
 
-## 构建三组件（_init 构建——不依赖场景树时序）。
+## 构建四组件（_init 构建——不依赖场景树时序）。
 func _build() -> void:
 	custom_minimum_size = Vector2(460, 48)
 	cost_bar = CostBar.new()
@@ -49,6 +59,9 @@ func _build() -> void:
 	deck_counter = DeckCounter.new()
 	deck_counter.name = "DeckCounter"
 	add_child(deck_counter)
+	bag_button = BagButtonScript.new()
+	bag_button.name = "BagButton"
+	add_child(bag_button)
 	end_turn_button = EndTurnButton.new()
 	end_turn_button.name = "EndTurnButton"
 	add_child(end_turn_button)
@@ -84,9 +97,13 @@ func set_deck_counts(deck_count: int, discard_count: int) -> void:
 
 ## === 信号回调 ================================================================
 
-## phase_changed → 结束出牌按钮显示/隐藏（AC-7——仅阶段 2 可见）。
+## phase_changed → 结束出牌按钮与行囊入口的显示/隐藏（AC-7——两者仅阶段 2 可见）。[br]
+## [br][b]为什么两者同一时机[/b]：出牌阶段是玩家唯一能支配灵力的那段时间，行囊与
+## 「结束出牌」是这段时间里并列的两个动作（见类文档「为什么行囊挨着结束出牌」）。
 func _on_phase_changed(_old_phase: int, new_phase: int, _turn: int) -> void:
 	end_turn_button.apply_phase(new_phase)
+	if bag_button != null:
+		bag_button.call(&"apply_phase", new_phase)
 
 
 ## cost_changed(current, max_show, total_max) → 费用栏刷新（AC-2 信号驱动）。[br]
@@ -98,13 +115,16 @@ func _on_cost_changed(current: int, max_show: int, total_max: int) -> void:
 
 ## === 布局 ====================================================================
 
-## 三组件横向排布（_notification 尺寸落定后重排）。
+## 四组件横向排布（_notification 尺寸落定后重排）。
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_relayout()
 
 
-## 横向排布：费用栏（左）→ 牌库计数（中）→ 结束出牌按钮（右端）。
+## 横向排布：费用栏（左）→ 牌库计数（中）→ 行囊 → 结束出牌按钮（右端）。[br]
+## [br][b]行囊走递增、结束出牌走右锚[/b]：结束出牌按钮自 Story 005 起就锚在右端
+## （玩家对它的位置有肌肉记忆，不随新增组件漂移）；行囊从左往右接在牌库计数之后，
+## 两者在出牌阶段相邻出现（见类文档「为什么行囊挨着结束出牌」）。
 func _relayout() -> void:
 	if cost_bar == null or size.x <= 0.0:
 		return
@@ -112,8 +132,15 @@ func _relayout() -> void:
 	x = _place_ratio(cost_bar, x, COST_WIDTH_RATIO)
 	x += GAP_RATIO * size.x
 	x = _place_ratio(deck_counter, x, DECK_WIDTH_RATIO)
+	x += GAP_RATIO * size.x
+	_place_ratio(bag_button, x, BAG_BUTTON_WIDTH_RATIO)
 	# 结束出牌按钮锚定右端（不随 x 递增——固定右对齐）
 	if end_turn_button != null:
+		# 行囊与右锚的结束出牌按钮之间留出间距：窗口极窄时两者会叠在一起，
+		# 把行囊的右边界压到结束出牌按钮的左边界之前（谁先让位由固定锚定的那个说了算）。
+		var end_left: float = size.x * (1.0 - END_BUTTON_WIDTH_RATIO)
+		if bag_button != null and bag_button.offset_right > end_left - GAP_RATIO * size.x:
+			bag_button.offset_right = end_left - GAP_RATIO * size.x
 		end_turn_button.anchor_left = 1.0 - END_BUTTON_WIDTH_RATIO
 		end_turn_button.anchor_right = 1.0
 		end_turn_button.anchor_top = 0.0
@@ -125,7 +152,7 @@ func _relayout() -> void:
 
 
 ## 子组件定位（anchor 比例换算——按容器实际宽 size.x 换算为 offset 像素，
-## 非固定 1920 基准——保证任意宽度下三组件占比一致，响应式）。
+## 非固定 1920 基准——保证任意宽度下各组件占比一致，响应式）。
 func _place_ratio(node: Control, x: float, width_ratio: float) -> float:
 	if node == null:
 		return x

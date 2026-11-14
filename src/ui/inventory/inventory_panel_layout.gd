@@ -64,27 +64,23 @@ static func build(p_panel: Control, p_title: String,
 	var panel_node: PanelContainer = parts["panel"]
 	panel_node.custom_minimum_size = Vector2(PANEL_WIDTH, PANEL_HEIGHT)
 
-	# 插到滚动列表[b]之前[/b]（标题下方、条目上方）——用「列表 → 滚动容器 →
-	# 纵列」的父子关系定位，不写字符串路径（路径会随布局改动碎掉）。
-	var scroll: Node = parts["item_box"].get_parent()
-	var column: Node = scroll.get_parent()
-
+	# 插到滚动列表[b]之前[/b]（标题下方、条目上方）——「列表 → 滚动容器 → 纵列」的
+	# 定位收在商店骨架那一处（[method ShopPanelLayout.insert_before_list]），本模块
+	# 不重数一遍层级（数错会拿到 VBoxContainer 并在赋值时报类型错）。
 	var category_button := Button.new()
 	category_button.name = "CategoryButton"
 	category_button.custom_minimum_size = Vector2(0.0, ITEM_HEIGHT)
 	category_button.focus_mode = Control.FOCUS_ALL
 	ShopLayoutScript.apply_focus_ring(category_button)
 	# 这里[b]不接任何回调[/b]：按钮原样交回面板，由面板自己 connect（见上方注记）。
-	column.add_child(category_button)
-	column.move_child(category_button, scroll.get_index())
+	ShopLayoutScript.insert_before_list(parts, category_button)
 
 	var detail_box := VBoxContainer.new()
 	detail_box.name = "DetailBox"
 	detail_box.add_theme_constant_override("separation", 4)
 	detail_box.visible = false  # 空时隐藏（没选中任何东西就不占版面）
-	column.add_child(detail_box)
-	# 摆在滚动列表[b]之后[/b]、提示文案之前（用列表的兄弟下标定位，不写字符串路径）。
-	column.move_child(detail_box, scroll.get_index() + 1)
+	# 摆在滚动列表[b]之后[/b]、提示文案之前（同上一处定位口径）。
+	ShopLayoutScript.insert_after_list(parts, detail_box)
 
 	parts["category_button"] = category_button
 	parts["detail_box"] = detail_box

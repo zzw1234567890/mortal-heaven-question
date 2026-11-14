@@ -13,6 +13,12 @@ extends Control
 ## [br][b]输入锁用 InputManager.push_lock[/b]（与设置面板同一把）：本宿主的面板是
 ## 只读的，不需要节点图那种「冻结舞台」语义；锁的作用是让 Esc 的语义在本层收敛，
 ## 释放走 [code]_exit_tree[/code] 兜底（防「面板被外部释放、锁留在栈上」）。[br]
+## [br][b]为什么要 [method InputManager.has_lock] 再 pop[/b]：见
+## [code]inventory_input_lock.gd[/code]——[code]InputManager[/code] 连接了
+## [code]SceneTree.tree_changed[/code] 并在回调里清空整个锁栈，而本界面每次刷新
+## 增删行都会触发一次 [code]tree_changed[/code]；「查询再弹」让日志保持干净。[br]
+## [br][b]输入锁拆出去了[/b]：[code]inventory_input_lock.gd[/code] 只做
+## 「申请 / 释放 / 兜底」三件事，本宿主留一句转发（拆因见文件行数上限）。[br]
 ## [br][b]为什么结算（用丹药）在这里而不在面板里[/b]：面板只发
 ## [signal InventoryScreen.item_use_requested]（「玩家确认了这一行」），由本宿主
 ## 交给 [code]InventoryPillUse[/code] 结算，再把系统给的文案回填给面板——与
@@ -35,6 +41,8 @@ const InventoryScript := preload("res://src/ui/inventory/inventory_screen.gd")
 const StatusScript := preload("res://src/ui/inventory/character_status_screen.gd")
 ## 背包内使用丹药的结算层（本宿主是它在生产路径上的唯一调用方）。
 const PillUseScript := preload("res://src/feature/inventory/inventory_pill_use.gd")
+## 输入锁持有者（申请 / 释放 / 退场兜底——见类文档「输入锁拆出去了」）。
+const InputLockScript := preload("res://src/ui/inventory/inventory_input_lock.gd")
 
 ## 锁来源标识——与设置面板同一把锁（同一时刻只该有一个全覆盖层）。
 const LOCK_SOURCE: StringName = &"inventory_screens"
@@ -48,14 +56,26 @@ const TEXT_TAB_HINT: String = "   （Tab 换页）"
 ## 依赖注入（测试可替换——null 时由各页自己去找 Autoload）。
 var inventory_model: RefCounted = null
 var status_model: RefCounted = null
-var input_manager: Node = null
+## InputManager（写入同时转给锁持有者——该字段是既有注入口，不能悄悄失效）。[br]
+## [br][b]为什么用背后字段[/b]：getter 里读同名属性在 GDScript 里会递归调自己，
+## 必须落在一个私有字段上；setter 转发是必需的——生产路径在 [code]_init[/code]
+## 之后才赋值，只认构造那一刻的注入会让锁永远拿不到管理器。
+var input_manager: Node:
+	get: return _input_manager
+	set(value):
+		_input_manager = value
+		if _lock != null:
+			_lock.call(&"set_input_manager", value)
 ## 丹药结算层（null 时本地 new——它自己去找 Autoload，全缺时其写入返回失败）。
 var pill_use: RefCounted = null
 
 var _tab_button: Button = null
 var _tab_index: int = 0
 var _pages: Array = []
-var _lock_held: bool = false
+## InputManager 的背后字段（见 [member input_manager]）。
+var _input_manager: Node = null
+## 输入锁持有者（[method _init] 创建——只做申请 / 释放 / 兜底）。
+var _lock: RefCounted = null
 
 
 func _init() -> void:
@@ -63,11 +83,12 @@ func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false  # 挂载即隐藏（先例 SettingsPanel：靠 open() 才显示）
+	_lock = InputLockScript.new(LOCK_SOURCE, input_manager)
 	_build()
 
 
 func _exit_tree() -> void:
-	_release_lock()
+	_lock.call(&"release")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -78,14 +99,14 @@ func _exit_tree() -> void:
 ## [br]每次打开都让两页现读——关闭期间玩家可能刚打完一场（生命与收藏都变了）。
 func open() -> void:
 	visible = true
-	_acquire_lock()
+	_lock.call(&"acquire")
 	show_page(_tab_index)
 
 ## 关闭界面——隐藏但[b]留树[/b]（复用式单例，重开不重建控件）。[br]
 ## [br]输入锁在这里释放：关闭是「玩家离开这一层」，锁不该留到下次打开。
 func close() -> void:
 	visible = false
-	_release_lock()
+	_lock.call(&"release")
 
 
 ## 是否处于打开态（主菜单据此决定「再点一次是开还是关」）。
@@ -256,50 +277,3 @@ func _update_tab_text() -> void:
 		var label: String = str(TAB_TEXTS[index])
 		parts.append("[%s]" % label if index == _tab_index else label)
 	_tab_button.text = TEXT_TITLE + "：" + "  ".join(parts) + TEXT_TAB_HINT
-
-
-## 申请输入锁（幂等——重复 open 不会叠两把；[code]_lock_held[/code] 同时防
-## 「同 source 重复 push」的那条 push_warning）。[br]
-## [br][b]枚举值从 InputManager 自己的常量取[/b]（[code]manager.LockType.MODAL[/code]），
-## 不 preload 它的脚本来抄一份——锁类型的真理来源只有一处。[br]
-## [br]InputManager 缺失（剥离 Autoload 的测试环境）时静默跳过：锁是收敛 Esc
-## 语义的加固，不是本界面能否工作的前提。
-func _acquire_lock() -> void:
-	if _lock_held:
-		return
-	var manager: Node = _resolve_input_manager()
-	if manager == null or not manager.has_method(&"push_lock"):
-		return
-	var lock_type: Variant = manager.get(&"LockType")
-	if lock_type == null:
-		return
-	manager.call(&"push_lock", lock_type.MODAL, LOCK_SOURCE)
-	_lock_held = true
-
-
-## 释放输入锁（未持有时为空操作；[code]_exit_tree[/code] 兜底再调一次也安全）。[br]
-## [br][b]先查 [method InputManager.has_lock] 再 pop[/b]：`InputManager` 连接了
-## [code]SceneTree.tree_changed[/code] 并在回调里清空整个锁栈，而本界面每次
-## [method refresh] 增删行都会触发一次 [code]tree_changed[/code]——锁可能已被外部
-## 清掉，此时再 pop 只会得到一条「source not found」的 push_warning 噪声。
-## 查询是只读的，代价可忽略，换来日志干净。
-func _release_lock() -> void:
-	if not _lock_held:
-		return
-	_lock_held = false
-	var manager: Node = _resolve_input_manager()
-	if manager == null or not manager.has_method(&"pop_lock"):
-		return
-	if manager.has_method(&"has_lock") and not bool(manager.call(&"has_lock", LOCK_SOURCE)):
-		return
-	manager.call(&"pop_lock", LOCK_SOURCE)
-
-
-## InputManager——注入优先，否则 Autoload 查找。
-func _resolve_input_manager() -> Node:
-	if input_manager != null:
-		return input_manager
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath("InputManager"))

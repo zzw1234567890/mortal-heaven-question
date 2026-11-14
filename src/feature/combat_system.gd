@@ -1602,6 +1602,25 @@ func _get_attack_coverage() -> RefCounted:
 	return _attack_coverage
 
 
+# === 只读/落库子模块的公开取数口（战斗域之外的表现层装配用）=====================
+
+## 敌我角色运行时状态表（HP / 存活 / 属性增益）。[br]
+## [br][b]为什么公开一层薄转发[/b]：[code]_get_roster_state()[/code] 是子模块之间的
+## 私有约定（它们持有父引用，直接 call 下划线方法）。战斗域[b]之外[/b]的装配侧
+## （战斗场景挂载 → 行囊结算）没有那条父子关系，让它去 call 下划线方法等于把私有
+## 约定当成公开 API；转一道手后，改动子模块内部只需同步这一个出口。[br]
+## [br]返回 [RefCounted]（[code]combat_roster_state.gd[/code]）——调用方按鸭子类型
+## 取用（[code]snapshot_all[/code] / [code]apply_bonus[/code] / [code]get_hp[/code]）。
+func get_roster_state() -> RefCounted:
+	return _get_roster_state()
+
+
+## 伤害落库模块（治疗 = 负伤害；唯一写 [code]current_hp[/code] 的路径）。[br]
+## 公开理由同 [method get_roster_state]；调用方按鸭子类型取用（[code]apply_heal[/code]）。
+func get_damage_settlement() -> RefCounted:
+	return _get_damage_settlement()
+
+
 # === 查询 API ===================================================================
 
 ## 返回当前阶段。
