@@ -54,6 +54,9 @@ const TEXT_NEW_GAME: String = "新游戏"
 const TEXT_CONTINUE: String = "继续游戏"
 const TEXT_SETTINGS: String = "设置"
 const TEXT_QUIT: String = "退出"
+## 「行囊与道友」入口文案——一个按钮开两个界面（背包 + 角色状态，宿主内页签切换）。
+## 名字取「行囊（物）与道友（人）」：玩家的两类诉求各占一字，比「背包」更贴实际内容。
+const TEXT_INVENTORY: String = "行囊与道友"
 
 ## 版本号缺省回退（ProjectSettings 未配置 version 键时的安全默认——
 ## story Implementation Notes「不硬编码」指不在 UI 层写死版本值，读取失败
@@ -88,6 +91,11 @@ const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
 ## 与 HUD 同源：主菜单是启动承载者，探索系统的回调注入点必须在场景层装配，
 ## 而不是写进 ExplorationSystem 内部（DEBT-EUI-006-3 / DEBT-EUI-006-5）。
 const ExplorationBootstrapScript := preload("res://src/feature/exploration/exploration_bootstrap.gd")
+## 「行囊与道友」界面（背包 + 角色状态双页）——主菜单的覆盖层入口。
+const InventoryScreensHostScript := preload("res://src/ui/inventory/inventory_screens_host.gd")
+## 两页的只读模型——主菜单在装配时把 Autoload 接进去（面板不直连 Autoload）。
+const InventoryModelScript := preload("res://src/feature/inventory/inventory_model.gd")
+const StatusModelScript := preload("res://src/feature/inventory/character_status_model.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -106,6 +114,11 @@ var _intro_tween: Tween = null
 ## 设置面板实例——复用式单例（首次点击实例化，重开不重建——关闭后
 ## [code]visible=false[/code] 留树）。
 var _settings_panel: SettingsPanel = null
+## 「行囊与道友」界面实例——复用式单例（同设置面板的形态：首次点击实例化，
+## 关闭留树）。它自带背包与角色状态两页，故主菜单只需一个入口按钮。[br]
+## 类型写作 [Control] 而非其 [code]class_name[/code]：本脚本在测试里被动态加载，
+## 全局类名注册时序不保证（先例 card_system 的「不依赖 class_name」注记）。
+var _inventory_screens: Control = null
 ## 按键绑定 store——启动加载用（Story 004；注入项供测试替换路径）。
 var keybind_store: KeybindStore = null
 
@@ -117,6 +130,7 @@ var keybind_store: KeybindStore = null
 @onready var save_summary_label: Label = $LayoutAnchor/ButtonBox/SaveSummaryLabel
 @onready var settings_button: Button = $LayoutAnchor/ButtonBox/SettingsButton
 @onready var quit_button: Button = $LayoutAnchor/ButtonBox/QuitButton
+@onready var inventory_button: Button = $LayoutAnchor/UtilityBox/InventoryButton
 @onready var version_label: Label = $VersionLabel
 @onready var corrupt_dialog: CorruptSaveDialog = $CorruptDialog
 
@@ -221,6 +235,7 @@ func _apply_texts() -> void:
 	continue_button.text = TEXT_CONTINUE
 	settings_button.text = TEXT_SETTINGS
 	quit_button.text = TEXT_QUIT
+	inventory_button.text = TEXT_INVENTORY
 	save_summary_label.text = ""
 
 ## 版本号——从 ProjectSettings 读取（story：不硬编码）。[br]
@@ -344,6 +359,25 @@ func _on_settings_pressed() -> void:
 ## 退出 → 关闭进程（AC-main-menu-006；UX 规范：直接退出无确认）。
 func _on_quit_pressed() -> void:
 	get_tree().quit()
+
+## 「行囊与道友」→ 打开背包 + 角色状态界面（两页签，共用一次开合）。[br]
+## [br][b]与设置按钮同源形态[/b]：场景内覆盖层、复用式单例、首次点击实例化后
+## [code]add_child[/code] 挂本节点树（ADR-0031 §1 场景内节点——不经 SceneManager
+## 转场）。面板自带输入锁与「返回」出口，主菜单只负责开。[br]
+## [br][b]两页的模型在这里装配[/b]：面板不直连 Autoload（零状态所有权），
+## 由主菜单把「数据实现」接到「界面接口」上——与 [method _mount_exploration_bootstrap]
+## 同一分工。面板在 [method InventoryScreensHost.open] 时现读，故不必在此预热数据。
+func _on_inventory_pressed() -> void:
+	if _inventory_screens == null or not is_instance_valid(_inventory_screens):
+		_inventory_screens = InventoryScreensHostScript.new()
+		_inventory_screens.inventory_model = InventoryModelScript.new(
+				get_node_or_null(NodePath("/root/GameStateManager")),
+				get_node_or_null(NodePath("/root/CardSystem")))
+		_inventory_screens.status_model = StatusModelScript.new(
+				get_node_or_null(NodePath("/root/GameStateManager")),
+				get_node_or_null(NodePath("/root/RealmSystem")))
+		add_child(_inventory_screens)
+	_inventory_screens.open()
 
 ## === 损坏对话框 ================================================================
 

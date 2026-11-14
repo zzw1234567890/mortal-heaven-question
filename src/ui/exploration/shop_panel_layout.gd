@@ -40,12 +40,21 @@ const TEXT_LEAVE: String = "离开"
 ## 构建面板控件树。[br]
 ## [br][param p_panel] 面板根节点（[method Control.add_child] 的宿主）。[br]
 ## [param p_title] 标题文案（由面板给出——本模块不持有面向玩家的词条）。[br]
-## [br][b]返回[/b]：[code]{title_label, balance_label, item_box, message_label,
+## [param p_leave_signal] 「离开」按钮转发哪个信号名。[b]必须传面板自己声明过的信号[/b]
+## ——[method Object.emit_signal] 对未声明的信号名不报编译错、只在运行时静默失败
+## （[code]ERR_UNAVAILABLE[/code]），届时按钮点了没反应。默认值是商店面板的信号名；
+## 「返回」语义的面板（背包/角色状态）要显式传自己的 [code]&"back_requested"[/code]。[br]
+## [br][b]返回[/b]：[code]{panel, title_label, balance_label, item_box, message_label,
 ## leave_button}[/code]——面板持有这些引用（不按控件路径查找：容器层级是构建细节，
 ## 路径会随布局改动碎掉）。[br]
-## [br][b]「离开」按钮的意图出口[/b]：直接转发面板的 [code]leave_requested[/code]
-## 信号（本模块不持有任何回调）。
-static func build(p_panel: Control, p_title: String) -> Dictionary:
+## [br][b][code]panel[/code] 为什么也交出去[/b]：后建的面板若要往「标题与列表之间」
+## 插一行（如分类栏），需要一个不靠数 [code]get_parent()[/code] 层级的落点——
+## 从 [code]item_box[/code] 上溯到 [PanelContainer] 其实隔了四层，数错了就会拿到
+## [VBoxContainer]/[MarginContainer] 并在赋值时报类型错。交出引用比让调用方猜层级稳。
+## [br][b]「离开」按钮的意图出口[/b]：直接转发面板的 [param p_leave_signal] 信号
+## （本模块不持有任何回调）。
+static func build(p_panel: Control, p_title: String,
+		p_leave_signal: StringName = &"leave_requested") -> Dictionary:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -116,11 +125,12 @@ static func build(p_panel: Control, p_title: String) -> Dictionary:
 	var leave := Button.new()
 	leave.name = "LeaveButton"
 	leave.text = TEXT_LEAVE
-	leave.pressed.connect(func() -> void: p_panel.emit_signal(&"leave_requested"))
+	leave.pressed.connect(func() -> void: p_panel.emit_signal(p_leave_signal))
 	apply_focus_ring(leave)
 	footer.add_child(leave)
 
 	return {
+		"panel": panel,
 		"title_label": title_label,
 		"balance_label": balance_label,
 		"item_box": item_box,
