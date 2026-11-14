@@ -2,16 +2,16 @@ class_name NodeIconAtlas
 extends RefCounted
 ## NodeIconAtlas —— 节点类型 → 图标图集映射（exploration-ui Story 001 stub）。
 ##
-## [b]纯函数静态类[/b]（ADR-0031 Logic 内核模式）：13 类节点类型的颜色/词条/
+## [b]纯函数静态类[/b]（ADR-0031 Logic 内核模式）：14 类节点类型的颜色/词条/
 ## 图集 region 判定——UI 节点只消费映射结果。[br]
-## [br][b]stub 图标[/b]：程序化生成单一图集（416×32，13 格×32px）——
+## [br][b]stub 图标[/b]：程序化生成单一图集（448×32，14 格×32px）——
 ## ADR-0031 §5「UI 图标统一使用 AtlasTexture，禁止独立纹理逐图标渲染」的直接
 ## 兑现。真实图标美术归资产管线 story（替换点：[method _build_atlas]——
 ## hud TD-011 emoji 占位同源技债，届时一并替换）。[br]
 ## [br][b]类型 ID 对齐[/b]：与 [code]ExplorationSystem.NodeType[/code] 枚举值
-## 一一对应（0=入口 … 10=采集点，11=炼丹台，12=炼器台）——语义来源
-## GDD exploration-ui-system.md §公式 1 node_type_to_icon，采集点/炼丹台/炼器台
-## 为近两轮新增节点类型的同源扩展。[br]
+## 一一对应（0=入口 … 10=采集点，11=炼丹台，12=炼器台，13=洞府）——语义来源
+## GDD exploration-ui-system.md §公式 1 node_type_to_icon，采集点/炼丹台/炼器台/
+## 洞府为近几轮新增节点类型的同源扩展。[br]
 ##
 ## [br]来源: ADR-0031 §5、design/gdd/exploration-ui-system.md §公式 1、
 ## exploration-ui Story 001（R-05 行为关卡）、GDD resource-system.md §资源表（灵材）、
@@ -19,8 +19,8 @@ extends RefCounted
 
 ## 单元格边长（px）——节点图标 region 尺寸基准。
 const CELL: int = 32
-## 图集列数（13 类节点各占一格）。
-const ATLAS_COLS: int = 13
+## 图集列数（14 类节点各占一格）。
+const ATLAS_COLS: int = 14
 
 ## 节点类型规格——GDD node_type_to_icon 映射（id ↔ NodeType 枚举值）。
 ## color 为节点类型主色；glyph 为 stub 图标内白色图形标识（真实图标入库后废弃）。
@@ -38,6 +38,7 @@ const TYPE_SPECS: Dictionary = {
 	10: {"label": "采集点", "color": Color("#7FA85C"), "glyph": "leaf"},
 	11: {"label": "炼丹台", "color": Color("#C06A9E"), "glyph": "furnace"},
 	12: {"label": "炼器台", "color": Color("#9A7B4F"), "glyph": "anvil"},
+	13: {"label": "洞府", "color": Color("#5E7C8B"), "glyph": "cave"},
 }
 
 ## 图集缓存——单实例跨全部节点共享（合批前提：同纹理才能合批）。
@@ -45,8 +46,8 @@ static var _atlas: Texture2D = null
 
 
 ## 获取（或首次构建）节点图标图集。[br]
-## [br][b]返回[/b]: 320×32 [ImageTexture]——10 格 × 32px，每格 = 类型主色底 +
-## 白色 glyph 图形（stub 视觉，真实图标入库后替换本方法实现）。
+## [br][b]返回[/b]: [constant ATLAS_COLS] 格 × 32px 的 [ImageTexture]，每格 =
+## 类型主色底 + 白色 glyph 图形（stub 视觉，真实图标入库后替换本方法实现）。
 static func get_atlas() -> Texture2D:
 	if _atlas == null:
 		_atlas = _build_atlas()
@@ -87,7 +88,7 @@ static func _build_atlas() -> Texture2D:
 
 
 ## glyph 形状判定——cell 归一化坐标 (x, y) ∈ [0,1]² 是否属于白色图形。[br]
-## 10 种图形互异（同色类型仍可区分：战斗红方 / 精英红菱形等）。
+## 各图形互异（同色类型仍可区分：战斗红方 / 精英红菱形等）。
 static func _glyph_pixel(glyph: String, x: float, y: float) -> bool:
 	var cx: float = x - 0.5
 	var cy: float = y - 0.5
@@ -134,6 +135,12 @@ static func _glyph_pixel(glyph: String, x: float, y: float) -> bool:
 			if y > 0.40 and y <= 0.52 and absf(cx) <= 0.14:
 				return true
 			return y > 0.52 and y <= 0.68 and absf(cx) <= 0.26
+		"cave":
+			# 洞府：拱形洞口（上半圆）+ 内腔留白（打坐/洞府——与采集点叶形、
+			# 炼器台铁砧区分）。拱顶 + 两侧壁，中间挖空成「外暗内亮」的洞口。
+			var arch: bool = (cx * cx + (cy + 0.02) * (cy + 0.02) <= 0.16 and cy <= 0.0) \
+					or (absf(cx) >= 0.22 and absf(cx) <= 0.40 and cy > 0.0 and cy <= 0.26)
+			return arch
 	return false
 
 

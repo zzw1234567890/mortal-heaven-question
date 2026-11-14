@@ -10,21 +10,18 @@ extends Control
 ## ——遍历 map_data.nodes/graph 构建节点控件快照 → 六态经
 ## [NodeStateLogic.classify_node_state] 纯函数判定 → 样式经
 ## [NodeStateLogic.node_state_style] 渲染（注入 renderer.set_states）。[br]
-## [br][b]数据源优先级[/b]（[method trigger_map_load]）：[br]
-##   1. 注入了真实探索系统且其声明 [code]map_generated[/code] → 调 [code]enter_map[/code]
-##      命令（系统自己广播信号），本界面不写任何游戏状态；[br]
-##   2. 否则 → 挂 [MapGeneratedStub] 降级发射器，渲染 story-003 的 stub 样本
-##      （headless/编辑器预览、Feature 层缺失时界面不空白）。降级路径由
-##      [method is_using_stub_source] 标记，集成测试据此断言「真实数据 ≠ stub」。[br]
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：[code]_current_snapshot[/code] 为渲染
-## 输入快照（瞬态交互状态，不进存档）；节点状态每次信号周期从系统 API/信号载荷
-## 重读。[br]
+## [br][b]数据源优先级[/b]（[method trigger_map_load]）：1. 注入了真实探索系统且其
+## 声明 [code]map_generated[/code] → 调 [code]enter_map[/code] 命令（系统自己广播
+## 信号），本界面不写任何游戏状态；2. 否则挂 [MapGeneratedStub] 降级发射器，渲染
+## story-003 的 stub 样本（headless/编辑器预览、Feature 层缺失时界面不空白）——
+## 降级路径由 [method is_using_stub_source] 标记，集成测试据此断言「真实数据 ≠ stub」。
+## [br][b]零状态所有权[/b]（ADR-0031 §2）：[code]_current_snapshot[/code] 为渲染输入
+## 快照（瞬态交互状态，不进存档）；节点状态每次信号周期从系统 API/信号载荷重读。
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——逐层展开动画（0.8s）经 Tween
 ## 驱动 renderer.reveal_max_layer（Tween 完成即停，非 _process 常驻）。[br]
-## [br][b]迷雾消散[/b]（0.3s）：node_moved 信号触发后重算六态并 queue_redraw——
-## 揭示集合按「已访问 ∪ 当前 ∪ 其前向邻接」推导（[NodeStateLogic.is_revealed]），
-## 与探索系统写入的 visited 同源；消散动画时序归手动证据（AC-2/AC-3）。
-##
+## [br][b]迷雾消散[/b]（0.3s）：node_moved 后重算六态并 queue_redraw——揭示集合按
+## 「已访问 ∪ 当前 ∪ 其前向邻接」推导（[NodeStateLogic.is_revealed]），与系统写入的
+## visited 同源；消散动画时序归手动证据（AC-2/AC-3）。[br]
 ## 来源: story-003-node-graph-data-states.md、ADR-0031 §2/§3、
 ## ADR-0014 §决策 3（map_generated/node_moved 信号）、story-001 基座。
 
@@ -84,10 +81,9 @@ var _load_source: RefCounted = null
 ## 补触发一次（场景编排先 add_child 后调 trigger_map_load 是既有顺序）。
 var _pending_map_id: StringName = &""
 ## 装配结果——[code]{interaction_mount, event_presenter, shop_presenter,
-## teleport_presenter, harvest_presenter, craft_presenter}[/code]
-## （见 [NodeGraphComponentAssembly]，装配细节不在此重复）。[br]
-## [b]为什么整块存字典[/b]：屏幕只负责「持引用防提前释放」+ 对外访问器；
-## 逐个声明等于把返回契约写两处。子组件经 [method _sub_component] 访问。
+## teleport_presenter, harvest_presenter, craft_presenter, meditation_presenter}[/code]
+## （见 [NodeGraphComponentAssembly]）。[b]为什么整块存字典[/b]：屏幕只负责
+## 「持引用防提前释放」+ 对外访问器，逐个声明等于把返回契约写两处。
 var _components: Dictionary = {}
 ## 六态重算 + 逐层展开动画（见 [NodeGraphRevealAnimator]）。
 var _reveal_animator: RefCounted = null
@@ -111,13 +107,13 @@ func _ready() -> void:
 
 
 ## 当前数据源是否为 stub 降级（只读标记——集成测试据此区分真实数据与 stub）。[br]
-## 未进树（_ready 未跑）时为 false——此时还没有数据源可选。
+## 未进树时为 false——此时还没有数据源可选。
 func is_using_stub_source() -> bool:
 	return _load_source != null and bool(_load_source.get(&"using_stub"))
 
 
 ## 商店/回复接线组件（见 [ShopNodePresenter]）——未挂载时为 null。[br]
-## [br][b]以下四个访问器同口径[/b]：公开入口，集成测试与后续 story 经此断言/驱动
+## [br][b]以下五个访问器同口径[/b]：公开入口，集成测试与后续 story 经此断言/驱动
 ## 各类 overlay，不依赖私有成员名。
 func shop_presenter() -> Variant:
 	return _components.get("shop_presenter")
@@ -136,6 +132,11 @@ func harvest_presenter() -> Variant:
 ## 炼丹台/炼器台接线组件（见 [CraftNodePresenter]——两个台子共用一份，靠 kind 区分）。
 func craft_presenter() -> Variant:
 	return _components.get("craft_presenter")
+
+
+## 打坐/洞府接线组件（见 [MeditationNodePresenter]——突破冲关 overlay）。
+func meditation_presenter() -> Variant:
+	return _components.get("meditation_presenter")
 
 
 ## 触发地图加载。[br]
@@ -172,9 +173,8 @@ func _connect_signals() -> void:
 		es.node_moved.connect(_on_node_moved)
 
 
-## 挂载全部子组件——挂载与接线细节在 [NodeGraphComponentAssembly]
-## （交互三组件 + 事件弹出通道 + 商店/回复接线 + 转发回调表构建），
-## 屏幕只持引用防提前释放。
+## 挂载全部子组件——挂载与接线细节在 [NodeGraphComponentAssembly]（交互三组件 +
+## 事件弹出通道 + 商店/回复/传送/采集/炼制/打坐接线 + 转发回调表），屏幕只持引用。
 func _mount_components(es: Node) -> void:
 	_components = ComponentAssemblyScript.assemble(self, renderer(),
 			viewport, es, reduce_motion_override)

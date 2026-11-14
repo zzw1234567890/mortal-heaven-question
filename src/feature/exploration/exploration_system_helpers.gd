@@ -29,25 +29,25 @@ const DIFFICULTY_CONFIGS: Array = [
 		"layers": 4, "min_nodes": 2, "max_nodes": 3,
 		"elite_count": 1, "shop_count": 1, "event_count": 2, "enemy_realm": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
 	{  # MEDIUM
 		"layers": 5, "min_nodes": 2, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 1, "event_count": 3, "enemy_realm": 2,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
 	{  # HIGH
 		"layers": 5, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 2, "event_count": 3, "enemy_realm": 3,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
 	{  # VERY_HIGH
 		"layers": 6, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 3, "shop_count": 2, "event_count": 4, "enemy_realm": 4,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "elite": 5},
+				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
 ]
 
@@ -107,8 +107,14 @@ var _harvest: RefCounted = null
 ## 炼丹台/炼器台结算子模块（GDD alchemy-crafting-system §1a/§2a——配方列表 + 炼制）。
 var _craft: RefCounted = null
 
+## 打坐/洞府结算子模块（境界突破——读既有境界配置表，成功率掷骰可注入）。
+var _breakthrough: RefCounted = null
+
 ## 卡牌系统注入（测试用桩；null 时 [ExplorationCraft] 按 Autoload 查找）。
 var craft_card_system: Node = null
+
+## 突破随机源注入（测试用固定种子；null 时 [ExplorationBreakthrough] 自建随机实例）。
+var breakthrough_rng: RandomNumberGenerator = null
 
 
 # === 通用助手 ====================================================================
@@ -215,6 +221,18 @@ func _get_craft() -> RefCounted:
 		if craft_card_system != null:
 			_craft.set("card_system", craft_card_system)
 	return _craft
+
+
+## 获取打坐/洞府突破结算子模块实例（境界突破——读既有境界配置表）。[br]
+## [br][b]随机源注入[/b]：优先 [member breakthrough_rng]（测试用固定种子——
+## 同种子同结果），否则由子模块自建随机实例。
+func _get_breakthrough() -> RefCounted:
+	if _breakthrough == null:
+		_breakthrough = preload(
+				"res://src/feature/exploration/exploration_breakthrough.gd").new(self)
+		if breakthrough_rng != null:
+			_breakthrough.set("rng", breakthrough_rng)
+	return _breakthrough
 
 
 ## 获取行动力泉结算子模块实例（GDD §节点类型一览——回复全部行动力）。

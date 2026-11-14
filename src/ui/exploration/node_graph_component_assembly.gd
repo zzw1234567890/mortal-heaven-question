@@ -43,6 +43,10 @@ const HarvestNodePresenterScript := preload(
 ## 与采集同为独立通道）。
 const CraftNodePresenterScript := preload(
 		"res://src/ui/exploration/craft_node_presenter.gd")
+## MeditationNodePresenter 脚本常量（打坐/洞府 overlay——到达即给突破状态与一颗
+## 尝试按钮，与采集/炼制同为独立通道）。
+const MeditationNodePresenterScript := preload(
+		"res://src/ui/exploration/meditation_node_presenter.gd")
 ## NodePopupStage 脚本常量（商店面板期间的节点图冻结——独立实例，见挂载方法）。
 const NodePopupStageScript := preload("res://src/ui/exploration/node_popup_stage.gd")
 ## SettingsStore 脚本常量——reduce_motion 偏好读取（GFX_KEY_* 单一真理来源）。
@@ -61,7 +65,8 @@ const SCENE_MANAGER_PATH: StringName = &"/root/SceneManager"
 ## [param p_es] 探索系统（信号源，可空——stub 降级时仍挂 UI 组件）。[br]
 ## [param p_reduce_motion_override] 测试注入的减少动态偏好（null 时读 SettingsStore）。[br]
 ## [b]返回[/b]：[code]{interaction_mount, event_presenter, shop_presenter,
-## teleport_presenter, harvest_presenter}[/code]——屏幕持有引用防 RefCounted 提前释放。
+## teleport_presenter, harvest_presenter, craft_presenter, meditation_presenter}[/code]
+## ——屏幕持有引用防 RefCounted 提前释放。
 static func assemble(p_screen: Control, p_renderer: Control, p_viewport: Control,
 		p_es: Node, p_reduce_motion_override: Variant) -> Dictionary:
 	var interaction_mount: RefCounted = NodeGraphInteractionMountScript.new()
@@ -80,6 +85,8 @@ static func assemble(p_screen: Control, p_renderer: Control, p_viewport: Control
 				p_es, interaction_mount.get(&"interactor")),
 		"craft_presenter": _mount_craft_presenter(p_screen, p_renderer, p_viewport,
 				p_es, interaction_mount.get(&"interactor")),
+		"meditation_presenter": _mount_meditation_presenter(p_screen, p_renderer,
+				p_viewport, p_es, interaction_mount.get(&"interactor")),
 	}
 
 
@@ -158,6 +165,24 @@ static func _mount_craft_presenter(p_host: Control, p_renderer: Control,
 	var stage: RefCounted = NodePopupStageScript.new()
 	stage.call(&"bind", p_host, p_renderer, p_viewport)
 	var presenter: RefCounted = CraftNodePresenterScript.new()
+	presenter.call(&"attach", p_es, p_interactor, p_host, _notification_sink(p_host),
+			_freeze_of(stage, p_interactor, true), _freeze_of(stage, p_interactor, false))
+	return presenter
+
+
+## 打坐/洞府 overlay 接线挂载——[MeditationNodePresenter] 消费交互组件的到达转发里的
+## [code]meditation[/code]（到达即给突破状态 + 一颗尝试按钮——与采集/炼制同形态）。[br]
+## [br][b]为什么挂屏幕自身[/b]：与商店/采集/传送/炼制 overlay 同层（都是全屏覆盖层）；
+## [b]冻结来源[/b]同样用自建 [NodePopupStage]（保存的基线是「突破面板打开前」）。[br]
+## [br][b]键盘路径[/b]：由面板自己的 [code]_input[/code] 消费方向键/确认/取消，
+## 冻结只需挡住节点图的键盘走位。
+static func _mount_meditation_presenter(p_host: Control, p_renderer: Control,
+		p_viewport: Control, p_es: Node, p_interactor: Variant) -> RefCounted:
+	if p_interactor == null or not (p_interactor is Control):
+		return null
+	var stage: RefCounted = NodePopupStageScript.new()
+	stage.call(&"bind", p_host, p_renderer, p_viewport)
+	var presenter: RefCounted = MeditationNodePresenterScript.new()
 	presenter.call(&"attach", p_es, p_interactor, p_host, _notification_sink(p_host),
 			_freeze_of(stage, p_interactor, true), _freeze_of(stage, p_interactor, false))
 	return presenter

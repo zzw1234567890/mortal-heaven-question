@@ -3,8 +3,29 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 炼丹台/炼器台消耗端最小闭环（配方清单 + 扣料入库）；下一步 其余 5 事件按策划意图补 min_realm 分层
+Task: 打坐/洞府境界突破（扣修为 + 升境界 + 属性重算落盘）；下一步 打坐节点的「连续失败保护」与策划定档成功率
 <!-- /STATUS -->
+
+## Session Extract — 打坐/洞府境界突破与修为消费（2026-11-14）
+- 任务：① 打坐/洞府节点——到达后可用当前修为尝试突破下一境界（读既有境界配置表、不硬编码等级与所需修为），成功率与加成按配置算、随机源可注入；② 成功扣修为 + 升境界 + 属性按配置重算并落盘 + 中文提示；失败按配置扣部分修为、境界不变、提示写清损失；任何情况下修为不落负；③ 测试覆盖成功扣费升境界且属性变化 / 修为不足拒绝且状态不变 / 失败按配置扣费不升境界 / 修为不被扣成负 / 同种子同结果
+- **「不硬编码所需修为」与「既有表 12 键被锁死」的冲突（本轮核心决策）**：`realm_table` 每境界恰好 12 个键，被 `test_realm_table_query.gd::test_ac002_realm_table_has_five_realms_ten_properties` 逐字锁定 → **无法往表里加突破键**。解法是拆两张表：所需修为 / 境界名 / 最高境界数从 `RealmSystem.realm_table` **读**（`ExplorationBreakthroughTable.required_cultivation/realm_name/max_realm`），只有成功率与失败惩罚比例放进新表 `SUCCESS_RATE_BY_REALM` / `FAILURE_PENALTY_RATIO_BY_REALM` ——既有 12 键一字未动，零测试破坏；「加成」同样是既有表的查询值（`get_realm_property`），突破后自动生效
+- **已登记的设计缺口**：GDD `cultivation-system.md` §边界/§调优参数只写「突破失败修为损失 10%」，**没有**无渡劫打坐突破的成功率规格；`exploration-system.md` §节点类型一览也没有打坐/洞府类型。按项目既有处置方式（`LING_CAI_CAP = 99` / `COLLECTION_CAP = 300` 同源）取一组可测默认值并显式登记在表文件文档：`SUCCESS_RATE_BY_REALM = [0.90, 0.80, 0.70, 0.60, 0.0]`（逐级递减，末档占位 0.0）、`FAILURE_PENALTY_RATIO_BY_REALM = [0.10 × 4, 0.0]`（**刻意不等于**渡劫撤退的 15%——两者是不同事件）。策划定档后只改这一个文件
+- **惩罚基数取 `max_cultivation` 而非当前修为**（与 `TribulationSettlement.handle_failure` 同口径）：以当前修为为基数会让「压着修为不攒满」变成省钱策略，惩罚失去意义
+- **修为写入沿用渡劫先例，不新开 GSM 第二层 API**：GSM 既有的修为写入口（`add_cultivation` / `restore_action_points`）**全是只增不减**；扣修为的既有先例是 `tribulation_settlement.gd` 的直接写 `player.cultivation` + `_buffer_change("player.cultivation", old, new)`。`ExplorationBreakthrough._write_cultivation` 照此办理，并用 `maxi(..., 0)` 保证**永不落负**；所有拒绝路径（境界已满 / 修为不足 / 配置缺失 / 系统不可用）**全在任何写入之前**返回，且 `rolled = false`（据此与「掷骰失败」区分）
+- **属性重算走既有单写者链，不另开第二条通路**：`RealmSystem.realm_up(old)` → `GSM.change_realm` → `realm_changed`（Cat 1，帧末）→ `CultivationSystem.update_max_cultivation`（`BASE_MAX × 1.5^(L-1)`）+ `settle_overflow`。本模块**不自己算 max_cultivation**；`attributes_of(L)` 只是对 `get_realm_property` 做快照供 UI/测试断言「属性按配置重算」
+- **半成品防护**：`realm_up` 通道不可用（或调用后 GSM 境界未变）时把已扣的修为**原样退回**，不留「扣了修为没升境界」——同商店「卡没到就把灵石退回」口径
+- **可重复尝试**：本节点不记「本节点已用过」——失败后修为还够就能再冲（这正是失败惩罚存在的意义；对比采集点的「同槽位只此一次」）
+- **新增 Feature 层三件**：`exploration_breakthrough_table.gd`（142，配置读取面 + 全部中文文案单点）、`exploration_breakthrough_status.gd`（200，只读半边——status / attributes_of / 结果形状 / 系统接入 / RNG 实例）、`exploration_breakthrough.gd`（160，写半边——校验→掷骰→扣修为→升境界）。`exploration_system_forward.gd` 加 `breakthrough_status` / `attempt_breakthrough` / `breakthrough_attributes` 三个转发（拆出两半正是为了守 300 行）
+- **随机源可注入**：`var rng: RandomNumberGenerator` 注入优先（测试固定种子 → 同种子同结果），否则 `rng_instance()` 自建 + `randomize()`（生产）。Autoload 侧入口 `ExplorationSystem.breakthrough_rng`——**须在首次 `attempt_breakthrough` 之前注入**（子模块首次取用时读取一次）
+- **节点类型新增**：`NodeType.MEDITATION = 13`；权重表三处同源加 `"meditation": 6`（`exploration_system_helpers.gd` 的 4 个 `DIFFICULTY_CONFIGS` + `exploration_map_catalog.gd` 的 `_difficulty_defaults` + `exploration_dag_builder.gd` 回退字面量）+ `_string_to_node_type` 映射 + `exploration_dag_content.gd` 的 `"洞府"` 标签。**副作用**（与前两轮同源）：新键改变 `_weighted_random` 的 total → 所有种子 DAG 重排；既有断言只锁区间/上限，全量跑完无 DAG 测试红
+- **图标图集**：`node_icon_atlas.gd` 的 `ATLAS_COLS` 13 → 14，新增类型 13（`label: 洞府`、`color: #5E7C8B`、`glyph: cave`）+ `_glyph_pixel` 的拱形洞口分支（上半圆拱顶 + 两侧壁，内腔留白 → 与采集点叶形、炼器台铁砧区分）。既有渲染测试只迭代 id 0..9，无枚举大小断言 → 未被破坏
+- **新增 UI 三件**：`meditation_panel_layout.gd`（79，委托 `ShopLayoutScript.build()`——尺寸/边距/焦点环同一处）、`meditation_panel_screen.gd`（247，`_input` 级导航复用 `ShopPanelNavigator`；状态行是 `Label` 不是 `Button` → 游标天然跳过，键盘不会停在纯文本上）、`meditation_node_presenter.gd`（226，消费交互组件转发里的 `meditation`，**只认 success 才发 HUD 提示**，失败文案留在面板上）
+- **打坐为什么不进 `DISPATCH_TABLE`**：与采集/炼制/传送同源——到达即上架「突破状态 + 一颗尝试按钮」（可反复按），中间再插确认框等于让玩家为同一件事点两次。`node_interaction_rules.gd` **只加文档说明，未加键**（宿主收到 `meditation` 直接返回，不开空弹窗）
+- **`node_graph_screen.gd` 收在 300 行内**：加 `meditation_presenter()` 访问器后越界，靠合并类文档与字段注释段落压回 300（访问器契约逐字不变，未删未改名任何既有测试）
+- 测试：新增 `tests/unit/exploration_system/breakthrough_fixture.gd`（97，共享装置——GSM 快照还原 + 种子扫描）、`test_exploration_breakthrough.gd`（320，19 例：五条点名验收各 2–3 例 + 配置读取面 5 例；**种子从 0 起扫描而非写死字面量**——改配置档位不会让用例失效）、`tests/integration/exploration_ui/test_meditation_node_flow.gd`（275，9 例端到端：到达上架且无确认弹窗 / 按钮文案含配置的成功率与所需修为 / 冻结 / 点击扣修为升境界并回填文案 / 刷新到新境界 / 修为不足禁用按钮且游标无处可停 / 失败扣惩罚不升境界且不发 HUD 提示 / 离开解冻不回退 / 零尝试不改状态）
+- 全量：**4355 tests / 4354 passing / 1 pending 存量 / 3 orphans 存量**，零失败、零回归（4327 → 净增 28，全过）
+- 遗留：① 打坐突破**无「连续失败保护」**——渡劫台的保底机制（`consecutive_tribulation_failures`）未延伸到本节点；② 成功率与惩罚比例为**本表默认值**（策划未定档，见上）；③ `cultivation_full` 标记在突破扣修为后未被重算（GSM 的 `add_cultivation` 会在满仓时置 true，扣减路径不置 false——既有渡劫失败路径同此）；④ 洞府节点与渡劫台的功能重叠边界只在两边类文档写明，无测试锁定
+- Next recommended: 打坐节点的连续失败保护（或明确不设）；其余 5 事件按策划意图补 min_realm 分层；策划定档突破成功率后只改 `exploration_breakthrough_table.gd`
 
 ## Session Extract — 炼丹台/炼器台消耗端最小闭环（2026-11-14）
 - 任务：① 炼丹台/炼器台节点——到达列出可炼配方（读既有配方资源）、每行显示所需材料与持有量、材料不足行禁用 + 中文原因；② 炼成扣料 + 产物入收藏（走 GSM 原子写入口），失败（材料不足/收藏已满）不改任何状态 + 中文提示；③ 测试覆盖成功扣料入库 / 材料不足拒绝且状态不变 / 已满拒绝 / 重复炼制计数 / 配方清单与配方资源一致

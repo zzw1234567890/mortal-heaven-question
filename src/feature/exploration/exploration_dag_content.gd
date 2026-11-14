@@ -93,6 +93,10 @@ func _fill_one(p_detail: Dictionary, p_node_id: int, p_ntype: int,
 		_parent.NodeType.FORGE:
 			# 炼器台——同炼丹台：配方源在 [AlchemyRecipes]，快照只记标签。
 			p_detail["label"] = "炼器台"
+		_parent.NodeType.MEDITATION:
+			# 打坐/洞府——突破数值全在境界配置表与 [ExplorationBreakthroughTable]，
+			# 快照不复制一份（改配置后旧档的节点不会揣着过期成功率）。
+			p_detail["label"] = "洞府"
 		_parent.NodeType.ACTION_SPRING:
 			p_detail["label"] = "行动力泉"
 		_parent.NodeType.TELEPORT:

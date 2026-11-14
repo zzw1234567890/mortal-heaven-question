@@ -159,3 +159,44 @@ func craft_at_node(p_kind: StringName, p_index: int) -> Dictionary:
 ## 各品质档位的灵材持有量（面板顶部摘要——只读 ResourceSystem）。
 func craft_balance() -> Dictionary:
 	return _get_craft().call(&"balance")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 打坐 / 洞府（委托给 _breakthrough 子模块）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 打坐/洞府的突破状态——[b]只读[/b]，不修改任何状态。[br]
+## [br][b]返回[/b]：[code]{can_breakthrough, reason, message, realm, next_realm,
+## realm_name, next_realm_name, headline, cultivation, max_cultivation, required,
+## success_rate, penalty, at_max, action_text, status_lines}[/code]；文案已由
+## Feature 层格式化（UI 零数值计算）。[br]
+## [br][b]数值来自既有境界配置表[/b]：所需修为 / 境界名 / 最高境界全部读
+## [code]RealmSystem.realm_table[/code]，不硬编码等级与所需修为。[br]
+## [br]来源: design/gdd/cultivation-system.md §4/§6、[ExplorationBreakthrough]。
+func breakthrough_status() -> Dictionary:
+	return _get_breakthrough().call(&"status")
+
+
+## 尝试突破下一境界——无战斗的冲关（成功扣修为 + 升境界 + 属性按配置重算；
+## 失败按配置扣一部分修为、境界不变；任何情况下修为不落负）。[br]
+## [br][b]返回[/b]：[code]{success, reason, message, rolled, realm_before,
+## realm_after, cultivation_before, cultivation_after, spent, penalty,
+## attributes, cultivation_full}[/code]——[code]message[/code] 为面向玩家的中文
+## 提示（面板原样显示）。[br]
+## [br][b]拒绝路径[/b]（境界已满 / 修为不足 / 配置缺失 / 系统不可用）不改任何状态，
+## 且 [code]rolled=false[/code]（据此与「掷骰失败」区分）。[br]
+## [br][b]随机源[/b]：注入 [member breakthrough_rng] 优先（测试固定种子——
+## 同种子同结果），否则子模块自建随机实例。[br]
+## [br]来源: design/gdd/cultivation-system.md §6/§边界、ADR-0010 §realm_up 编排器。
+func attempt_breakthrough() -> Dictionary:
+	return _get_breakthrough().call(&"attempt")
+
+
+## 各属性在指定境界的取值（[code]realm_table[/code] 的只读查询快照）。[br]
+## [br][param p_level] 境界等级（1 炼气 … 5 化神）。[br]
+## [br][b]返回[/b]：[code]{max_cultivation, max_deploy, deck_limit, action_points,
+## card_pool_tier, gongfa_slots, fabao_slots}[/code]；境界不在表中时空字典。[br]
+## [br][b]用途[/b]：突破后「属性按配置重算」的实证面——UI 与测试都读它，
+## 不自己查表推算。[br]
+func breakthrough_attributes(p_level: int) -> Dictionary:
+	return _get_breakthrough().call(&"attributes_of", p_level)

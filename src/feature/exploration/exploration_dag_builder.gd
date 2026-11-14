@@ -118,7 +118,7 @@ func _repair_paths(p_graph: Dictionary, p_nodes_per_layer: Array, p_total_layers
 
 ## 加权随机分配节点类型——排除超限类型后重新加权。
 func _assign_node_types(all_nodes: Array, nodes_per_layer: Array, config: Dictionary, total_layers: int) -> Dictionary:
-	var weights: Dictionary = config.get("weights", {"combat": 40, "event": 30, "shop": 15, "rest": 10, "harvest": 10, "alchemy": 8, "forge": 8, "elite": 5})
+	var weights: Dictionary = config.get("weights", {"combat": 40, "event": 30, "shop": 15, "rest": 10, "harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5})
 	var max_elite: int = int(config.get("elite_count", 2))
 	var max_shop: int = int(config.get("shop_count", 1))
 	var elite_assigned: int = 0
@@ -175,5 +175,6 @@ func _string_to_node_type(type_str: String) -> int:
 		"harvest": return _parent.NodeType.HARVEST
 		"alchemy": return _parent.NodeType.ALCHEMY
 		"forge": return _parent.NodeType.FORGE
+		"meditation": return _parent.NodeType.MEDITATION
 		"elite": return _parent.NodeType.ELITE
 		_: return _parent.NodeType.COMBAT

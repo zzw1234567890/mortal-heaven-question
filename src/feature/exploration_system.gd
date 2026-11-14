@@ -167,6 +167,13 @@ func resolve_node(node_id: int) -> void:
 					[node_id, &"teleport", {"targets": targets}])
 		NodeType.TRIBULATION:
 			_emit_safe(&"node_interaction_triggered", [node_id, &"tribulation", {}])
+		NodeType.MEDITATION:
+			# 打坐/洞府——载荷带当前突破状态（能否突破 / 所需修为 / 成功率 /
+			# 失败代价），由境界配置表现算；面板不必再查一次同一件事
+			# （同采集点/传送的载荷口径）。
+			_emit_safe(&"node_interaction_triggered",
+					[node_id, &"meditation",
+					{"status": _get_breakthrough().call(&"status")}])
 		NodeType.ENTRY:
 			pass  # 入口无交互
 

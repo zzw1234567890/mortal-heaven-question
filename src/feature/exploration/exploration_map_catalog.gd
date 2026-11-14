@@ -278,5 +278,5 @@ static func _difficulty_defaults(p_difficulty: int) -> Dictionary:
 	var config: Dictionary = (DIFFICULTY_DEFAULTS[index] as Dictionary).duplicate(true)
 	config["difficulty"] = index
 	config["weights"] = {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-			"harvest": 10, "alchemy": 8, "forge": 8, "elite": 5}
+			"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5}
 	return config
