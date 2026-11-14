@@ -91,8 +91,10 @@ var _interaction_mount: RefCounted = null
 var _reveal_animator: RefCounted = null
 ## 事件节点弹出器（见 [EventNodePresenter]）。
 var _event_presenter: RefCounted = null
-## 商店 overlay / 回复提示接线（见 [ShopNodePresenter]——消费弹窗宿主的确认信号）。
+## 商店 overlay / 回复/灵泉提示接线（见 [ShopNodePresenter]——消费弹窗宿主的确认信号）。
 var _shop_presenter: RefCounted = null
+## 传送选层 overlay 接线（见 [TeleportNodePresenter]——B5 裁决下传送不进弹窗分发表）。
+var _teleport_presenter: RefCounted = null
 
 
 func _ready() -> void:
@@ -123,6 +125,13 @@ func is_using_stub_source() -> bool:
 ## 不依赖私有成员名。
 func shop_presenter() -> Variant:
 	return _shop_presenter
+
+
+## 传送选层接线组件（见 [TeleportNodePresenter]）——未挂载时为 null。[br]
+## [b]公开入口[/b]：集成测试与后续 story 经此断言/驱动传送 overlay，
+## 不依赖私有成员名。
+func teleport_presenter() -> Variant:
+	return _teleport_presenter
 
 
 ## 触发地图加载。[br]
@@ -168,6 +177,7 @@ func _mount_components(es: Node) -> void:
 	_interaction_mount = parts.get("interaction_mount")
 	_event_presenter = parts.get("event_presenter")
 	_shop_presenter = parts.get("shop_presenter")
+	_teleport_presenter = parts.get("teleport_presenter")
 
 
 ## 键盘焦点转发——渲染器绘制松石青焦点环（ADR-0031 §4 双焦点双视觉）。

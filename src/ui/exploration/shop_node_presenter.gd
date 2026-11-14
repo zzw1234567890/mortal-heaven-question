@@ -11,6 +11,9 @@ extends RefCounted
 ## [br][b]回复流程[/b]：[code]popup_host.rest_used[/code]（玩家点了「休息」）——
 ## 回血量已由宿主经探索系统 API 结算完毕，本类只把系统返回值变成一句提示；
 ## 不再自己算一遍（UI 零数值计算）。[br]
+## [br][b]灵泉流程[/b]：[code]popup_host.spring_used[/code]（玩家点了「使用灵泉」）
+## ——行动力已由 [code]ExplorationSystem.use_action_spring[/code] 回复并夹到上限，
+## 本类同样只把返回值变成一句提示（回复量 0 = 已满，走另一句文案）。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：本类不写任何玩法数据——扣费与入收藏
 ## 全在 [code]ExplorationShop[/code]，回血全在 [code]ExplorationSystem.rest_at_node[/code]。
 ## [br][br][b]提示出口[/b]：注入 [code]notify_cb[/code]（HUD 通知区域）；未注入时
@@ -39,6 +42,9 @@ const ShopScript := preload("res://src/feature/exploration/exploration_shop.gd")
 ## 回复点提示文案（空回复量走另一句——「回复 0 点」读起来像 bug）。
 const TEXT_REST_HEALED: String = "歇脚处：全队回复 %d 点生命"
 const TEXT_REST_FULL: String = "歇脚处：全队安然无恙"
+## 灵泉提示文案（回复量为 0 时走「已满」——满行动力时不该显示「回复 0 点」）。
+const TEXT_SPRING_RESTORED: String = "灵泉：回复 %d 点行动力"
+const TEXT_SPRING_FULL: String = "灵泉：行动力已满"
 ## 提示类型（HUD 通知区域色档——green = 获得/正向）。
 const NOTIFY_TYPE: String = "green"
 
@@ -91,6 +97,10 @@ func attach(p_exploration_system: Object, p_popup_host: Control, p_host: Control
 	if _popup_host.has_signal(&"rest_used") \
 			and not _popup_host.is_connected(&"rest_used", rest_handler):
 		_popup_host.connect(&"rest_used", rest_handler)
+	var spring_handler := Callable(self, &"_on_spring_used")
+	if _popup_host.has_signal(&"spring_used") \
+			and not _popup_host.is_connected(&"spring_used", spring_handler):
+		_popup_host.connect(&"spring_used", spring_handler)
 	var closed_handler := Callable(self, &"_on_popup_closed")
 	if _popup_host.has_signal(&"popup_closed") \
 			and not _popup_host.is_connected(&"popup_closed", closed_handler):
@@ -237,6 +247,14 @@ func _release_freeze() -> void:
 ## [br][b]探索系统缺失[/b]（stub 降级）：宿主返回 0，同样走无恙文案，不臆造数值。
 func _on_rest_used(_p_node_id: int, p_healed: int) -> void:
 	_emit_hint(TEXT_REST_HEALED % p_healed if p_healed > 0 else TEXT_REST_FULL)
+
+
+## 灵泉确认——提示系统结算出的行动力回复量（宿主已调 API，本类不重算）。[br]
+## [br][b]回复量 0[/b] 走「行动力已满」文案（满行动力是常态——每次路过灵泉都会
+## 撞上；「回复 0 点行动力」读起来像故障）。[br]
+## [br][b]探索系统缺失[/b]（stub 降级）：宿主返回 0，同样走已满文案，不臆造数值。
+func _on_spring_used(_p_node_id: int, p_restored: int) -> void:
+	_emit_hint(TEXT_SPRING_RESTORED % p_restored if p_restored > 0 else TEXT_SPRING_FULL)
 
 
 ## 发一句提示——注入出口优先；未注入时只留痕（不把缺 UI 变成崩溃）。

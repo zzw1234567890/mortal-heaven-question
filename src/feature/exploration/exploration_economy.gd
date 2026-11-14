@@ -26,8 +26,7 @@ func calculate_reentry_cost(map_id: StringName) -> int:
 	# 永久免费地图——始终 0
 	if _parent.get("PERMANENT_FREE_MAPS").has(map_id):
 		return 0
-	var stored_count: int = _parent.call("_get_entry_count", map_id)
-	var entry_count: int = stored_count + 1  # 本次进入的序号（1=首次, 2=第二次, ...）
+	var entry_count: int = _parent.call("_get_entry_count", map_id) + 1  # 本次进入的序号（1=首次, 2=第二次, ...）
 	# 首次进入免费
 	if entry_count <= 1:
 		return 0
@@ -35,10 +34,23 @@ func calculate_reentry_cost(map_id: StringName) -> int:
 	var config: Dictionary = _parent.call("_get_map_config", map_id, _parent.call("_get_player_realm"))
 	var difficulty: int = _get_difficulty_from_config(config)
 	var base: int = _parent.get("REENTRY_BASE_COSTS")[difficulty]
-	# multiplier = min(1.0 + (entry_count - 2) * 0.5, 3.0)
-	var multiplier: float = 1.0 + (entry_count - 2) * 0.5
-	multiplier = minf(multiplier, 3.0)
-	return int(floor(base * multiplier))
+	return int(floor(base * reentry_multiplier(map_id)))
+
+
+## 重入次数倍率（GDD §公式 10）——[code]min(1.0 + (序号-2) × 0.5, 3.0)[/code]。[br]
+## [br][param map_id] 地图 ID。[br]
+## [br][b]返回[/b]：倍率（首入与第二次进入为 1.0，此后每次 +0.5，上限 3.0）。[br]
+## [br][b]为什么单独暴露[/b]：地图选择界面的费用明细要拆开展示「基础价 × 倍率」
+## （[code]TEXT_COST_DETAIL[/code]）——倍率若只内联在费用里，UI 侧就得自己再推一遍
+## 公式（UI 零数值计算，control-manifest）。[br]
+## [br][b]与费用同一处实现[/b]：[method calculate_reentry_cost] 调本方法，
+## 明细与总额不会各算一套。[br]
+## [br]来源: GDD exploration-system.md §公式 10 + §地图重入消耗规则。
+func reentry_multiplier(map_id: StringName) -> float:
+	var entry_count: int = _parent.call("_get_entry_count", map_id) + 1
+	if entry_count <= 2:
+		return 1.0
+	return minf(1.0 + (entry_count - 2) * 0.5, 3.0)
 
 
 ## 计算地图通关奖励（GDD §公式 5+6）。[br]

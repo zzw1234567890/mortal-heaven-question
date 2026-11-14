@@ -169,6 +169,15 @@ var _map_flush: RefCounted = null
 ## 回复点结算子模块（GDD §公式 7——全队回复 50% 已损失 HP）。
 var _rest: RefCounted = null
 
+## 行动力泉结算子模块（GDD §节点类型一览——回复全部行动力）。
+var _action_spring: RefCounted = null
+
+## 传送子模块（目标层解锁判定 + 跨层跳转执行）。
+var _teleport: RefCounted = null
+
+## 地图选择列表载荷组装子模块（探明表 × GSM → 卡片条目）。
+var _map_list: RefCounted = null
+
 
 # === 通用助手 ====================================================================
 
@@ -256,3 +265,25 @@ func _get_rest() -> RefCounted:
 	if _rest == null:
 		_rest = preload("res://src/feature/exploration/exploration_rest.gd").new(self)
 	return _rest
+
+
+## 获取行动力泉结算子模块实例（GDD §节点类型一览——回复全部行动力）。
+func _get_action_spring() -> RefCounted:
+	if _action_spring == null:
+		_action_spring = preload(
+				"res://src/feature/exploration/exploration_action_spring.gd").new(self)
+	return _action_spring
+
+
+## 获取传送子模块实例（目标层解锁判定 + 跨层跳转执行）。
+func _get_teleport() -> RefCounted:
+	if _teleport == null:
+		_teleport = preload("res://src/feature/exploration/exploration_teleport.gd").new(self)
+	return _teleport
+
+
+## 获取地图列表组装子模块实例（探明表 × GSM → 卡片条目）。
+func _get_map_list() -> RefCounted:
+	if _map_list == null:
+		_map_list = preload("res://src/feature/exploration/exploration_map_list.gd").new(self)
+	return _map_list

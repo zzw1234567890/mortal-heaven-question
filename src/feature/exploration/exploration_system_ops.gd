@@ -112,6 +112,64 @@ func get_total_layers() -> int:
 	return int(_node_details.keys().max()) / 100 + 1
 
 
+## 地图列表载荷——[MapSelectScreen] 的唯一数据源（探明表 × GSM → 卡片条目）。[br]
+## [br][b]为什么不硬编码[/b]：地图清单来自探明表 [code]ExplorationMapCatalog.MAPS[/code]
+## 的键、解锁门槛来自该表 [code]unlock_realm[/code]、重入费用来自
+## [ExplorationEconomy] 的既有公式——本层只转发，组装见 [ExplorationMapList]。[br]
+## [br][b]返回[/b]：条目数组（字段口径见该类文档「条目契约」）；探明表为空时空数组
+## （调用方按空列表渲染，不臆造占位地图）。[br]
+## [br][b]只读[/b]：不修改任何状态——UI 每信号周期现取（ADR-0031 §2）。[br]
+## [br]来源: ADR-0014 §get_map_list 契约、GDD exploration-system.md §1/§8。
+func get_map_list() -> Array:
+	return _get_map_list().call(&"build")
+
+
+## 行动力泉结算——行动力回复至上限（夹到上限），返回实际回复量。[br]
+## [br][b]唯一入口[/b]：UI 侧 [code]NodePopupServices.use_spring[/code] 调本方法，
+## 面板只显示返回值（UI 零数值计算）。实现见 [ExplorationActionSpring]。[br]
+## [br][param p_node_id] 灵泉节点 ID（透传——实现侧只用于日志）。[br]
+## [br][b]返回[/b]：实际回复量（已满 / GSM 写回入口缺失时为 0）。[br]
+## [br]来源: GDD exploration-system.md §节点类型一览 + §8 边界、exploration-ui §4。
+func use_action_spring(p_node_id: int) -> int:
+	return int(_get_action_spring().call(&"use_action_spring", p_node_id))
+
+
+## 传送可跳转层列表——[b]只读[/b]，不修改任何状态。[br]
+## [br][param p_node_id] 当前传送节点 ID。[br]
+## [br][b]返回[/b]：[code][{layer, node_ids}][/code] 按层升序；空数组表示传送节点
+## 不可激活（GDD §8 边界：目标层均未解锁）。[br]
+## [br]来源: GDD exploration-system.md §4 移动规则 + §8 边界、[ExplorationTeleport]。
+func teleport_targets(p_node_id: int) -> Array:
+	return _get_teleport().call(&"targets_from", p_node_id)
+
+
+## 传送到目标节点——0 行动力跨层跳转。[br]
+## [br][param p_node_id] 当前传送节点 ID。[br]
+## [param p_target_id] 目标节点 ID（须在 [method teleport_targets] 的列表内）。[br]
+## [br][b]返回[/b]：[code]{success, reason, ap_remaining}[/code]（与
+## [method move_to_node] 同形——UI 失败反馈共用一套 reason 文案）。[br]
+## [br]来源: GDD exploration-system.md §节点类型一览（传送 0 行动力）+ §8 边界。
+func teleport_to_node(p_node_id: int, p_target_id: int) -> Dictionary:
+	return _get_teleport().call(&"teleport_to_node", p_node_id, p_target_id)
+
+
+## 按层传送——落在该层的首个可跳节点上（[param p_layer] 为 0 基层索引）。[br]
+## [br][b]为什么有这个重载[/b]：传送面板让玩家选的是[b]层[/b]而不是节点，
+## 「层内选哪个落点」是 Feature 层的口径（UI 零数值计算）——UI 报层号，本方法
+## 落到节点再走 [method teleport_to_node] 的同一条执行链。[br]
+## [br][b]返回[/b]：同 [method teleport_to_node]；该层不可跳时 reason 为
+## 「目标层未解锁」（与逐节点路径同一套拒绝文案）。[br]
+## [br]来源: GDD exploration-system.md §4 移动规则、[ExplorationTeleport]。
+func teleport_to_layer(p_node_id: int, p_layer: int) -> Dictionary:
+	var target_id: int = int(_get_teleport().call(
+			&"target_node_of_layer", p_node_id, p_layer))
+	if target_id < 0:
+		var gsm: Node = _get_gsm()
+		var ap: int = int(gsm.exploration.get("action_points", 0)) if gsm != null else 0
+		return {"success": false, "reason": "目标层未解锁", "ap_remaining": ap}
+	return teleport_to_node(p_node_id, target_id)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 统一标记入口
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -189,72 +247,3 @@ func get_node_graph() -> Dictionary:
 ## 返回当前节点详情（测试桩）。
 func get_node_details() -> Dictionary:
 	return _node_details
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 子模块转发（经济 / 结算刷新 / 回复点）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-## 计算地图重入传送费——委托给 _economy 子模块。
-func calculate_reentry_cost(map_id: StringName) -> int:
-	return _get_economy().calculate_reentry_cost(map_id)
-
-
-## 计算地图通关奖励——委托给 _economy 子模块。
-func calculate_map_clear_rewards(map_id: StringName, is_first_clear: bool, player_realm: int, map_max_realm: int) -> Dictionary:
-	return _get_economy().calculate_map_clear_rewards(map_id, is_first_clear, player_realm, map_max_realm)
-
-
-## 境界差额惩罚系数——委托给 _economy 子模块。
-func realm_gap_penalty(player_L: int, map_max_L: int) -> float:
-	return _get_economy().realm_gap_penalty(player_L, map_max_L)
-
-
-## 收集资源——委托给 _map_flush 子模块（Sprint 12 Story 011 拆分）。
-func collect_resource(resource_type: StringName, amount: int) -> void:
-	_get_map_flush().collect_resource(resource_type, amount)
-
-
-## 回复点结算——全队回复 50% 已损失 HP（GDD §公式 7），返回实际回复量。[br]
-## [br][b]唯一入口[/b]：UI 侧 [code]NodePopupServices.rest_party[/code] 调本方法，
-## 面板只显示返回值（UI 零数值计算）。效果实现见 [ExplorationRest]。[br]
-## [br][param p_node_id] 回复点节点 ID（透传——实现侧只用于日志）。[br]
-## [br][b]返回[/b]：实际回复总量（全队满血 / 无角色登记 HP / GSM 写回入口缺失时为 0）。[br]
-## [br]来源: GDD exploration-system.md §公式 7 + §8 边界、exploration-ui-system.md §4c。
-func rest_at_node(p_node_id: int) -> int:
-	return int(_get_rest().call(&"rest_at_node", p_node_id))
-
-
-## 将 map_states[map_id] 中的 collected_* 转移到 GSM player.* 域——委托给 _map_flush 子模块。
-func _flush_map_state(map_id: StringName) -> void:
-	_get_map_flush()._flush_map_state(map_id)
-
-
-## 战败结算——委托给 _map_flush 子模块。
-func _flush_map_state_half_cultivation(map_id: StringName) -> void:
-	_get_map_flush()._flush_map_state_half_cultivation(map_id)
-
-
-## 探索结束结算——委托给 _map_flush 子模块（Sprint 12 Story 011 拆分）。
-func end_exploration(reason: int) -> Dictionary:
-	return _get_map_flush().end_exploration(reason)
-
-
-## 检查地图是否已通关——委托给 _map_flush 子模块。
-func _is_map_cleared(map_id: StringName) -> bool:
-	return _get_map_flush()._is_map_cleared(map_id)
-
-
-## 标记地图通关——委托给 _map_flush 子模块。
-func _mark_map_cleared(map_id: StringName) -> void:
-	_get_map_flush()._mark_map_cleared(map_id)
-
-
-## 获取玩家境界——委托给 _map_flush 子模块。
-func _get_player_realm() -> int:
-	return _get_map_flush()._get_player_realm()
-
-
-## 获取地图最高允许境界——委托给 _map_flush 子模块。
-func _get_map_max_realm(map_id: StringName) -> int:
-	return _get_map_flush()._get_map_max_realm(map_id)

@@ -58,72 +58,140 @@ const POOL_GUIYU: Array = [         # 归墟：鬼修 + 魔修
 ]
 
 ## 地图 ID 别名表——历史写法 → 规范写法。[br]
-## [br][b]规范写法以地图选择界面为准[/b]（[code]map_data_stub.gd[/code] 的卡片
-## 列表与 [constant MAPS] 的键）：章节表早期用的是「单词连写」风格
-## （[code]cang_xuan_zhengdao_meng[/code]），与地图选择的「逐词下划线」风格
-## （[code]cang_xuan_zheng_dao_meng[/code]）不一致。章节表已改为规范写法；
-## 本表保留旧写法的读取兼容（存档里的历史地图 ID、外部数据），并作为
-## [method canonical_id] 的唯一转换入口。[br]
-## [br][b]只收录「同一个地图的两种写法」[/b]——章节表里尚未在地图选择界面出现的
-## 地图（如 [code]wan_gu_dian[/code]）不在此表，它们是「未登记地图」，
-## 由难度档位兜底，不是命名冲突。
+## [br][b]规范写法以地图选择界面为准[/b]（[constant MAPS] 的键 = 地图卡片列表）：
+## 章节表早期用的是「单词连写」风格（[code]cang_xuan_zhengdao_meng[/code]），
+## 与地图选择的「逐词下划线」风格（[code]cang_xuan_zheng_dao_meng[/code]）不一致。
+## 章节表已改为规范写法；本表保留旧写法的读取兼容（存档里的历史地图 ID、外部数据），
+## 并作为 [method canonical_id] 的唯一转换入口。[br]
+## [br][b]只收录「同一个地图的两种写法」[/b]——未登记地图不在此表，它们是「未登记
+## 地图」，由难度档位兜底，不是命名冲突。[br]
+## [br]2026-11-13 补齐：章节表里此前只有 ID 没有配置的 7 张地图已登记进
+## [constant MAPS]（万古殿 / 碎星内海 / 西域边境 / 西域 / 归墟通道 / 归墟·万妖谷 /
+## 归墟·古魔战场），其章节旧写法一并进表。别名对（[code]旧名 → 规范名[/code]）
+## 不允许反向解析——[method canonical_id] 只做单向转换。
 const MAP_ID_ALIASES: Dictionary = {
 	&"cang_xuan_zhengdao_meng": &"cang_xuan_zheng_dao_meng",
 	&"cang_xuan_guzhanchang": &"cang_xuan_gu_zhan_chang",
 	&"suixing_waihuan": &"sui_xing_wai_huan",
+	&"suixing_neihai": &"sui_xing_nei_hai",
 	&"xiyu": &"xi_yu_gu_lin",
+	&"dajin_gulin": &"xi_yu_gu_lin",
+	&"dajin_bianjing": &"xi_yu_bian_jing",
+	&"yueguo_capital": &"yun_lan_cheng",
 	&"mulan_caoyuan": &"mu_lan_cao_yuan",
 	&"guixu_fuyun_lu": &"gui_xu_fu_yun_lu",
+	&"guixu_tongdao": &"gui_xu_tong_dao",
+	&"guixu_wanyao_gu": &"gui_xu_wan_yao_gu",
+	&"guixu_gumo_zhanchang": &"gui_xu_gu_mo_zhan_chang",
 }
 
-## 地图登记表——键为地图 ID（[b]规范写法[/b]：与地图选择界面一致）。[br]
-## [br][code]difficulty[/code] 为 MapDifficulty 枚举值（0=LOW … 3=VERY_HIGH）；
-## [code]enemy_realm[/code] 是该地图的敌人基准境界（GDD「敌人强度按地图本身
-## 境界设定」）；[code]max_realm[/code] 是该地图允许的最高玩家境界（通关奖励
-## 的境界差额惩罚读它）。[br]
+## 地图登记表（[b]「探明表」[/b]）——键为地图 ID（[b]规范写法[/b]：与地图选择界面一致）。[br]
+## [br][b]这是「有哪些地图」的唯一真理来源[/b]：地图选择列表（
+## [code]ExplorationSystem.get_map_list[/code]）按本表的键逐条出卡片，章节表按
+## [method canonical_id] 落到本表的键上——两侧不再各存一份地图清单。[br]
+## [br][code]name[/code] 是面向玩家的中文名；[code]difficulty[/code] 为 MapDifficulty
+## 枚举值（0=LOW … 3=VERY_HIGH，卡片 ⭐ 数取 +1）；[code]unlock_realm[/code] 是
+## 解锁所需玩家境界（GDD §8「该境界突破后所有地图一次性解锁」）；
+## [code]max_realm[/code] 是该地图允许的最高玩家境界（通关奖励的境界差额惩罚读它）；
+## [code]enemy_realm[/code] 是该地图的敌人基准境界（GDD「敌人强度按地图本身境界
+## 设定」）。[br]
+## [br][code]reentry_allowed[/code] 缺省 [code]true[/code]，只有苍玄古战场显式写
+## [code]false[/code]（GDD §8「剧情地图，通关后不可重入」）——缺省值由读取方
+## [code].get(key, true)[/code] 承担，表里不写满。[br]
+## [br][b]难度档取值口径[/b]：[code]difficulty[/code] 取
+## [code]design/assets/specs/map-card-illustrations-assets.md[/code]（ASSET-211~227，
+## 逐张标注「境界·难度」）——它是唯一覆盖全部 17 张地图的逐图规格。
+## [code]design/gdd/exploration-system.md[/code] §地图重入消耗规则的重入基价表与之
+## 在个别地图上不一致（如归墟·浮云陆：GDD 表作「高」、现有登记作「极高」）——
+## 该分歧是存量（本次未改动既有 10 张的档位），不因本次登记而变大。[br]
 ## [br][b]命名口径[/b]：章节表早期用连写 ID（[code]cang_xuan_zhengdao_meng[/code]），
 ## 地图选择用逐词下划线（[code]cang_xuan_zheng_dao_meng[/code]）——章节表已改为
 ## 规范写法，历史写法的读取兼容由 [constant MAP_ID_ALIASES] + [method
 ## canonical_id] 承担（见 [method config_for] 的入口规范化）。
 const MAPS: Dictionary = {
 	&"qing_yun_jian_zong": {
-		"difficulty": 0, "max_realm": 1, "enemy_realm": 1,
+		"name": "青云剑宗", "difficulty": 0, "unlock_realm": 1, "max_realm": 1,
+		"enemy_realm": 1,
 		"enemy_pool": POOL_LIANQI, "enemy_count_min": 1, "enemy_count_max": 2,
 	},
 	&"xue_yuan_mi_jing": {
-		"difficulty": 1, "max_realm": 1, "enemy_realm": 1,
+		"name": "血渊秘境", "difficulty": 1, "unlock_realm": 1, "max_realm": 1,
+		"enemy_realm": 1,
 		"enemy_pool": POOL_BLOOD, "enemy_count_min": 2, "enemy_count_max": 2,
 	},
 	&"yun_lan_cheng": {
-		"difficulty": 2, "max_realm": 2, "enemy_realm": 2,
+		"name": "云澜城", "difficulty": 2, "unlock_realm": 1, "max_realm": 2,
+		"enemy_realm": 2,
 		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 2, "enemy_count_max": 3,
 	},
 	&"dan_xia_gu": {
-		"difficulty": 3, "max_realm": 2, "enemy_realm": 2,
+		"name": "丹霞谷", "difficulty": 3, "unlock_realm": 1, "max_realm": 2,
+		"enemy_realm": 2,
 		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 3, "enemy_count_max": 4,
 	},
 	&"cang_xuan_zheng_dao_meng": {
-		"difficulty": 0, "max_realm": 2, "enemy_realm": 2,
+		"name": "苍玄正道盟", "difficulty": 0, "unlock_realm": 2, "max_realm": 2,
+		"enemy_realm": 2,
 		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 1, "enemy_count_max": 2,
 	},
 	&"cang_xuan_gu_zhan_chang": {
-		"difficulty": 1, "max_realm": 2, "enemy_realm": 2,
+		"name": "苍玄古战场", "difficulty": 1, "unlock_realm": 2, "max_realm": 2,
+		"enemy_realm": 2, "reentry_allowed": false,
 		"enemy_pool": POOL_GHOST, "enemy_count_min": 2, "enemy_count_max": 2,
 	},
 	&"sui_xing_wai_huan": {
-		"difficulty": 0, "max_realm": 2, "enemy_realm": 2,
+		"name": "碎星外环", "difficulty": 0, "unlock_realm": 1, "max_realm": 2,
+		"enemy_realm": 2,
 		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 1, "enemy_count_max": 2,
 	},
+	&"sui_xing_nei_hai": {
+		"name": "碎星内海", "difficulty": 1, "unlock_realm": 2, "max_realm": 2,
+		"enemy_realm": 2,
+		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 2, "enemy_count_max": 3,
+	},
+	&"wan_gu_dian": {
+		"name": "万古殿", "difficulty": 0, "unlock_realm": 3, "max_realm": 3,
+		"enemy_realm": 3,
+		"enemy_pool": POOL_GHOST, "enemy_count_min": 1, "enemy_count_max": 2,
+	},
 	&"xi_yu_gu_lin": {
-		"difficulty": 2, "max_realm": 3, "enemy_realm": 3,
+		"name": "西域古林", "difficulty": 2, "unlock_realm": 3, "max_realm": 3,
+		"enemy_realm": 3,
 		"enemy_pool": POOL_GHOST, "enemy_count_min": 2, "enemy_count_max": 3,
 	},
+	&"xi_yu_bian_jing": {
+		"name": "西域边境", "difficulty": 2, "unlock_realm": 3, "max_realm": 3,
+		"enemy_realm": 3,
+		"enemy_pool": POOL_BLOOD, "enemy_count_min": 2, "enemy_count_max": 3,
+	},
+	&"xi_yu": {
+		"name": "西域", "difficulty": 0, "unlock_realm": 4, "max_realm": 4,
+		"enemy_realm": 4,
+		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 1, "enemy_count_max": 2,
+	},
 	&"mu_lan_cao_yuan": {
-		"difficulty": 2, "max_realm": 4, "enemy_realm": 4,
+		"name": "慕兰草原", "difficulty": 2, "unlock_realm": 4, "max_realm": 4,
+		"enemy_realm": 4,
 		"enemy_pool": POOL_LIANQI, "enemy_count_min": 2, "enemy_count_max": 3,
 	},
+	&"gui_xu_tong_dao": {
+		"name": "归墟通道", "difficulty": 2, "unlock_realm": 4, "max_realm": 4,
+		"enemy_realm": 4,
+		"enemy_pool": POOL_GUIYU, "enemy_count_min": 2, "enemy_count_max": 3,
+	},
 	&"gui_xu_fu_yun_lu": {
-		"difficulty": 3, "max_realm": 5, "enemy_realm": 5,
+		"name": "归墟·浮云陆", "difficulty": 3, "unlock_realm": 5, "max_realm": 5,
+		"enemy_realm": 5,
+		"enemy_pool": POOL_GUIYU, "enemy_count_min": 3, "enemy_count_max": 4,
+	},
+	&"gui_xu_wan_yao_gu": {
+		"name": "归墟·万妖谷", "difficulty": 1, "unlock_realm": 5, "max_realm": 5,
+		"enemy_realm": 5,
+		"enemy_pool": POOL_LIANQI, "enemy_count_min": 2, "enemy_count_max": 3,
+	},
+	&"gui_xu_gu_mo_zhan_chang": {
+		"name": "归墟·古魔战场", "difficulty": 2, "unlock_realm": 5, "max_realm": 5,
+		"enemy_realm": 5,
 		"enemy_pool": POOL_GUIYU, "enemy_count_min": 3, "enemy_count_max": 4,
 	},
 }

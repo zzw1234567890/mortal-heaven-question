@@ -1,4 +1,4 @@
-extends "res://src/feature/exploration/exploration_system_ops.gd"
+extends "res://src/feature/exploration/exploration_system_forward.gd"
 ## ExplorationSystem —— 探索系统 Autoload（ADR-0014 #19）——[b]编排面[/b]。[br]
 ## [br]Feature 层 Autoload。程序化 DAG 地图生成 + 节点导航 + 子系统委托调度。[br]
 ## DAG 生成算法委托给 [ExplorationDAGBuilder]（RefCounted 子模块），[br]
@@ -8,13 +8,15 @@ extends "res://src/feature/exploration/exploration_system_ops.gd"
 ## [method enter_map]）、节点导航（[method move_to_node]）、节点交互分发
 ## （[method resolve_node]）、Autoload 生命周期钩子（[method _ready]）——
 ## 也就是「编排」这一件事。[br]
-## [br][b]继承链[/b]（`exploration_system.gd` 686 行 → 三段各守 300 行内，
+## [br][b]继承链[/b]（`exploration_system.gd` 686 行 → 四段各守 300 行内，
 ## 成员名与访问路径逐字不变——机械拆分、行为零改动）：[br]
 ##   1. [code]exploration_system_base.gd[/code]——枚举 / 常量 / 状态 / 注入点 /
 ##      子模块句柄 / 通用助手；[br]
-##   2. [code]exploration_system_ops.gd[/code]——Cat 2b 信号表 / 子模块转发 /
-##      只读查询 / DAG 缓存生命周期 / 测试桩；[br]
-##   3. 本文件——编排面（也是 project.godot 注册的那份脚本）。[br]
+##   2. [code]exploration_system_ops.gd[/code]——Cat 2b 信号表 / 只读查询 /
+##      DAG 缓存生命周期 / 统一标记入口 / 测试桩；[br]
+##   3. [code]exploration_system_forward.gd[/code]——子模块转发（经济 / 结算刷新 /
+##      回复点 / 灵泉）；[br]
+##   4. 本文件——编排面（也是 project.godot 注册的那份脚本）。[br]
 ## [br][b]为什么钩子在这一层[/b]：Godot 只调最派生类的 [code]_ready[/code]
 ## （实测父类的不会自动链式执行），故生命周期钩子统一放链尾，只此一份。[br]
 ## [br]来源: ADR-0014 §决策 2 程序化 DAG 生成 / GDD exploration-system.md §2-3。[br]
@@ -109,6 +111,9 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 ## [br]COMBAT/ELITE → combat_node_reached(enemy_roster, combat_type)[br]
 ## [br]BOSS → boss_node_reached(boss_data)[br]
 ## [br]SHOP/REST/ACTION_SPRING/TELEPORT/TRIBULATION → node_interaction_triggered(node_id, type, payload)[br]
+## [br][b]TELEPORT 载荷[/b]：多带一个 [code]targets[/code] 键（可跳转层列表，见
+## [method ExplorationTeleport.targets_from]）——传送节点不出弹窗（B5 裁决），
+## 但它需要一份「能跳到哪」的数据，随本次到达一次性下发比 UI 再查一次更省事。[br]
 ## [br]来源: ADR-0014 §决策 3 信号驱动子系统委托。
 func resolve_node(node_id: int) -> void:
 	# _dag_ready 守卫（ADR-0014 R7）
@@ -143,7 +148,11 @@ func resolve_node(node_id: int) -> void:
 		NodeType.ACTION_SPRING:
 			_emit_safe(&"node_interaction_triggered", [node_id, &"action_spring", {}])
 		NodeType.TELEPORT:
-			_emit_safe(&"node_interaction_triggered", [node_id, &"teleport", {}])
+			# 可跳转层列表随载荷下发——UI 不必再调系统查询同一件事
+			# （GDD §8 边界：目标层均未解锁时列表为空 = 传送节点不可激活）。
+			var targets: Array = _get_teleport().call(&"targets_from", node_id)
+			_emit_safe(&"node_interaction_triggered",
+					[node_id, &"teleport", {"targets": targets}])
 		NodeType.TRIBULATION:
 			_emit_safe(&"node_interaction_triggered", [node_id, &"tribulation", {}])
 		NodeType.ENTRY:
