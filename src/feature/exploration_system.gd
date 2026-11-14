@@ -42,12 +42,16 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 
 ## 节点导航——从 from_node 移动到 to_node。[br]
 ## [br][b]验证链路[/b]（短路求值）：可达性 → 已访问 → 行动力。[br]
-## [br][b]AP=0 豁免[/b]：传送/行动力泉/Boss 节点不消耗 AP，行动力不足时仍可移动。[br]
+## [br][b]AP 开销按地图配置[/b]：目标节点类型的开销经 [ExplorationApRules.cost_for]
+## 解析（[code]ap_cost[/code] / [code]ap_costs[/code] 配置键，缺键为 GDD 默认 1）；
+## 豁免类型（传送/灵泉/Boss）恒为 0，且 AP=0 时仍可移动。[br]
+## [br][b]拒绝不扣费[/b]：AP 不足时直接返回，[b]不写任何导航状态[/b]——
+## reason 为「行动力不足」，UI 据此给中文提示（不静默失败）。[br]
 ## [br][b]成功后[/b]：更新 GSM 导航状态 → 消耗 AP → 发射 node_moved → 调用 resolve_node。[br]
 ## [br][param from_node] 起始节点 ID。[br]
 ## [br][param to_node] 目标节点 ID。[br]
 ## [br][b]返回[/b]: [code]{success: bool, reason: String, ap_remaining: int}[/code] Dictionary。[br]
-## [br]来源: ADR-0014 §关键接口 + GDD §4 节点导航。
+## [br]来源: ADR-0014 §关键接口 + GDD §4 节点导航、GDD action-point-system.md §公式 3。
 func move_to_node(from_node: int, to_node: int) -> Dictionary:
 	var result: Dictionary = {"success": false, "reason": "", "ap_remaining": 0}
 
@@ -71,19 +75,16 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 		result["reason"] = "已访问"
 		return result
 
-	# 验证 3：行动力——非豁免节点 AP 不足时拒绝
-	var ap: int = int(gsm.exploration.get("action_points", 0))
-	var to_type: int = _get_node_type(to_node)
-	var is_exempt: bool = AP_EXEMPT_TYPES.has(to_type)
-	if ap < 1 and not is_exempt:
+	# 验证 3：行动力——按地图配置算开销，不足时拒绝（不写任何状态、不扣费）
+	# 越界存档值（负数）先夹到 0：豁免节点仍可移入，且 AP 永不落负。
+	var ap: int = maxi(int(gsm.exploration.get("action_points", 0)), 0)
+	var ap_cost: int = ap_cost_to(to_node)
+	if ap < ap_cost:
 		result["reason"] = "行动力不足"
 		return result
 
-	# 验证通过——执行移动
-	var ap_cost: int = 1
-	if is_exempt:
-		ap_cost = 0
-	var new_ap: int = ap - ap_cost
+	# 验证通过——执行移动（AP 永不落负：越界存档值先夹到 0 再扣）
+	var new_ap: int = maxi(ap - ap_cost, 0)
 
 	# 更新 GSM 导航状态（通过第二层方法——ADR-0014 §GSM 写入契约）
 	var to_layer: int = to_node / 100

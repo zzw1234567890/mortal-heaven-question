@@ -16,16 +16,23 @@ extends RefCounted
 ## 来源: GDD exploration-system.md §1/§3 步骤⑥/§7 回旧地图、ADR-0014 §决策 2、
 ## DEBT-EUI-006-3 / DEBT-EUI-006-5。
 
-## 难度档位 → 默认层数 / 节点数 / 敌人境界（与 ExplorationSystem.DIFFICULTY_CONFIGS 同构）。
+## 难度档位 → 默认层数 / 节点数 / 敌人境界（与 ExplorationSystem.DIFFICULTY_CONFIGS 同构）。[br]
+## [br][b]ap_cost[/b]：本档地图每次移动的行动力开销（GDD action-point-system.md
+## §调优参数「每格消耗 1，安全范围 1-2」——出厂全档为 1，键存在的意义是
+## 「按地图配置扣」走的是配置读取而不是硬编码常量；单独的地图可覆盖它）。[br]
 const DIFFICULTY_DEFAULTS: Array = [
 	{"layers": 4, "min_nodes": 2, "max_nodes": 3, "elite_count": 1, "shop_count": 1,
-		"enemy_realm": 1, "enemy_count_min": 1, "enemy_count_max": 2, "elite_bonus": 1},
+		"enemy_realm": 1, "enemy_count_min": 1, "enemy_count_max": 2, "elite_bonus": 1,
+		"ap_cost": 1},
 	{"layers": 5, "min_nodes": 2, "max_nodes": 4, "elite_count": 2, "shop_count": 1,
-		"enemy_realm": 2, "enemy_count_min": 2, "enemy_count_max": 3, "elite_bonus": 1},
+		"enemy_realm": 2, "enemy_count_min": 2, "enemy_count_max": 3, "elite_bonus": 1,
+		"ap_cost": 1},
 	{"layers": 5, "min_nodes": 3, "max_nodes": 4, "elite_count": 2, "shop_count": 2,
-		"enemy_realm": 3, "enemy_count_min": 2, "enemy_count_max": 3, "elite_bonus": 1},
+		"enemy_realm": 3, "enemy_count_min": 2, "enemy_count_max": 3, "elite_bonus": 1,
+		"ap_cost": 1},
 	{"layers": 6, "min_nodes": 3, "max_nodes": 4, "elite_count": 3, "shop_count": 2,
-		"enemy_realm": 4, "enemy_count_min": 3, "enemy_count_max": 4, "elite_bonus": 1},
+		"enemy_realm": 4, "enemy_count_min": 3, "enemy_count_max": 4, "elite_bonus": 1,
+		"ap_cost": 1},
 ]
 
 ## 敌人池——四类出厂模板（[code]assets/enemies/*.tres[/code]）：

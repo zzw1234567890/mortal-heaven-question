@@ -110,6 +110,40 @@ func test_restore_action_points_non_positive_rejected() -> void:
 	assert_eq(gsm.exploration.action_points, 5, "非正恢复量不应改变行动力")
 
 
+func test_restore_action_points_clamps_to_max() -> void:
+	## GDD action-point-system.md §8 边界：「使用丹药回复超过上限：回复时取
+	## min(current + amount, max_action_points)，不溢出」。
+	gsm.exploration.action_points = 4
+	gsm.exploration.max_action_points = 5
+	gsm.restore_action_points(3)
+	assert_eq(gsm.exploration.action_points, 5, "超出部分被夹掉，不写成 7/5")
+
+
+func test_restore_action_points_exact_fill_not_clamped_early() -> void:
+	## 恰好补满不得被少算——夹取是 min 不是「留一手」
+	gsm.exploration.action_points = 3
+	gsm.exploration.max_action_points = 5
+	gsm.restore_action_points(2)
+	assert_eq(gsm.exploration.action_points, 5, "3 + 2 = 5 恰好等于上限")
+
+
+func test_restore_action_points_without_max_does_not_clamp() -> void:
+	## 上限未知（0 = 尚未进入任何地图，gsm_serializer 出厂值）时不臆造上限
+	gsm.exploration.action_points = 1
+	gsm.exploration.max_action_points = 0
+	gsm.restore_action_points(2)
+	assert_eq(gsm.exploration.action_points, 3,
+			"上限 0 → 按原值累加（不拿 0 当上限把恢复吞掉）")
+
+
+func test_restore_action_points_overflowed_save_not_deducted() -> void:
+	## 越界存档值（已超上限）走同一条 min 口径 = 落到上限，不倒扣
+	gsm.exploration.action_points = 9
+	gsm.exploration.max_action_points = 5
+	gsm.restore_action_points(2)
+	assert_eq(gsm.exploration.action_points, 5, "越界值回落到上限，不倒扣为 2")
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # unlock_talent —— 解锁天赋（去重 append）
 # ═════════════════════════════════════════════════════════════════════════════

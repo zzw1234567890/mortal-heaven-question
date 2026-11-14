@@ -53,6 +53,11 @@ func _reset_gsm_state() -> void:
 	GameStateManager.collection.owned_cards.clear()
 	GameStateManager.collection.total_count = 0
 	GameStateManager.exploration.action_points = 0
+	# 上限也归零——restore_action_points 现在会夹到 max_action_points
+	# （GDD action-point-system.md §8 边界）；不归零的话本文件的 RESTORE_AP
+	# 断言会依赖前一个测试文件留下的上限，违反测试隔离性。0 = 上限未知，
+	# 与 gsm_serializer 的出厂值一致，此时不夹。
+	GameStateManager.exploration.max_action_points = 0
 	GameStateManager.narrative.current_chapter = ""
 	GameStateManager.narrative.completed_chapters.clear()
 	GameStateManager.narrative.story_flags.clear()
@@ -246,6 +251,25 @@ func test_ac006_restore_ap_writes_to_gsm() -> void:
 	# Assert —— exploration.action_points 应增加 2
 	assert_eq(GameStateManager.exploration.action_points, 2,
 			"RESTORE_AP(2) 应写入 GSM.exploration.action_points")
+
+
+func test_ac006_restore_ap_clamps_to_max_action_points() -> void:
+	## GDD action-point-system.md §8 边界：「使用丹药回复超过上限：回复时取
+	## min(current + amount, max_action_points)，不溢出」——事件恢复与丹药回复
+	## 走的是同一个 GSM 入口，故同样受夹取约束。
+	# Arrange —— 4/5，事件给 +3
+	GameStateManager.exploration.action_points = 4
+	GameStateManager.exploration.max_action_points = 5
+	var inst := _make_instance_with_outcomes([
+		_make_triggered_outcome(EventEnumsClass.OutcomeType.RESTORE_AP, "", 3),
+	])
+
+	# Act
+	es.apply_outcomes(inst)
+
+	# Assert —— 夹到上限而不是 7/5
+	assert_eq(GameStateManager.exploration.action_points, 5,
+			"RESTORE_AP 超出上限的部分被夹掉（4 + 3 → 5，不是 7）")
 
 
 # ============================================================================

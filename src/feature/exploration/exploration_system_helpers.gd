@@ -13,6 +13,9 @@ extends "res://src/feature/exploration/exploration_system_base.gd"
 
 # === 常量（留在继承链上——测试与子模块通过 es.get / _parent.get 访问）==========
 
+## 行动力开销规则（Feature 层规范副本——扣费与判定共用同一份解析）。
+const ApRules := preload("res://src/feature/exploration/exploration_ap_rules.gd")
+
 ## 默认地图难度配置表——按 MapDifficulty 枚举索引。[br]
 ## [br][code]enemy_realm[/code] 是节点敌人强度的定档基准（GDD「回旧地图」§7：
 ## 敌人强度按地图本身境界设定，不随玩家境界上涨）。缺键的地图配置会回退玩家
@@ -24,28 +27,36 @@ extends "res://src/feature/exploration/exploration_system_base.gd"
 ## 结果（确定性仍在，只是每张图长得不一样）。[br]
 ## [br][b]alchemy / forge 为本轮新增[/b]：炼丹台与炼器台的权重各 8——与采集点
 ## （10）同一量级，「探索路上偶遇一座丹炉」是偶发事件而非每图必得。[br]
+## [br][b]ap_cost[/b]：本档每次移动的行动力开销（GDD action-point-system.md
+## §调优参数「每格消耗 1，安全范围 1-2」）——出厂全档为 1，与
+## [code]exploration_map_catalog.gd[/code] 的 [code]DIFFICULTY_DEFAULTS[/code]
+## 同源；解析见 [code]exploration_ap_rules.gd[/code]。[br]
 const DIFFICULTY_CONFIGS: Array = [
 	{  # LOW
 		"layers": 4, "min_nodes": 2, "max_nodes": 3,
 		"elite_count": 1, "shop_count": 1, "event_count": 2, "enemy_realm": 1,
+		"ap_cost": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
 				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
 	{  # MEDIUM
 		"layers": 5, "min_nodes": 2, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 1, "event_count": 3, "enemy_realm": 2,
+		"ap_cost": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
 				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
 	{  # HIGH
 		"layers": 5, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 2, "shop_count": 2, "event_count": 3, "enemy_realm": 3,
+		"ap_cost": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
 				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
 	{  # VERY_HIGH
 		"layers": 6, "min_nodes": 3, "max_nodes": 4,
 		"elite_count": 3, "shop_count": 2, "event_count": 4, "enemy_realm": 4,
+		"ap_cost": 1,
 		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
 				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6, "elite": 5},
 	},
@@ -54,8 +65,13 @@ const DIFFICULTY_CONFIGS: Array = [
 ## 入口节点 ID——DAG 编码 [code]layer * 100 + idx[/code]，第 0 层 0 号。
 const ENTRY_NODE_ID: int = 0
 
-## AP=0 豁免节点类型集合——不消耗行动力且行动力不足时仍可移动。
-const AP_EXEMPT_TYPES: Array = [NodeType.TELEPORT, NodeType.ACTION_SPRING, NodeType.BOSS]
+## AP=0 豁免节点类型集合——不消耗行动力且行动力不足时仍可移动。[br]
+## [br][b]来源指向 [ExplorationApRules][/b]（Feature 层规范副本）：判定与扣费
+## 共用同一份豁免集合，两处各写一遍必然漂移（数值仍是 3=BOSS / 6=TELEPORT /
+## 7=ACTION_SPRING，与拆分前逐项相同）。[br]
+## [br][b]UI 侧另有一份数值副本[/b]（[code]NodeStateLogic.AP_EXEMPT_TYPES[/code]
+## ——headless 下不加载 Feature 层），由单测锁定两者同源。
+const AP_EXEMPT_TYPES: Array = ApRules.AP_EXEMPT_TYPES
 
 ## 永久免费地图列表——每个境界 1 张，重入始终免费（GDD §1 经济安全阀）。
 const PERMANENT_FREE_MAPS: Dictionary = {
@@ -173,6 +189,19 @@ func _is_reachable(from_node: int, to_node: int) -> bool:
 func _get_node_type(node_id: int) -> int:
 	var detail: Dictionary = _node_details.get(node_id, {})
 	return int(detail.get("type", NodeType.COMBAT))
+
+
+## 移动到 [param node_id] 的 AP 开销——按当前地图配置解析。[br]
+## [br][b]单一来源[/b]：[method move_to_node]（扣费）与 [method can_move_to]
+## （判定）都走本方法转发到 [ExplorationApRules.cost_for]——两处各解析一遍配置
+## 必然漂移（判定说能走、扣费扣不起）。[br]
+## [br][b]配置从哪来[/b]：[member _map_config] 是 [ExplorationDAGBuilder] 生成期
+## 写入的本图配置快照（[method ExplorationSystem.rebuild_dag_cache] 读档重建时
+## 为空 → 按 GDD 默认 1 处理，不臆造）。[br]
+## [br][param node_id] 目标节点 ID。[br]
+## [br][b]返回[/b]：非负整数开销（豁免类型恒为 0）。
+func ap_cost_to(node_id: int) -> int:
+	return ApRules.cost_for(_map_config, _get_node_type(node_id))
 
 
 # === 子模块获取（惰性初始化）===================================================

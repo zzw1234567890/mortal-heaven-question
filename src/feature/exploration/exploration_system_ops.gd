@@ -59,10 +59,12 @@ signal node_marked_visited(node_id: int, is_new: bool)
 
 ## 只读查询——验证从 from_node 是否可移动到 to_node。[br]
 ## [br][b]不修改任何状态[/b]——与 move_to_node() 分离（查询 vs 命令，ADR-0014 §关键接口）。[br]
+## [br][b]与扣费同一口径[/b]：AP 判定读 [method ap_cost_to]（按地图配置解析，
+## 豁免类型为 0）——判定与扣费若各写一套，会出现「查询说能走、移动扣不起」。[br]
 ## [br][param from_node] 起始节点 ID。[br]
 ## [br][param to_node] 目标节点 ID。[br]
 ## [br][b]返回[/b]: [code]true[/code] 可移动，[code]false[/code] 不可移动。[br]
-## [br]来源: ADR-0014 §关键接口 can_move_to。
+## [br]来源: ADR-0014 §关键接口 can_move_to、GDD action-point-system.md §公式 2 可移动判定。
 func can_move_to(from_node: int, to_node: int) -> bool:
 	# _dag_ready 守卫（ADR-0014 R7）
 	if not _dag_ready:
@@ -75,12 +77,9 @@ func can_move_to(from_node: int, to_node: int) -> bool:
 	var visited: Array = gsm.exploration.get("visited_nodes", [])
 	if visited.has(to_node):
 		return false
-	var ap: int = int(gsm.exploration.get("action_points", 0))
-	var to_type: int = _get_node_type(to_node)
-	var is_exempt: bool = AP_EXEMPT_TYPES.has(to_type)
-	if ap < 1 and not is_exempt:
-		return false
-	return true
+	# 越界存档值（负数）按 0 处理——与 move_to_node 的夹取一致
+	var ap: int = maxi(int(gsm.exploration.get("action_points", 0)), 0)
+	return ap >= ap_cost_to(to_node)
 
 
 ## 只读查询——当前地图总层数，从 DAG 缓存推导（hud Story 006 LP 跨域

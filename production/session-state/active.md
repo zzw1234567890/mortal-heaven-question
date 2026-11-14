@@ -3,8 +3,21 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 战斗内「行囊」入口（战斗回合内用丹药与法宝）；下一步 两界面的手柄实机核对 + 行囊条目的键盘/鼠标双路径实机验证
+Task: 行动力（AP）消耗闭环——移动按地图配置扣、不足拒绝且零写入、回复夹上限；下一步 灵泉/渡劫台等豁免节点的 UI 提示与 AP 上限的可视化核对
 <!-- /STATUS -->
+
+## Session Extract — 行动力消耗闭环（2026-11-14）
+- 任务：① 审计行动力现状（存哪、谁读写、各动作有无扣减）；② 节点间移动按**地图配置**扣 AP，不足时拒绝并给中文提示「行动力不足」（不静默失败）；③ 灵泉回复与上限夹取一致，不出现 AP 超上限；④ 单测/集成覆盖正常扣减、不足拒绝且不扣、回复夹上限；⑤ 单文件 ≤300 行；⑥ 全量零失败后提交
+- **审计结论**：AP 存在 `GSM.exploration.action_points` + `max_action_points`（持久化域，序列化默认 0）。**读**：`move_to_node` / `can_move_to` / `teleport_to_node`（仅透传 `ap_remaining`）/ `use_action_spring` / `node_graph_load_source`（`enter_map` 的 max_ap 取自 `RealmSystem.get_realm_property(realm,"action_points")`，L1=5…L5=13）/ HUD 两处。**写**：`move_to_node`（唯一扣减路径，走 `set_exploration_ap`）、`enter_map`（重置为上限）、`ExplorationActionSpring`（回复，已夹上限）、`GSMAtomicWrites.restore_action_points`（事件 RESTORE_AP）。**各动作**：移动扣分（本轮起按配置）；战斗不扣（AP 是探索域资源，战斗消耗走 `CostSystem` 灵力，`combat_bag_use.gd` 注释已明示）；采集/炼丹/炼器/回复/商店/打坐**不再单独扣**（到达时已由 `move_to_node` 付过）；传送/Boss/灵泉开销恒 0
+- **发现并修掉的两处存量不一致**：① `move_to_node` 与 `can_move_to` 各写一遍「`ap_cost=1` + `AP_EXEMPT_TYPES.has(type)`」——配置化后必然漂移（查询说能走、扣费扣不起）；② `restore_action_points` 只加不夹，与 GDD `action-point-system.md` §8 边界「使用丹药回复超过上限：取 `min(current+amount, max_action_points)`，不溢出」相悖——不夹会让 AP 顶到 5/5 之上仍持有 9 点，而灵泉按「上限 − 当前」算出的回复量变成 0（界面显示已满，实际还能多花 4 点）
+- **新文件 `exploration_ap_rules.gd`（52 行）**：AP 开销解析的**单一来源**（纯静态函数，无 Autoload）。配置键 `ap_cost`（本图默认，缺键→GDD 默认 1）/ `ap_costs`（按 NodeType 覆盖表）；**豁免先判**（3=BOSS/6=TELEPORT/7=ACTION_SPRING 恒 0，配置写非零也不生效——豁免是系统级不变量，不是地图可调项）；负值按默认值处理而非 0（配置是外部数据，负开销会让移动「回血」）。`ExplorationSystemHelpers.AP_EXEMPT_TYPES` 改为**派生**自它，`ap_cost_to(node_id)` 由 `move_to_node`（扣费）与 `can_move_to`（判定）共同转发——两处同口径
+- **越界存档值顺带收口**：`move_to_node` / `can_move_to` 先 `maxi(ap, 0)` 再比较，`new_ap = maxi(ap - cost, 0)`——负数存档不再让豁免节点被锁死，AP 永不落负；拒绝路径**零写入**（不扣 AP、不写 position/visited、不发 `node_moved`）
+- **`restore_action_points` 迁到探索域**（`gsm_atomic_writes.gd` → `gsm_exploration_writes.gd`）：它与 `set_exploration_ap` 同写一个域，散在两处无谓；`GSMAtomicWrites` 保留同名转发（外部调用点一字未改）。**上限为 0 时不夹**——0 表示「尚未进入任何地图、上限未知」（序列化出厂值），此时按原值累加，不臆造上限把恢复吞掉
+- **配置落库**：`exploration_map_catalog.gd` 的 4 条 `DIFFICULTY_DEFAULTS` 与 `exploration_system_helpers.gd` 的 4 条 `DIFFICULTY_CONFIGS` 都补了 `ap_cost: 1`（出厂全档 1，GDD §调优参数「每格消耗 1，安全范围 1-2」）；键存在的意义是「按地图配置扣」读的是配置而不是硬编码，单张地图可覆盖
+- 测试：新增 `test_exploration_ap_rules.gd`（149 行，13 例——配置解析各分支 / 负值回落 / 畸形配置不崩 / 豁免压制覆盖 / **三层豁免集合同源断言** Feature `ApRules` ≡ 继承链 ≡ UI `NodeStateLogic` / 探明表与难度表 `ap_cost` 两处同源）+ `test_action_point_consumption.gd`（300 行，24 例——正常扣减三档配置 / 不足拒绝且**零写入** / `can_move_to` 与扣费同口径 / 豁免 / 负数存档 / 灵泉夹上限 / **系统 reason 必须命中 UI `REASON_TEXTS` 键**）；`test_second_layer_methods.gd` 补 4 例夹上限边缘；`test_apply_outcomes.gd` 补 1 例事件 RESTORE_AP 夹上限、并在 `_reset_gsm_state` 把 `max_action_points` 一并归零（不回零会让该文件依赖前一个测试文件留下的上限——违反隔离性）。既有测试零改名零删除零跳过
+- 全量：**4630 tests / 4629 passing / 1 pending 存量 / 3 orphans 存量，零失败**；stash 本轮改动跑 HEAD 基线 4592/4591——净增 38 全过，零回归
+- 已知边界：① `test_hud_bootstrap` 的 `test_main_menu_does_not_auto_mount_when_not_current_scene` 在**目录级**隔离跑时红（全量跑绿）——stash 后跑 HEAD 同样红，**存量**，与本轮改动域零交集；② 灵泉 DAG 权重表不含 `action_spring` 键，生产路径刷不出灵泉节点，「每图限 1 次」计数位仍缺（存量）；③ `can_move_to` 仍是三态混叠布尔（可达/已访问/AP 不足都 false），UI 六态由 `NodeStateLogic` 自行推导，若将来要「点击即知为何不可走」需系统侧返回 reason
+- Next recommended: 灵泉节点接入 DAG 权重表（连带「每图限 1 次」计数落 `map_states`）；丹药回复 AP 的入口（`InventoryPillUse` 目前只处理治疗类效果，RESTORE_AP 类丹药走不通）；AP 上限随境界突破重算并在 HUD 提示
 
 ## Session Extract — 战斗内使用丹药与法宝（行囊面板）（2026-11-14）
 - 任务：① 战斗界面加「行囊」入口（回合内可开，列真实收藏里的丹药与法宝，打开冻结出牌输入、关闭解冻）；② 用丹药按模板效果走既有结算层（治疗/减益），扣掉该卡实例、按既有规则计费（走 `CostSystem` 扣灵力，不新增「行动点」）、给中文提示、目标可显式选择；③ 法宝同理走攻击/增益；不可用条目禁用并写明原因（已用尽/灵能不足）；④ 测试覆盖五条点名断言

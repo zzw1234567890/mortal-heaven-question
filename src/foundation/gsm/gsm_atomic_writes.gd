@@ -344,18 +344,12 @@ func remove_card_from_collection(card_instance_id: int) -> bool:
 	return true
 
 
-## 恢复行动力——写入 exploration.action_points。[br]
-## [br]行动力属探索系统（ADR-0014），AP 上限由 ExplorationSystem 管理——本方法不 clamp。[br]
-## [br][param amount] 恢复量（必须为正值）。[br]
-## [br][b]示例[/b]: [code]GameStateManager.restore_action_points(2)[/code]
+## 恢复行动力——委托 → [GSMExplorationWrites]（与同域的 set_exploration_ap 同处）。[br]
+## [br][b]为什么归探索域[/b]：写的是 [code]exploration.action_points[/code]，
+## 上限也在同一域（ADR-0014）——放在本文件的通用区会让「探索域写入」散成两处。[br]
+## [br][b]实现见[/b] [method GSMExplorationWrites.restore_action_points]（含夹上限口径）。
 func restore_action_points(amount: int) -> void:
-	if amount <= 0:
-		push_error("GSM.restore_action_points: amount 必须为正值（收到: %d）" % amount)
-		return
-
-	var old_val: int = _gsm.exploration.action_points
-	_gsm.exploration.action_points = old_val + amount
-	_gsm._buffer_change("exploration.action_points", old_val, _gsm.exploration.action_points)
+	_exploration_writes.restore_action_points(amount)
 
 
 # === 探索导航域写入（委托 → GSMExplorationWrites）===========================

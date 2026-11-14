@@ -81,6 +81,38 @@ func set_exploration_ap(current: int, max_ap: int) -> void:
 	_gsm._buffer_change("exploration.max_action_points", old_max, max_ap)
 
 
+## 恢复行动力——写入 exploration.action_points，[b]夹到上限[/b]。[br]
+## [br][b]与 set_exploration_ap 的分工[/b]：那个是「设成某个值」（进入地图 /
+## 移动扣费——调用方已经算好了值），本方法是「在现值上加」的语义
+## （事件结果 RESTORE_AP / 丹药回复）。[br]
+## [br][b]为什么要 clamp[/b]：GDD action-point-system.md §8 边界「使用丹药回复超过
+## 上限：回复时取 [code]min(current + amount, max_action_points)[/code]，不溢出」。
+## 不夹会让行动力顶到上限之上：图标显示 5/5 却持有 9 点，而灵泉
+## （[code]ExplorationActionSpring.restore_for[/code]）按「上限 - 当前」算出的
+## 回复量变成 0——玩家看到「行动力已满」但其实还能再多花 4 点。[br]
+## [br][b]上限为 0 时不夹[/b]：0 表示「尚未进入任何地图、上限未知」
+## （[code]gsm_serializer.gd[/code] 的两个字段出厂都是 0）——此时按原值累加，
+## 不臆造一个上限把恢复吞掉。[br]
+## [br][b]越界存档值[/b]：当前值本就超过上限时也走同一条 [code]min[/code] 口径
+## （结果就是上限），不倒扣——与 [code]ExplorationActionSpring[/code] 的
+## 「不放大也不倒扣」一致。[br]
+## [br][param amount] 恢复量（必须为正值，非正值报错并原样返回）。[br]
+## [br]来源: GDD action-point-system.md §8 边界、ADR-0014 §GSM 写入契约。
+func restore_action_points(amount: int) -> void:
+	if amount <= 0:
+		push_error("GSM.restore_action_points: amount 必须为正值（收到: %d）" % amount)
+		return
+
+	var old_val: int = int(_gsm.exploration.get("action_points", 0))
+	var max_ap: int = int(_gsm.exploration.get("max_action_points", 0))
+	var new_val: int = old_val + amount
+	# 上限未知（0）→ 不夹；已知 → min(current + amount, max)，见方法注释
+	if max_ap > 0:
+		new_val = mini(new_val, max_ap)
+	_gsm.exploration.action_points = new_val
+	_gsm._buffer_change("exploration.action_points", old_val, new_val)
+
+
 ## 合并写入地图状态——更新 exploration.map_states[map_id] 子字段。[br]
 ## [br][b]仅 ExplorationSystem 调用[/b]——用于 entry_count、collected_* 等跨地图累计数据。[br]
 ## [br]来源: ADR-0014 §决策 1 状态分层模型。
