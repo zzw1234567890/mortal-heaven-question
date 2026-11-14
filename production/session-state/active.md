@@ -3,8 +3,30 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: Sprint 18（表现层接真实数据）
-Task: 打坐/洞府境界突破（扣修为 + 升境界 + 属性重算落盘）；下一步 打坐节点的「连续失败保护」与策划定档成功率
+Task: 背包 + 角色状态界面最小可用版（主菜单「行囊与道友」入口，两页签）；下一步 两界面的手柄适配与战斗内快捷入口
 <!-- /STATUS -->
+
+## Session Extract — 背包与角色状态界面最小可用版（2026-11-14）
+- 任务：主菜单可打开「背包（灵材/丹药/法宝，读真实存档不硬编码，数量为 0 不显示）+ 角色状态（境界/修为与上限/生命与上限/各属性按境界配置表算/阵亡标记）」两个界面，有返回、方向键切分类、空态给中文；测试覆盖分类过滤与排序、数值与境界配置一致、阵亡标记、空态文案、返回不掉状态
+- **读取层放 `src/feature/inventory/`（3 个文件）**，面板只显示——与商店（`ExplorationShop` 结算 / `ShopPanelScreen` 显示）同源分工。`InventoryModel`（236）两条数据源：灵材读 `player.resources.ling_cai` 四档计数、丹药/法宝读 `collection.owned_cards` 按 `CardTemplate.type` 过滤 + 按 `template_id` 合并同名（×N）。`CharacterStatusModel`（300）三块：境界读 GSM 既有字段、属性**逐键遍历 `realm_table` 当前档**（表里加键界面自动多行，一个数值都不写死）、角色走 `DeployRosterReader` + `CombatHpCarryover.read_all` + `DeploymentSystem.get_unavailable_characters`
+- **`InventoryCatalog`（147）是分类表 / 排序 / 中文词条 / 空态文案的单点**：三分类三条空态各指向不同下一步（「去灵脉采掘处采些回来」/「丹成之后自会出现在这里」/「炼器台上炼成一件便有了」）
+- **灵材不借卡牌稀有度词条**：`rarity` 只作排序刻度（下品 1 → 极品 4），`rarity_name` 留空——「极品/下品」与卡牌的「金/暗金」是两套刻度，混用会让玩家以为灵材也有暗金档；布局把空段过滤掉，行文案即「极品灵材 · ×2」
+- **阵亡角色照实列出**（不隐藏，GDD combat-system.md §7 要求跨场持久），带中文标「已阵亡（不可出战）」；`current_hp` 为 0 就显示 0（**不夹到 1 冒充存活**，与 `CombatHpCarryover` 口径一致）。生命无账本记录时回退模板 `base_hp` 并把 `hp_known` 标 false，界面加注「（生命为模板基准）」——让「满血」与「没数据」可区分
+- **已登记的缺口：防御力无数据来源**——境界表没有防御项，`CardTemplate` 也没有 `base_defense`（该字段只存在于敌方 `EnemyTemplate`）。界面**不显示防御，也不拿 `max_deploy` 之类冒充**。另两条边界：灵能只到上限（`cost_per_turn`），战斗内当前灵能属战斗域；角色属性只到模板基础值，未叠功法/法宝/本命加成
+- **UI 层 5 个文件全部 ≤300**：`inventory_panel_layout`（123，复用 `ShopPanelLayout` 骨架，只多加一条分类栏）、`inventory_screen`（269）、`character_status_rows`（95，纯文案组装——拆出来正是为了把面板压回 300 内）、`character_status_screen`（281）、`inventory_screens_host`（268，页签 + 输入锁 + 两页生命周期）
+- **本轮修掉两个静默失效（都不是新写的 bug，是复用既有骨架时暴露的）**：
+  ① `ShopPanelLayout.build` 的「离开」按钮**写死转发 `&"leave_requested"`**——对声明 `&"back_requested"` 的面板，`emit_signal` 不报编译错、只在运行时抛 `ERR_UNAVAILABLE`：按钮看着能点、点了没反应。改为 `p_leave_signal` 参数（默认值保持商店不变）
+  ② `build()` 返回值加了 `panel` 键——原先调用方要 `item_box.get_parent().get_parent()` 才够到 `PanelContainer`，而真实层级是 `item_box → scroll → column → margin → panel`（**四层，看着像两层**），数错就是 `VBoxContainer` 赋给 `PanelContainer` 的类型错。交出引用比让调用方猜层级稳
+- **删掉两个多余信号** `category_cycle_requested` / `section_cycle_requested`：分类栏的点击意图在面板内部闭环，没有任何外部消费者——原先布局发信号、面板再 connect，等于把同一条路走两遍。改为布局把按钮原样交回、面板自己 `connect`（分类栏的接线因此从 `_init` 移进 `_build_layout`）
+- **两处「顺序问题」的防御**（都是「测试先赋字段后建页」掩盖了「生产先建页后赋字段」）：
+  ① `InventoryScreensHost` 的模型注入改为**每次 `show_page` 都补一次**——主菜单先 `new` 宿主再赋 `inventory_model`/`status_model`，而建页发生在宿主 `_init` 里（那时字段还是 null）。只认建页时刻的注入会让**生产路径整页走「链路未就绪」降级分支，而测试全绿**
+  ② `CharacterStatusModel` 对 `deployment_system` / `binding_manager` 加 **Autoload 回落**——名册读取器要 `DeploymentSystem`，若只认注入，漏接时**全部角色都显示「可出战」且不报任何错**。专门有一条集成用例 `test_dead_marking_works_with_production_wiring` 按主菜单的接线方式钉住它
+- **`_release_lock` 先查 `has_lock` 再 pop**：`InputManager` 连接了 `SceneTree.tree_changed` 并在回调里清空整个锁栈，而本界面每次 refresh 增删行都会触发一次 `tree_changed`——锁可能已被外部清掉，此时再 pop 只得到一条「source not found」的 push_warning 噪声
+- **测试装置的坑（已就地修）**：`give_card` 原先不 prime 模板，模板未就位时 `create_instance` 返回 null、卡根本进不了收藏（界面随后少一行，断言却分不清「界面漏读」还是「卡没造出来」）——改为就地 `prime_templates`；`ARTIFACT_ID_2`（上品法器）漏进 `_card_template_database` 导致 `add_card_to_collection` 被校验拒绝；**`DeploymentSystem._unavailable_characters` 不随 GSM 域还原**（它是 Autoload 私有字段），上一个用例标过的角色会漏到下一个用例，「只标阵亡那一个」这类断言因此看到多余标记——装置 `_reset_player_domains` 里加 `load_unavailable_from_gsm({})` 清空
+- 测试：单元 58 例（拆 5 文件 + 2 装置）、集成 23 例（真实 Autoload + 真实存档端到端，拆 2 文件 + 1 装置）、主菜单入口 6 例（`test_inventory_entry.gd`：按钮在/文案/接线/键盘可达/点开/复用单例/关掉后主菜单仍可用）。全部文件 ≤300 行
+- 全量：**4442 tests / 4441 passing / 1 pending 存量 / 3 orphans 存量**，零失败、零回归（基线 4355/4354 → 净增 87 全过）
+- 遗留：① 两界面均为**只读**，条目不进详情页、不可用/不可丢弃（本轮任务书即「最小可用版」）；② `ShopPanelNavigator` 在两个面板里游标恒为 -1（条目是 Label 不是 Button）——这是如实结果，但意味着**上下键无用**，若后续要选条目需换控件；③ 手柄适配未验证（只走键盘 `ui_left`/`ui_right`/`ui_accept` 默认映射）；④ 背包分类目前只有灵材/丹药/法宝三类，功法/阵法/符箓（`CardType` 1/3/5）已有 `_type_name` 词条但未开分类
+- Next recommended: 两界面的手柄适配；从战斗/探索内也能开背包（目前只在主菜单）；`ShopPanelLayout` 已被三个布局复用（商店/采集/背包）——若再加一处应改名为中性名
 
 ## Session Extract — 打坐/洞府境界突破与修为消费（2026-11-14）
 - 任务：① 打坐/洞府节点——到达后可用当前修为尝试突破下一境界（读既有境界配置表、不硬编码等级与所需修为），成功率与加成按配置算、随机源可注入；② 成功扣修为 + 升境界 + 属性按配置重算并落盘 + 中文提示；失败按配置扣部分修为、境界不变、提示写清损失；任何情况下修为不落负；③ 测试覆盖成功扣费升境界且属性变化 / 修为不足拒绝且状态不变 / 失败按配置扣费不升境界 / 修为不被扣成负 / 同种子同结果
