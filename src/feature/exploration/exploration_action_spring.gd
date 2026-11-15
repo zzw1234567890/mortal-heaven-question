@@ -116,9 +116,10 @@ func use_action_spring(p_node_id: int) -> int:
 		return 0
 
 	var state: Dictionary = _map_state(gsm)
-	if is_exhausted(state, _map_config()):
+	var config: Dictionary = _map_config()
+	if is_exhausted(state, config):
 		push_warning("ExplorationActionSpring: 本图灵泉已用尽（限 %d 次），未回复（node=%d）"
-				% [limit_of(_map_config()), p_node_id])
+				% [limit_of(config), p_node_id])
 		return 0
 
 	var max_ap: int = int(gsm.exploration.get("max_action_points", 0))
@@ -147,13 +148,55 @@ func _map_state(p_gsm: Node) -> Dictionary:
 	return map_states.get(current_map, {})
 
 
-## 本图配置——生成期由 [ExplorationDAGBuilder] 写入 [member _map_config]；读档重建
-## 后为空（此时限次回退 [constant DEFAULT_MAP_LIMIT]，不臆造地图设定）。
+## 本图配置——[b]按存档里的当前地图 ID 重新解析[/b]，不依赖宿主的 [member _map_config]
+## 快照。[br]
+## [br][b]为什么不能只读宿主字段[/b]：那个字段由 [ExplorationDAGBuilder] 在[b]生成期[/b]
+## 写入，而读档重建走的是 [code]ExplorationSystem.rebuild_dag_cache[/code]——它置空该字段
+## （[code]map_states[/code] 只存 graph/nodes，没有配置这一项）。于是「读档后进图用一次
+## 灵泉」会拿着空配置去问 [method limit_of]，回退出厂值 1：地图表里写着限 2 次的图，
+## 读档后只给 1 次——失败形态是「静默变严」，玩家只会觉得这眼泉坏了。[br]
+## [br][b]解析顺序[/b]：[br]
+##   1. 有存档地图 ID 且宿主能给配置 → [code]_parent._get_map_config(map_id, realm)[/code]
+##      （注入回调 [code]ExplorationMapCatalog.config_for[/code] → 难度档位兜底）——
+##      这条路上「配置」与「生成期用的那份」同源（都是同一张探明表），故重解析不会
+##      与本次进入的图打架；[br]
+##   2. 没有地图 ID（未进入任何地图）或宿主给不出配置 → 回落到宿主快照
+##      （直调 [code]generate_map[/code] 的单测路径——那时存档不记地图）；[br]
+##   3. 两者都没有 → 空字典（限次退化为出厂值，不臆造地图设定）。[br]
+## [br][b]境界从哪来[/b]：复用既有只读口径 [code]GSM.player.realm[/code]
+## （与 [code]ExplorationMapFlush._get_player_realm[/code] 同源），不自行臆造。
 func _map_config() -> Dictionary:
+	var resolved: Dictionary = _resolved_config()
+	return resolved if not resolved.is_empty() else _host_config()
+
+
+## 按存档地图 ID 重解析配置——无地图 ID / 宿主无解析能力 / 解析为空时返回空字典。
+func _resolved_config() -> Dictionary:
+	if _parent == null or not _parent.has_method(&"_get_map_config"):
+		return {}
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return {}
+	var map_id: StringName = gsm.exploration.get("current_map", &"")
+	if map_id == &"" or str(map_id).is_empty():
+		return {}
+	var resolved: Variant = _parent.call(&"_get_map_config", map_id, _player_realm(gsm))
+	if not (resolved is Dictionary) or (resolved as Dictionary).is_empty():
+		return {}
+	return resolved
+
+
+## 宿主 [code]_map_config[/code] 快照——[b]兜底[/b]路径（存档不记地图时的直调场景）。
+func _host_config() -> Dictionary:
 	if _parent == null:
 		return {}
 	var config: Variant = _parent.get("_map_config")
 	return config if config is Dictionary else {}
+
+
+## 玩家当前境界——[code]GSM.player.realm[/code]（只读；缺失回退 1，与进图口径一致）。
+func _player_realm(p_gsm: Node) -> int:
+	return maxi(int(p_gsm.get(&"player").get("realm", 1)), 1)
 
 
 ## 记下本图已用掉一次——整块单键写入，随探索域持久化。

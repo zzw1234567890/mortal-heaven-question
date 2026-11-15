@@ -272,10 +272,18 @@ func _refresh_ap_label(snapshot: Dictionary) -> void:
 	ap_label.text = "%s: %d" % [TEXT_AP_PREFIX, int(snapshot.get("ap_remaining", 0))]
 
 
-## 六态重算 + 展开动画子模块（惰性初始化）。
+## 六态重算 + 展开动画子模块（惰性初始化）。[br]
+## [br][b]可达性判定交给系统[/b]：[code]can_move_to_detail[/code]（本轮拆出的
+## [code]{ok, reason}[/code]）与本界面六态同词表——由它作答，画出来的可达性就是
+## 玩家点下去会得到的结果（含本图 [code]ap_cost[/code]）。[br]
+## [br][b]只在快照真的出自系统时才接[/b]（见
+## [code]NodeGraphLoadSource.from_system[/code]）——否则会被系统缓存里那张无关的
+## DAG 判成一片不可达。每轮重算前刷新（系统与数据源均可注入）。
 func _reveal() -> RefCounted:
 	if _reveal_animator == null:
 		_reveal_animator = NodeGraphRevealAnimatorScript.new()
+	var from_system: bool = _load_source != null and bool(_load_source.get(&"from_system"))
+	_reveal_animator.call(&"bind_verdict_provider", _get_exploration_system(), from_system)
 	return _reveal_animator
 
 

@@ -5,6 +5,9 @@ extends RefCounted
 ## 与「逐层浮现的 Tween 编排」是纯渲染职责，与信号接线/交互挂载互相独立。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：本模块不改游戏状态——六态映射是纯函数
 ## 判定结果，reveal_max_layer 是渲染参数。[br]
+## [br][b]可达性判定可外接[/b]：[member verdict_provider] 接系统
+## [code]can_move_to_detail[/code] 时以系统作答（它才算得出本图 [code]ap_cost[/code]），
+## 未接时回落 [NodeStateLogic.verdict_for] 纯函数——两条路是同一套形状与词表。[br]
 ## [br][b]零轮询[/b]：不使用 [code]_process()[/code]——逐层展开走 Tween，
 ## 完成即停（停靠宿主提供的 Tween 宿主节点）。[br]
 ## [br]来源: story-003-node-graph-data-states.md AC-1/AC-3、ADR-0031 §2/§5。
@@ -18,8 +21,20 @@ const REVEAL_DURATION: float = 0.8
 ## 当前 Tween 句柄（重入时 kill 防悬挂）。
 var _tween: Tween = null
 
+## 可达性判定的外部答主（可选）——接 [code]ExplorationSystem.can_move_to_detail[/code]，
+## 签名 [code](from_node, to_node) -> {ok, reason}[/code]。[br]
+## [br][b]为什么可以接外部判定[/b]：真实系统才算得出本图的 [code]ap_cost[/code]
+## （渲染快照里没有地图配置），也可能有快照之外的规则；由它作答比 UI 再推导一遍
+## 更接近玩家点击时会发生的事。[br]
+## [br][b]无效时回落自算[/b]：[NodeStateLogic.verdict_for]（纯函数，同形状同词表）
+## ——stub 快照、headless、系统未就绪等路径不受影响。[br]
+## [br][b]只在不一致时才分流[/b]：两者对同一格给出不同结论时以外部判定为准，
+## 这正是接线它的目的。
+var verdict_provider: Callable = Callable()
 
-## 重算六态并注入渲染器——每个节点经 [NodeStateLogic.classify_node_state] 判定。[br]
+
+## 重算六态并注入渲染器——每个节点经 [NodeStateLogic.classify_node_state] 判定，
+## 有外部答主时可达性那一格改问它（见 [member verdict_provider]）。[br]
 ## [br][param p_renderer] 渲染器（消费 [code]set_states[/code]）。[br]
 ## [param p_snapshot] 渲染快照（graph / nodes / visited / current_node / ap_remaining）。[br]
 func recompute_states(p_renderer: Control, p_snapshot: Dictionary) -> void:
@@ -30,9 +45,35 @@ func recompute_states(p_renderer: Control, p_snapshot: Dictionary) -> void:
 	var ap_remaining: int = int(p_snapshot.get("ap_remaining", 0))
 	var state_map: Dictionary = {}
 	for node_id: int in nodes.keys():
-		state_map[node_id] = NodeStateLogicScript.classify_node_state(
-				node_id, graph, visited, current_node, ap_remaining, nodes)
+		state_map[node_id] = NodeStateLogicScript.classify_with_verdict(
+				node_id, graph, visited, current_node,
+				_verdict_of(current_node, node_id, graph, visited, ap_remaining, nodes))
 	p_renderer.call(&"set_states", state_map)
+
+
+## 一格的可达性判定——外部答主优先（返回形状不符时回落自算，不把 UI 拖进错误态）。
+func _verdict_of(p_from: int, p_to: int, p_graph: Dictionary, p_visited: Array,
+		p_ap: int, p_nodes: Dictionary) -> Dictionary:
+	if verdict_provider.is_valid():
+		var external: Variant = verdict_provider.call(p_from, p_to)
+		if external is Dictionary and (external as Dictionary).has("ok"):
+			return external
+	return NodeStateLogicScript.verdict_for(p_from, p_to, p_graph, p_visited,
+			p_ap, p_nodes)
+
+
+## 装配可达性判定的来源。[br]
+## [br][b]只在快照真的出自系统时才接[/b]（[param p_from_system] 来自
+## [code]NodeGraphLoadSource.from_system[/code]）：系统在场不等于眼前这份快照出自
+## 它——stub 降级与测试直调快照时系统照样在场，此时拿系统缓存里那张无关的 DAG 去
+## 判定，会把节点画成一片不可达。标记为假时清空答主、回落纯函数自算。[br]
+## [br][param p_system] 探索系统（可为 null）。[br]
+## [param p_from_system] 当前快照是否由系统的 [code]enter_map[/code] 产出。
+func bind_verdict_provider(p_system: Node, p_from_system: bool) -> void:
+	if p_from_system and p_system != null and p_system.has_method(&"can_move_to_detail"):
+		verdict_provider = Callable(p_system, &"can_move_to_detail")
+		return
+	verdict_provider = Callable()
 
 
 ## 逐层展开浮现（0.8s）——reveal_max_layer 从 -1 递增到最大层。[br]

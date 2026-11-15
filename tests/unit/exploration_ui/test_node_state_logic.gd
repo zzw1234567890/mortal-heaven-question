@@ -3,10 +3,11 @@ extends GutTest
 ##
 ## 覆盖故事 AC-1/AC-2/AC-5/AC-8/AC-10 的 Logic 内核：[br]
 ##   - classify_node_state：六态分类（当前/可达/已访问/不可达/行动力不足/迷雾）[br]
+##   - verdict_for / state_from_verdict：可判别版移动判定与六态映射（本轮新增——
+##     三态混叠拆开，见文件末段）[br]
 ##   - node_state_style：六态 → 视觉样式映射（边框/标记/发光/暗化/斜线）[br]
-##   - is_revealed：迷雾揭示判定（AC-6 走过分支不重新迷雾）[br]
-##   - is_tribulation_not_ready：渡劫台修为未满（AC-8）[br]
-##   - tooltip_text：悬停预览（AC-10；迷雾节点显示「?」不显示敌人构成）[br]
+##   - is_revealed：迷雾揭示（AC-6 走过分支不重新迷雾）；is_tribulation_not_ready：
+##     渡劫台修为未满（AC-8）；tooltip_text：悬停预览（AC-10；迷雾只显示「?」）[br]
 ##
 ## [b]纯函数直调[/b]：static 函数以 [code]NODE_LOGIC.func(...)[/code] 直接调用
 ## （GUT 直调模式——S16-1/2 先例）。stub 载荷来自 [NodeGraphDataStub]。
@@ -207,3 +208,95 @@ func test_tooltip_fogged_shows_question_mark_only() -> void:
 			"enemy_detail": "外门弟子×2"}
 	assert_eq(NODE_LOGIC.tooltip_text(detail, true), "?",
 			"迷雾节点悬停应只显示 ? 不暴露敌人构成")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 可判别版移动判定（本轮新增——三态混叠拆开）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_verdict_reachable_is_ok_without_reason() -> void:
+	## 可达 → ok，reason 为空串（与系统侧 can_move_to_detail 同形状）
+	var snap: Dictionary = DATA_STUB.stub_snapshot()
+	var verdict: Dictionary = NODE_LOGIC.verdict_for(0, 101, snap["graph"],
+			snap["visited"], snap["ap_remaining"], snap["nodes"])
+	assert_true(bool(verdict["ok"]), "入口前向邻接应为可达")
+	assert_eq(str(verdict["reason"]), "", "通过时 reason 为空串")
+
+
+func test_verdict_distinguishes_the_three_refusals() -> void:
+	## 病根是「都返回 false」——三条拒绝路径必须给出三个不同的 reason。
+	## 图里给 101 加一条回退边到 0：stub 的邻接表没有它（真实 DAG 无回退边），
+	## 不加则「已访问」那一格会被拓扑判定先拦下，测不到进度原因。
+	var snap: Dictionary = DATA_STUB.stub_snapshot()
+	var graph: Dictionary = (snap["graph"] as Dictionary).duplicate(true)
+	graph[101] = [201, 202, 0]
+	var nodes: Dictionary = snap["nodes"]
+	# 不可达：0 与远处 Boss 不相邻
+	var unreachable: String = str(NODE_LOGIC.verdict_for(0, 500, graph,
+			[0], 3, nodes)["reason"])
+	# 已访问：0 已在 visited（且 101→0 邻接）
+	var visited: String = str(NODE_LOGIC.verdict_for(101, 0, graph,
+			[0, 101], 3, nodes)["reason"])
+	# 行动力不足：101 战斗节点可达但 AP=0
+	var ap_short: String = str(NODE_LOGIC.verdict_for(0, 101, graph,
+			[0], 0, nodes)["reason"])
+	assert_eq(unreachable, NODE_LOGIC.REASON_UNREACHABLE, "走不到 → 拓扑原因")
+	assert_eq(visited, NODE_LOGIC.REASON_VISITED, "走过了 → 进度原因")
+	assert_eq(ap_short, NODE_LOGIC.REASON_AP_SHORT, "走不起 → 资源原因")
+	assert_ne(unreachable, visited, "不可达与已访问必须不同")
+	assert_ne(unreachable, ap_short, "不可达与行动力不足必须不同")
+	assert_ne(visited, ap_short, "已访问与行动力不足必须不同")
+
+
+func test_verdict_exempt_type_passes_at_zero_ap() -> void:
+	## 对照（防「AP=0 一律拒绝」的假通过）：Boss 豁免，AP=0 仍判可达
+	var snap: Dictionary = DATA_STUB.stub_snapshot()
+	var verdict: Dictionary = NODE_LOGIC.verdict_for(402, 500, snap["graph"],
+			[0, 101, 202, 301, 402], 0, snap["nodes"])
+	assert_true(bool(verdict["ok"]), "Boss 豁免类型 AP=0 仍可达")
+
+
+func test_verdict_checks_visited_before_ap() -> void:
+	## 顺序不是风格问题：已访问且邻接的节点在系统里报「已访问」，UI 若先判 AP
+	## 就会对同一个节点给出另一种说法。
+	var snap: Dictionary = DATA_STUB.stub_snapshot()
+	var graph: Dictionary = (snap["graph"] as Dictionary).duplicate(true)
+	graph[101] = [201, 202, 0]
+	var verdict: Dictionary = NODE_LOGIC.verdict_for(101, 0, graph,
+			[0, 101], 0, snap["nodes"])
+	assert_eq(str(verdict["reason"]), NODE_LOGIC.REASON_VISITED,
+			"AP=0 且已访问时，先判出的应是「已访问」")
+
+
+func test_state_from_verdict_maps_to_six_states() -> void:
+	## 六态映射穷尽词表：通过 / 行动力不足 / 已访问各归其位，其余两条守卫态
+	## （DAG 未就绪、GSM 不可用）按不可达处理（UI 没有第四种视觉）。
+	assert_eq(NODE_LOGIC.state_from_verdict({"ok": true, "reason": ""}),
+			NODE_LOGIC.NodeState.REACHABLE, "通过 → 可达")
+	assert_eq(NODE_LOGIC.state_from_verdict(
+			{"ok": false, "reason": NODE_LOGIC.REASON_AP_SHORT}),
+			NODE_LOGIC.NodeState.AP_INSUFFICIENT, "行动力不足 → 红色斜线")
+	assert_eq(NODE_LOGIC.state_from_verdict(
+			{"ok": false, "reason": NODE_LOGIC.REASON_VISITED}),
+			NODE_LOGIC.NodeState.VISITED, "已访问 → 绿色勾")
+	assert_eq(NODE_LOGIC.state_from_verdict(
+			{"ok": false, "reason": NODE_LOGIC.REASON_UNREACHABLE}),
+			NODE_LOGIC.NodeState.UNREACHABLE, "不可达 → 锁标记")
+	assert_eq(NODE_LOGIC.state_from_verdict(
+			{"ok": false, "reason": NODE_LOGIC.REASON_NOT_READY}),
+			NODE_LOGIC.NodeState.UNREACHABLE, "DAG 未就绪 → 按不可达画")
+	assert_eq(NODE_LOGIC.state_from_verdict(
+			{"ok": false, "reason": NODE_LOGIC.REASON_NO_GSM}),
+			NODE_LOGIC.NodeState.UNREACHABLE, "GSM 不可用 → 按不可达画")
+
+
+func test_classify_agrees_with_verdict_path() -> void:
+	## 分类器走的就是 verdict_for 这条路——两处对同一次判定必须同结论
+	## （防「改了 verdict_for 但分类器还留着一份旧推导」）。
+	var snap: Dictionary = DATA_STUB.stub_snapshot()
+	for ap: int in [3, 0]:
+		var expected: int = NODE_LOGIC.state_from_verdict(
+				NODE_LOGIC.verdict_for(0, 101, snap["graph"], [0], ap, snap["nodes"]))
+		assert_eq(NODE_LOGIC.classify_node_state(101, snap["graph"], [0], 0, ap,
+				snap["nodes"]), expected,
+				"AP=%d 时分类器应与 verdict_for 同结论" % ap)

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardTemplate" format=3]
+
+[ext_resource type="Script" path="res://src/core/card_system/card_template.gd" id="1_card_template"]
+
+[resource]
+script = ExtResource("1_card_template")
+card_id = &"pill_hui_qi_dan"
+name = "回气丹"
+type = 4
+rarity = 2
+cost = 1
+description = "回复 2 点行动力。"
+flavor_text = "不入丹田，只走经脉——赶路人的常备之物。"
+effect_type = &"restore_ap"
+effect_value = 2
+target_type = &"self"
+stack_limit = 3

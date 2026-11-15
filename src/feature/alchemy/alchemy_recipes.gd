@@ -70,6 +70,24 @@ const ALCHEMY_RECIPES: Dictionary = {
 		"unlock_level": 3,
 		"stack_limit": 1,
 	},
+	# 回气丹——低级灵材×2，蓝色，回复 2 点行动力（action-point-system.md §3「回复丹药」）
+	# [br][b]为什么与回春丹同档材料[/b]：GDD §3 把「回复丹药」与回春丹并列在同一行
+	# 「玩家在探索中使用丹药」上，§调优参数给的是「丹药回复量 +2（范围 1-3）」——
+	# 与回春丹同为最低一档、炼气期即可炼，才配得上「行动力见底时的应急手段」，
+	# 而不是高阶奖励。数值 2 逐字取自该表默认值。[br]
+	# [br][b]为什么排在表尾[/b]：配方表顺序即可炼清单的行序，既有用例按「首行 =
+	# 回春丹」取行号（[code]_first_index[/code]）——插在中间会改动既有行序，
+	# 那不是本配方该付的代价。
+	"hui_qi_dan": {
+		"name": "回气丹",
+		"materials": {LING_CAI_LOW: 2},
+		"rarity": RARITY_BLUE,
+		"card_type": "pill",
+		"template_id": "pill_hui_qi_dan",
+		"base_effect": 2,
+		"unlock_level": 0,
+		"stack_limit": 3,
+	},
 }
 
 const ARTIFACT_RECIPES: Dictionary = {

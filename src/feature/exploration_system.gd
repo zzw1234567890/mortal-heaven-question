@@ -57,22 +57,22 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 
 	# _dag_ready 守卫（ADR-0014 R7）
 	if not _dag_ready:
-		result["reason"] = "DAG 缓存未就绪"
+		result["reason"] = REASON_NOT_READY
 		return result
 
 	# 验证 1：可达性——graph[from] 包含 to
 	if not _is_reachable(from_node, to_node):
-		result["reason"] = "不可达"
+		result["reason"] = REASON_UNREACHABLE
 		return result
 
 	# 验证 2：已访问——不可回退到已访问节点
 	var gsm: Node = _get_gsm()
 	if gsm == null:
-		result["reason"] = "GSM 不可用"
+		result["reason"] = REASON_NO_GSM
 		return result
 	var visited: Array = gsm.exploration.get("visited_nodes", [])
 	if visited.has(to_node):
-		result["reason"] = "已访问"
+		result["reason"] = REASON_VISITED
 		return result
 
 	# 验证 3：行动力——按地图配置算开销，不足时拒绝（不写任何状态、不扣费）
@@ -80,7 +80,7 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 	var ap: int = maxi(int(gsm.exploration.get("action_points", 0)), 0)
 	var ap_cost: int = ap_cost_to(to_node)
 	if ap < ap_cost:
-		result["reason"] = "行动力不足"
+		result["reason"] = REASON_AP_SHORT
 		return result
 
 	# 验证通过——执行移动（AP 永不落负：越界存档值先夹到 0 再扣）

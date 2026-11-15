@@ -1,5 +1,5 @@
 extends GutTest
-## Story 001 验收测试：配方表（const Dictionary, 8 配方）+ 查询 API。
+## Story 001 验收测试：配方表（const Dictionary, 9 配方）+ 查询 API。
 ##
 ## 覆盖 AC-001 到 AC-012（12 条 AC）。
 ## 测试策略：
@@ -8,20 +8,26 @@ extends GutTest
 ##
 ## 设计文档来源：GDD alchemy-crafting-system.md §1a/§2a
 ## Story 来源：production/epics/alchemy-crafting-system/story-001-recipe-table.md
+##
+## 炼丹配方本轮由 4 增至 5（新增「回气丹」——回复行动力，见
+## GDD action-point-system.md §3）：只更新计数断言的值，既有用例名一概不改
+## （本轮任务书要求「不许改名既有测试」）。
 
 const AS := preload("res://src/feature/alchemy_system.gd")
 
 
 # ============================================================================
-# AC-001：ALCHEMY_RECIPES 包含恰好 4 个炼丹配方
+# AC-001：ALCHEMY_RECIPES 包含恰好 5 个炼丹配方
 # ============================================================================
-
+# [b]用例名保留 four 不改[/b]：本轮新增「回气丹」把配方数从 4 推到 5，但既有用例
+# 的名字属于「不许改名既有测试」的范围（本轮任务书的硬约束）——只更新断言值，
+# 名字留在原处，避免改名掩盖「这条到底还测不测同一件事」。
 func test_alchemy_recipes_contains_four_pill_recipes() -> void:
 	# Act
 	var count: int = AS.ALCHEMY_RECIPES.size()
 
 	# Assert
-	assert_eq(count, 4, "ALCHEMY_RECIPES 应包含 4 个炼丹配方")
+	assert_eq(count, 5, "ALCHEMY_RECIPES 应包含 5 个炼丹配方（回春/玉灵/天罗/九转 + 回气）")
 
 
 # ============================================================================
@@ -177,15 +183,15 @@ func test_get_pill_recipe_valid_id_returns_full_data() -> void:
 
 
 # ============================================================================
-# AC-011：get_all_pill_recipes() 返回 4 个条目
+# AC-011：get_all_pill_recipes() 返回 5 个条目
 # ============================================================================
-
+# 同上：用例名保留 four——本轮只更新断言值，不改名既有测试。
 func test_get_all_pill_recipes_returns_four_entries() -> void:
 	# Act
 	var recipes: Array = AS.get_all_pill_recipes()
 
 	# Assert
-	assert_eq(recipes.size(), 4, "应返回 4 个炼丹配方")
+	assert_eq(recipes.size(), 5, "应返回 5 个炼丹配方")
 
 
 # ============================================================================

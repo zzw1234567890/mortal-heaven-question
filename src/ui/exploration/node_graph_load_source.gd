@@ -20,6 +20,16 @@ var system: Node = null
 var stub_emitter: Node = null
 ## 当前是否为 stub 降级（屏幕经 [method NodeGraphScreen.is_using_stub_source] 暴露）。
 var using_stub: bool = false
+## 本次 [method load_map] 是否真的走了系统命令。[br]
+## [br][b]为什么要这个标记[/b]：屏幕要判断「正在渲染的这份快照是不是系统给的」——
+## 系统在场（Autoload 存在）不等于快照出自它：测试直调
+## [code]_on_map_generated[/code] 传 stub 样本时系统照样在场，此时拿系统的判定去
+## 翻六态会得到一张与快照无关的图（系统缓存里是别的 DAG）。本标记只在命令真的
+## 下发过时为真，是「这份快照的出处」的唯一凭据。[br]
+## [br][b]为什么可靠[/b]：[code]enter_map[/code] 同步广播 [code]map_generated[/code]，
+## 屏幕的 [method NodeGraphScreen._on_map_generated] 在本调用返回之前就已执行完
+## ——读到的一定是本次置的值。
+var from_system: bool = false
 
 
 ## 绑定数据源——真实源只用不建；缺信号时建 stub 发射器并接回调。[br]
@@ -44,6 +54,7 @@ func resolve(p_system: Node, p_host: Node, p_handler: Callable) -> void:
 ## [br][param p_map_id] 目标地图 ID。[br]
 ## [br][b]返回[/b]：是否受理（无系统且无 stub 时 false）。[br]
 func load_map(p_map_id: StringName) -> bool:
+	from_system = false
 	if stub_emitter != null:
 		stub_emitter.emit_map_generated(p_map_id)
 		return true
@@ -52,6 +63,10 @@ func load_map(p_map_id: StringName) -> bool:
 		return false
 	# 境界与行动力上限来自系统侧（GSM / RealmSystem），不在 UI 里猜
 	var realm: int = player_realm()
+	# 标记先置——enter_map 同步广播 map_generated，屏幕的渲染回调在本行[b]返回之前[/b]
+	# 就已执行，此时读到的必须已经是 true（否则「按快照出处决定判定来源」那一格会
+	# 拿到上一轮的旧值，真实地图被当成 stub 渲染）。
+	from_system = true
 	system.call(&"enter_map", p_map_id, realm, max_action_points(realm))
 	return true
 

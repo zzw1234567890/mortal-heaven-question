@@ -38,7 +38,8 @@ const ARTIFACT_TEMPLATE: String = "artifact_ji_chu_fa_qi"
 ## 配方资源里的全部模板 ID（GSM 校验库需要它们才让写入）。
 const ALL_TEMPLATES: Array = [
 	"pill_hui_chun_dan", "pill_yu_ling_dan", "pill_tian_luo_dan",
-	"pill_jiu_zhuan_jin_dan", "artifact_ji_chu_fa_qi", "artifact_zhong_pin_fa_qi",
+	"pill_jiu_zhuan_jin_dan", "pill_hui_qi_dan", "artifact_ji_chu_fa_qi",
+	"artifact_zhong_pin_fa_qi",
 	"artifact_shang_pin_fa_qi", "artifact_tong_tian_ling_bao",
 ]
 
