@@ -14,6 +14,80 @@ extends "res://src/feature/exploration/exploration_system_ops.gd"
 ## [br]来源: ADR-0014 §决策 1 状态分层模型 / §GSM 写入契约、
 ## 本轮「继承链各段 300 行以内」任务。
 
+## 可达性纯算法（行动力最短路）——本层是它唯一的调用方，故常量就近声明
+## （[code]exploration_system_helpers.gd[/code] 已贴 300 行软上限）。
+const Reachability := preload("res://src/feature/exploration/exploration_reachability.gd")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 可达性查询（委托给 Reachability 纯算法——本层唯一只读方法族）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 从当前节点走到 Boss 的最少行动力花费。[br]
+## [br][b]为什么需要它[/b]：系统里此前没有任何地方回答得了「还走不走得到 Boss」
+## ——[method can_move_to_detail] 只判一步邻接，[method end_exploration] 只看入参。
+## 于是行动力见底时，玩家既不知道自己还能不能通关，UI 也无从把「此刻离开会丢掉
+## 什么」讲清楚（GDD exploration-system.md §5「行动力归零且无法到达Boss → 立即
+## 结算」、§8「退出按钮在探索HUD中始终可用」两条都缺一个可判定的输入）。[br]
+## [br][b]为什么是花费而不是步数[/b]：出厂配置每次移动 1 点，两者等价；但地图可把
+## [code]ap_cost[/code] 调成 2（GDD §调优参数「安全范围 1-2」），且豁免节点
+## （Boss/传送/灵泉 0 消耗）让「步数少但花费多」成为常态——数步数会给出玩家做不到
+## 的答案。边权与 [method move_to_node] 的扣费共用
+## [ExplorationApRules.cost_for]（同一份解析，不各算一套）。[br]
+## [br][b]已访问节点算障碍[/b]：与 [method move_to_node] 的验证 2 同口径——
+## 把走过的格子算进路径等于承诺一条玩家点不动的路线。[br]
+## [br][b]已在 Boss 节点时为 0[/b]：GDD §8「行动力归零但已在Boss节点 → 可挑战
+## Boss」，此时无需再花任何行动力。[br]
+## [br][b]只读[/b]：不修改任何状态（查询 vs 命令，ADR-0014 §关键接口）。[br]
+## [br][b]返回[/b]：最少花费（≥0）；[constant ExplorationReachability.UNREACHABLE]
+## （-1）表示走不到——也用于 DAG 未就绪 / GSM 不可用（无法作答时不给假答案）。[br]
+## [br][b]读档后的口径差[/b]：[member _map_config] 由生成期写入，
+## [method rebuild_dag_cache] 读档重建时置空 → 那时按 GDD 默认开销 1 解析
+## （拆分前就存在，见 [method ap_cost_to] 的说明）。[br]
+## [br]来源: design/gdd/exploration-system.md §4 移动规则 / §5 结束条件 / §8 边界、
+## design/gdd/action-point-system.md §公式 2/3、ADR-0014 §关键接口。
+func min_ap_to_boss() -> int:
+	if not _dag_ready:
+		return Reachability.UNREACHABLE
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return Reachability.UNREACHABLE
+	var visited: Array = gsm.exploration.get("visited_nodes", [])
+	return Reachability.min_ap_to_any(_node_graph, _node_details, _map_config,
+			_current_node_id(gsm), visited, [NodeType.BOSS])
+
+
+## 以剩余行动力是否还走得到 Boss。[br]
+## [br][b]与 [method min_ap_to_boss] 的分工[/b]：那个报「要花多少」，本方法答
+## 「够不够」——UI 只需要后者决定退出按钮的呈现，多一层比较不必让 UI 自己算
+## （UI 零数值计算）。[br]
+## [br][b]已在 Boss 节点 / 走到 Boss 不花行动力[/b]时恒为 true（GDD §8）。[br]
+## [br][b]返回[/b]：true = 还走得到；false = 走不到（含 DAG 未就绪 / GSM 不可用 /
+## 剩余行动力不足——都无法承诺「还能通关」）。[br]
+## [br]来源: GDD exploration-system.md §5 结束条件 / §8 边界。
+func can_still_reach_boss() -> bool:
+	var need: int = min_ap_to_boss()
+	if need == Reachability.UNREACHABLE:
+		return false
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return false
+	return maxi(int(gsm.exploration.get("action_points", 0)), 0) >= need
+
+
+## 当前所在节点 ID——从 GSM 的层/位反解（编码 [code]layer * 100 + idx[/code]）。[br]
+## [br][b]与移动写入同源[/b]：[method move_to_node] 正是按这个编码写
+## [code]node_position[/code] 的，反解不会与它分家（用乘法而非整除——避开
+## [code]INTEGER_DIVISION[/code] 告警，且编码本身就是乘加）。[br]
+## [br][b]越界存档值夹到 0 层 0 位[/b]（入口）：比返回一个图里不存在的 ID 安全
+## （同 [method move_to_node] 对负 AP 先夹到 0 的取向）。[br]
+func _current_node_id(p_gsm: Node) -> int:
+	var pos: Dictionary = p_gsm.exploration.get("node_position", {})
+	var layer: int = maxi(int(pos.get("layer", 0)), 0)
+	var idx: int = maxi(int(pos.get("idx", 0)), 0)
+	return layer * 100 + idx
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 经济（委托给 _economy 子模块）
 # ═══════════════════════════════════════════════════════════════════════════════

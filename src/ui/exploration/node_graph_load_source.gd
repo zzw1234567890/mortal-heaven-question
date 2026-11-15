@@ -16,6 +16,11 @@ const MapGeneratedStubScript := preload("res://src/ui/exploration/map_generated_
 
 ## 真实探索系统引用（可为 null——测试注入桩或 Autoload 缺失）。
 var system: Node = null
+## map_generated 处理回调（屏幕的 [method NodeGraphScreen._on_map_generated]）——
+## 连接与退订都靠它，所以必须记下来（[method unbind] 无从凭空还原这个 Callable）。
+var map_handler: Callable = Callable()
+## node_moved 处理回调（屏幕的迷雾消散重算；可无效——调用方不需要时传空）。
+var move_handler: Callable = Callable()
 ## stub 降级发射器实例（真实源可用时为 null）。
 var stub_emitter: Node = null
 ## 当前是否为 stub 降级（屏幕经 [method NodeGraphScreen.is_using_stub_source] 暴露）。
@@ -36,18 +41,55 @@ var from_system: bool = false
 ## [br][param p_system] 探索系统（注入或 Autoload，可空）。[br]
 ## [param p_host] stub 发射器的挂载宿主（一般是屏幕自身，随屏幕释放）。[br]
 ## [param p_handler] map_generated 处理回调（屏幕的 [method NodeGraphScreen._on_map_generated]）。[br]
-func resolve(p_system: Node, p_host: Node, p_handler: Callable) -> void:
+## [param p_move_handler] node_moved 处理回调（屏幕的迷雾消散重算；可空）。[br]
+## [br][b]真实源的信号连接也在这里[/b]：本模块是「数据源」这件事的唯一归属地——
+## 连哪个信号、连给谁，跟「用真实源还是 stub」是同一个决定（此前屏幕另有一处
+## 连接，两处各记一份，退订也就各自漏掉）。[br]
+func resolve(p_system: Node, p_host: Node, p_handler: Callable,
+		p_move_handler: Callable = Callable()) -> void:
 	system = p_system
+	map_handler = p_handler
+	move_handler = p_move_handler
 	using_stub = false
 	stub_emitter = null
-	# 真实源的 map_generated 连接由屏幕统一处理（同一处连 node_moved 等）——
-	# 本模块只在降级时额外接 stub 自己的信号。
 	if system != null and system.has_signal(&"map_generated"):
+		bind_signals()
 		return
 	stub_emitter = MapGeneratedStubScript.new()
 	p_host.add_child(stub_emitter)
 	stub_emitter.map_generated.connect(p_handler)
 	using_stub = true
+
+
+## 连接真实系统的 map_generated / node_moved（幂等——重复调用不重复连）。[br]
+## [br][b]为什么配对必须有 unbind[/b]：[method unbind] 见那里的说明（退出探索后
+## 旧界面仍挂在信号上会收到不该收的广播）。
+func bind_signals() -> void:
+	if system == null:
+		return
+	if system.has_signal(&"map_generated") and not system.map_generated.is_connected(
+			map_handler):
+		system.map_generated.connect(map_handler)
+	if move_handler.is_valid() and system.has_signal(&"node_moved") \
+			and not system.node_moved.is_connected(move_handler):
+		system.node_moved.connect(move_handler)
+
+
+## 断开真实系统的信号——[b]界面离树时必须调用[/b]。[br]
+## [br][b]为什么不能只等释放[/b]：退出探索走 [code]remove_child + queue_free[/code]，
+## 而 [code]queue_free[/code] 到帧末才真正执行；这中间玩家（或测试）完全可能再次
+## 进图，[code]enter_map[/code] 广播的 [code]map_generated[/code] 会打到这棵
+## [b]已脱离场景树[/b]的旧界面上——它随即去查 Autoload（绝对路径）并重建
+## Tween/Timer，全是「节点不在树里」的引擎报错（实测：重进地图时刷出一串
+## [code]Can't use get_node() with absolute paths from outside the active scene tree[/code]）。
+func unbind() -> void:
+	if system == null:
+		return
+	if system.has_signal(&"map_generated") and system.map_generated.is_connected(map_handler):
+		system.map_generated.disconnect(map_handler)
+	if move_handler.is_valid() and system.has_signal(&"node_moved") \
+			and system.node_moved.is_connected(move_handler):
+		system.node_moved.disconnect(move_handler)
 
 
 ## 触发地图加载。[br]

@@ -219,6 +219,31 @@ static func _mount_event_presenter(p_host: Control, p_es: Node) -> RefCounted:
 	return presenter
 
 
+## 快照下发给交互侧子组件（interactor / popup_host）——组件缺席时静默跳过。[br]
+## [br][b]为什么快照下发归装配器[/b]：哪些组件需要快照、拿哪一份，正是装配知道的事
+## （是它建的这些组件）；屏幕只说「有新快照了」，不必逐个记住键名。[br]
+## [br]S17-006：弹窗宿主的快照必须随移动重下发——否则它的 [code]current_node[/code]
+## 停在上一节点，战斗弹窗会锚在「出发节点」而非「到达节点」。
+static func push_snapshot(p_components: Dictionary, p_snapshot: Dictionary) -> void:
+	var mount: Variant = p_components.get("interaction_mount")
+	if mount == null:
+		return
+	for key: StringName in [&"interactor", &"popup_host"]:
+		var component: Variant = mount.get(key)
+		if component != null:
+			component.call(&"apply_snapshot", p_snapshot)
+
+
+## 首次进入教程入口（S17-005）——组件缺席时静默跳过。
+static func notify_map_entered(p_components: Dictionary) -> void:
+	var mount: Variant = p_components.get("interaction_mount")
+	if mount == null:
+		return
+	var tutorial: Variant = mount.get(&"tutorial")
+	if tutorial != null:
+		tutorial.call(&"on_map_entered")
+
+
 ## 转发回调表——交互组件的到达/反馈信号经屏幕公开信号再暴露（审查 H3——
 ## 后续 story 只连屏幕信号，不依赖私有成员）。
 static func _forward_table(p_screen: Node) -> Dictionary:

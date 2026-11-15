@@ -34,13 +34,28 @@ grow_horizontal = 0
 horizontal_alignment = 2
 text = "AP: 0"
 
-[node name="BackButton" type="Button" parent="TopBar"]
+[node name="ExitButton" type="Button" parent="TopBar"]
 layout_mode = 1
 offset_left = 16.0
 offset_top = 8.0
-offset_right = 112.0
+offset_right = 128.0
 offset_bottom = 40.0
-text = "返回地图选择"
+text = "退出探索"
+
+[node name="StatusLabel" type="Label" parent="TopBar"]
+layout_mode = 1
+offset_left = 144.0
+offset_top = 12.0
+offset_right = 720.0
+offset_bottom = 36.0
+theme_override_colors/font_color = Color(0.9, 0.75, 0.3, 1)
+vertical_alignment = 1
+visible = false
+
+[node name="ExitDialog" type="ConfirmationDialog" parent="."]
+title = "退出探索"
+ok_button_text = "确认退出"
+cancel_button_text = "继续探索"
 
 [node name="NodeGraphViewport" type="Control" parent="."]
 layout_mode = 1

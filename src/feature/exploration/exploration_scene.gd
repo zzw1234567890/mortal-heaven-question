@@ -12,11 +12,17 @@ extends Control
 ## 已连 [method _on_enter_map_requested]（挂载 NodeGraphScreen 并把玩家选中的
 ## 地图 ID 转交给它）；[signal MapSelectScreen.reentry_requested] 意图仍无下游
 ## 消费者（重入实际编排归探索系统）。[br]
+## [br][b]退出探索闭环[/b]：节点图的 [signal NodeGraphScreen.back_to_map_select_requested]
+## 连到 [method _on_exit_exploration_requested]——走既有
+## [code]ExplorationMapFlush.end_exploration(PLAYER_QUIT)[/code] 结算，再拆界面回到
+## 地图选择（GDD exploration-system.md §8「退出按钮在探索HUD中始终可用」）。此前该
+## 意图全库无消费者，玩家在行动力见底时无处可退。[br]
 ## [br][b]数据链[/b]：容器[b]不生成地图[/b]——[code]NodeGraphScreen.trigger_map_load[/code]
 ## 调 [code]ExplorationSystem.enter_map[/code]，地图生成 / GSM 写入 / 信号广播都在
 ## 系统侧；容器只传「玩家点了哪张图」。[br]
 ##
-## 来源: ADR-0031 §1、ADR-0005（场景切换唯一仲裁）、story-002/story-003。
+## 来源: ADR-0031 §1、ADR-0005（场景切换唯一仲裁）、ADR-0014 §决策 5、
+## story-002/story-003。
 
 ## MapSelectScreen 场景常量——实例化地图选择界面（含静态节点树，须用
 ## PackedScene.instantiate() 而非脚本 new()——脚本 new 不加载 .tscn 节点）。
@@ -27,6 +33,9 @@ const NodeGraphScreenScene := preload("res://src/ui/exploration/node_graph_scree
 const ResultViewScript := preload("res://src/feature/combat/combat_result_view.gd")
 ## HUD 通知入口（战斗奖励到账提示——HUD 未挂载时静默降级）。
 const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
+## 探索系统脚本——[code]EndReason[/code] 枚举的真理来源（preload 避免 headless 下
+## 的全局名解析问题，同 [code]node_interaction_popup_host.gd[/code] 的 SceneManager 口径）。
+const ExplorationSystemScript := preload("res://src/feature/exploration_system.gd")
 
 ## 地图选择界面实例（挂载子节点）。
 var map_select_screen: Control = null
@@ -89,5 +98,67 @@ func _on_enter_map_requested(p_map_id: StringName) -> void:
 	if node_graph_screen != null:
 		return
 	node_graph_screen = NodeGraphScreenScene.instantiate()
+	# 退出探索意图（GDD exploration-system.md §8「退出按钮在探索HUD中始终可用」）
+	# ——本容器是唯一同时持有节点图与结算入口的地方。
+	node_graph_screen.back_to_map_select_requested.connect(_on_exit_exploration_requested)
 	add_child(node_graph_screen)
 	node_graph_screen.trigger_map_load(p_map_id)
+
+
+## 主动退出探索意图（[signal NodeGraphScreen.back_to_map_select_requested]）——结算并
+## 退回地图选择界面。[br]
+## [br][b]顺序[/b]：先结算再拆节点图。结算走既有 [code]ExplorationMapFlush[/code]
+## （[code]end_exploration[/code] + [code]EndReason.PLAYER_QUIT[/code]）——它负责把
+## [code]collected_*[/code] 全额转入 [code]player.*[/code]、清导航状态、清 DAG 缓存；
+## 先拆界面会让结算时读到的 [code]current_map[/code] 变成空（拆界面之前只有这一处
+## 能读），玩家已收集的资源就留在了 [code]map_states[/code] 里永远转不出来。[br]
+## [br][b]为什么是 PLAYER_QUIT[/b]：GDD §8 明说「主动退出 = 全额保留，与行动力归零
+## 结束相同，区别仅在触发方式」——用 [code]AP_DEPLETED[/code] 描述一次主动操作会
+## 让存档/统计里的事件语义失真。[br]
+## [br][b]结算失败仍拆界面[/b]：无活跃地图时结算直接返回（GSM 里本就没有东西可转），
+## 此时卡在节点图里比退出去更糟。[br]
+## [br]来源: ADR-0014 §决策 5 探索结束结算、GDD exploration-system.md §5/§8。
+func _on_exit_exploration_requested() -> void:
+	_settle_active_exploration()
+	_unmount_node_graph()
+
+
+## 结算当前地图（[code]EndReason.PLAYER_QUIT[/code]）。[br]
+## [br][b]返回[/b]：结算摘要（系统不可用时为只能标出原因的短字典）——测试断言用。
+func _settle_active_exploration() -> Dictionary:
+	var es: Node = get_node_or_null(NodePath("/root/ExplorationSystem"))
+	if es == null or not es.has_method(&"end_exploration"):
+		push_warning("ExplorationScene: 探索系统不可用，退出未结算")
+		return {}
+	return es.call(&"end_exploration", ExplorationSystemScript.EndReason.PLAYER_QUIT)
+
+
+## 卸载节点图并刷新地图选择界面——回到「选择地图」这一步。[br]
+## [br][b]为什么不重建地图选择界面[/b]：[method _on_enter_map_requested] 只把节点图
+## [code]add_child[/code] 叠在上面，地图选择界面[b]从未被卸下[/b]——重建会多出一份
+## 需要显式回收的实例，而旧实例在 [method Node.queue_free] 生效前仍连着 GSM 的
+## [signal GameStateManager.resource_changed]（结算刚写的那笔灵石会打到一棵已脱树
+## 的界面上）；刷新既有的那份没有这一类时序问题。[br]
+## [br][b]为什么要显式刷新[/b]：[method MapSelectScreen._refresh_map_list] 只在
+## [code]_ready[/code] 与 [code]resource_changed[/code] 时跑，而 [code]_ready[/code]
+## 早在本局开始前就跑过了——不刷新的话卡片上的可重入状态与余额停在进图那一刻。[br]
+## [br][b]解除引用[/b]：[member node_graph_screen] 必须置空——[method
+## _on_enter_map_requested] 靠它判「是否已挂载」，留着会拒绝下一次进入。
+func _unmount_node_graph() -> void:
+	if node_graph_screen == null:
+		return
+	if node_graph_screen.back_to_map_select_requested.is_connected(
+			_on_exit_exploration_requested):
+		node_graph_screen.back_to_map_select_requested.disconnect(
+				_on_exit_exploration_requested)
+	remove_child(node_graph_screen)
+	node_graph_screen.queue_free()
+	node_graph_screen = null
+	if map_select_screen != null:
+		# 重读两侧数据（列表 + 余额）——[method MapSelectScreen._refresh_map_list] /
+		# [method MapSelectScreen._refresh_balance] 是它自己的读取面，这里只是触发一次
+		# 「现取」（跨模块调私有方法是本库既有做法：子模块走
+		# [code]_parent.call("_get_map_config")[/code]；[code]MapSelectScreen[/code]
+		# 已贴 300 行软上限，不为其新开一个仅转发的公开方法）。
+		map_select_screen.call(&"_refresh_map_list")
+		map_select_screen.call(&"_refresh_balance")
