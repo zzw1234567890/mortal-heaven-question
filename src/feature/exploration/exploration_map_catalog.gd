@@ -16,7 +16,12 @@ extends RefCounted
 ## 来源: GDD exploration-system.md §1/§3 步骤⑥/§7 回旧地图、ADR-0014 §决策 2、
 ## DEBT-EUI-006-3 / DEBT-EUI-006-5。
 
+## 首通额外奖励表（按难度档——本文件不逐档重复，见类文档「首通额外奖励」）。
+const FirstClearRewards := preload(
+		"res://src/feature/exploration/exploration_first_clear_rewards.gd")
+
 ## 难度档位 → 默认层数 / 节点数 / 敌人境界（与 ExplorationSystem.DIFFICULTY_CONFIGS 同构）。[br]
+## [br][b]首通额外奖励[/b]：不在本表逐档重复，由 [code]exploration_first_clear_rewards.gd[/code] 按档位提供（[method _difficulty_defaults] 注入）。[br]
 ## [br][b]ap_cost[/b]：本档地图每次移动的行动力开销（GDD action-point-system.md
 ## §调优参数「每格消耗 1，安全范围 1-2」——出厂全档为 1，键存在的意义是
 ## 「按地图配置扣」走的是配置读取而不是硬编码常量；单独的地图可覆盖它）。[br]
@@ -115,10 +120,7 @@ const MAP_ID_ALIASES: Dictionary = {
 ## [code]design/gdd/exploration-system.md[/code] §地图重入消耗规则的重入基价表与之
 ## 在个别地图上不一致（如归墟·浮云陆：GDD 表作「高」、现有登记作「极高」）——
 ## 该分歧是存量（本次未改动既有 10 张的档位），不因本次登记而变大。[br]
-## [br][b]命名口径[/b]：章节表早期用连写 ID（[code]cang_xuan_zhengdao_meng[/code]），
-## 地图选择用逐词下划线（[code]cang_xuan_zheng_dao_meng[/code]）——章节表已改为
-## 规范写法，历史写法的读取兼容由 [constant MAP_ID_ALIASES] + [method
-## canonical_id] 承担（见 [method config_for] 的入口规范化）。
+## [br][b]命名口径[/b]：本表的键一律为规范写法；历史写法的读取兼容见 [constant MAP_ID_ALIASES]。
 const MAPS: Dictionary = {
 	&"qing_yun_jian_zong": {
 		"name": "青云剑宗", "difficulty": 0, "unlock_realm": 1, "max_realm": 1,
@@ -288,6 +290,10 @@ static func _difficulty_defaults(p_difficulty: int) -> Dictionary:
 		index = 1
 	var config: Dictionary = (DIFFICULTY_DEFAULTS[index] as Dictionary).duplicate(true)
 	config["difficulty"] = index
+	# 首通额外奖励——按难度档注入（表在 exploration_first_clear_rewards.gd，
+	# 避免 17 张地图各抄一遍；消费方是 ExplorationEconomy.calculate_map_clear_rewards
+	# 的 config.get("first_clear_reward", {}) 钩子）。
+	config["first_clear_reward"] = FirstClearRewards.for_difficulty(index)
 	config["weights"] = {"combat": 40, "event": 30, "shop": 15, "rest": 10,
 			"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
 			"elite": 5, "action_spring": 8}

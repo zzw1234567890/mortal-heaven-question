@@ -17,13 +17,24 @@ extends Control
 ## epic 入库后替换为 key（同 S16/S17 TEXT_* 口径）。[br]
 ## [br][b]战斗节点胜利标记[/b]：从战斗结算/战败返回探索时，若结果为胜利，
 ## 标记战斗开始的节点为已清（GSM visited_nodes）。[br]
+## [br][b]Boss 战胜利 = 本图通关[/b]：开战上下文里记的 [code]combat_type[/code]
+## 为 [code]boss[/code] 时不走「标一格已清」，而是经
+## [code]ExplorationSystem.end_exploration(BOSS_DEFEATED)[/code] 走完整通关结算
+## （通关次数 / 首通标记 / 通关奖励 / 结算面板视图）——见 [method _settle_boss_victory]。[br]
 ## 来源: ADR-0005（场景切换唯一仲裁）、ADR-0031（表现层基线）、
 ## gate-check-presentation-layer-complete-2026-11-08 §B1（四占位场景）、
-## ADR-0014 §决策 1 状态分层模型。
+## ADR-0014 §决策 1 状态分层模型、GDD exploration-system.md §5、
+## GDD exploration-ui-system.md §7。
 
 ## SceneManager 脚本常量——SceneID / TransitionType 单一真理来源
 ## （preload 而非 Autoload 全局名——与 identity_select / node_popup_host 同源）。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
+## 开战上下文（跨场景读回「这场是不是 Boss 战」——见
+## [method _mark_battle_node_cleared_if_victory]）。
+const LaunchScript := preload("res://src/feature/combat/combat_launch_context.gd")
+## 探索系统脚本——[code]EndReason[/code] 枚举的真理来源（preload 避免 headless 下
+## 的全局名解析问题；同 exploration_scene.gd 口径，不在这里另写一份字面值）。
+const ExplorationSystemScript := preload("res://src/feature/exploration_system.gd")
 
 ## 底色（深墨基底——与 identity_select / loading 同源 BG-0 口径）。
 const BG_COLOR: Color = Color(0.071, 0.071, 0.086)
@@ -121,8 +132,8 @@ func _build() -> void:
 ## [br][b]转场类型[/b]：COMBAT_TO_EXPLORE（音频矩阵唯一的「→探索」行，
 ## 1.0s 淡出淡入——结算/战败/商店/事件/养成共用）。[br]
 ## [br][b]from 动态取当前场景[/b]：不写魔数（PauseMenu M-2 先例）。[br]
-## [br][b]战斗节点胜利标记[/b]：若从战斗结算/战败返回，且结果为胜利，
-## 标记战斗开始的节点为已清（GSM visited_nodes）。[br]
+## [br][b]结算必须先于转场[/b]：通关结算会 publish 面板视图（跨场景缓存），
+## 面板挂在转场[b]之后[/b]的探索场景里——顺序反了面板就是空的。[br]
 ## [br]来源: ADR-0005、ADR-0014 §决策 1 状态分层模型。
 func _on_return_pressed() -> void:
 	var sm: Node = _scene_manager()
@@ -132,35 +143,56 @@ func _on_return_pressed() -> void:
 	var from_id: int = screen_id
 	if sm.has_method(&"get_current_scene_id"):
 		from_id = int(sm.call(&"get_current_scene_id"))
-	# 战斗胜利时标记节点为已清
 	_mark_battle_node_cleared_if_victory()
 	sm.call(&"request_scene_change", from_id,
 		SceneManagerScript.SceneID.EXPLORATION,
 		SceneManagerScript.TransitionType.COMBAT_TO_EXPLORE)
 
 
-## 战斗胜利时标记节点为已清——GSM visited_nodes。[br]
-## [br][b]条件[/b]：当前场景是 RESULT_SCREEN (8) 或 DEFEAT_SCREEN (9)，[br]
-## 战斗结果为胜利，且探索侧有战斗节点上下文。[br]
-## [br][b]语义[/b]：胜利 → 节点标记为已清（加入 visited_nodes），[br]
-## 失败/撤退 → 不标记（玩家主动逃跑或战败不算通关）。[br]
-## [br]来源: ADR-0014 §决策 1 状态分层模型。
+## 战斗胜利的收尾（既有调用点与本方法名保持不变——它就是入口）。[br]
+## [br][b]两分支[/b]：开战上下文记的 [code]combat_type[/code] 是 [code]boss[/code]
+## 时走本图[b]通关结算[/b]（[method _settle_boss_victory]）；其余（普通/精英，
+## 以及无上下文的旧调用方）仍只把这一格标为已清。[br]
+## [br][b]判据是开战上下文而不是节点类型[/b]：跨场景之后节点图已释放，只剩这一份
+## 上下文能回答「刚打完的是不是 Boss」——见
+## [method CombatLaunchContext.get_origin_combat_type]。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型、GDD exploration-system.md §5。
 func _mark_battle_node_cleared_if_victory() -> void:
-	# 只处理战斗结算/战败场景（8 或 9）
-	if screen_id != 8 and screen_id != 9:
-		return
-	# 检查战斗结果
-	var view: RefCounted = _get_combat_result_view()
-	if view == null:
-		return
-	if not view.has_method(&"is_victory") or not bool(view.call(&"is_victory")):
-		return
-	# 获取战斗开始的节点 ID
-	var LaunchScript := preload("res://src/feature/combat/combat_launch_context.gd")
-	var node_id: int = LaunchScript.get_origin_node_id()
+	var node_id: int = _victory_origin_node()
 	if node_id < 0:
 		return
-	# 标记节点为已清——统一走 ExplorationSystem.mark_node_visited（与到达标记同一口径）
+	if _is_boss_battle() and _settle_boss_victory():
+		return
+	_mark_node_cleared(node_id)
+
+
+## 刚打完的是不是 Boss 战（开战上下文的 [code]combat_type[/code] 判据）。[br]
+## [br]无探索侧上下文的旧调用方得到 [code]&""[/code] → false，走普通标记路径。
+func _is_boss_battle() -> bool:
+	return LaunchScript.get_origin_combat_type() == LaunchScript.COMBAT_TYPE_BOSS
+
+
+## Boss 战胜利 → 本图通关结算（通关次数 / 首通标记 / 奖励 / 结算面板视图）。[br]
+## [br][b]返回[/b]：结算是否真的跑起来了。[code]summary[/code] 带
+## [code]is_first_clear[/code] 即表示走通了 [code]_settle_boss_defeated[/code]；
+## GSM 不可用或无活跃地图时结算提前返回，摘要里没有这个键——此时调用方回退到
+## 「只标一格已清」，免得玩家打完 Boss 连节点都没清。[br]
+## [br][b]为什么经 Autoload 调用而非本地实现[/b]：通关结算属 Feature 层
+## （ADR-0014 §决策 5），本场景只负责「胜利之后该请求哪种结算」。[br]
+## [br]来源: GDD exploration-system.md §5、GDD exploration-ui-system.md §7。
+func _settle_boss_victory() -> bool:
+	var exploration: Node = get_node_or_null("/root/ExplorationSystem")
+	if exploration == null or not exploration.has_method(&"end_exploration"):
+		push_warning("PlaceholderScene: ExplorationSystem 不可用——Boss 通关结算跳过")
+		return false
+	var summary: Dictionary = exploration.call(&"end_exploration",
+			ExplorationSystemScript.EndReason.BOSS_DEFEATED)
+	return summary.has("is_first_clear")
+
+
+## 标记战斗开始的节点为已清——统一走 [code]ExplorationSystem.mark_node_visited[/code]
+## （与到达标记同一口径）；系统不可用时回退 GSM 的 [code]add_visited_node[/code]。
+func _mark_node_cleared(node_id: int) -> void:
 	var exploration: Node = get_node_or_null("/root/ExplorationSystem")
 	if exploration != null and exploration.has_method(&"mark_node_visited"):
 		exploration.call(&"mark_node_visited", node_id)
@@ -169,6 +201,22 @@ func _mark_battle_node_cleared_if_victory() -> void:
 	if gsm == null or not gsm.has_method(&"add_visited_node"):
 		return
 	gsm.call(&"add_visited_node", node_id)
+
+
+## 本次返回是否为「一场胜利的战斗」，是则给出其起始节点 ID（否则 -1）。[br]
+## [br][b]条件[/b]：当前场景是 RESULT_SCREEN (8) / DEFEAT_SCREEN (9)、战斗结果为
+## 胜利、且探索侧留下了战斗节点上下文。失败/撤退不标记也不结算——主动逃跑
+## 或战败不算通关。
+## [br]来源: ADR-0014 §决策 1 状态分层模型。
+func _victory_origin_node() -> int:
+	if screen_id != 8 and screen_id != 9:
+		return -1
+	var view: RefCounted = _get_combat_result_view()
+	if view == null or not view.has_method(&"is_victory"):
+		return -1
+	if not bool(view.call(&"is_victory")):
+		return -1
+	return LaunchScript.get_origin_node_id()
 
 
 ## 获取战斗结算对象（胜利判定用）。

@@ -36,11 +36,17 @@ const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
 ## 探索系统脚本——[code]EndReason[/code] 枚举的真理来源（preload 避免 headless 下
 ## 的全局名解析问题，同 [code]node_interaction_popup_host.gd[/code] 的 SceneManager 口径）。
 const ExplorationSystemScript := preload("res://src/feature/exploration_system.gd")
+## 地图通关结算面板的接线（Boss 胜利 → 本场景挂载时弹出结算 overlay）。
+const MapClearPresenterScript := preload("res://src/ui/exploration/map_clear_presenter.gd")
+## 卡牌模板查询入口（结算面板点开奖励卡牌时的详情来源；缺失时面板只显示载荷字段）。
+const CardSystemPath: StringName = &"/root/CardSystem"
 
 ## 地图选择界面实例（挂载子节点）。
 var map_select_screen: Control = null
 ## 节点图主界面实例（进入地图后挂载）。
 var node_graph_screen: Control = null
+## 地图通关结算接线（未挂载为 null）。
+var map_clear_presenter: RefCounted = null
 ## [b]测试注入[/b]：通知请求入口 [code]func(type: String, text: String) -> int[/code]。
 ## 为 null 时按 SceneManager → PersistentLayer/HUD 查找（生产路径）。
 var notify_cb: Callable = Callable()
@@ -54,6 +60,8 @@ func _ready() -> void:
 	map_select_screen.enter_map_requested.connect(_on_enter_map_requested)
 	# 战斗奖励回探索提示——一次性取走（取不到 = 本场无奖励/没打过战斗）
 	_flush_battle_reward_notice()
+	# 地图通关结算（Boss 胜利的那一局）——同一条「回到探索时检查一次」的时序
+	_mount_map_clear_settlement()
 
 
 ## 战斗奖励到账提示。[br]
@@ -87,6 +95,65 @@ func _notification_sink() -> Callable:
 	if hud == null or not hud.has_method(&"request_notification"):
 		return Callable()
 	return Callable(hud, &"request_notification")
+
+
+## 地图通关结算面板——Boss 战胜利后本场景挂载时弹出（GDD exploration-ui-system.md §7）。[br]
+## [br][b]时机同战斗奖励提示[/b]：结算与 [code]MapClearView[/code] 的发布都在转场
+## [b]之前[/b]（[code]PlaceholderScene[/code] 里调 [code]end_exploration(BOSS_DEFEATED)[/code]），
+## 而 Boss 胜利的转场目的地就是本场景——面板在此挂载，取走即清（反复进出不重放）。[br]
+## [br][b]为什么挂在本容器而不是节点图[/b]：打完 Boss 回到的是[b]地图选择界面[/b]
+## （节点图要玩家点卡片才挂），挂在节点图上的面板永远不会出现。[br]
+## [br][b]「回到地图选择」出口[/b]：确认即收起 overlay，并刷新底下的地图列表与余额
+## ——[b]不复用[/b] [code]back_to_map_select_requested[/code]（那条会再触发一次
+## [code]end_exploration(PLAYER_QUIT)[/code]，多广播一次语义失真的结束事件）。[br]
+## [br][b]详情来源注入[/b]：面板点开奖励卡牌时读卡牌模板的 [code]description[/code] /
+## [code]flavor_text[/code]；CardSystem 缺失时提供者返回空字典，面板只用载荷字段
+## （不臆造描述文本）。[br]
+## [br]来源: GDD exploration-ui-system.md §7、ADR-0014 §决策 5、ADR-0031 §2。
+func _mount_map_clear_settlement() -> void:
+	map_clear_presenter = MapClearPresenterScript.new()
+	map_clear_presenter.set(&"detail_provider", Callable(self, &"_card_detail_extra"))
+	map_clear_presenter.call(&"attach", self, Callable(self, &"_on_map_clear_confirmed"))
+	map_clear_presenter.call(&"show_pending")
+
+
+## 通关结算已确认——刷新地图选择界面（列表 + 余额）。[br]
+## [br][b]为什么要显式刷新[/b]：与 [method _unmount_node_graph] 同源理由——
+## [method MapSelectScreen._refresh_map_list] / [method MapSelectScreen._refresh_balance]
+## 只在 [code]_ready[/code] 与 [code]resource_changed[/code] 时跑，而 [code]_ready[/code]
+## 早在本局开始前就跑过了；不刷新的话卡片上的「已通关」标记与余额停在进图那一刻。[br]
+## [br][b]不结算[/b]：BOSS_DEFEATED 的结算已经在转场前完成（本容器只负责收尾展示）。
+func _on_map_clear_confirmed() -> void:
+	if map_select_screen != null:
+		map_select_screen.call(&"_refresh_map_list")
+		map_select_screen.call(&"_refresh_balance")
+
+
+## 通关结算面板是否正开着（宿主查询/测试断言用）。
+func map_clear_panel_open() -> bool:
+	return map_clear_presenter != null and bool(
+			map_clear_presenter.call(&"is_panel_open"))
+
+
+## 卡牌详情补充字段——按模板 ID 查卡牌系统（面板点击奖励卡牌时调用）。[br]
+## [br][b]返回[/b]：[code]{description, flavor_text}[/code]；查不到模板时为空字典
+## （面板只用载荷里的名称/稀有度/类型，不编造描述）。[br]
+## [br][b]只读查询[/b]：本方法不改任何状态（ADR-0031 §2——UI 零状态所有权）。
+func _card_detail_extra(p_entry: Variant) -> Dictionary:
+	var entry: Dictionary = p_entry if p_entry is Dictionary else {}
+	var card_id: String = str(entry.get("template_id", entry.get("card_id", "")))
+	if card_id.is_empty():
+		return {}
+	var card_system: Node = get_node_or_null(NodePath(CardSystemPath))
+	if card_system == null or not card_system.has_method(&"get_template"):
+		return {}
+	var template: Variant = card_system.call(&"get_template", StringName(card_id))
+	if template == null:
+		return {}
+	return {
+		"description": str(template.get("description")),
+		"flavor_text": str(template.get("flavor_text")),
+	}
 
 
 ## 进入地图意图（[signal MapSelectScreen.enter_map_requested]）——挂载节点图主界面

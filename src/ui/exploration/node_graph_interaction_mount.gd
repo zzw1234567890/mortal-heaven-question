@@ -95,6 +95,10 @@ func _mount_popup_host(p_host: Control, p_renderer: Control, p_viewport: Control
 	interactor.combat_arrival_forwarded.connect(
 			func(roster: Array, ctype: StringName) -> void:
 				popup_host.on_combat_arrival(roster, ctype))
+	# Boss 到达（GDD §5 独立弹窗规格——与战斗同源，只是文案组与 kind 不同）
+	interactor.boss_arrival_forwarded.connect(
+			func(data: Dictionary) -> void:
+				popup_host.on_boss_arrival(data))
 	# 弹窗期间冻结键盘路径（鼠标/缩放平移由宿主经视口 input_frozen 冻结）
 	popup_host.popup_opened.connect(func(_nid: int, _kind: StringName) -> void:
 		if interactor != null:

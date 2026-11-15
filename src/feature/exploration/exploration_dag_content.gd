@@ -16,6 +16,13 @@ const HarvestTable := preload("res://src/feature/exploration/exploration_harvest
 ## 地图配置里敌人基准境界的键（缺键 = 旧配置，回退玩家境界并警告一次）。
 const KEY_ENEMY_REALM: String = "enemy_realm"
 
+## Boss 节点在节点图上显示的标签。[br]
+## [br][b]为什么不复用名册标签[/b]：`散修 ×3` 是「这一格有几个什么敌人」，
+## Boss 节点要回答的是「这是本图的终点」——节点图最后一层只有一格，图标已是王冠，
+## 标签再写敌人名反而看不出「打到这里就算通关」。敌人构成在开战前弹窗里给
+## （GDD exploration-ui-system.md §5），不在节点标签上给。
+const BOSS_LABEL: String = "Boss"
+
 
 ## 父节点引用——ExplorationSystem Autoload 实例。
 var _parent: Node = null
@@ -61,7 +68,18 @@ func _fill_one(p_detail: Dictionary, p_node_id: int, p_ntype: int,
 		_parent.NodeType.ENTRY:
 			p_detail["label"] = "入口"
 		_parent.NodeType.BOSS:
-			p_detail["label"] = "Boss"
+			# Boss 节点的敌人构成与战斗/精英同源（本图敌人池 + 地图境界定档），
+			# 但标签固定为「Boss」——见 [constant BOSS_LABEL]。
+			# [br][b]为什么按精英档生成名册[/b]：本图终点只有一格，人数与强度
+			# 都该高于沿途的普通战斗节点（精英档 = 数量 +[code]elite_bonus[/code]），
+			# 否则「打完 Boss 通关」和「打完一场普通战斗」在体感上没有区别。
+			_fill_encounter(p_detail, p_node_id, p_map_id, p_player_realm, true, p_config)
+			p_detail["label"] = BOSS_LABEL
+			# 遭遇展示名改回「Boss」——[method _fill_encounter] 按名册取名（如
+			# 「散修」），直接用会让开战标题变成「⚔ 散修」，看不出这是终点。
+			var encounter: Variant = p_detail.get(Fields.KEY_ENCOUNTER, {})
+			if encounter is Dictionary:
+				(encounter as Dictionary)[Fields.KEY_DISPLAY_NAME] = BOSS_LABEL
 		_parent.NodeType.COMBAT, _parent.NodeType.ELITE:
 			_fill_encounter(p_detail, p_node_id, p_map_id, p_player_realm,
 					p_ntype == _parent.NodeType.ELITE, p_config)

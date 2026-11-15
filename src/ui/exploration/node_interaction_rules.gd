@@ -25,11 +25,18 @@ const CombatPreview := preload("res://src/ui/exploration/node_combat_preview_rul
 ## [br][b]UI → Feature 的只读依赖[/b]：本文件只调它的静态纯函数 [code]heal_for[/code]，
 ## 不碰 HP 读写——与 [method spring_restore_all] 的只读包装同源口径。
 const RestScript := preload("res://src/feature/exploration/exploration_rest.gd")
+## 开战上下文的战斗类型常量——Boss 战 token 的唯一来源（[constant KIND_BOSS]
+## 的键取它，不在这里另写一遍 [code]&"boss"[/code]）。
+const CombatLaunchScript := preload("res://src/feature/combat/combat_launch_context.gd")
 
 ## === 弹窗种类（kind）=======================================================
 
 const KIND_NONE: StringName = &""
 const KIND_COMBAT: StringName = &"combat"
+## Boss 战确认弹窗（GDD §5 独立规格）——与 [constant KIND_COMBAT] 同样是「进战斗」，
+## 但标题/正文/警示都不同（Boss 战撤退按战败处理）；确认动作完全一致（
+## [constant ACTION_ENTER_COMBAT]）——分的是文案不是流程。
+const KIND_BOSS: StringName = CombatLaunchScript.COMBAT_TYPE_BOSS
 const KIND_SHOP: StringName = &"shop"
 const KIND_SPRING: StringName = &"action_spring"
 const KIND_REST: StringName = &"rest"
@@ -57,15 +64,18 @@ const ACTION_ENTER_TRIBULATION: StringName = &"enter_tribulation"
 const DISPATCH_TABLE: Dictionary = {
 	&"combat": KIND_COMBAT,
 	&"elite": KIND_COMBAT,
+	CombatLaunchScript.COMBAT_TYPE_BOSS: KIND_BOSS,
 	&"shop": KIND_SHOP,
 	&"action_spring": KIND_SPRING,
 	&"rest": KIND_REST,
 	&"tribulation": KIND_TRIBULATION,
 }
 
-## kind → 确认动作（数据驱动，非 if-elif 链）。
+## kind → 确认动作（数据驱动，非 if-elif 链）。[br]
+## [b]Boss 与普通战斗同一个动作[/b]：分的是弹窗文案与战斗类型 token，不是流程。
 const CONFIRM_ACTIONS: Dictionary = {
 	KIND_COMBAT: ACTION_ENTER_COMBAT,
+	KIND_BOSS: ACTION_ENTER_COMBAT,
 	KIND_SHOP: ACTION_OPEN_SHOP,
 	KIND_SPRING: ACTION_USE_SPRING,
 	KIND_REST: ACTION_REST,
@@ -77,15 +87,17 @@ const CONFIRM_ACTIONS: Dictionary = {
 ## 弹窗标题（含 GDD §4 线框图标）。
 const TITLES: Dictionary = {
 	KIND_COMBAT: "⚔ 战斗",
+	KIND_BOSS: "👑 Boss战",
 	KIND_SHOP: "🏪 坊市",
 	KIND_SPRING: "💧 灵泉",
 	KIND_REST: "💚 歇脚处",
 	KIND_TRIBULATION: "🌩 渡劫台",
 }
 
-## 确认按钮文案（GDD §4/§4b 线框原文）。
+## 确认按钮文案（GDD §4/§4b/§5 线框原文）。
 const CONFIRM_TEXTS: Dictionary = {
 	KIND_COMBAT: "进入战斗",
+	KIND_BOSS: "进入战斗",
 	KIND_SHOP: "进入商店",
 	KIND_SPRING: "使用灵泉",
 	KIND_REST: "休息",
@@ -95,13 +107,14 @@ const CONFIRM_TEXTS: Dictionary = {
 ## 取消按钮文案——点击等效「先等等」（AC-3：关闭弹窗、停留该节点、AP 不回退）。
 const CANCEL_TEXTS: Dictionary = {
 	KIND_COMBAT: "先等等",
+	KIND_BOSS: "再准备一下",
 	KIND_SHOP: "离开",
 	KIND_SPRING: "离开",
 	KIND_REST: "继续前进",
 	KIND_TRIBULATION: "再等等",
 }
 
-## 固定正文（GDD §4/§4b 线框原文；战斗与渡劫的正文另有动态行）。
+## 固定正文（GDD §4/§4b 线框原文；战斗/Boss/渡劫的正文另有动态行）。
 const BODY_LINES: Dictionary = {
 	KIND_SHOP: ["「你走进一间修仙坊市」", "这里有各种丹药和法器"],
 	KIND_SPRING: ["「一股灵气从泉眼中涌出」", "回复全部行动力"],
@@ -116,6 +129,8 @@ const TRIBULATION_WARNING_NOTE: String = "——远严于普通战败（50%）"
 ## 普通战斗/精英提示（GDD §4 线框「推荐战力」行——B3 裁决采用角色数版本）。
 ## 转发到 [NodeCombatPreviewRules]——文案只在一处定义。
 const TEXT_RECOMMENDED_PREFIX: String = CombatPreview.TEXT_RECOMMENDED_PREFIX
+## Boss 战确认弹窗的文案内核（GDD §5 独立规格——文案与警示数值的唯一来源）。
+const BossConfirmScript := preload("res://src/ui/exploration/boss_confirm_rules.gd")
 
 ## === 颜色（美术圣经「墨骨丹青」——朱砂红 / 淡墨 / 暖白）====================
 const COLOR_TITLE: Color = Color(0.94, 0.92, 0.86)
@@ -228,6 +243,21 @@ static func realm_name(realm: int) -> String:
 ## 渡劫警示行（朱砂红渲染的独立行——AC-6「不与 Boss 50% 混用」）。
 static func tribulation_warning_lines() -> Array:
 	return [TRIBULATION_WARNING, TRIBULATION_WARNING_NOTE]
+
+
+## Boss 战警示行（GDD §5——撤退视为战败，保留 50% 本局修为）。[br]
+## [br][b]转发[/b]到 [BossConfirmRules.warning_lines]（文案只在一处定义）——
+## 与 [method tribulation_warning_lines] 分成两个方法而非一个带参方法：
+## 两边数值不同（50% vs 80%）且 GDD 两处都明写「不得混用」，传错要编译不过。
+static func boss_warning_lines() -> Array:
+	return BossConfirmScript.warning_lines()
+
+
+## Boss 战弹窗的动态正文行（GDD §5 线框：地图 → 敌人 → 境界 → 推荐上场）。[br]
+## [br][b]转发[/b]到 [BossConfirmRules.body_lines]（实现只在一处）。
+static func boss_body_lines(p_map_name: String, p_encounter: Dictionary,
+		p_roster: Array, p_max_deploy: int) -> Array:
+	return BossConfirmScript.body_lines(p_map_name, p_encounter, p_roster, p_max_deploy)
 
 
 ## 灵泉回复量校验——[b]期望值[/b]（上限 - 当前）；仅供测试断言系统返回值，

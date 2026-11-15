@@ -33,10 +33,23 @@ const KEY_ENEMY_LEVEL: String = "enemy_level"
 const KEY_REWARDS: String = "rewards"
 const KEY_PLAYER_ROSTER: String = "player_roster"
 
+## Boss 战的战斗类型取值——[constant KEY_COMBAT_TYPE] 的第三个取值
+## （既有两个是 [code]&"combat"[/code] / [code]&"elite"[/code]）。[br]
+## [br][b]为什么不是第四个信号[/b]：Boss 节点在探索侧走独立的
+## [code]boss_node_reached[/code]（GDD §5 有专属弹窗规格），但「这场战斗是不是
+## Boss 战」在跨场景之后只剩这一个字段可读——胜利结算据此决定「标节点已清」还是
+## 「本图通关」（[code]placeholder_scene.gd[/code]）。[br]
+## [br][b]单一来源[/b]：UI 侧（[code]node_interaction_rules.gd[/code] 的 Boss 警示行、
+## [code]node_interaction_popup_host.gd[/code] 的 Boss 到达分支）转引本常量，
+## 不各写一遍 [code]&"boss"[/code]。
+const COMBAT_TYPE_BOSS: StringName = &"boss"
+
 ## 待消费的上下文（null/空 = 无探索侧上下文）。
 static var _pending: Dictionary = {}
 ## 战斗开始的节点 ID（战斗胜利后标记已清用）。
 static var _origin_node_id: int = -1
+## 战斗开始的战斗类型（[constant COMBAT_TYPE_BOSS] 时胜利 = 本图通关）。
+static var _origin_combat_type: StringName = &""
 
 
 ## 构造上下文——从节点详情 + 到达名册 + 玩家阵容合并出四份输入。[br]
@@ -71,6 +84,7 @@ static func build(p_node_id: int, p_combat_type: StringName, p_roster: Array,
 static func publish(context: Dictionary) -> void:
 	_pending = _sanitize(context) if context is Dictionary else {}
 	_origin_node_id = int(context.get(KEY_NODE_ID, -1))
+	_origin_combat_type = StringName(str(context.get(KEY_COMBAT_TYPE, "")))
 
 
 ## 净化——键转 String、丢弃运行时对象（对象/资源不进跨场景缓存）。[br]
@@ -115,12 +129,21 @@ static func peek() -> Dictionary:
 static func clear() -> void:
 	_pending = {}
 	_origin_node_id = -1
+	_origin_combat_type = &""
 
 
 ## 获取战斗开始的节点 ID（战斗胜利后标记已清用）。[br]
 ## [br][b]返回[/b]: 节点 ID（-1 表示无战斗节点上下文）。
 static func get_origin_node_id() -> int:
 	return _origin_node_id
+
+
+## 获取战斗开始的战斗类型（[constant COMBAT_TYPE_BOSS] 时胜利 = 本图通关）。[br]
+## [br][b]返回[/b]：战斗类型 token（[code]&""[/code] = 无探索侧上下文 / 旧调用方）。
+## [br][b]用途[/b]：战斗结算场景据此区分「普通/精英节点已清」与「Boss 战胜利 →
+## 触发本图通关结算」——两者都在战斗场景里发生，跨场景之后只剩这一个标记。
+static func get_origin_combat_type() -> StringName:
+	return _origin_combat_type
 
 
 ## 契约校验——返回空串表示可开战，否则返回可读的缺失项说明。[br]
