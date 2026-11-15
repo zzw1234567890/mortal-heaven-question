@@ -48,6 +48,8 @@ var _difficulty_label: Label
 var _status_label: Label
 ## 费用/不可重入标签。
 var _cost_label: Label
+## 解锁条件标签（未解锁时显示「需筑基期」等；已解锁为空且不占位）。
+var _lock_label: Label
 
 
 ## 初始化卡片视觉——[param map_entry] 为 [code]get_map_list()[/code] 载荷
@@ -101,6 +103,13 @@ func _build() -> void:
 	_cost_label.text = _cost_text()
 	box.add_child(_cost_label)
 
+	# 解锁条件行——未解锁时明确写出缺什么（GDD exploration-ui-system.md §1
+	# 「未解锁 → 灰色锁标记，不可点击，标明所需境界」；剧情前置同理）。
+	# 空文本时 Label 不占高度（GODOT 空 Label 的 min_size 为 0），已解锁卡不受影响。
+	_lock_label = Label.new()
+	_lock_label.text = locked_hint_text()
+	box.add_child(_lock_label)
+
 	# 视觉状态：锁定卡半透明遮罩 + 🔒 标记；tooltip 显示解锁条件/不可重入。
 	if is_unlocked_card():
 		modulate = Color(1.0, 1.0, 1.0, 1.0)
@@ -140,11 +149,26 @@ func _cost_text() -> String:
 	return ""
 
 
-## 悬停 tooltip 文本——未解锁显示「需X境界」；不可重入显示原因；其余空。
+## 未解锁卡片的条件文案——条目自带的 [code]locked_hint[/code]（Feature 层按探明表
+## 算好的「需筑基期」/「需通关苍玄古战场」/两者并排）。[br]
+## [br][b]缺字段回退[/b]：旧载荷（只带 [code]realm_requirement[/code]）按
+## 「需N境界」显示，与 [MapCard] 此前的 tooltip 口径一致——不因为载荷升级就
+## 让锁定卡说不出话。[br]
+## [br][b]返回[/b]：已解锁卡为空串（不占版面）。[br]
+func locked_hint_text() -> String:
+	if is_unlocked_card():
+		return ""
+	var hint: String = str(entry.get(&"locked_hint", ""))
+	if not hint.is_empty():
+		return hint
+	return TEXT_REALM_PREFIX + str(int(entry.get(&"realm_requirement", 0))) \
+			+ TEXT_REALM_SUFFIX
+
+
+## 悬停 tooltip 文本——未解锁显示解锁条件；不可重入显示原因；其余空。
 func _tooltip_text() -> String:
 	if not is_unlocked_card():
-		return "%s%d%s" % [TEXT_REALM_PREFIX,
-				int(entry.get(&"realm_requirement", 0)), TEXT_REALM_SUFFIX]
+		return locked_hint_text()
 	if bool(entry.get(&"is_cleared", false)) \
 			and not bool(entry.get(&"reentry_allowed", false)):
 		return TEXT_NO_REENTRY

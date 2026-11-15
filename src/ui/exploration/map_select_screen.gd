@@ -2,43 +2,36 @@ class_name MapSelectScreen
 extends Control
 ## MapSelectScreen —— 地图选择界面（exploration-ui Story S16-2）。
 ##
-## [b]节点形态[/b]（ADR-0031 §1）：场景内 Control 树（零新增 Autoload），
-## 挂载于 [code]res://src/feature/exploration/exploration_scene.tscn[/code]
-## 薄容器（本 story 落盘，闭合 SCENE_PATHS EXPLORATION 占位）。[br]
-## [br][b]结构[/b]：标题 + 顶部灵石余额 + 横向滚动卡片列表（ScrollContainer
-## + HBoxContainer，MapCard 动态构建）+ 重入确认弹窗（ConfirmationDialog）。[br]
-## [br][b]Logic 内核[/b]（BLOCKING 单测目标）：[method should_show_lock] /
+## [b]节点形态[/b]（ADR-0031 §1）：场景内 Control 树（零新增 Autoload），挂载于
+## [code]exploration_scene.tscn[/code] 薄容器（闭合 SCENE_PATHS EXPLORATION 占位）。[br]
+## [b]结构[/b]：标题 + 灵石余额 + 横向滚动卡片列表（ScrollContainer + HBoxContainer，
+## MapCard 动态构建）+ 重入确认弹窗（ConfirmationDialog）。[br]
+## [b]Logic 内核[/b]（BLOCKING 单测目标）：[method should_show_lock] /
 ## [method is_reenterable] / [method can_confirm_reentry] /
 ## [method unlock_requirement_text] / [method entry_action] 五个 static 纯函数
 ## （场景脚本内定义、static 暴露供 GUT 直调——S16-1 先例）。[br]
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：灵石余额与地图列表经 [MapSelectData]
-## 只读现取（UI 绝不写 GSM、绝不自行扣灵石）；列表刷新由 GSM [signal
-## resource_changed] 驱动（零轮询）。重入流只发意图（[signal reentry_requested]），
-## 扣费与拒绝归探索系统。[br]
-## [br][b]不硬编码地图[/b]：列表 100% 来自 [code]ExplorationSystem.get_map_list()[/code]
-## （探明表 [code]ExplorationMapCatalog.MAPS[/code] × GSM 组装）；此前的
-## [code]map_data_stub.gd[/code] 兜底随 get_map_list 落地删除——数据源不可用时
-## 列表为空，不塞假地图。[br]
-## [br][b]零轮询[/b]：无 [code]_process()[/code]。
+## [b]零状态所有权[/b]（ADR-0031 §2）：灵石余额与地图列表经 [MapSelectData] 只读现取
+## （UI 绝不写 GSM、绝不自行扣灵石）；列表刷新由 GSM [signal resource_changed] 驱动，
+## 重入流只发意图（[signal reentry_requested]），扣费与拒绝归探索系统。[br]
+## [b]不硬编码地图[/b]：列表 100% 来自 [code]ExplorationSystem.get_map_list()[/code]
+## （探明表 × GSM 组装）——数据源不可用时列表为空，不塞假地图（stub 兜底已删）。[br]
+## [b]未解锁卡[/b]：灰显 + 🔒 + 卡面条件行，点击由 [MapSelectNotice] 给中文提示不进场。[br]
+## [b]零轮询[/b]：无 [code]_process()[/code]。@experimental
 ##
-## @experimental
 ## 来源: ADR-0031、ADR-0014 §get_map_list 契约、control-manifest §Presentation、
 ## design/gdd/exploration-ui-system.md §1/§6、story-002-map-select-screen.md。
 
 ## === 视觉常量（数据驱动）====================================================
 
-## 卡片尺寸（B7 裁决）——MapCard 内部也声明，主界面用于滚动容器预估算。
-const CARD_SIZE: Vector2 = Vector2(360, 420)
-
 ## 固定 UI 词条（项目暂无本地化系统——S16-1 TEXT_* 同源豁免注记）。
 const TEXT_TITLE: String = "选择地图"
-## 顶部灵石余额前缀（AC-8——GDD 布局「灵石: 125」格式，不复用 TEXT_TITLE
-## 避免与左上角标题文字重复，code-review Required #1）。
+## 顶部灵石余额前缀（AC-8——GDD 布局「灵石: 125」格式，不复用 TEXT_TITLE 避免与
+## 左上角标题文字重复，code-review Required #1）。
 const TEXT_BALANCE_PREFIX: String = "灵石"
-## 重入弹窗的标题与取消文案（弹窗内的正文/明细文案在 [MapSelectReentryDialog]
-## ——那边是填控件的地方，词条跟着它走）。
-const TEXT_REENTRY_DIALOG_TITLE: String = "重入地图"
-const TEXT_REENTRY_CANCEL: String = "取消"
+## 卡片尺寸与重入弹窗词条[b]不在本脚本重复声明[/b]：前者在 [code]MapCard.setup[/code]
+## （卡片自建时写入 [code]custom_minimum_size[/code]），后者在 [code]map_select_screen.tscn[/code]
+## （title / ok_button_text / cancel_button_text）与 [MapSelectReentryDialog]。此处曾各存
+## 一份从无读取方的副本——留着只会与真源漂移（.claude/rules 禁止重复）。
 
 ## MapCard 脚本常量——动态构建卡片用（class_name 在动态加载下不可靠）。
 const MapCardScript := preload("res://src/ui/exploration/map_card.gd")
@@ -51,6 +44,8 @@ const ReentryDialogScript := preload(
 		"res://src/ui/exploration/map_select_reentry_dialog.gd")
 ## 手柄横向滚动（见 [MapSelectScroll]——设备限定逻辑只在一处）。
 const ScrollScript := preload("res://src/ui/exploration/map_select_scroll.gd")
+## 未解锁卡的中文提示出口（见 [MapSelectNotice]——文案与出口都在那边）。
+const NoticeScript := preload("res://src/ui/exploration/map_select_notice.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -60,6 +55,10 @@ var exploration_system: Node = null
 var resource_system: Node = null
 ## 动画开关——测试注入 + reduce-motion 预留接线点（S16-1 先例）。
 var animate: bool = true
+## [b]测试注入[/b]：未解锁卡提示的通知入口 [code]func(type, text) -> int[/code]。
+## 为 null 时按常驻 HUD 查找（生产路径，见 [MapSelectNotice.notification_sink]）
+## ——与 [code]ExplorationScene.notify_cb[/code] 同源注入点。
+var notify_cb: Callable = Callable()
 
 ## === 瞬态交互状态（ADR-0031 §2.1）=============================================
 
@@ -106,10 +105,9 @@ enum EntryAction {
 
 
 ## 卡片点击分流决策（AC-3/AC-5/AC-7）。[br]
-## [b]返回[/b]：锁定卡 → IGNORE；已通关可重入 → REENTER；已通关不可重入
-## （苍玄古战场）→ IGNORE（与未通关区分，QA-S16-2-001 回归目标）；未通关 →
-## ENTER。[br]纯函数、无 Autoload 访问——[method _on_card_activated] 消费它，
-## 路由缺陷可单测捕获。
+## [b]返回[/b]：锁定卡 → IGNORE；已通关可重入 → REENTER；已通关不可重入（苍玄古战场）
+## → IGNORE（与未通关区分，QA-S16-2-001 回归目标）；未通关 → ENTER。纯函数、无 Autoload
+## 访问——[method _on_card_activated] 消费它，路由缺陷可单测捕获。
 static func entry_action(entry: Dictionary) -> int:
 	if should_show_lock(entry):
 		return EntryAction.IGNORE
@@ -119,30 +117,30 @@ static func entry_action(entry: Dictionary) -> int:
 
 
 ## 锁定卡片判定（AC-1/AC-10）。[br]
-## [b]返回[/b]：[code]is_unlocked[/code] 为 false → true（灰显+🔒）；缺字段安全
-## 默认不锁定（[code].get(..., true)[/code] 视为已解锁）。纯函数。
+## [b]返回[/b]：[code]is_unlocked[/code] 为 false → true（灰显+🔒）；缺字段安全默认不
+## 锁定（[code].get(..., true)[/code] 视为已解锁）。纯函数。
 static func should_show_lock(entry: Dictionary) -> bool:
 	return not bool(entry.get(&"is_unlocked", true))
 
 
 ## 重入资格判定（AC-3/AC-5）。[br]
-## [b]返回[/b]：已通关且 [code]reentry_allowed[/code] → true（点击弹确认窗）；
-## 苍玄古战场 [code]reentry_allowed=false[/code] → false。缺字段默认 false。纯函数。
+## [b]返回[/b]：已通关且 [code]reentry_allowed[/code] → true（点击弹确认窗）；苍玄古战场
+## [code]reentry_allowed=false[/code] → false。缺字段默认 false。纯函数。
 static func is_reenterable(entry: Dictionary) -> bool:
 	return bool(entry.get(&"is_cleared", false)) \
 			and bool(entry.get(&"reentry_allowed", false))
 
 
 ## 重入确认按钮启用态（AC-4）。[br]
-## [b]返回[/b]：可重入且 [code]can_reenter[/code]（灵石充足）→ true；
-## 灵石不足 → false（灰显 + 标注「灵石不足」）。缺字段默认 false。纯函数。
+## [b]返回[/b]：可重入且 [code]can_reenter[/code]（灵石充足）→ true；灵石不足 → false
+## （灰显 + 标注「灵石不足」）。缺字段默认 false。纯函数。
 static func can_confirm_reentry(entry: Dictionary) -> bool:
 	return is_reenterable(entry) and bool(entry.get(&"can_reenter", false))
 
 
 ## 解锁条件悬停文本（AC-6）。[br]
-## [b]返回[/b]: [code]"需%d境界" % realm_requirement[/code]。[br]
-## 纯函数。
+## [b]返回[/b]: [code]"需%d境界" % realm_requirement[/code]（数字形式；卡片与点击提示
+## 走 [MapCard.locked_hint_text] / [MapSelectNotice] 的中文口径）。纯函数。
 static func unlock_requirement_text(entry: Dictionary) -> String:
 	return "需%d境界" % int(entry.get(&"realm_requirement", 0))
 
@@ -175,8 +173,7 @@ func _connect_signals() -> void:
 ## === 数据刷新（零状态所有权——每信号周期从源系统读取）======================
 
 ## 刷新地图卡片列表——消费 [code]get_map_list()[/code]（探明表 × GSM）。[br]
-## [b]空列表不兜底[/b]：数据源不可用时列表就是空的——塞假地图会让玩家点进一张
-## 不存在的图（此前的 stub 兜底正是这个问题）。
+## [b]空列表不兜底[/b]：数据源不可用时列表就是空的——塞假地图会让玩家点进一张不存在的图。
 func _refresh_map_list() -> void:
 	for child: Node in card_row.get_children():
 		card_row.remove_child(child)
@@ -202,7 +199,10 @@ func _refresh_balance() -> void:
 ## === 卡片交互分流 ==============================================================
 
 ## 卡片点击分流（MapCard.card_activated）——消费 [method entry_action] 决策。[br]
-## [b]改变游戏状态的分支[/b]（进入/重入确认）必须先过输入锁栈判定。
+## [b]改变游戏状态的分支[/b]（进入/重入确认）必须先过输入锁栈判定。[br]
+## [br][b]锁定卡给中文条件提示[/b]（不进场）：[method entry_action] 的 IGNORE 同时覆盖
+## 「未解锁」与「已通关不可重入」两种卡，[method MapSelectNotice.notify_locked] 只对前者
+## 出声（后者是设计而非缺陷）——分流决策本身不变，既有断言不受影响。
 func _on_card_activated(entry: Dictionary) -> void:
 	match entry_action(entry):
 		EntryAction.REENTER:
@@ -212,13 +212,13 @@ func _on_card_activated(entry: Dictionary) -> void:
 			if _is_input_allowed():
 				enter_map_requested.emit(entry.get(&"map_id", &""))
 		_:
-			pass  # IGNORE——锁定卡 / 已通关不可重入
+			NoticeScript.notify_locked(self, entry)
 
 
 ## === 重入确认弹窗 ==============================================================
 
 ## 弹出重入确认窗口。[br]
-## [b]文案与启用态的填充在 [MapSelectReentryDialog][/b]——本方法只决定「弹哪张卡」。
+## [b]文案与启用态的填充在 [MapSelectReentryDialog][/b]——本方法只决定弹哪张卡。
 func _show_reentry_dialog(entry: Dictionary) -> void:
 	_pending_reentry_id = entry.get(&"map_id", &"")
 	_reentry_ref().call(&"show_for", entry, int(_data_ref().call(&"ling_shi")),
@@ -239,9 +239,9 @@ func _on_reentry_canceled() -> void:
 
 ## === 输入 ======================================================================
 
-## 手柄 LB/RB 横向滚动——设备限定逻辑在 [MapSelectScroll]（只认手柄事件，键盘
-## 方向键留给引擎的焦点导航；滚轮/滚动条为 ScrollContainer 内建）。[br]
-## 消费走 [method Viewport.set_input_as_handled]——滚动手柄时不惊动下层。
+## 手柄横向滚动——设备限定逻辑在 [MapSelectScroll]（只认手柄事件，键盘方向键留给
+## 引擎的焦点导航；滚轮/滚动条为 ScrollContainer 内建）。消费走
+## [method Viewport.set_input_as_handled]——滚动手柄时不惊动下层。
 func _input(event: InputEvent) -> void:
 	if bool(_scroll_ref().call(&"handle", event)):
 		get_viewport().set_input_as_handled()

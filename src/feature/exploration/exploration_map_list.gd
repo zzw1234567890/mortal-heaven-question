@@ -19,7 +19,12 @@ extends RefCounted
 ##   · [code]difficulty: int[/code] —— 1~4（低/中/高/极高，卡片 ⭐ 数）；[br]
 ##   · [code]realm_requirement: int[/code] —— 解锁所需境界（tooltip「需X境界」）；[br]
 ##   · [code]is_cleared: bool[/code] —— 是否已通关（GSM 的 [code]is_first_clear[/code]）；[br]
-##   · [code]is_unlocked: bool[/code] —— 玩家境界是否达标；[br]
+##   · [code]is_unlocked: bool[/code] —— 解锁条件是否[b]全部[/b]达成（境界 ×
+##     前置通关，判定见 [code]exploration_map_gate.gd[/code]）；[br]
+##   · [code]locked_hint: String[/code] —— 未解锁时的中文条件文案（如「需筑基期」
+##     /「需通关苍玄古战场」），已解锁为空串——UI 原样显示，不另写措辞；[br]
+##   · [code]unlock_after_clear / prerequisite_name / prerequisite_cleared[/code]
+##     —— 前置通关条件（地图 ID / 中文名 / 是否已通关）；[br]
 ##   · [code]reentry_allowed: bool[/code] —— 是否允许重入（苍玄古战场为 false）；[br]
 ##   · [code]reentry_base / reentry_multiplier / reentry_total[/code] —— 费用明细
 ##     （基础价 / 次数倍率 / 实付总额）；[br]
@@ -33,6 +38,8 @@ extends RefCounted
 
 ## 地图配置目录（探明表——「有哪些地图」的唯一真理来源）。
 const CatalogScript := preload("res://src/feature/exploration/exploration_map_catalog.gd")
+## 解锁门槛判定与文案（境界 × 前置通关的求值单点，见该类文档）。
+const GateScript := preload("res://src/feature/exploration/exploration_map_gate.gd")
 
 ## GSM 不可用时的兜底玩家境界（炼气——最保守的解锁态）。
 const FALLBACK_REALM: int = 1
@@ -48,6 +55,9 @@ func _init(parent: Node = null) -> void:
 
 
 ## 组装地图列表（探明表顺序 = 剧情顺序，卡片按此排列）。[br]
+## [br][b]解锁态一次取全[/b]：先算出「哪些图已通关」的集合再逐条求值——前置条件
+## （[code]unlock_after_clear[/code]）判的是[b]别张图[/b]的通关态，逐条现读 GSM
+## 会让同一次刷新里出现「A 卡说血渊已通关、B 卡说没有」的读法分歧。[br]
 ## [br][b]返回[/b]：[code]Array[/code]，逐条见类文档「条目契约」。
 func build() -> Array:
 	var gsm: Node = _gsm()
@@ -58,11 +68,12 @@ func build() -> Array:
 		var resources: Variant = gsm.player.get("resources", {})
 		if resources is Dictionary:
 			ling_shi = int((resources as Dictionary).get("ling_shi", 0))
+	var cleared: Dictionary = cleared_maps(gsm)
 
 	var entries: Array = []
 	for raw_id: Variant in CatalogScript.MAPS.keys():
 		var map_id: StringName = StringName(str(raw_id))
-		entries.append(_entry_for(map_id, player_realm, ling_shi, gsm))
+		entries.append(_entry_for(map_id, player_realm, ling_shi, gsm, cleared))
 	return entries
 
 
@@ -72,22 +83,30 @@ func build() -> Array:
 
 ## 组装单张地图的卡片条目（字段口径见类文档）。[br]
 ## [br][param p_map_id] 规范写法的地图 ID（调用方保证来自 [code]MAPS[/code] 的键）。[br]
-## [param p_player_realm] 玩家当前境界（解锁判定的唯一依据）。[br]
+## [param p_player_realm] 玩家当前境界（解锁判定的入参之一）。[br]
 ## [param p_ling_shi] 当前灵石余额（[code]can_reenter[/code] 的预判依据）。[br]
-## [param p_gsm] GSM 引用（可空——空时视作未通关）。
+## [param p_gsm] GSM 引用（可空——空时视作未通关）。[br]
+## [param p_cleared] 各图通关态集合（[method cleared_maps] 的产物——前置条件判它）。[br]
+## [br][b]解锁态不在这里算[/b]：境界 × 前置通关的求值与文案一律走
+## [code]ExplorationMapGate.evaluate[/code]——卡片灰显、悬停 tooltip、点击提示
+## 三处消费同一份结果，加一条解锁条件只需要改那一处。[br]
 func _entry_for(p_map_id: StringName, p_player_realm: int, p_ling_shi: int,
-		p_gsm: Node) -> Dictionary:
+		p_gsm: Node, p_cleared: Dictionary) -> Dictionary:
 	var config: Dictionary = CatalogScript.MAPS.get(p_map_id, {})
-	var unlock_realm: int = int(config.get("unlock_realm", FALLBACK_REALM))
+	var gate: Dictionary = GateScript.evaluate(p_map_id, p_player_realm, p_cleared)
 	var cost: int = _reentry_total(p_map_id)
 	return {
 		"map_id": p_map_id,
 		"name": str(config.get("name", str(p_map_id))),
 		# 探明表的 difficulty 是 0 基枚举（0=LOW）；卡片要 1 基（⭐ 数）
 		"difficulty": int(config.get("difficulty", 0)) + 1,
-		"realm_requirement": unlock_realm,
-		"is_cleared": _is_cleared(p_gsm, p_map_id),
-		"is_unlocked": p_player_realm >= unlock_realm,
+		"realm_requirement": int(gate.get("realm_requirement", FALLBACK_REALM)),
+		"is_cleared": bool(p_cleared.get(p_map_id, false)),
+		"is_unlocked": bool(gate.get("is_unlocked", false)),
+		"locked_hint": str(gate.get("locked_hint", "")),
+		"unlock_after_clear": gate.get("unlock_after_clear", &""),
+		"prerequisite_name": str(gate.get("prerequisite_name", "")),
+		"prerequisite_cleared": bool(gate.get("prerequisite_cleared", true)),
 		"reentry_allowed": bool(config.get("reentry_allowed", true)),
 		"reentry_base": _reentry_base(p_map_id),
 		"reentry_multiplier": _reentry_multiplier(p_map_id),
@@ -95,6 +114,20 @@ func _entry_for(p_map_id: StringName, p_player_realm: int, p_ling_shi: int,
 		"can_reenter": p_ling_shi >= cost,
 		"is_permanent_free": _is_permanent_free(p_map_id),
 	}
+
+
+## 各图通关态集合——[code]{地图ID: 是否已通关}[/code]，按探明表的键逐项现取。[br]
+## [br][b]读档后重算[/b]：本集合每次 [method build] 都从 GSM 重取，解锁态是它的纯
+## 函数——存档里不需要存「解锁标记」，也就不会出现标记与进度不一致（任务要求的
+## 「读档后重算，不依赖一次性写入」）。[br]
+## [br][b]未登记的旧图[/b]（存档里有、探明表里没有的 map_states 条目）不进本集合：
+## 解锁前置只可能指向探明表里的图。[br]
+func cleared_maps(p_gsm: Node) -> Dictionary:
+	var cleared: Dictionary = {}
+	for raw_id: Variant in CatalogScript.MAPS.keys():
+		var map_id: StringName = StringName(str(raw_id))
+		cleared[map_id] = _is_cleared(p_gsm, map_id)
+	return cleared
 
 
 ## 重入总费用——委托 [code]ExplorationEconomy.calculate_reentry_cost[/code]

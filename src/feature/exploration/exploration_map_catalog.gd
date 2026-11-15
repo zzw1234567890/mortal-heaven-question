@@ -10,8 +10,7 @@ extends RefCounted
 ## 档位默认值）——不静默用玩家境界，也不让地图生成崩溃。[br]
 ## [br][b]敌人池[/b]：[code]enemy_pool[/code] 是 [code]{template_id, weight}[/code]
 ## 列表，权重按地图给（不同地图的散修/魔修配比可以不同）。模板不存在时由
-## [code]exploration_enemy_pool.gd[/code] 跳过并告警，本目录不校验模板是否存在
-## （数据与运行时不耦合）。[br]
+## [code]exploration_enemy_pool.gd[/code] 跳过并告警——数据与运行时不耦合。[br]
 ##
 ## 来源: GDD exploration-system.md §1/§3 步骤⑥/§7 回旧地图、ADR-0014 §决策 2、
 ## DEBT-EUI-006-3 / DEBT-EUI-006-5。
@@ -21,14 +20,13 @@ const FirstClearRewards := preload(
 		"res://src/feature/exploration/exploration_first_clear_rewards.gd")
 
 ## 难度档位 → 默认层数 / 节点数 / 敌人境界（与 ExplorationSystem.DIFFICULTY_CONFIGS 同构）。[br]
-## [br][b]首通额外奖励[/b]：不在本表逐档重复，由 [code]exploration_first_clear_rewards.gd[/code] 按档位提供（[method _difficulty_defaults] 注入）。[br]
-## [br][b]ap_cost[/b]：本档地图每次移动的行动力开销（GDD action-point-system.md
-## §调优参数「每格消耗 1，安全范围 1-2」——出厂全档为 1，键存在的意义是
-## 「按地图配置扣」走的是配置读取而不是硬编码常量；单独的地图可覆盖它）。[br]
-## [br][b]action_spring_count[/b]：本档灵泉的每图限次（GDD action-point-system.md
-## §调优参数「行动力泉每图限次 1次（范围 1-2）」——同上：键存在是为了让
-## 「每图限次」走配置读取，单独的地图可覆盖；读取侧是
-## [code]exploration_action_spring.gd[/code] 的 [code]limit_of[/code]）。[br]
+## [b]首通额外奖励[/b]：不逐档重复，由 [code]exploration_first_clear_rewards.gd[/code]
+## 按档位提供（[method _difficulty_defaults] 注入）。[br]
+## [code]ap_cost[/code]：本档每次移动的行动力开销（GDD action-point-system.md §调优参数
+## 「每格消耗 1，安全范围 1-2」——出厂全档 1，键存在是为了让「按地图配置扣」走配置读取
+## 而非硬编码；单张地图可覆盖）。[br]
+## [code]action_spring_count[/code]：本档灵泉的每图限次（同 GDD「每图限次 1 次」口径，
+## 读取侧是 [code]exploration_action_spring.gd[/code] 的 [code]limit_of[/code]）。
 const DIFFICULTY_DEFAULTS: Array = [
 	{"layers": 4, "min_nodes": 2, "max_nodes": 3, "elite_count": 1, "shop_count": 1,
 		"enemy_realm": 1, "enemy_count_min": 1, "enemy_count_max": 2, "elite_bonus": 1,
@@ -73,18 +71,14 @@ const POOL_GUIYU: Array = [         # 归墟：鬼修 + 魔修
 	{"template_id": &"mo_xiu", "weight": 40},
 ]
 
-## 地图 ID 别名表——历史写法 → 规范写法。[br]
+## 地图 ID 别名表——历史写法 → 规范写法（[method canonical_id] 的唯一转换入口，
+## 单向：别名只做读取兼容，不反向解析）。[br]
 ## [br][b]规范写法以地图选择界面为准[/b]（[constant MAPS] 的键 = 地图卡片列表）：
-## 章节表早期用的是「单词连写」风格（[code]cang_xuan_zhengdao_meng[/code]），
-## 与地图选择的「逐词下划线」风格（[code]cang_xuan_zheng_dao_meng[/code]）不一致。
-## 章节表已改为规范写法；本表保留旧写法的读取兼容（存档里的历史地图 ID、外部数据），
-## 并作为 [method canonical_id] 的唯一转换入口。[br]
-## [br][b]只收录「同一个地图的两种写法」[/b]——未登记地图不在此表，它们是「未登记
-## 地图」，由难度档位兜底，不是命名冲突。[br]
-## [br]2026-11-13 补齐：章节表里此前只有 ID 没有配置的 7 张地图已登记进
-## [constant MAPS]（万古殿 / 碎星内海 / 西域边境 / 西域 / 归墟通道 / 归墟·万妖谷 /
-## 归墟·古魔战场），其章节旧写法一并进表。别名对（[code]旧名 → 规范名[/code]）
-## 不允许反向解析——[method canonical_id] 只做单向转换。
+## 章节表早期用「单词连写」（[code]cang_xuan_zhengdao_meng[/code]），与地图选择的
+## 「逐词下划线」（[code]cang_xuan_zheng_dao_meng[/code]）不一致，现已统一。[br]
+## [br][b]只收录「同一个地图的两种写法」[/b]——未登记地图不在此表，它们由难度档位
+## 兜底，不是命名冲突。2026-11-13 补齐：章节表里此前只有 ID 没有配置的 7 张地图已
+## 登记进 [constant MAPS]，其旧写法一并进表。
 const MAP_ID_ALIASES: Dictionary = {
 	&"cang_xuan_zhengdao_meng": &"cang_xuan_zheng_dao_meng",
 	&"cang_xuan_guzhanchang": &"cang_xuan_gu_zhan_chang",
@@ -102,8 +96,8 @@ const MAP_ID_ALIASES: Dictionary = {
 }
 
 ## 地图登记表（[b]「探明表」[/b]）——键为地图 ID（[b]规范写法[/b]：与地图选择界面一致）。[br]
-## [br][b]这是「有哪些地图」的唯一真理来源[/b]：地图选择列表（
-## [code]ExplorationSystem.get_map_list[/code]）按本表的键逐条出卡片，章节表按
+## [b]这是「有哪些地图」的唯一真理来源[/b]：地图选择列表
+## （[code]ExplorationSystem.get_map_list[/code]）按本表的键逐条出卡片，章节表按
 ## [method canonical_id] 落到本表的键上——两侧不再各存一份地图清单。[br]
 ## [br][code]name[/code] 是面向玩家的中文名；[code]difficulty[/code] 为 MapDifficulty
 ## 枚举值（0=LOW … 3=VERY_HIGH，卡片 ⭐ 数取 +1）；[code]unlock_realm[/code] 是
@@ -112,8 +106,14 @@ const MAP_ID_ALIASES: Dictionary = {
 ## [code]enemy_realm[/code] 是该地图的敌人基准境界（GDD「敌人强度按地图本身境界
 ## 设定」）。[br]
 ## [br][code]reentry_allowed[/code] 缺省 [code]true[/code]，只有苍玄古战场显式写
-## [code]false[/code]（GDD §8「剧情地图，通关后不可重入」）——缺省值由读取方
-## [code].get(key, true)[/code] 承担，表里不写满。[br]
+## [code]false[/code]（GDD §8「剧情地图，通关后不可重入」）——缺省由读取方承担，表里不写满。[br]
+## [br][code]unlock_after_clear[/code] 是「需先通关哪张图」的前置登记（缺省无前置 =
+## 无序列锁）；GDD §8 的两条序列规则此前在代码里没有落点（只有境界门槛），现由它承载：
+## 「青云剑宗 → 血渊秘境 → 云澜城 → 丹霞谷」的炼气链，以及「苍玄古战场 → 碎星外环」的
+## 剧情锁（该章剧情链在本库尚未接线，暂以「首通苍玄古战场」作可玩到的等价前置）。[br]
+## [br]判定与面向玩家的文案统一在 [code]exploration_map_gate.gd[/code]，本表只存事实。
+## 字段值一律写 [constant MAPS] 的规范键——写错会让前置永不满足（该图永远开不了），
+## 单测对全表做完整性断言。[br]
 ## [br][b]难度档取值口径[/b]：[code]difficulty[/code] 取
 ## [code]design/assets/specs/map-card-illustrations-assets.md[/code]（ASSET-211~227，
 ## 逐张标注「境界·难度」）——它是唯一覆盖全部 17 张地图的逐图规格。
@@ -129,17 +129,17 @@ const MAPS: Dictionary = {
 	},
 	&"xue_yuan_mi_jing": {
 		"name": "血渊秘境", "difficulty": 1, "unlock_realm": 1, "max_realm": 1,
-		"enemy_realm": 1,
+		"enemy_realm": 1, "unlock_after_clear": &"qing_yun_jian_zong",
 		"enemy_pool": POOL_BLOOD, "enemy_count_min": 2, "enemy_count_max": 2,
 	},
 	&"yun_lan_cheng": {
 		"name": "云澜城", "difficulty": 2, "unlock_realm": 1, "max_realm": 2,
-		"enemy_realm": 2,
+		"enemy_realm": 2, "unlock_after_clear": &"xue_yuan_mi_jing",
 		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 2, "enemy_count_max": 3,
 	},
 	&"dan_xia_gu": {
 		"name": "丹霞谷", "difficulty": 3, "unlock_realm": 1, "max_realm": 2,
-		"enemy_realm": 2,
+		"enemy_realm": 2, "unlock_after_clear": &"yun_lan_cheng",
 		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 3, "enemy_count_max": 4,
 	},
 	&"cang_xuan_zheng_dao_meng": {
@@ -153,8 +153,8 @@ const MAPS: Dictionary = {
 		"enemy_pool": POOL_GHOST, "enemy_count_min": 2, "enemy_count_max": 2,
 	},
 	&"sui_xing_wai_huan": {
-		"name": "碎星外环", "difficulty": 0, "unlock_realm": 1, "max_realm": 2,
-		"enemy_realm": 2,
+		"name": "碎星外环", "difficulty": 0, "unlock_realm": 2, "max_realm": 2,
+		"enemy_realm": 2, "unlock_after_clear": &"cang_xuan_gu_zhan_chang",
 		"enemy_pool": POOL_FOUNDATION, "enemy_count_min": 1, "enemy_count_max": 2,
 	},
 	&"sui_xing_nei_hai": {
