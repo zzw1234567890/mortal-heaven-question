@@ -57,6 +57,14 @@ const TEXT_QUIT: String = "退出"
 ## 「行囊与道友」入口文案——一个按钮开两个界面（背包 + 角色状态，宿主内页签切换）。
 ## 名字取「行囊（物）与道友（人）」：玩家的两类诉求各占一字，比「背包」更贴实际内容。
 const TEXT_INVENTORY: String = "行囊与道友"
+## 「读档」入口文案——与「继续游戏」（读最新档）并列的第三条路径：这一条让玩家
+## 自己挑槽位。两条路径都能进游戏，差别只在这里（GDD §新游戏/继续游戏/读档）。
+const TEXT_LOAD: String = "读档"
+## 无存档时的中文提示（GDD 边界：无档时继续游戏置灰并给出说明）。[br]
+## [br][b]为什么两个按钮各说一句[/b]：它们被禁用的原因不同——「继续游戏」要的是
+## 「至少有一份档」，「读档」要的是「有一格非空槽位」；共用一句会让其中一边说谎。
+const TEXT_NO_SAVE_CONTINUE: String = "还没有存档——先点「新游戏」开始一轮"
+const TEXT_NO_SAVE_LOAD: String = "还没有任何存档槽位可读"
 
 ## 版本号缺省回退（ProjectSettings 未配置 version 键时的安全默认——
 ## story Implementation Notes「不硬编码」指不在 UI 层写死版本值，读取失败
@@ -98,6 +106,10 @@ const InventoryModelScript := preload("res://src/feature/inventory/inventory_mod
 const StatusModelScript := preload("res://src/feature/inventory/character_status_model.gd")
 ## 背包内「使用丹药」的结算层——背包页只发意图，由宿主持有它去结算。
 const PillUseScript := preload("res://src/feature/inventory/inventory_pill_use.gd")
+## 读档槽位选择面板——「读档」按钮打开的覆盖层（纯代码构建，与设置面板同形态）。
+const LoadSlotPanelScript := preload("res://src/ui/main_menu/load_slot_panel.gd")
+## 读档 → 进探索这一跳的编排（含「成功但空载荷」的判别——见该模块类文档）。
+const LaunchScript := preload("res://src/ui/main_menu/main_menu_launch.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -121,6 +133,10 @@ var _settings_panel: SettingsPanel = null
 ## 类型写作 [Control] 而非其 [code]class_name[/code]：本脚本在测试里被动态加载，
 ## 全局类名注册时序不保证（先例 card_system 的「不依赖 class_name」注记）。
 var _inventory_screens: Control = null
+## 读档槽位选择面板实例——复用式单例（同设置面板形态：首次点击实例化，关闭留树）。
+var _load_slot_panel: Control = null
+## 读档编排子模块——懒建一次（注入引用在 [method _get_launch] 里透传）。
+var _launch: RefCounted = null
 ## 按键绑定 store——启动加载用（Story 004；注入项供测试替换路径）。
 var keybind_store: KeybindStore = null
 
@@ -133,6 +149,8 @@ var keybind_store: KeybindStore = null
 @onready var settings_button: Button = $LayoutAnchor/ButtonBox/SettingsButton
 @onready var quit_button: Button = $LayoutAnchor/ButtonBox/QuitButton
 @onready var inventory_button: Button = $LayoutAnchor/UtilityBox/InventoryButton
+@onready var load_button: Button = $LayoutAnchor/UtilityBox/LoadButton
+@onready var no_save_hint_label: Label = $LayoutAnchor/NoSaveHintLabel
 @onready var version_label: Label = $VersionLabel
 @onready var corrupt_dialog: CorruptSaveDialog = $CorruptDialog
 
@@ -238,7 +256,9 @@ func _apply_texts() -> void:
 	settings_button.text = TEXT_SETTINGS
 	quit_button.text = TEXT_QUIT
 	inventory_button.text = TEXT_INVENTORY
+	load_button.text = TEXT_LOAD
 	save_summary_label.text = ""
+	no_save_hint_label.text = ""
 
 ## 版本号——从 ProjectSettings 读取（story：不硬编码）。[br]
 ## project.godot [code]application/config/version[/code] = "0.1.0-dev"。[br]
@@ -259,7 +279,12 @@ func _read_version() -> String:
 ## === 存档状态（零缓存——每刷新周期从 SaveLoadSystem 读取）=====================
 
 ## 刷新存档存在性 + 摘要（_ready + 读档完成信号驱动）。[br]
-## UI 不缓存列表——每次调用重新 [code]list_slots()[/code]（ADR-0031 §2）。
+## UI 不缓存列表——每次调用重新 [code]list_slots()[/code]（ADR-0031 §2）。[br]
+## [br][b]两个入口一起刷[/b]：「继续游戏」（读最新档）与「读档」（挑槽位）读的是
+## 同一份 [code]list_slots()[/code]，只是判定宽严不同——前者只要有档，后者要有非空
+## 槽位。分两次读会出现「继续游戏亮着、读档灰着」这种自相矛盾的界面。[br]
+## [br][b]中文提示的落点[/b]：无档时下方提示行说明原因（GDD 边界：无档时置灰并给出
+## 说明）——只说一句，且两个按钮的说明不同（见 TEXT_NO_SAVE_* 常量注记）。
 func _refresh_save_state() -> void:
 	var slots: Array = _list_slots_safe()
 	var has_save: bool = Logic.has_continuable_save(slots)
@@ -272,6 +297,25 @@ func _refresh_save_state() -> void:
 	# 摘要行 visible 控制（story AC：无存档时隐藏，布局占位保留——
 	# visible 而非从树移除）
 	save_summary_label.visible = has_save
+	# 「读档」按槽位判定——自动槽空但有手动档时它仍该亮着（两者不等价）
+	var entries: Array[Dictionary] = Logic.loadable_slots(slots)
+	load_button.disabled = not _has_any_slot(entries)
+	no_save_hint_label.text = "" if has_save else TEXT_NO_SAVE_CONTINUE
+	if _load_slot_panel != null and is_instance_valid(_load_slot_panel) \
+			and bool(_load_slot_panel.call(&"is_open")):
+		# 面板正开着（读档失败退回的场景）：列表可能已变，跟着重刷一次
+		_load_slot_panel.call(&"populate", entries)
+
+
+## 槽位条目里是否有至少一个非空（「读档」按钮的启用判据）。[br]
+## [br][b]与 [method Logic.has_continuable_save] 的差别[/b]：那个判的是
+## [code]list_slots()[/code] 的原始列表（含战前快照槽），本判据只看玩家可在读档
+## 界面里选到的那几格——快照槽非空不该让「读档」亮起来（点进去列表里没有它）。
+static func _has_any_slot(p_entries: Array) -> bool:
+	for entry: Dictionary in p_entries:
+		if bool(entry.get("exists", false)):
+			return true
+	return false
 
 ## list_slots 防御读取——SaveLoadSystem 不可用时返回空数组（安全默认：
 ## 按无存档处理，按钮禁用——Logic 内核空状态防御对齐）。
@@ -319,16 +363,16 @@ func _on_new_game_pressed() -> void:
 			SceneManagerScript.SceneID.IDENTITY_SELECT,
 			SceneManagerScript.TransitionType.MENU_TO_GAME)
 
-## 继续游戏 → 读最近存档（AC-main-menu-003 + 损坏路径）。[br]
-## [code]load_game()[/code] 失败（非 SUCCESS）或发 [signal save_corrupted] →
-## 弹损坏提示；成功 → 读档流程由 GSM/SceneManager 编排（转场归后续 story）。
+## 继续游戏 → 读最近存档并[b]回到上次那张图[/b]（AC-main-menu-003 + 损坏路径）。[br]
+## [br][b]此前这里是死路[/b]：读档成功后没有任何导航——玩家点了按钮，界面纹丝不动，
+## 只有损坏分支有后续（弹对话框）。「继续游戏」的全部意义就在读完那一跳。[br]
+## [br][b]导航归 [MainMenuLaunch][/b]：读档 → 发跨场景意图 → 请求转场三件事在那里
+## 一条线走完（本类已超 300 行，且这条链与「读档按钮」共用同一份实现）。[br]
+## [br][b]失败才弹损坏框[/b]：成功但载荷为空、或依赖不可用，都[b]不[/b]弹——文件没坏，
+## 弹「存档损坏」是在对玩家说谎（那条链的判别见 [method MainMenuLaunch.load_and_resume]）。
 func _on_continue_pressed() -> void:
 	if continue_button.disabled:
 		return  # 守卫：disabled 态不可达（键盘焦点防御）
-	var sl: Node = _get_save_load()
-	if sl == null or not sl.has_method(&"load_game"):
-		push_error("MainMenu: SaveLoadSystem 不可用——继续游戏中止")
-		return
 	var slots: Array = _list_slots_safe()
 	var latest: Dictionary = Logic.select_latest_save(slots)
 	if latest.is_empty():
@@ -336,12 +380,46 @@ func _on_continue_pressed() -> void:
 		# 仍空则按无存档处理（不弹损坏框，静默禁用）。
 		_refresh_save_state()
 		return
-	var result: Dictionary = sl.load_game(
-			int(latest.get("slot_type", 0)), int(latest.get("slot_id", 0)))
-	if result.is_empty() \
-			or int(result.get("result", SLScript.LoadResult.DESERIALIZE_ERROR)) \
-			!= SLScript.LoadResult.SUCCESS:
+	var code: int = int(_get_launch().call(&"load_and_resume",
+			int(latest.get("slot_type", 0)), int(latest.get("slot_id", 0))))
+	if code != SLScript.LoadResult.SUCCESS:
 		corrupt_dialog.show_corrupt()
+
+
+## 读档 → 打开槽位选择面板（第三条路径）。[br]
+## [br][b]与设置/行囊同源形态[/b]：场景内覆盖层、复用式单例、首次点击实例化后
+## [code]add_child[/code] 挂本节点树（ADR-0031 §1——不经 SceneManager 转场）。[br]
+## [br][b]每次打开都重新 populate[/b]：槽位状态可能在主菜单停留期间变了（另一个
+## 进程、或刚从暂停菜单退出来），面板不缓存列表（ADR-0031 §2）。[br]
+## [br][b]空列表也照开[/b]（按钮 disabled 时不可达，键盘焦点防御除外）：面板会把四格
+## 全画成「（空）」——比什么都不发生更能说明「你还没有存档」。
+func _on_load_pressed() -> void:
+	if _load_slot_panel == null or not is_instance_valid(_load_slot_panel):
+		_load_slot_panel = LoadSlotPanelScript.new()
+		_load_slot_panel.connect(&"slot_chosen", _on_load_slot_chosen)
+		_load_slot_panel.connect(&"back_requested", _on_load_panel_back)
+		add_child(_load_slot_panel)
+	_load_slot_panel.call(&"populate", Logic.loadable_slots(_list_slots_safe()))
+	_load_slot_panel.call(&"open")
+	var first: Variant = _load_slot_panel.call(&"first_enabled_button")
+	if first is Button and (first as Button).is_inside_tree():
+		(first as Button).grab_focus()
+
+
+## 玩家在读档面板选中一格——执行与「继续游戏」同一条读档链。[br]
+## [br]面板已在 [method LoadSlotPanel._on_slot_pressed] 里自行收起（先收起再报意图，
+## 避免读档成功转场时两层画面叠在一起）。[br]
+## [br]失败弹损坏框——与「继续游戏」同一条判别（同一份存档，两条路径不该给两种说法）。
+func _on_load_slot_chosen(p_slot_type: int, p_slot_id: int) -> void:
+	var code: int = int(_get_launch().call(&"load_and_resume", p_slot_type, p_slot_id))
+	if code != SLScript.LoadResult.SUCCESS:
+		corrupt_dialog.show_corrupt()
+
+
+## 读档面板「返回」——关闭并重刷按钮态（关闭期间槽位可能已变）。
+func _on_load_panel_back() -> void:
+	_refresh_save_state()
+
 
 ## 设置 → 打开设置面板（AC-main-menu-007；Story 002 恢复启用）。[br]
 ## 首次点击实例化 [SettingsPanel] 挂载本节点树（顶层 CanvasItem——
@@ -428,3 +506,15 @@ func _get_save_load() -> Node:
 	if save_load != null:
 		return save_load
 	return get_node_or_null("/root/SaveLoadSystem")
+
+## 取/建读档编排子模块——注入引用透传（本类已超 300 行，编排实现见该模块）。[br]
+## [br][b]为什么每次都透传一遍注入引用[/b]：测试在 [code]_ready[/code] 之后才注入
+## [code]save_load[/code] / [code]scene_manager[/code]（[code]before_each[/code] 先
+## [code]add_child[/code] 再赋值），只认建模块那一刻的注入会让读档打到真实 Autoload。
+func _get_launch() -> RefCounted:
+	if _launch == null:
+		_launch = LaunchScript.new()
+		_launch.host = self
+	_launch.scene_manager = scene_manager
+	_launch.save_load = save_load
+	return _launch

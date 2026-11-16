@@ -23,6 +23,8 @@ const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
 const AudioEnumsScript := preload("res://src/ui/audio/audio_enums.gd")
 ## InputManager 脚本常量——ActionType / DeviceType 枚举真理来源。
 const InputManagerScript := preload("res://src/foundation/input_manager.gd")
+## 跨场景进入意图（新开局直落第一张图——见该模块类文档）。
+const IntentScript := preload("res://src/feature/exploration/exploration_entry_intent.gd")
 
 ## 宿主场景节点（取 Autoload 回退用）。
 var host: Node = null
@@ -67,6 +69,22 @@ func _on_scene_transition(_from: int, _to: int) -> void:
 
 
 # === 导航请求 ===================================================================
+
+## 请求「新开局」的导航到探索——[b]身份选择确认后走这条[/b]。[br]
+## [br][b]与 [method request_exploration] 的差别只有一处[/b]：本方法先落一条
+## [constant ExplorationEntryIntent.EntryMode.FIRST_MAP] 意图，探索场景挂载时据此
+## [b]直接进入第一张图[/b]（青云剑宗，探明表首项）而不是停在选图界面。[br]
+## [br][b]为什么不直接写进 [method request_exploration][/b]：那条还服务「读档跳过」
+## 路径（身份已在存档里 → 跳过选择 UI）——那条路玩家手上有进行中的图，硬塞 FIRST_MAP
+## 会把他从上次那张图里拽回起点。[br]
+## [br][b]发起方不写探索状态[/b]（ADR-0031 §2 零状态所有权）：这里只留一份跨场景
+## 意图，地图生成与 GSM 写入仍归探索系统。[br]
+## [br]来源: ADR-0005（导航唯一入口）、ADR-0031 §2、design/gdd/main-menu-system.md、
+## design/gdd/exploration-system.md §1（探明表顺序 = 剧情顺序）。
+func request_new_run_exploration() -> void:
+	IntentScript.request_new_run()
+	request_exploration()
+
 
 ## 请求导航到探索地图（读档跳过 + 叙事结束两条路径共用）。[br]
 ## [b]注意[/b]：EXPLORATION 场景为占位路径（exploration story 002 落盘后自动生效）。

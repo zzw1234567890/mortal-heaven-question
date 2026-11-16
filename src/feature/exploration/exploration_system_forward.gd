@@ -17,6 +17,37 @@ extends "res://src/feature/exploration/exploration_system_ops.gd"
 ## 可达性纯算法（行动力最短路）——本层是它唯一的调用方，故常量就近声明
 ## （[code]exploration_system_helpers.gd[/code] 已贴 300 行软上限）。
 const Reachability := preload("res://src/feature/exploration/exploration_reachability.gd")
+## 读档续玩子模块（缓存重建 + 快照重播）——同样因 helpers 贴顶，句柄与获取都放本层。
+const ResumeScript := preload("res://src/feature/exploration/exploration_system_resume.gd")
+
+## 读档续玩子模块实例（惰性创建并持有引用——防 RefCounted 提前释放）。
+var _resume: RefCounted = null
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 读档续玩（委托给 ResumeScript 子模块）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 读档续玩——从存档快照重建某张图并广播渲染快照（[b]不重新生成地图[/b]）。[br]
+## [br][b]为什么不走 [method enter_map][/b]：那条路会重新生成 DAG（新 seed）、把
+## 已访问重置为入口、行动力回满——玩家读档后会被悄悄送回起点。续玩要的正是
+## [b]原样恢复[/b]：图、走过的路、剩余行动力全部取自存档。[br]
+## [br][b]返回[/b]：广播出去的快照；该图在存档里没有 graph/nodes 时返回空字典
+## （调用方据此退回选图界面——不臆造一张图让玩家进去）。[br]
+## [br]来源: ADR-0014 §决策 1 状态分层模型（读档重建）、GDD save-load-system.md。
+func resume_map(p_map_id: StringName) -> Dictionary:
+	if _resume == null:
+		_resume = ResumeScript.new(self)
+	return _resume.call(&"resume_map", p_map_id)
+
+
+## 从存档快照重建 DAG 缓存（不发信号）——[method resume_map] 的前半段，单独暴露给
+## 需要「先建缓存再自己广播」的调用方与测试。[br]
+## [br][b]返回[/b]：重建用的 map_data；无快照时返回空字典。
+func rebuild_cache_from_storage(p_map_id: StringName) -> Dictionary:
+	if _resume == null:
+		_resume = ResumeScript.new(self)
+	return _resume.call(&"cache_from_storage", p_map_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -26,26 +57,20 @@ const Reachability := preload("res://src/feature/exploration/exploration_reachab
 ## 从当前节点走到 Boss 的最少行动力花费。[br]
 ## [br][b]为什么需要它[/b]：系统里此前没有任何地方回答得了「还走不走得到 Boss」
 ## ——[method can_move_to_detail] 只判一步邻接，[method end_exploration] 只看入参。
-## 于是行动力见底时，玩家既不知道自己还能不能通关，UI 也无从把「此刻离开会丢掉
-## 什么」讲清楚（GDD exploration-system.md §5「行动力归零且无法到达Boss → 立即
-## 结算」、§8「退出按钮在探索HUD中始终可用」两条都缺一个可判定的输入）。[br]
-## [br][b]为什么是花费而不是步数[/b]：出厂配置每次移动 1 点，两者等价；但地图可把
-## [code]ap_cost[/code] 调成 2（GDD §调优参数「安全范围 1-2」），且豁免节点
-## （Boss/传送/灵泉 0 消耗）让「步数少但花费多」成为常态——数步数会给出玩家做不到
-## 的答案。边权与 [method move_to_node] 的扣费共用
-## [ExplorationApRules.cost_for]（同一份解析，不各算一套）。[br]
+## 于是行动力见底时玩家无从知道自己还能不能通关，UI 也讲不清「此刻离开会丢掉
+## 什么」（GDD §5「行动力归零且无法到达Boss → 立即结算」、§8 退出按钮）。[br]
+## [br][b]为什么是花费而不是步数[/b]：出厂每次移动 1 点两者等价，但地图可把
+## [code]ap_cost[/code] 调成 2，且豁免节点（Boss/传送/灵泉 0 消耗）让「步数少但
+## 花费多」成为常态。边权与 [method move_to_node] 的扣费共用
+## [ExplorationApRules.cost_for]（同一份解析）。[br]
 ## [br][b]已访问节点算障碍[/b]：与 [method move_to_node] 的验证 2 同口径——
-## 把走过的格子算进路径等于承诺一条玩家点不动的路线。[br]
-## [br][b]已在 Boss 节点时为 0[/b]：GDD §8「行动力归零但已在Boss节点 → 可挑战
-## Boss」，此时无需再花任何行动力。[br]
-## [br][b]只读[/b]：不修改任何状态（查询 vs 命令，ADR-0014 §关键接口）。[br]
+## 把走过的格子算进路径等于承诺一条玩家点不动的路线。已在 Boss 节点时为 0。[br]
+## [br][b]只读[/b]：不修改任何状态（ADR-0014 §关键接口）。[br]
 ## [br][b]返回[/b]：最少花费（≥0）；[constant ExplorationReachability.UNREACHABLE]
-## （-1）表示走不到——也用于 DAG 未就绪 / GSM 不可用（无法作答时不给假答案）。[br]
-## [br][b]读档后的口径差[/b]：[member _map_config] 由生成期写入，
-## [method rebuild_dag_cache] 读档重建时置空 → 那时按 GDD 默认开销 1 解析
-## （拆分前就存在，见 [method ap_cost_to] 的说明）。[br]
-## [br]来源: design/gdd/exploration-system.md §4 移动规则 / §5 结束条件 / §8 边界、
-## design/gdd/action-point-system.md §公式 2/3、ADR-0014 §关键接口。
+## （-1）表示走不到——也用于 DAG 未就绪 / GSM 不可用（无法作答时不给假答案）。
+## [member _map_config] 由生成期写入，[method rebuild_dag_cache] 读档重建时置空
+## → 那时按 GDD 默认开销 1 解析（拆分前就存在，见 [method ap_cost_to]）。[br]
+## [br]来源: GDD exploration-system.md §4/§5/§8、action-point-system.md §公式 2/3。
 func min_ap_to_boss() -> int:
 	if not _dag_ready:
 		return Reachability.UNREACHABLE
@@ -59,12 +84,10 @@ func min_ap_to_boss() -> int:
 
 ## 以剩余行动力是否还走得到 Boss。[br]
 ## [br][b]与 [method min_ap_to_boss] 的分工[/b]：那个报「要花多少」，本方法答
-## 「够不够」——UI 只需要后者决定退出按钮的呈现，多一层比较不必让 UI 自己算
-## （UI 零数值计算）。[br]
-## [br][b]已在 Boss 节点 / 走到 Boss 不花行动力[/b]时恒为 true（GDD §8）。[br]
+## 「够不够」——UI 只需后者决定退出按钮的呈现（UI 零数值计算）。已在 Boss 节点 /
+## 走到 Boss 不花行动力时恒为 true（GDD §8）。[br]
 ## [br][b]返回[/b]：true = 还走得到；false = 走不到（含 DAG 未就绪 / GSM 不可用 /
-## 剩余行动力不足——都无法承诺「还能通关」）。[br]
-## [br]来源: GDD exploration-system.md §5 结束条件 / §8 边界。
+## 剩余行动力不足——都无法承诺「还能通关」）。来源 GDD §5 结束条件 / §8 边界。
 func can_still_reach_boss() -> bool:
 	var need: int = min_ap_to_boss()
 	if need == Reachability.UNREACHABLE:

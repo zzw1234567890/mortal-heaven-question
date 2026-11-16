@@ -26,6 +26,14 @@ var _is_writing: bool = false
 ## 自动存档排队标志——写入进行中触发自动存档时不丢弃，写入完成后重试。
 var _pending_autosave: bool = false
 
+## === 自动存档子模块 ============================================================
+
+## 自动存档的实现子模块——「什么时候该自动存、存什么元信息」在那边，
+## 本类只留一个转发（文件已严重超 300 行软上限，见 [method auto_save]）。
+const SaveAutoSaveScript := preload("res://src/foundation/save_auto_save.gd")
+## 子模块实例——惰性创建并持有引用（防 RefCounted 提前释放）。
+var _auto_save: RefCounted = null
+
 ## === 存档槽位类型 ==============================================================
 
 ## 存档槽位类型——驱动文件路径解析和 UI 展示。
@@ -639,6 +647,26 @@ func save_game(slot_type: SaveSlotType, slot_id: int = 0,
 		_update_meta_json(slot_type, slot_id, meta)
 
 	return result
+
+
+## [b]自动存档[/b]——把当前 GSM 状态写进自动槽位（[constant SaveSlotType.AUTOSAVE]）。[br]
+## [br][b]谁在调[/b]：[code]SceneManager.request_scene_change[/code] 在 Phase 2
+## 经 [code]has_method("auto_save")[/code] 守卫调用（AC-2：「每次场景变更都保存」）
+## ——本方法此前根本不存在，那条调用是[b]静默空操作[/b]，于是玩家的进度只在
+## 手动点「保存并退出」时才落盘，「继续游戏」多数时候读不到东西。[br]
+## [br][b]fire-and-forget[/b]：不阻塞转场管线；因此返回 null 是正常结果（还没开局
+## ——详见 [method SaveAutoSave.run]），调用方不必区分「没写」与「写成功」，
+## 只有测试与排障需要这个返回值。[br]
+## [br][b]实现为什么不在本文件[/b]：本类已严重超 300 行软上限
+## （.claude/docs/coding-standards.md），而「存不存、存什么元信息」与「原子写盘、
+## JSON 引擎、迁移链」是两件事。[br]
+## [br][b]返回[/b]：写入的 [enum SaveResult]；未开局 / 依赖不可用时
+## [code]null[/code]（没写也没出错）。[br]
+## [br]来源: GDD save-load-system.md §9 自动存档、scene_manager.gd §Phase 2（AC-2）。
+func auto_save() -> Variant:
+	if _auto_save == null:
+		_auto_save = SaveAutoSaveScript.new(self)
+	return _auto_save.call(&"run")
 
 
 ## [b]读取游戏[/b]——从指定槽位读取存档并恢复完整游戏状态。

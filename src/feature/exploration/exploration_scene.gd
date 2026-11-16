@@ -40,6 +40,8 @@ const ExplorationSystemScript := preload("res://src/feature/exploration_system.g
 const MapClearPresenterScript := preload("res://src/ui/exploration/map_clear_presenter.gd")
 ## 卡牌模板查询入口（结算面板点开奖励卡牌时的详情来源；缺失时面板只显示载荷字段）。
 const CardSystemPath: StringName = &"/root/CardSystem"
+## 跨场景进入意图（新开局直落第一张图 / 读档续玩回上次那张图——见该模块类文档）。
+const IntentScript := preload("res://src/feature/exploration/exploration_entry_intent.gd")
 
 ## 地图选择界面实例（挂载子节点）。
 var map_select_screen: Control = null
@@ -62,7 +64,51 @@ func _ready() -> void:
 	_flush_battle_reward_notice()
 	# 地图通关结算（Boss 胜利的那一局）——同一条「回到探索时检查一次」的时序
 	_mount_map_clear_settlement()
+	# 本次进入的意图（新开局直落第一张图 / 读档续玩回上次那张图）——取走即清
+	_consume_entry_intent()
 
+
+## 消费「本次进探索要干什么」的意图（[ExplorationEntryIntent]——取走即清）。[br]
+## [br][b]为什么要这条路径[/b]：本容器是「新开局」「读档续玩」「从别处回来」三条
+## 路径的共同终点，而它挂载那一刻无从分辨自己是被谁叫来的——不消费意图的话，
+## 无论从哪条路进来，玩家都停在选图界面，得再点一次地图卡才看到节点图
+## （新开局因此要多两跳，读档则完全回不到上次那张图）。[br]
+## [br][b]FIRST_MAP[/b]：新开局——直接进第一张图（探明表首项，[b]表序即剧情序[/b]）。
+## 地图 ID 不在这里硬编码，取 [method ExplorationEntryIntent.first_map_id]。[br]
+## [br][b]RESUME[/b]：读档续玩——GSM 里 [code]current_map[/code] 非空才进（且走
+## [method NodeGraphScreen.trigger_map_load] 的续玩分支：从存档快照重建，不重生成）；
+## 为空则[b]停在选图界面[/b]（存档没有进行中的图，让玩家自己挑一张）。[br]
+## [br][b]NONE[/b]：其余路径（占位场景/暂停菜单回来）——维持现状。[br]
+## [br][b]返回[/b]：实际消费到的模式（[enum ExplorationEntryIntent.EntryMode]；
+## 测试断言用——无意图时为 NONE）。
+func _consume_entry_intent() -> int:
+	var mode: int = IntentScript.take_entry_mode()
+	match mode:
+		IntentScript.EntryMode.FIRST_MAP:
+			var first: StringName = IntentScript.first_map_id()
+			if first != &"":
+				_on_enter_map_requested(first)
+		IntentScript.EntryMode.RESUME:
+			_resume_last_map()
+	return mode
+
+
+## 读档续玩——回到存档里那张图（[code]current_map[/code] 为空则停在选图界面）。[br]
+## [br][b]为什么读 GSM 而不是从意图里带地图 ID[/b]：意图只持一个枚举（见
+## [code]ExplorationEntryIntent[/code] 类文档「只持一个枚举」），地图 ID 是存档里的
+## 事实——UI 层缓存一份就会与存档漂移。[br]
+## [br][b]返回[/b]：实际进入的地图 ID（空 = 没有可续玩的图，停在选图界面）。
+func _resume_last_map() -> StringName:
+	var gsm: Node = get_node_or_null(NodePath("/root/GameStateManager"))
+	if gsm == null:
+		push_warning("ExplorationScene: GSM 不可用，读档续玩中止")
+		return &""
+	var map_id: StringName = gsm.exploration.get("current_map", &"")
+	if map_id == &"" or str(map_id).is_empty():
+		# 存档里没有进行中的图（在选图界面存的档/第一次进探索）——不臆造一张
+		return &""
+	_enter_map(map_id, true)
+	return map_id
 
 ## 战斗奖励到账提示。[br]
 ## [br][b]时机[/b]：本场景每次挂载（= 从战斗/结算/战败回到探索）检查一次；
@@ -160,16 +206,37 @@ func _card_detail_extra(p_entry: Variant) -> Dictionary:
 ## 并把玩家选中的地图 ID 转交给它。[br]
 ## [br][param p_map_id] 玩家在地图选择界面点中的地图（[b]不再丢弃[/b]——此前固定
 ## 进青云剑宗，导致无论点哪张图都看到同一张 DAG）。[br]
-## [br][b]重复点击[/b]：节点图已挂载时忽略（进入动画期间双击不应重复生成地图）。
+## [br][b]重复点击[/b]：节点图已挂载时忽略（进入动画期间双击不应重复生成地图）。[br]
+## [br][b]新生成[/b]：本条路径走 [code]p_resume = false[/code]（重新生成地图）；读档续玩
+## 走 [method _resume_last_map]，两条路都汇到 [method _enter_map]。
 func _on_enter_map_requested(p_map_id: StringName) -> void:
+	_enter_map(p_map_id, false)
+
+
+## 进图实现——挂载 [code]NodeGraphScreen[/code] 并按 [param p_resume] 触发加载。[br]
+## [br][param p_resume] [code]false[/code] = 新生成（[code]enter_map[/code]：新 seed、
+## 已访问重置为入口、行动力回满）；[code]true[/code] = 读档续玩（[code]resume_map[/code]：
+## 图 / 走过的路 / 剩余行动力全部取自存档，见 [code]NodeGraphLoadSource.resume_map[/code]）。[br]
+## [br][b]为什么抽成一处[/b]：挂载与接线（含退出意图）对两条路径完全相同，差别只在
+## 传给节点图的最后一个布尔——复制一份挂载序列会让「接线漏一条」只在一半路径上出现。[br]
+## [br][b]返回[/b]：是否真的挂了节点图（已挂载时为 false——重复意图被忽略；
+## 读档续玩拿不到快照时也返回 false——那种情况下这张空图已被拆掉）。
+func _enter_map(p_map_id: StringName, p_resume: bool) -> bool:
 	if node_graph_screen != null:
-		return
+		return false
 	node_graph_screen = NodeGraphScreenScene.instantiate()
 	# 退出探索意图（GDD exploration-system.md §8「退出按钮在探索HUD中始终可用」）
 	# ——本容器是唯一同时持有节点图与结算入口的地方。
 	node_graph_screen.back_to_map_select_requested.connect(_on_exit_exploration_requested)
 	add_child(node_graph_screen)
-	node_graph_screen.trigger_map_load(p_map_id)
+	node_graph_screen.trigger_map_load(p_map_id, p_resume)
+	# 读档续玩拿不到快照（该图在存档里没有 graph/nodes）——加载如实失败，本屏幕
+	# 是一块什么都没有的画板。拆掉它退回选图界面：留在里面玩家既看不到图、
+	# 也点不动任何东西，只能靠退出按钮脱身。
+	if p_resume and not bool(node_graph_screen.call(&"has_snapshot")):
+		_unmount_node_graph()
+		return false
+	return true
 
 
 ## 主动退出探索意图（[signal NodeGraphScreen.back_to_map_select_requested]）——结算并

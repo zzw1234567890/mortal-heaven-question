@@ -258,18 +258,8 @@ func _ready() -> void:
 	var current_map: StringName = gsm.exploration.get("current_map", &"")
 	if current_map != &"" and not str(current_map).is_empty():
 		# 读档后重建——从 map_states 读取 graph/nodes 快照
-		var map_states: Dictionary = gsm.exploration.get("map_states", {})
-		var state: Dictionary = map_states.get(current_map, {})
-		if state.has("graph") and state.has("nodes"):
-			var map_data: Dictionary = {
-				"graph": state["graph"],
-				"nodes": state["nodes"],
-				"layers": state.get("layers", []),
-				"boss_node_id": state.get("boss_node_id", 0),
-				"path_count": state.get("path_count", 0),
-			}
-			rebuild_dag_cache(current_map, map_data)
-		else:
+		# （重建逻辑与「读档续玩」共用一处，见 ExplorationSystemResume）
+		if rebuild_cache_from_storage(current_map).is_empty():
 			push_warning("ExplorationSystem._ready: current_map=%s 但 map_states 无 graph/nodes 快照" % current_map)
 
 	_dag_ready = true

@@ -81,15 +81,30 @@ theme_override_font_sizes/font_size = 18
 layout_mode = 1
 anchors_preset = 0
 offset_top = 496.0
-offset_right = 320.0
+offset_right = 640.0
 offset_bottom = 544.0
 theme_override_constants/separation = 12
 
 [node name="InventoryButton" type="Button" parent="LayoutAnchor/UtilityBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(320, 48)
+custom_minimum_size = Vector2(314, 48)
 text = "行囊与道友"
 theme_override_font_sizes/font_size = 18
+
+[node name="LoadButton" type="Button" parent="LayoutAnchor/UtilityBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(314, 48)
+text = "读档"
+theme_override_font_sizes/font_size = 18
+
+[node name="NoSaveHintLabel" type="Label" parent="LayoutAnchor"]
+layout_mode = 1
+anchors_preset = 0
+offset_top = 552.0
+offset_right = 640.0
+offset_bottom = 576.0
+theme_override_font_sizes/font_size = 13
+text = ""
 
 [node name="VersionLabel" type="Label" parent="."]
 layout_mode = 1
@@ -113,4 +128,5 @@ script = ExtResource("2_corrupt_dialog")
 [connection signal="pressed" from="LayoutAnchor/ButtonBox/SettingsButton" to="." method="_on_settings_pressed"]
 [connection signal="pressed" from="LayoutAnchor/ButtonBox/QuitButton" to="." method="_on_quit_pressed"]
 [connection signal="pressed" from="LayoutAnchor/UtilityBox/InventoryButton" to="." method="_on_inventory_pressed"]
+[connection signal="pressed" from="LayoutAnchor/UtilityBox/LoadButton" to="." method="_on_load_pressed"]
 [connection signal="confirmed" from="CorruptDialog" to="." method="_on_corrupt_dialog_confirmed"]

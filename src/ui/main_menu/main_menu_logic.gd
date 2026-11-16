@@ -37,8 +37,66 @@ const SLOT_ORDER: Dictionary = {
 ## 本地化入库后替换为本地化键。
 const SUMMARY_TEMPLATE: String = "上次：%s · 游玩 %s"
 
+## 「读档」界面列出的槽位（见 [method loadable_slots]）。[br]
+## [br][b]为什么不遍历 [code]list_slots()[/code][/b]：那份列表是给判定用的（含战前
+## 快照槽 [code]snapshot_0[/code]），展示清单是 UI 的决定——混在一起后，往
+## [code]list_slots()[/code] 里加一个槽位就会悄悄改变玩家看到的列表（多出一格
+## 「预战斗快照」），而战前快照是战斗管线的中间产物，不该让玩家从主菜单读。
+const LOADABLE_SLOT_SPECS: Array[Dictionary] = [
+	{"slot_type": 0, "slot_id": 0},  # SaveSlotType.AUTOSAVE
+	{"slot_type": 1, "slot_id": 1},  # SaveSlotType.MANUAL 1
+	{"slot_type": 1, "slot_id": 2},  # SaveSlotType.MANUAL 2
+	{"slot_type": 1, "slot_id": 3},  # SaveSlotType.MANUAL 3
+]
+
 ## 无存档时摘要返回空串（story AC：无存档时摘要行隐藏——UI 以空串判定隐藏）。
 const SUMMARY_EMPTY: String = ""
+
+## 「读档」列表里每种槽位的中文名（本地化豁免注记同 [constant SUMMARY_TEMPLATE]）。[br]
+## [br][b]只列玩家能自己选的两种[/b]：自动槽 + 三个手动槽。战前快照
+## [code]snapshot_0[/code] 不进列表——它是战斗管线的中间产物，让玩家从主菜单
+## 读一份「打之前的状态」既不是存档语义、也会和战斗恢复流程抢同一份文件。
+const SLOT_LABEL_AUTOSAVE: String = "自动存档"
+const SLOT_LABEL_MANUAL: String = "手动存档 %d"
+## 空槽位的后缀（玩家要能一眼看出哪几格还能存）。
+const SLOT_EMPTY_SUFFIX: String = "（空）"
+## 槽位名与摘要之间的分隔（纯排版，无本地化语义）。
+const SLOT_LABEL_SEPARATOR: String = " — "
+
+## 读档列表的槽位清单——顺序即展示顺序：自动槽在前，手动 1-3 依次。[br]
+## [br][b]为什么顺序写死而不是遍历 list_slots()[/b]：那份列表是给判定用的（含快照槽
+## 与全部已知键），展示顺序是 UI 的决定——两件事混在一起后，往 [code]list_slots()[/code]
+## 里加槽位会悄悄改变玩家看到的列表顺序。[br]
+## [br][b]返回[/b]：[code]{slot_type, slot_id, exists, label}[/code] 四项的数组，
+## [code]label[/code] 已含「存在 → 摘要 / 不存在 → （空）」两种文案。[br]
+## [br][b]空状态防御[/b]：同 [method has_continuable_save]——null / 非数组一律按
+## 「四个槽位都空」返回，调用方不必先判空。[br]
+## [b]来源[/b]: design/gdd/main-menu-system.md（新游戏 / 继续游戏 / 读档三条路径）。
+static func loadable_slots(save_meta_list: Variant) -> Array[Dictionary]:
+	var by_key: Dictionary = {}
+	if save_meta_list is Array:
+		for meta in save_meta_list:
+			if not (meta is Dictionary):
+				continue
+			by_key[_meta_key(meta)] = meta
+
+	var out: Array[Dictionary] = []
+	for spec: Dictionary in LOADABLE_SLOT_SPECS:
+		var slot_type: int = int(spec["slot_type"])
+		var slot_id: int = int(spec["slot_id"])
+		var meta: Dictionary = by_key.get(_slot_key(slot_type, slot_id), {})
+		var exists: bool = bool(meta.get("exists", false))
+		var name: String = SLOT_LABEL_AUTOSAVE if slot_type == 0 \
+				else SLOT_LABEL_MANUAL % slot_id
+		var label: String = name + SLOT_EMPTY_SUFFIX if not exists \
+				else name + SLOT_LABEL_SEPARATOR + build_save_summary(meta)
+		out.append({
+			"slot_type": slot_type,
+			"slot_id": slot_id,
+			"exists": exists,
+			"label": label,
+		})
+	return out
 
 ## === 判定纯函数 ===============================================================
 
@@ -115,6 +173,34 @@ static func build_save_summary(meta: Variant) -> String:
 
 
 ## === 内部辅助 ================================================================
+
+## 槽位键——与 [code]SaveLoadSystem._slot_key[/code] 同一口径
+## （[code]"autosave_0"[/code] / [code]"manual_1"[/code] / [code]"snapshot_0"[/code]）。[br]
+## [br][b]为什么本地重写一份而不是调系统那边[/b]：本内核是纯静态函数（不访问任何
+## Autoload），而 [code]_slot_key[/code] 是实例方法。两侧口径由单测锁定同源——
+## 改槽位编号规则时那条用例会先红。
+static func _slot_key(p_slot_type: int, p_slot_id: int) -> String:
+	match p_slot_type:
+		0:
+			return "autosave_0"
+		1:
+			return "manual_%d" % p_slot_id
+		2:
+			return "snapshot_0"
+		_:
+			return "unknown"
+
+
+## 槽位元数据 → 它的键（从 [code]slot_type[/code] / [code]slot_id[/code] 反解）。[br]
+## 未知槽位类型也返回一个不会与 [constant LOADABLE_SLOT_SPECS] 撞车的键
+## （[code]"unknown_<type>_<id>"[/code]）——查表落空、进不了读档列表，且不会
+## 顶掉某个真槽位的条目。
+static func _meta_key(meta: Dictionary) -> String:
+	var slot_type: int = int(meta.get("slot_type", -1))
+	if slot_type < 0 or slot_type > 2:
+		return "unknown_%d_%d" % [slot_type, int(meta.get("slot_id", -1))]
+	return _slot_key(slot_type, int(meta.get("slot_id", 0)))
+
 
 ## 槽位 tie-break 权重（SLOT_ORDER 表驱动；MANUAL 以 slot_id 内插权重）。
 static func _slot_order(meta: Dictionary) -> int:

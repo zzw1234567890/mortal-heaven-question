@@ -4,25 +4,18 @@ extends Control
 ##
 ## [b]节点形态[/b]（ADR-0031 §1）：场景内 Control 树（零新增 Autoload），由
 ## [code]ExplorationScene[/code] 薄容器挂载（进入地图后叠加于 MapSelectScreen）。[br]
-## [br][b]结构[/b]：NodeGraphViewport（缩放平移容器）承载 NodeGraphRenderer（渲染
-## 基座）+ 顶栏状态区（[NodeGraphStatusBar]：行动力 / 走投无路提示 / 退出探索）。[br]
+## [br][b]结构[/b]：NodeGraphViewport（缩放平移）承载 NodeGraphRenderer（渲染基座）
+## + 顶栏状态区（[NodeGraphStatusBar]：行动力 / 走投无路提示 / 退出探索）。[br]
 ## [br][b]信号驱动路径[/b]：本界面[b]只消费 [signal ExplorationSystem.map_generated][/b]
-## ——按 map_data.nodes/graph 构建快照 → 六态经
-## [NodeStateLogic.classify_node_state] 判定 → 样式经
-## [NodeStateLogic.node_state_style] 渲染。[br]
+## ——按 map_data.nodes/graph 构建快照 → 六态经 [NodeStateLogic.classify_node_state]
+## 判定 → 样式经 [NodeStateLogic.node_state_style] 渲染。[br]
 ## [br][b]数据源优先级[/b]（[method trigger_map_load]）：1. 真实探索系统可用且声明
-## [code]map_generated[/code] → 调 [code]enter_map[/code] 命令（生成/写入/广播都在
-## 系统侧），本界面不写任何游戏状态；2. 否则挂 [MapGeneratedStub] 降级发射器渲染
-## story-003 样本（headless/编辑器预览、Feature 层缺失时界面不空白）。降级由
-## [method is_using_stub_source] 标记——[b]选择依据是信号是否声明[/b]，不看 Autoload
-## 是否存在（B-1 回归）；信号连接与退订同归 [NodeGraphLoadSource]。[br]
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：[code]_current_snapshot[/code] 为渲染输入
-## 快照（瞬态交互状态，不进存档）。[br]
-## [br][b]零轮询[/b]：无 [code]_process()[/code]——逐层展开（0.8s）与迷雾消散（0.3s）
-## 都由 node_moved / map_generated 驱动的 Tween 推进（揭示集合按
-## [NodeStateLogic.is_revealed] 推导，与系统写入的 visited 同源）。[br]
-## 来源: story-003-node-graph-data-states.md、ADR-0031 §2/§3、
-## ADR-0014 §决策 3（map_generated/node_moved 信号）、story-001 基座。
+## [code]map_generated[/code] → 调 [code]enter_map[/code] 命令（生成/写入/广播都在系统侧），
+## 本界面不写任何游戏状态；2. 否则挂 [MapGeneratedStub] 降级发射器渲染 story-003 样本
+## （判据是[b]信号是否声明[/b]而非 Autoload 是否存在——B-1 回归）。[br]
+## [br][b]零状态所有权[/b]（ADR-0031 §2）：[code]_current_snapshot[/code] 为渲染输入快照
+## （瞬态交互状态，不进存档）。[b]零轮询[/b]：无 [code]_process()[/code]——展开/迷雾皆由信号驱动 Tween。[br]
+## 来源: story-003-node-graph-data-states.md、ADR-0031 §2/§3、ADR-0014 §决策 3。
 
 ## === 依赖（测试可替换）======================================================
 
@@ -40,10 +33,9 @@ const NodeGraphLoadSourceScript := preload("res://src/ui/exploration/node_graph_
 ## 子组件装配编排（交互组件 + 事件弹出通道）——挂载细节在装配器，屏幕只持引用。
 const ComponentAssemblyScript := preload(
 		"res://src/ui/exploration/node_graph_component_assembly.gd")
-## 六态重算 + 逐层展开动画。
+## 六态重算 + 逐层展开动画；顶栏状态区（行动力显示 / 走投无路提示 / 退出探索）。
 const NodeGraphRevealAnimatorScript := preload(
 		"res://src/ui/exploration/node_graph_reveal_animator.gd")
-## 顶栏状态区（行动力显示 / 走投无路提示 / 退出探索）——见 [NodeGraphStatusBar]。
 const StatusBarScript := preload("res://src/ui/exploration/node_graph_status_bar.gd")
 
 ## === 信号 ==================================================================
@@ -53,14 +45,11 @@ const StatusBarScript := preload("res://src/ui/exploration/node_graph_status_bar
 ## exploration-system.md §AC），故不另立一个语义重复的信号；结算由薄容器接住。
 signal back_to_map_select_requested
 
-## === 到达通知转发（审查 H3——006/007 消费入口）=============================
-## 交互组件的到达信号经屏幕层再暴露一层：后续 story 只需连接屏幕信号，
-## 无需依赖子组件节点路径。
+## === 到达通知转发（审查 H3——006/007 消费入口：组件信号经屏幕再暴露一层，后续 story 不必依赖节点路径）==
 signal combat_arrival_forwarded(enemy_roster: Array, combat_type: StringName)
 signal boss_arrival_forwarded(boss_data: Dictionary)
 signal node_interaction_forwarded(node_id: int, interaction_type: StringName, payload: Dictionary)
-## 移动失败 toast 文案（审查 H1——延迟接线义务：HUD 通知区域
-## [method Hud.request_notification] 存在后由 006 接入，见 story Test Evidence）。
+## 移动失败 toast 文案（审查 H1——HUD 通知区域 [method Hud.request_notification] 接线后由 006 接入）。
 signal move_feedback_forwarded(toast_text: String, node_id: int)
 
 ## === 节点引用 ==============================================================
@@ -77,6 +66,8 @@ var _load_source: RefCounted = null
 ## 待加载地图 ID——[method trigger_map_load] 在进树前被调用时记下，[method _ready]
 ## 补触发一次（场景编排先 add_child 后调 trigger_map_load 是既有顺序）。
 var _pending_map_id: StringName = &""
+## 待加载是否走读档续玩——与 [member _pending_map_id] 同进同出（同一个请求的两半）。
+var _pending_resume: bool = false
 ## 装配结果——[code]{interaction_mount, event_presenter, shop_presenter,
 ## teleport_presenter, harvest_presenter, craft_presenter, meditation_presenter}[/code]
 ## （见 [NodeGraphComponentAssembly]）。[b]为什么整块存字典[/b]：屏幕只负责
@@ -99,8 +90,10 @@ func _ready() -> void:
 	# 反之（先赋值再 add_child）留待宿主调用。
 	if _pending_map_id != &"":
 		var pending: StringName = _pending_map_id
+		var pending_resume: bool = _pending_resume
 		_pending_map_id = &""
-		trigger_map_load(pending)
+		_pending_resume = false
+		trigger_map_load(pending, pending_resume)
 
 
 func _exit_tree() -> void:
@@ -118,11 +111,18 @@ func is_using_stub_source() -> bool:
 	return _load_source != null and bool(_load_source.get(&"using_stub"))
 
 
+## 是否已拿到渲染快照（[param p_resume] 路径的失败判据）。[br]
+## [br][b]为什么薄容器需要它[/b]：读档续玩时该图若在存档里没有 graph/nodes 快照，
+## 加载会如实失败、本屏幕保持空白——容器据此拆掉它退回选图界面。
+func has_snapshot() -> bool:
+	return not _current_snapshot.is_empty()
+
+
 ## 商店/回复接线组件（见 [ShopNodePresenter]）——未挂载时为 null。[br]
 ## [br][b]以下五个 presenter 访问器同口径[/b]：公开入口，集成测试与后续 story 经此
 ## 断言/驱动各类 overlay，不依赖私有成员名。依次为——商店/回复、传送选层、采集、
 ## 炼丹台+炼器台（共用一份，靠 kind 区分）、打坐/洞府（突破冲关 overlay）。
-## 因此处都是纯转发，按本库单空行分段先例紧凑排列（不改访问器名）。
+## 都是纯转发，故紧凑排列（不改访问器名）。
 func shop_presenter() -> Variant:
 	return _components.get("shop_presenter")
 
@@ -149,14 +149,17 @@ func status_bar() -> Variant:
 ## 本界面只是监听者（零状态所有权，ADR-0031 §2）。[br]
 ## [b]stub 源[/b]：发射 stub 快照驱动同一渲染路径（降级，见 [method is_using_stub_source]）。[br]
 ## [br][param p_map_id] 目标地图 ID（默认青云剑宗——编辑器/预览路径用）。[br]
-func trigger_map_load(p_map_id: StringName = &"qing_yun_jian_zong") -> void:
+## [param p_resume] [code]true[/code] = [b]读档续玩[/b]（从存档快照重建，不重生成）。
+func trigger_map_load(p_map_id: StringName = &"qing_yun_jian_zong",
+		p_resume: bool = false) -> void:
 	# 未进树时信号尚未连接（_ready 里连）——记下目标，进树后补触发，
 	# 否则真实源广播的 map_generated 会被丢掉、节点图空白。
 	if not is_inside_tree():
 		_pending_map_id = p_map_id
+		_pending_resume = p_resume
 		return
 	_ensure_load_source()
-	_load_source.call(&"load_map", p_map_id)
+	_load_source.call(&"load_map", p_map_id, p_resume)
 
 
 ## 挂载全部子组件——挂载与接线细节在 [NodeGraphComponentAssembly]（交互三组件 +
@@ -252,9 +255,7 @@ func _refresh_ap_label(snapshot: Dictionary) -> void:
 
 ## 挂载顶栏状态区——行动力标签 / 走投无路提示 / 退出探索按钮（见 [NodeGraphStatusBar]）。[br]
 ## [br][b]退出路径[/b]：按钮 → 确认弹窗 → [signal back_to_map_select_requested]，
-## 由薄容器 [code]ExplorationScene[/code] 接住并走既有结算
-## （[code]ExplorationSystem.end_exploration[/code]）。本屏幕[b]不结算[/b]——
-## 零状态所有权（ADR-0031 §2）。
+## 由薄容器接住并走既有结算。本屏幕[b]不结算[/b]——零状态所有权（ADR-0031 §2）。
 func _mount_status_bar() -> void:
 	_status_bar = StatusBarScript.mount(self, Callable(self, &"_on_exit_confirmed"))
 

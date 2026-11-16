@@ -197,14 +197,20 @@ func _on_confirm_dialog_confirmed() -> void:
 ## === 开局叙事（基础展示 + 任意键跳过——完整演出归叙事 epic）====================
 
 ## 开始叙事展示——从 [code]get_identity_preview()[/code] 的 flavor_text 逐行显示。[br]
+## [br][b]结束时请求的是「新开局」那条导航[/b]：本场景只有「玩家确认了身份」这一种
+## 情况会走到叙事，因此叙事结束 = 一局新游戏的开端——请求里带上
+## [constant ExplorationEntryIntent.EntryMode.FIRST_MAP] 意图，探索场景挂载时直接
+## 进第一张图（青云剑宗），玩家不必再点一次地图卡。[br]
+## [br][b]读档跳过不在此列[/b]：那条走 [method IdentitySelectNav.skip_to_exploration]，
+## 目标是「回到存档里那张图」——见 [method _get_nav] 的 on_transition_target。[br]
 ## [br]信号经 [method Object.connect] 接线（Presenter 声明为 RefCounted——
 ## 静态类型下用 [method Object.call] / [method Object.connect] 访问其成员，
 ## 避免把子模块的具体类型泄漏进场景脚本）。
 func _start_narrative() -> void:
 	var flavor: String = str(_get_identity_preview(selected_id).get(&"flavor_text", ""))
 	var presenter: RefCounted = _get_presenter()
-	if not presenter.is_connected(&"narrative_finished", _request_exploration):
-		presenter.connect(&"narrative_finished", _request_exploration)
+	if not presenter.is_connected(&"narrative_finished", _request_new_run_exploration):
+		presenter.connect(&"narrative_finished", _request_new_run_exploration)
 	presenter.call(&"start_narrative", flavor)
 
 
@@ -237,9 +243,17 @@ func _show_toast(text: String, title: String = "") -> void:
 
 ## === 内部辅助 ==================================================================
 
-## 请求导航到探索（叙事结束 / 读档跳过共用；实现在 Nav）。
+## 请求导航到探索（读档跳过 / 叙事结束共用；实现在 Nav）。
 func _request_exploration() -> void:
 	_get_nav().request_exploration()
+
+
+## 请求导航到探索——[b]新开局路径[/b]（叙事结束时的回调）。[br]
+## [br][b]与 [method _request_exploration] 的差别[/b]：多带一条「直接进第一张图」的
+## 跨场景意图（见 [method IdentitySelectNav.request_new_run_exploration]）。读档跳过的
+## 回调仍是前者——那条要回到存档里那张图，不是第一张。[br]
+func _request_new_run_exploration() -> void:
+	_get_nav().request_new_run_exploration()
 
 
 ## 输入锁栈判定——确认按钮改变游戏状态，必须过

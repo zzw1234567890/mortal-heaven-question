@@ -94,12 +94,15 @@ func unbind() -> void:
 
 ## 触发地图加载。[br]
 ## [br][param p_map_id] 目标地图 ID。[br]
+## [param p_resume] [code]true[/code] = [b]读档续玩[/b]（见 [method resume_map]）。[br]
 ## [br][b]返回[/b]：是否受理（无系统且无 stub 时 false）。[br]
-func load_map(p_map_id: StringName) -> bool:
+func load_map(p_map_id: StringName, p_resume: bool = false) -> bool:
 	from_system = false
 	if stub_emitter != null:
 		stub_emitter.emit_map_generated(p_map_id)
 		return true
+	if p_resume:
+		return resume_map(p_map_id)
 	if system == null or not system.has_method(&"enter_map"):
 		push_warning("NodeGraphLoadSource: 探索系统不支持 enter_map，节点图保持空白")
 		return false
@@ -111,6 +114,23 @@ func load_map(p_map_id: StringName) -> bool:
 	from_system = true
 	system.call(&"enter_map", p_map_id, realm, max_action_points(realm))
 	return true
+
+
+## 读档续玩加载——[b]不重新生成地图[/b]，由系统从存档快照重建并广播。[br]
+## [br][b]与 [method load_map] 的分工[/b]：那条走 [code]enter_map[/code]（新 seed、
+## 已访问重置为入口、行动力回满）；本方法走 [code]resume_map[/code]（图 / 走过的路 /
+## 剩余行动力全部取自存档）。读档后走前者，玩家会被悄悄送回起点。[br]
+## [br][b]from_system 的置位时机同 [method load_map][/b]：系统同步广播
+## [code]map_generated[/code]，屏幕的渲染回调在本行返回之前就会读到它。[br]
+## [br][b]返回[/b]：是否受理。系统不支持 [code]resume_map[/code] 或该图无快照时
+## false（[code]resume_map[/code] 自己会 push_warning）——屏幕据此保持空态，
+## 由薄容器决定退回选图界面。
+func resume_map(p_map_id: StringName) -> bool:
+	if system == null or not system.has_method(&"resume_map"):
+		push_warning("NodeGraphLoadSource: 探索系统不支持 resume_map，读档续玩中止")
+		return false
+	from_system = true
+	return not (system.call(&"resume_map", p_map_id) as Dictionary).is_empty()
 
 
 ## 玩家当前境界——GSM 只读；缺失时回退 1（新档炼气）。[br]
