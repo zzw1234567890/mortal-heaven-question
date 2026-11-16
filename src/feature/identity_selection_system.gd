@@ -20,6 +20,9 @@ signal identity_selected(identity_id: StringName)
 ## 身份模板表子模块（Sprint 12 Story 013 拆分）。
 const _Templates := preload("res://src/feature/identity/identity_templates.gd")
 
+## 解锁/就绪判定子模块（纯函数——解锁双来源 + 卡组模板齐备性）。
+const _Unlock := preload("res://src/feature/identity/identity_unlock.gd")
+
 ## 6 个开局身份模板——委托给 _Templates 子模块（Sprint 12 Story 013 拆分）。
 ## 保留 const 引用以兼容测试直接访问 ISS.IDENTITY_TEMPLATES。
 const IDENTITY_TEMPLATES: Dictionary = _Templates.IDENTITY_TEMPLATES
@@ -54,25 +57,25 @@ func _get_initializer() -> RefCounted:
 
 # === 查询 API ====================================================================
 
-## 查询可用身份列表——结合轮回天赋解锁状态。[br]
+## 查询可用身份列表——结合轮回天赋解锁状态 + 开局就绪度。[br]
 ## [br][b]返回[/b]: Array[Dictionary]，每个条目含：[br]
 ## [code]{identity_id, name, description, style_tag, initial_ling_shi,[br]
-##   talent_name, talent_desc, character_display_names, is_unlocked, is_recommended}[/code][br]
+##   talent_name, talent_desc, character_display_names, is_unlocked,[br]
+##   is_ready, block_reason, is_recommended}[/code][br]
 ## [br][b]ProgressionSystem 不可用时[/b]: 5 个默认身份解锁，阵道双杰锁定。[br]
+## [br][b]is_unlocked ≠ is_ready[/b]（本子模块的要点）：[code]is_unlocked[/code] 只答
+## 「轮回天赋到位没」，[code]is_ready[/code] 还答「这套卡组的模板齐不齐」。
+## 未解锁必然不就绪；已解锁但模板缺失同样不就绪——UI 据此拦住开局，
+## 而不是放它走到 [code]apply_identity[/code] 里失败回滚。[br]
 ## [br]来源: ADR-0022 §get_available_identities + GDD §7 身份影响范围。
 func get_available_identities() -> Array[Dictionary]:
 	var unlocked: Array[String] = _get_unlocked_talents()
+	var has_template: Callable = _make_template_probe()
 	var result: Array[Dictionary] = []
 
 	for id: StringName in IDENTITY_TEMPLATES:
 		var tmpl: Dictionary = IDENTITY_TEMPLATES[id]
-		var cond: Dictionary = tmpl["unlock_condition"]
-
-		var is_unlocked: bool = cond.get("default_unlocked", true)
-		if not is_unlocked:
-			var required: String = str(cond.get("require_talent", ""))
-			if required != "" and required in unlocked:
-				is_unlocked = true
+		var ready: Dictionary = _Unlock.readiness(tmpl, id, unlocked, has_template)
 
 		var entry: Dictionary = {
 			"identity_id": id,
@@ -83,12 +86,24 @@ func get_available_identities() -> Array[Dictionary]:
 			"talent_name": tmpl["talent"]["name"],
 			"talent_desc": tmpl["talent"]["description"],
 			"character_display_names": _get_character_names(tmpl),
-			"is_unlocked": is_unlocked,
+			"is_unlocked": ready["is_unlocked"],
+			"is_ready": ready["is_ready"],
+			"block_reason": ready["block_reason"],
 			"is_recommended": tmpl.get("recommended_for_new_player", false),
 		}
 		result.append(entry)
 
 	return result
+
+
+## 构造 [code]CardSystem.has_template[/code] 形态的探测 Callable——CardSystem 不可用时
+## 返回无效 Callable（就绪度判定据此判「无法校验 → 不就绪」，不放行）。[br]
+## [br]来源: ADR-0022 §apply_identity ② 前置校验（同一份模板存在性口径）。
+func _make_template_probe() -> Callable:
+	var card_sys: Node = _get_card_system()
+	if card_sys == null or not card_sys.has_method("has_template"):
+		return Callable()
+	return card_sys.has_template
 
 
 ## 获取完整身份预览——供 UI 预览面板使用。[br]
@@ -116,7 +131,7 @@ func get_identity_preview(identity_id: StringName) -> Dictionary:
 	}
 
 
-# === 工具方法（Story 6-3 占位——Story 6-2/6-3 实现）===========================
+# === 工具方法 ===================================================================
 
 ## 检查是否已选择身份——读 GSM.player.identity_id。[br]
 ## [br][b]返回[/b]: true 已选择，false 未选择。[br]
@@ -156,7 +171,7 @@ func get_identity_talent_value(talent_id: StringName) -> int:
 ## [br][param identity_id] 身份 ID。[br]
 ## [br][b]返回[/b]: [code]true[/code] 成功，[code]false[/code] 失败（GSM 不变或已回滚）。[br]
 ## [br][b]流程[/b]（ADR-0022 §apply_identity 8 步原子操作）:[br]
-##   ① 验证 identity_id 有效 + 已解锁[br]
+##   ① 验证 identity_id 有效 + 已解锁 + 已就绪（卡组模板齐备）[br]
 ##   ② 验证所有 card_id 在 CardSystem.templates 中存在[br]
 ##   ③ 写入 GSM.player.identity_id[br]
 ##   ④ 设置初始灵石——通过 ResourceSystem（ADR-0019 强制契约）[br]
@@ -178,32 +193,24 @@ func apply_identity(identity_id: StringName) -> bool:
 		push_error("IdentitySelectionSystem.apply_identity: 未知 identity_id '%s'" % identity_id)
 		return false
 
-	# 校验解锁状态
-	var available: Array[Dictionary] = get_available_identities()
-	var is_unlocked: bool = false
-	for entry: Dictionary in available:
-		if entry["identity_id"] == identity_id and entry["is_unlocked"]:
-			is_unlocked = true
-			break
-	if not is_unlocked:
+	# 校验解锁状态 + 开局就绪度（解锁双来源 + 卡组模板齐备性）
+	var ready: Dictionary = _Unlock.readiness(tmpl, identity_id,
+			_get_unlocked_talents(), _make_template_probe())
+	if not bool(ready["is_unlocked"]):
 		push_error("IdentitySelectionSystem.apply_identity: 身份 '%s' 未解锁" % identity_id)
 		return false
+	if not bool(ready["is_ready"]):
+		push_error("IdentitySelectionSystem.apply_identity: 身份 '%s' 未开放（原因 %s，缺模板 %s）"
+				% [identity_id, ready["block_reason"], str(ready["missing_templates"])])
+		return false
 
-	# ② 校验所有卡牌模板有效性——通过 CardSystem
+	# ② 卡牌模板有效性——就绪度已用同一份 CardSystem.has_template 口径查过一遍；
+	# 此处只补「CardSystem 本身不可用」的兜底（readiness 对无效探测 Callable
+	# 一律判不就绪，走到这里即说明 CardSystem 可用，故只为可读性保留守卫）。
 	var card_sys: Node = _get_card_system()
 	if card_sys == null or not card_sys.has_method("has_template"):
 		push_error("IdentitySelectionSystem.apply_identity: CardSystem 不可用")
 		return false
-	for card_entry: Dictionary in tmpl["initial_deck"]["cards"]:
-		var card_id: String = str(card_entry["card_id"])
-		if not card_sys.has_template(StringName(card_id)):
-			push_error("IdentitySelectionSystem.apply_identity: 卡牌模板缺失 '%s'" % card_id)
-			return false
-	for char_entry: Dictionary in tmpl["initial_deck"]["character_slots"]:
-		var char_id: String = str(char_entry["card_id"])
-		if not card_sys.has_template(StringName(char_id)):
-			push_error("IdentitySelectionSystem.apply_identity: 角色模板缺失 '%s'" % char_id)
-			return false
 
 	# ③ 写入 GSM.player.identity_id（先写以满足"选择身份"语义）
 	gsm.set_identity(identity_id)

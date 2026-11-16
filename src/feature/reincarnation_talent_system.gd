@@ -25,7 +25,7 @@ const TALENT_TREE: Dictionary = {
 	"resource_1": {"id": "resource_1", "name": "灵脉感应", "cost": 8, "branch": "resource", "layer": 1, "effect": {"type": "resource_boost", "value": 0.10}, "desc": "探索灵石掉落+10%"},
 	"resource_2": {"id": "resource_2", "name": "坊市老客", "cost": 12, "branch": "resource", "layer": 2, "effect": {"type": "shop_discount", "value": 0.15}, "desc": "商店卡牌价格-15%", "prerequisite": "resource_1"},
 	"resource_3": {"id": "resource_3", "name": "炼器余料", "cost": 18, "branch": "resource", "layer": 3, "effect": {"type": "craft_cost_reduce", "value": 1}, "desc": "炼丹/炼器灵材消耗-1", "prerequisite": "resource_2"},
-	"resource_4": {"id": "resource_4", "name": "苍玄行者", "cost": 30, "branch": "resource", "layer": 4, "effect": {"type": "identity_unlock", "value": "array_master"}, "desc": "解锁隐藏身份「阵道双杰」", "prerequisite": "resource_3", "unlock_condition": {"type": "unique_cards", "value": 50}},
+	"resource_4": {"id": "resource_4", "name": "苍玄行者", "cost": 30, "branch": "resource", "layer": 4, "effect": {"type": "identity_unlock", "value": "formation_duo"}, "desc": "解锁隐藏身份「阵道双杰」", "prerequisite": "resource_3", "unlock_condition": {"type": "unique_cards", "value": 50}},
 
 	# 【战意之道】—— 战斗属性加成
 	"combat_1": {"id": "combat_1", "name": "锋芒初显", "cost": 8, "branch": "combat", "layer": 1, "effect": {"type": "start_cost", "value": 1}, "desc": "开局首回合费用+1"},
