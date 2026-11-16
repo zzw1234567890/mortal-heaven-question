@@ -380,6 +380,9 @@ func is_targetable(character_id: int, attacker_has_penetration: bool = false) ->
 ## [br][b]存储结构[/b]：[code]{death_turn, death_battle_id, revival_methods}[/code]——[param death_context]
 ## 缺字段填充默认值（death_turn=0 / death_battle_id="" / revival_methods=[]）。[br]
 ## [br][b]重复标记[/b]：同一角色重复标记时覆盖旧 context（战斗结算逻辑保证一个角色只标记一次）。[br]
+## [br][b]同步落库[/b]：[member _unavailable_characters] 是这份状态的本地权威，但存档读的是
+## GSM 的 [code]player.unavailable_characters[/code]——标完立刻 [method _push_unavailable_to_gsm]
+## 推一次，避免「阵亡只活在内存里，一存档就复活」。[br]
 ## [br][param character_id] 阵亡角色 ID。[br]
 ## [br][param death_context] 死亡上下文 [code]{death_turn, death_battle_id, revival_methods?}[/code]。
 func mark_unavailable(character_id: int, death_context: Dictionary) -> void:
@@ -388,6 +391,7 @@ func mark_unavailable(character_id: int, death_context: Dictionary) -> void:
 		"death_battle_id": str(death_context.get("death_battle_id", "")),
 		"revival_methods": death_context.get("revival_methods", []).duplicate(true),
 	}
+	_push_unavailable_to_gsm()
 	_emit_character_unavailable(character_id)
 
 
@@ -399,14 +403,27 @@ func get_unavailable_characters() -> Array:
 
 ## 复活不可用角色——从 [member _unavailable_characters] 移除并发射 [signal character_revived]。[br]
 ## [br]角色属性保留但空载（无绑定卡——绑定卡生命周期由 BindingManager 处理）。[br]
+## [br][b]同步落库[/b]：与 [method mark_unavailable] 对称——复活也要推一次 GSM，
+## 否则存档里那句「此人已阵亡」会在读档时把人重新按死。[br]
 ## [br][param character_id] 待复活角色 ID。[br]
 ## [br][b]返回[/b]: true = 成功复活；false = 角色不在不可用列表中（不发射信号）。
 func revive_character(character_id: int) -> bool:
 	if not _unavailable_characters.has(character_id):
 		return false
 	_unavailable_characters.erase(character_id)
+	_push_unavailable_to_gsm()
 	_emit_character_revived(character_id)
 	return true
+
+
+## 把 [member _unavailable_characters] 推给 GSM——[b]写入即落库[/b]的唯一转发点。[br]
+## [br][b]为什么标完就推[/b]：存档读的是 GSM 的那份（[code]player.unavailable_characters[/code]），
+## 本地表只是权威副本——只在战斗结束时推（[method sync_unavailable_to_gsm] 的旧时机）
+## 意味着玩家在路上阵亡、直接退出游戏时，这次死亡从未进过存档。[br]
+## [br][b]GSM 不可用[/b]：静默跳过（委托方 [code]deployment_serializer[/code] 的双守卫），
+## 内存里的标记照常生效。[br]
+func _push_unavailable_to_gsm() -> void:
+	_get_serializer().sync_unavailable_to_gsm()
 
 
 ## 全部角色位不可用判定——战斗开始前由 CombatSystem 调用（触发游戏失败）。[br]
@@ -464,6 +481,11 @@ func deserialize_field(data: Dictionary) -> void:
 ## 战斗结束时同步不可用角色列表至 GSM——委托给 _serializer 子模块。
 func sync_unavailable_to_gsm() -> void:
 	_get_serializer().sync_unavailable_to_gsm()
+
+
+## 从 GSM 现读不可用角色列表并拉回本地——委托给 _serializer 子模块。
+func restore_unavailable_from_storage() -> void:
+	_get_serializer().restore_unavailable_from_storage()
 
 
 ## 从 GSM 存档数据恢复不可用角色列表——委托给 _serializer 子模块。

@@ -11,6 +11,9 @@ extends RefCounted
 ##
 ## 来源: ADR-0001 §第四层序列化 + ADR-0019 §向前兼容。
 
+## 存档类型边界——写侧归一 / 读侧还原 / 默认值驱动的类型归一（纯函数）。
+const SaveTypes := preload("res://src/foundation/gsm/gsm_save_types.gd")
+
 ## 指向 GSM 父节点的引用——序列化引擎通过它访问域数据。
 var _gsm: Node = null
 
@@ -158,11 +161,19 @@ func init_all_domains() -> void:
 # === 序列化 / 反序列化 =========================================================
 
 ## 将当前游戏状态序列化为纯 Dictionary。[br]
-## [br]排除 battle 和 session 域（不可持久化）。返回深拷贝——调用方修改不影响 GSM 内部状态。
+## [br]排除 battle 和 session 域（不可持久化）。返回深拷贝——调用方修改不影响 GSM 内部状态。[br]
+## [br][b]输出一定是 JSON 安全形态[/b]：[code]talents[/code] /
+## [code]owned_cards[*].template_id[/code] / [code]deck.slots[/code] /
+## [code]exploration.current_map[/code] 等处含 StringName，[code]map_states[*].graph[/code] /
+## [code]harvested[/code] 含 int 键——未归一的话 [code]SaveLoadSystem.save_game[/code]
+## 的类型校验会把整份载荷判为非法（实测：任何一次真实存档都写不进去，返回
+## [code]VALIDATION_ERROR[/code]）。归一由 [GsmSaveTypes.to_save_safe] 统一做，
+## int 键在此按 [code]str()[/code] 落成 String 键、读档时由同一模块还原（int 键与
+## String 键在 Godot 里是两个键，不还原就会在写回时新增条目而不是覆盖）。
 func serialize() -> Dictionary:
 	var data: Dictionary = {}
 	for domain: String in _gsm.PERSISTABLE_DOMAINS:
-		data[domain] = _deep_copy(_get_domain(domain))
+		data[domain] = SaveTypes.to_save_safe(_get_domain(domain))
 	return data
 
 
@@ -243,23 +254,30 @@ func _validate_save_structure(data: Dictionary) -> bool:
 
 
 ## 反序列化单个域到目标快照中。[br]
-## [br]逐字段写入——类型不匹配时返回 false。输入中缺失的字段使用默认值。
+## [br]逐字段写入——按默认值类型归一（[method GsmSaveTypes.coerce_dict]）；归一不了
+## 的字段报错并返回 false，整份存档拒绝。输入中缺失的字段使用默认值。[br]
+## [br][b]为什么由默认值驱动而不是直接比 typeof[/b]：存档是 JSON，数字一律回来成
+## float、StringName 回来成 String——直接比类型会把每一份真实存档都判非法
+## （实测：连 [code]meta.seed[/code] 这种恒为 0 的字段都过不去）。归一后内存里的
+## 类型与出厂状态逐字一致，读侧那些 [code]has(int)[/code] / [code]get(int_key)[/code]
+## 才仍然成立。[br]
+## [br][b]域级还原[/b]：结构性的 int 键 / int 数组交给 [method GsmSaveTypes.restore_domain]
+## （键类型必须还原，否则写回时新增条目而不是覆盖）——先还原再补默认值，缺省键
+## 不会被还原这一步漏掉。[br]
+## [br][b]域级归一前置[/b]：[code]player.resources[/code] 的旧扁平
+## [code]ling_cai[/code] 先在输入侧迁移成四品质字典，再走逐键归一。[br]
 func _deserialize_domain(snapshot: Dictionary, domain: String, input: Dictionary, defaults: Dictionary) -> bool:
-	var result: Dictionary = {}
-	for key: Variant in defaults.keys():
-		if input.has(key):
-			var default_val = defaults[key]
-			var input_val = input[key]
-			# 向前兼容：旧存档 player.resources.ling_cai 为扁平 int，迁移为嵌套 Dictionary
-			if domain == "player" and key == "resources" and input_val is Dictionary:
-				input_val = _migrate_resources_dict(input_val)
-			if not _type_check(domain, key, input_val, default_val):
-				return false
-			result[key] = _deep_copy(input_val)
-		else:
-			# 旧存档缺失字段 → 使用默认值
-			result[key] = _deep_copy(defaults[key])
-	snapshot[domain] = result
+	var migrated: Dictionary = input.duplicate(true)
+	if domain == "player" and migrated.get("resources") is Dictionary:
+		migrated["resources"] = _migrate_resources_dict(migrated["resources"])
+	var normalized: Dictionary = SaveTypes.restore_domain(domain, migrated)
+	var step: Dictionary = SaveTypes.coerce_dict(normalized, defaults)
+	if not bool(step.get("ok", false)):
+		push_error("GSM.deserialize: 域 '%s.%s' 类型不匹配（期望%d，实际%d）"
+				% [domain, str(step.get("key", "")), int(step.get("expected", 0)),
+				int(step.get("actual", 0))])
+		return false
+	snapshot[domain] = step["value"]
 	return true
 
 
@@ -283,19 +301,11 @@ func _migrate_resources_dict(input: Dictionary) -> Dictionary:
 	return result
 
 
-## 类型校验——新值的类型必须与默认值匹配。[br]
-## [br]null 默认值不校验（任何类型均接受——允许未来扩展）。
-func _type_check(domain: String, key: String, new_val: Variant, default_val: Variant) -> bool:
-	var default_type: int = typeof(default_val)
-	var new_type: int = typeof(new_val)
-
-	# null 默认值放行——允许未来扩展该字段
-	if default_type == TYPE_NIL:
-		return true
-	if new_type != default_type:
-		push_error("GSM.deserialize: 域 '%s.%s' 类型不匹配（期望%d，实际%d）" % [domain, key, default_type, new_type])
-		return false
-	return true
+## 类型校验——[b]已并入 [method GsmSaveTypes.coerce][/b]（默认值驱动的归一 +
+## 同口径的 push_error 文案）。保留本说明而非留一个空壳：旧实现只比顶层键的
+## [code]typeof[/code]，嵌套字段（[code]node_position.layer[/code]）从来不校验，
+## 于是「int 字段收到 float」这种 JSON 必现的形态被漏过——统一到一处后不存在
+## 「顶层过了、嵌套靠读侧 int() 兜」的两套口径。
 
 
 # === 深拷贝 / 深层相等 =========================================================

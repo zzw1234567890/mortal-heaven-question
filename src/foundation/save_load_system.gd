@@ -267,17 +267,69 @@ func _atomic_write(path: String, data: Dictionary) -> int:
 ## === Story 003: 存档容器 schema + 完整性校验 =====================================
 
 ## 当前存档格式版本——递增整数，唯一驱动迁移链的字段。
-## 引入 ADR-0002 定义的第 1 版存档容器格式。
-const CURRENT_SCHEMA_VERSION: int = 1
+## [br][b]v2（本轮）[/b]：探索域的「已弹事件节点」进存档
+## （[code]map_states[*].events_shown[/code]）——此前该状态只在事件面板的成员变量里
+## （进程一退就丢，重进同一张图同一节点会再弹一次）。v1 档读入时为每张已存在的图
+## 补空的 [code]events_shown[/code]（旧档没有这个键，等价于「本图什么都还没弹过」，
+## 不改变玩家已获得的任何东西）。[br]
+## [br][b]v1[/b]：ADR-0002 定义的第 1 版存档容器格式。[br]
+const CURRENT_SCHEMA_VERSION: int = 2
 
-## 迁移函数注册表——键为迁移前的 schema_version，值为迁移函数（纯函数 Dictionary → Dictionary）。
+## 迁移函数注册表（[b]覆盖层[/b]）——键为迁移前的 schema_version，值为迁移函数
+## （纯函数 Dictionary → Dictionary）。[br]
 ## [br]每个函数是纯函数：接收完整存档容器，返回修改后的存档容器。[br]
-## [br]使用 [code]static var[/code]（非 const）以允许测试注入迁移函数。[br]
-## 当前为初始 schema——无迁移。首次需要升级时追加条目：[br]
-## [code]  1: _migrate_v1_to_v2,[/code]  # 例如：card_instance 新增 breakthrough_layers 字段[br]
-## [code]  2: _migrate_v2_to_v3,[/code]  # 例如：story_flags 从 Array 改为 Dictionary[br]
-## [br][b]⚠️ 测试[/b]: 通过 [code]SaveLoadSystem.MIGRATIONS[0] = some_func[/code] 注入测试用迁移函数。
+## [br][b]为什么与 [constant DEFAULT_MIGRATIONS] 分开[/b]：本表是
+## [code]static var[/code]——测试可以注入自己的迁移函数（[code]MIGRATIONS[0] = f[/code]），
+## 也可以 [code]clear()[/code] 掉它来构造「迁移链缺失」场景。既有测试正是这么做的，
+## 而它们在 [code]after_each[/code] 里 [code]clear()[/code] 之后不会（也无法）
+## 把生产迁移装回去——若生产链也放在这里，测试执行顺序一变就会让后续用例
+## 读 v1 档时报 [code]MIGRATION_MISSING[/code]。故：生产链常驻
+## [constant DEFAULT_MIGRATIONS]，本表只在[b]同名版本[/b]上覆盖它。[br]
+## [br][b]查找顺序[/b]：本表 > [constant DEFAULT_MIGRATIONS]（见 [method _migration_for]）。
 static var MIGRATIONS: Dictionary[int, Callable] = {}
+
+## 生产迁移链——随版本发布固定，不受测试注入 / [code]clear()[/code] 影响。[br]
+## [br]已登记：[br]
+## [code]  1: _migrate_v1_to_v2,[/code]  # 探索域新增 events_shown[br]
+static var DEFAULT_MIGRATIONS: Dictionary[int, Callable] = {1: _migrate_v1_to_v2}
+
+
+## 取某个起始版本的迁移函数——覆盖层优先，其次生产链（无则返回空 Callable）。[br]
+## [br][param p_from] 迁移前的 schema_version。[br]
+static func _migration_for(p_from: int) -> Callable:
+	if MIGRATIONS.has(p_from):
+		return MIGRATIONS[p_from]
+	if DEFAULT_MIGRATIONS.has(p_from):
+		return DEFAULT_MIGRATIONS[p_from]
+	return Callable()
+
+
+## v1 → v2 迁移——探索域补齐 [code]events_shown[/code]（纯函数，无副作用）。[br]
+## [br][b]补的是默认值，不是数据[/b]：v1 档里每张图的 [code]map_states[/code] 条目
+## 没有 [code]events_shown[/code] 键，读侧按「未弹过」处理——功能上已经向后兼容，
+## 这里显式补键是为了让存档形状与 v2 一致（下一次写盘就是完整 v2 形态，不必让
+## 每张老图都留着一个「靠 .get 缺省」的键）。[br]
+## [br][b]不碰任何已有键[/b]：通关记录 / 已访问节点 / 已采槽位 / 灵泉次数原样透传
+## ——迁移不得改变玩家已有的进度（旧档不许丢档）。[br]
+## [br][b]容错[/b]：域缺失 / 非字典 / 图条目非字典一律跳过（不是崩溃，也不是臆造）。[br]
+## [br]来源: ADR-0002 §迁移链纯函数契约、本轮「事件已弹进存档」任务。
+static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
+	var game_state: Variant = data.get("game_state", null)
+	if not (game_state is Dictionary):
+		return data
+	var exploration: Variant = (game_state as Dictionary).get("exploration", null)
+	if not (exploration is Dictionary):
+		return data
+	var map_states: Variant = (exploration as Dictionary).get("map_states", null)
+	if not (map_states is Dictionary):
+		return data
+	for map_id: Variant in (map_states as Dictionary).keys():
+		var state: Variant = (map_states as Dictionary)[map_id]
+		if not (state is Dictionary):
+			continue
+		if not (state as Dictionary).has("events_shown"):
+			(state as Dictionary)["events_shown"] = []
+	return data
 
 
 ## 构造完整存档容器——包含全部 7 个顶层字段。
@@ -534,13 +586,14 @@ func _migrate_if_needed(data: Dictionary) -> Dictionary:
 
 	# AC-003/AC-004：逐级执行迁移链
 	while save_schema < CURRENT_SCHEMA_VERSION:
-		if not MIGRATIONS.has(save_schema):
+		var migrate: Callable = _migration_for(save_schema)
+		if not migrate.is_valid():
 			# AC-005：迁移链中缺少对应版本函数
 			return {
 				"error": "MIGRATION_MISSING",
 				"from": save_schema
 			}
-		data = MIGRATIONS[save_schema].call(data)
+		data = migrate.call(data)
 		assert(typeof(data) == TYPE_DICTIONARY, "迁移函数 %d 必须返回 Dictionary" % save_schema)
 		save_schema += 1
 		data["schema_version"] = save_schema
@@ -556,12 +609,16 @@ func _migrate_if_needed(data: Dictionary) -> Dictionary:
 ##   [param slot_type] 槽位类型——AUTOSAVE / MANUAL / SNAPSHOT。[br]
 ##   [param slot_id] 槽位编号——MANUAL 时为 1-3，其他类型忽略。[br]
 ##   [param data] 调用方已序列化的 GSM 数据——必须是 [method GameStateManager.serialize] 的输出。
-##     必须仅包含 JSON 兼容类型（String 键、int/float/String/bool/null 值、嵌套 Array/Dictionary）。[br]
+##     该输出已归一为 JSON 安全形态（String 键 + 标量；见
+##     [method GSMSerializer.serialize]），故正常路径不会触发校验失败。[br]
 ##   [param meta] 展示用元信息字典——参见 [method _build_save_container]。[br]
 ## [b]返回[/b]: [enum SaveResult]——SUCCESS 或错误码。[br]
 ## [br][b]信号[/b]: 保存完成后发射 [signal save_completed]。[br]
 ## [br][b]⚠️ AC-002[/b]: data 中包含非 JSON 兼容类型（Vector2/Color 等）→
 ## [method JSON.stringify] 会失败 → 返回 [enum SaveResult.VALIDATION_ERROR]。
+## [br]这是[b]最后一道关[/b]：类型归一在 [method GameStateManager.serialize]
+## （StringName → String、int 键 → String 键），此处只负责拒绝归一化不了的
+## 类型（对象 / Vector2 / Color）——不在这里再归一一次，否则两处口径会漂。[br]
 func save_game(slot_type: SaveSlotType, slot_id: int = 0,
                data: Dictionary = {}, meta: Dictionary = {}) -> int:
 	# AC-002：类型校验——data 必须仅含 JSON 兼容类型
@@ -641,11 +698,40 @@ func load_game(slot_type: SaveSlotType, slot_id: int = 0) -> Dictionary:
 		var owned_cards: Array = data["game_state"].get("collection", {}).get("owned_cards", [])
 		cs.reconstitute_instances(owned_cards)
 
+	# 阵亡名单落地（ADR-0016 §跨战斗持久）——把 GSM 里的存档值拉回
+	# DeploymentSystem 的本地权威表；不拉的话「读档后阵亡角色照常上场、
+	# 下次存档又抹平死亡记录」。GSM 不可用 / 系统缺席时静默跳过（前向兼容）。
+	_restore_deployment_from_gsm()
+
 	# 清理旧战斗快照
 	clear_battle_snapshot()
 
 	load_completed.emit(true)
 	return {"result": LoadResult.SUCCESS, "data": data}
+
+
+## 读档后把 GSM 里的阵亡名单拉回 DeploymentSystem（读档链路第 6 阶段）。[br]
+## [br][b]为什么在 SaveLoadSystem 而不是 GSM[/b]：拉回来的是 [b]Feature 层[/b]的本地权威表
+## （[code]DeploymentSystem._unavailable_characters[/code]），Foundation 不该反向依赖
+## Feature——本方法只做「找到 Autoload、调它的公开入口」，与
+## [method _get_card_system] 调 [code]CardSystem.reconstitute_instances[/code] 同一形态
+## （同层级的读取后落地）。[br]
+## [br][b]缺席即跳过[/b]：headless 单测 / 早期启动没有 DeploymentSystem 时静默返回
+## ——读档本身照常成功（[method _get_card_system] 的前向兼容先例）。[br]
+func _restore_deployment_from_gsm() -> void:
+	var ds: Node = _get_deployment_system()
+	if ds == null or not ds.has_method("restore_unavailable_from_storage"):
+		return
+	ds.call("restore_unavailable_from_storage")
+
+
+## 获取当前使用的 DeploymentSystem 引用——未注册 Autoload 时返回 null（前向兼容）。[br]
+## [br]用 SceneTree.root 查找而非硬引用全局名——避免测试环境无 Autoload 时崩溃。[br]
+func _get_deployment_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/DeploymentSystem")
 
 
 ## [b]删除存档[/b]——删除指定槽位的存档文件并更新 meta.json。

@@ -79,9 +79,32 @@ func sync_unavailable_to_gsm() -> void:
 	gsm.call("_set_player_unavailable_characters", unavailable.duplicate(true))
 
 
+## 从 GSM [b]现读[/b]阵亡名单并拉回本地——[b]读档完成后的落地入口[/b]。[br]
+## [br][b]为什么必须有这一步[/b]：[code]GSM.deserialize[/code] 只把
+## [code]player.unavailable_characters[/code] 写进 GSM，而「谁能上场」的判定读的是
+## [code]DeploymentSystem._unavailable_characters[/code]（[method setup_field] /
+## [code]deploy_roster_reader[/code]）——不拉回来的话，存档里记的阵亡角色会被当成活人
+## 重新上场；而下一次存档又用本地空表覆盖掉存档里的死亡记录
+## （[method sync_unavailable_to_gsm] 以本地为源），死亡由此[b]单向丢失[/b]。[br]
+## [br][b]GSM 不可用 / 域内没有该键[/b]：按空名单处理——与旧存档口径一致
+## （旧档没记过阵亡，等价于全员存活），不报错也不崩。[br]
+## [br]来源: ADR-0016 §不可用角色生命周期 §跨战斗持久。
+func restore_unavailable_from_storage() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var player: Variant = gsm.get("player")
+	if not (player is Dictionary):
+		return
+	var raw: Variant = (player as Dictionary).get("unavailable_characters", {})
+	load_unavailable_from_gsm(raw if raw is Dictionary else {})
+
+
 ## 从 GSM 存档数据恢复不可用角色列表——读档时。[br]
 ## [br][b]安全处理[/b]：非法 entry（非 Dictionary）跳过，缺字段填充默认值。[br]
-## [br][param data] GSM.player.unavailable_characters 快照 Dictionary。
+## [br][b]整表替换[/b]：先清空再重建——不做增量合并（GSM 那份是存档权威，增量会让
+## 已复活却残留在本地的角色阴魂不散）。[br]
+## [param data] GSM.player.unavailable_characters 快照 Dictionary。
 func load_unavailable_from_gsm(data: Dictionary) -> void:
 	var unavailable: Dictionary = _parent.get("_unavailable_characters")
 	unavailable.clear()

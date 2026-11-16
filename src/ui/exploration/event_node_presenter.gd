@@ -19,13 +19,19 @@ extends RefCounted
 
 const EventSystemScript := preload("res://src/feature/exploration_event_system.gd")
 const PanelScript := preload("res://src/ui/event_panel/event_panel_screen.gd")
+## 「本图这个节点弹过没有」的判定与记录（ADR-0031 §2 零状态所有权——UI 不持状态）。
+const ShownScript := preload("res://src/feature/exploration/exploration_event_shown.gd")
 
 ## 本类持有的事件注册表与结算器。
 var _events: RefCounted = null
 ## 当前面板（无面板时为 null）。
 var _panel: Variant = null
-## 已弹过事件的节点 id——同一节点重复到达只弹一次（仅在面板成功弹出时标记：
-## 缺可用事件的到达不占名额）。
+## [b]存档不可用时的瞬态回退[/b]——正常路径下「弹过哪些节点」记在
+## [code]map_states[map_id].events_shown[/code]（随存档持久化，读档回来仍然生效）；
+## 只有在 GSM 缺失 / 无法写存档时才退到这里（headless 单测的裸宿主即此情形），
+## 否则同一节点会无休止地重弹。两条路都记，读的时候以存档为准。[br]
+## [br][b]为什么必须两条[/b]：只留瞬态 = 读档丢进度（本模块要修的缺口）；
+## 只留存档 = GSM 不可用时（单测 / 早期启动）完全失去「只弹一次」语义。
 var _shown_nodes: Dictionary = {}
 ## 面板宿主（父 Control——通常是 NodeGraphScreen 自身）。
 var _host: Control = null
@@ -68,19 +74,47 @@ func is_panel_open() -> bool:
 
 func _on_event_node_reached(_p_map_pool: Array, p_player_realm: int) -> void:
 	var node_id: int = _current_node_id()
-	if node_id >= 0 and _shown_nodes.has(node_id):
+	if _already_shown(node_id):
 		return
 	var def: Variant = _pick_event(node_id, p_player_realm)
 	if def == null:
 		return
-	if node_id >= 0:
-		_shown_nodes[node_id] = true
+	_mark_shown(node_id)
 	_open_panel(def)
+
+
+## 本图这个节点弹过没有——[b]存档优先[/b]，存档不可用时看瞬态回退。[br]
+## [br][b]为什么先查存档[/b]：读档回来的第一批到达，存档里已经有记录而瞬态字典是空的
+## ——顺序反了就会重弹一次（正是本模块要修的缺口）。[br]
+func _already_shown(p_node_id: int) -> bool:
+	if p_node_id < 0:
+		return false
+	var gsm: Node = _gsm()
+	if ShownScript.is_shown_in_gsm(gsm, p_node_id):
+		return true
+	return _shown_nodes.has(p_node_id)
+
+
+## 记下「本图这个节点弹过」——写存档，并在存档写不进去（无 GSM / 无活跃地图）
+## 时退回瞬态字典。[br]
+## [br][b]返回[/b]：是否已记录（两条路任一成立即可，调用方不需要分支）。[br]
+func _mark_shown(p_node_id: int) -> bool:
+	if p_node_id < 0:
+		return false
+	if ShownScript.mark_shown(_gsm(), p_node_id):
+		return true
+	_shown_nodes[p_node_id] = true
+	return true
+
+
+## GSM——headless 单测里可能缺席，返回 null 让判定退回瞬态路径。[br]
+func _gsm() -> Node:
+	return _autoload(&"GameStateManager")
 
 
 ## 取当前所在节点 id——读 GSM 探索位置；取不到时返回 -1（按 0 号事件兜底）。
 func _current_node_id() -> int:
-	var gsm: Node = _autoload(&"GameStateManager")
+	var gsm: Node = _gsm()
 	if gsm == null or not gsm.has_method(&"get_state"):
 		return -1
 	var pos: Variant = gsm.call(&"get_state", "exploration.position")

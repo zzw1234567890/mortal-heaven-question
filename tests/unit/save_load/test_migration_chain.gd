@@ -31,9 +31,9 @@ func after_each() -> void:
 # === AC-003：同版本无迁移 ========================================================
 
 func test_migrate_if_needed_same_version_noop() -> void:
-	# Arrange：构造 schema_version == CURRENT (1) 的存档容器
+	# Arrange：构造 schema_version == CURRENT 的存档容器（CURRENT 随版本提升而变）
 	var data: Dictionary = {
-		"schema_version": 1,
+		"schema_version": sls.CURRENT_SCHEMA_VERSION,
 		"version": "1.0.0",
 		"game_state": {"player": {"name": "测试"}},
 	}
@@ -42,7 +42,8 @@ func test_migrate_if_needed_same_version_noop() -> void:
 	var result: Dictionary = sls._migrate_if_needed(data)
 
 	# Assert：不变——无迁移函数被调用
-	assert_eq(result["schema_version"], 1, "schema_version 应保持为 1")
+	assert_eq(result["schema_version"], sls.CURRENT_SCHEMA_VERSION,
+			"schema_version 应保持为 CURRENT")
 	assert_eq(result["game_state"]["player"]["name"], "测试", "game_state 内容不应被修改")
 	assert_false(result.has("error"), "不应包含 error 键")
 
@@ -50,9 +51,9 @@ func test_migrate_if_needed_same_version_noop() -> void:
 # === AC-004：单步迁移 ============================================================
 
 func test_migrate_if_needed_single_step() -> void:
-	# Arrange：CURRENT_SCHEMA_VERSION=1，模拟 schema_version=0 的旧存档
+	# Arrange：模拟 schema_version=0 的旧存档
 	# 注册 MIGRATIONS[0]：v0→v1 迁移——添加 version 字段
-	# 使用 Array 包装以在 lambda 闭包中按引用传递（GDScript 对原始类型按值捕获）
+	# 使用 Array 包装以在 lambda 闭包中按引用传递（GDScript 对原始类型按值传递）
 	var track: Array[bool] = [false]
 	sls.MIGRATIONS[0] = func(data: Dictionary) -> Dictionary:
 		track[0] = true
@@ -69,22 +70,47 @@ func test_migrate_if_needed_single_step() -> void:
 
 	# Assert
 	assert_true(track[0], "迁移函数应被调用一次")
-	assert_eq(result["schema_version"], 1, "迁移后 schema_version 应递增到 1")
+	assert_eq(result["schema_version"], sls.CURRENT_SCHEMA_VERSION,
+			"迁移后 schema_version 应递增到 CURRENT")
 	assert_eq(result["version"], "1.0.0", "迁移函数添加的字段应存在")
 
 
 # === AC-004 边界情况：多步迁移 ==================================================
-# 注意：CURRENT_SCHEMA_VERSION 为 const 1——多步迁移（v0→v1→v2）
-# 需要 CURRENT >= 2 才能测试 while 循环的多次迭代。
-# 此测试在当前 CURRENT=1 下无法完整验证多步场景——
-# 待首次升级 CURRENT_SCHEMA_VERSION 到 2+ 时取消跳过并实现。
+# CURRENT_SCHEMA_VERSION 提升到 2 之后，v0 档要依次走过 v0→v1 与 v1→v2 两级。
+# 本用例注册 MIGRATIONS[0]（覆盖层），v1→v2 走生产链
+# （SaveLoadSystem.DEFAULT_MIGRATIONS）——两级都必须真的被调用。
 
 func test_migrate_if_needed_multi_step() -> void:
-	# ⚠️ SKIP: 多步迁移需要 CURRENT_SCHEMA_VERSION >= 2 才能测试 while 循环的多次迭代。
-	# 当前 CURRENT=1，MIGRATIONS 为空——此测试在首次升级 CURRENT 到 2+ 时取消注释并实现。
-	# 验证要点：注册 MIGRATIONS[0] 和 MIGRATIONS[1]，构造 schema_version=0 数据，
-	# 断言两个函数依次调用，最终 data["schema_version"] == 2。
-	pending("多步迁移需要 CURRENT_SCHEMA_VERSION >= 2——首次升级时实现")
+	# Arrange：v0 档 + 注册 v0→v1 迁移
+	var first_calls: Array[int] = [0]
+	var second_calls: Array[int] = [0]
+	sls.MIGRATIONS[0] = func(data: Dictionary) -> Dictionary:
+		first_calls[0] += 1
+		data["step_one"] = true
+		return data
+	# 包一层观察生产链的 v1→v2 是否被调用（不改它的行为，只记次数）
+	var production_v1_to_v2: Callable = sls.DEFAULT_MIGRATIONS[1]
+	sls.MIGRATIONS[1] = func(data: Dictionary) -> Dictionary:
+		second_calls[0] += 1
+		return production_v1_to_v2.call(data)
+
+	var data: Dictionary = {
+		"schema_version": 0,
+		"game_state": {"exploration": {"map_states": {"map_a": {"entry_count": 1}}}},
+	}
+
+	# Act
+	var result: Dictionary = sls._migrate_if_needed(data)
+
+	# Assert：两级各调用一次，最终落在 2
+	assert_eq(first_calls[0], 1, "v0→v1 迁移应被调用一次")
+	assert_eq(second_calls[0], 1, "v1→v2 迁移应被调用一次")
+	assert_eq(result["schema_version"], 2, "多步迁移后 schema_version 应为 2")
+	assert_true(result.has("step_one"), "第一级迁移写入的字段应存在")
+	assert_eq(result["game_state"]["exploration"]["map_states"]["map_a"]["events_shown"], [],
+			"第二级（生产链）应给每张图补空的 events_shown")
+	assert_eq(result["game_state"]["exploration"]["map_states"]["map_a"]["entry_count"], 1,
+			"迁移不得改动已有进度字段")
 
 
 # === AC-005：迁移链缺失 ==========================================================
@@ -124,7 +150,7 @@ func test_migrate_if_needed_empty_registry_returns_missing() -> void:
 # === AC-006：高版本拒绝 ==========================================================
 
 func test_migrate_if_needed_version_mismatch_rejected() -> void:
-	# Arrange：archive schema_version=99，CURRENT=1
+	# Arrange：archive schema_version=99，CURRENT=2
 	var data: Dictionary = {
 		"schema_version": 99,
 		"game_state": {"player": {}},
@@ -137,7 +163,7 @@ func test_migrate_if_needed_version_mismatch_rejected() -> void:
 	assert_true(result.has("error"), "应包含 error 键")
 	assert_eq(result["error"], "VERSION_MISMATCH", "错误类型应为 VERSION_MISMATCH")
 	assert_eq(result["save_schema"], 99, "应报告存档的 schema 版本")
-	assert_eq(result["current_schema"], 1, "应报告当前的 schema 版本")
+	assert_eq(result["current_schema"], 2, "应报告当前的 schema 版本")
 
 
 # === AC-006 边界情况：save_schema 远大于 CURRENT ================================
@@ -194,7 +220,8 @@ func test_migrate_if_needed_defaults_zero_with_migration_registered() -> void:
 
 	# Assert
 	assert_true(track[0], "save_schema 默认为 0，应触发 MIGRATIONS[0] 迁移")
-	assert_eq(result["schema_version"], 1, "迁移后 schema_version 应为 CURRENT")
+	assert_eq(result["schema_version"], sls.CURRENT_SCHEMA_VERSION,
+			"迁移后 schema_version 应为 CURRENT")
 	assert_true(result.has("migrated_from_v0"), "迁移函数添加的字段应存在")
 
 
@@ -379,7 +406,8 @@ func test_migration_failure_in_chain_is_isolated() -> void:
 # === AC-001：CURRENT_SCHEMA_VERSION 常量存在 =====================================
 
 func test_current_schema_version_constant_exists() -> void:
-	assert_eq(sls.CURRENT_SCHEMA_VERSION, 1, "当前项目初始 schema_version 应为 1")
+	assert_eq(sls.CURRENT_SCHEMA_VERSION, 2,
+			"本轮探索域新增 events_shown，schema 版本提升到 2")
 	assert_true(typeof(sls.CURRENT_SCHEMA_VERSION) == TYPE_INT, "应为 int 类型")
 
 
@@ -388,7 +416,22 @@ func test_current_schema_version_constant_exists() -> void:
 func test_migrations_registry_exists_and_is_empty_initially() -> void:
 	assert_not_null(sls.MIGRATIONS, "MIGRATIONS 注册表应存在")
 	assert_eq(typeof(sls.MIGRATIONS), TYPE_DICTIONARY, "MIGRATIONS 应为 Dictionary 类型")
-	assert_eq(sls.MIGRATIONS.size(), 0, "初始 MIGRATIONS 应为空——当前无历史版本需迁移")
+	assert_eq(sls.MIGRATIONS.size(), 0,
+			"覆盖层初始为空——生产迁移常驻 DEFAULT_MIGRATIONS，不受测试注入影响")
+
+
+# === AC-002 补充：生产迁移链随版本发布固定 ========================================
+
+func test_default_migrations_registry_holds_production_chain() -> void:
+	## 覆盖层（MIGRATIONS）与生产链（DEFAULT_MIGRATIONS）分离——测试注入/清空覆盖层
+	## 不该让 v1 档变成读不进来。
+	assert_eq(typeof(sls.DEFAULT_MIGRATIONS), TYPE_DICTIONARY,
+			"DEFAULT_MIGRATIONS 应为 Dictionary 类型")
+	assert_eq(sls.DEFAULT_MIGRATIONS.size(), sls.CURRENT_SCHEMA_VERSION - 1,
+			"生产链应覆盖 0..CURRENT-1 中除 0 外的每一级（v1→v2 共 1 级）")
+	for from_version: int in range(1, sls.CURRENT_SCHEMA_VERSION):
+		assert_true(sls.DEFAULT_MIGRATIONS.has(from_version),
+				"生产链应登记 v%d→v%d 迁移" % [from_version, from_version + 1])
 
 
 # === 辅助方法 =====================================================================
