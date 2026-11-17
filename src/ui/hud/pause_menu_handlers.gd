@@ -50,11 +50,6 @@ func _color_fail() -> Color:
 # 菜单项
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 继续游戏 / 遮罩点击——收起菜单。
-func close_menu() -> void:
-	_host.call(&"request_close")
-
-
 ## 查看卡组——打开只读卡组查看面板（见 [PauseMenuDeckView]）。[br]
 ## [br][b]信号保留[/b]：本按钮此前只发导航请求信号、全库零消费者；面板现在落在
 ## 宿主树里，[signal PauseMenu.deck_view_requested] 仍照发一次——它是「玩家看了
