@@ -17,7 +17,7 @@ extends RefCounted
 ## 的 [code]COMBAT_RESIGNED[/code] 是本项目对它的称呼，没有第二套结算实现。[br]
 ## [br][b]投降之后谁负责转场[/b]：战斗系统自己——[code]battle_end[/code] 末段按结果
 ## 请求 DEFEAT_SCREEN(9)（[method CombatSystem._request_scene_change]），战败画面
-## 与正常战败[b]同一个场景[/b]（规格要求「与正常战败一致」），玩家从那块「返回探索」
+## 与正常战败[b]同一个场景[/b]（规格要求「与正常战败一致」），玩家从那块「返回主菜单」
 ## 按钮出来。本模块[b]绝不[/b]再发一次转场请求：两条转场会撞在
 ## [code]SceneManager._transitioning[/code] 的并发守卫上。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：本模块不写任何玩法数据——「视为战败」

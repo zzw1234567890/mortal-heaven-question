@@ -5,8 +5,9 @@ extends "res://src/ui/shared/battle_record_scene.gd"
 ## 方向必须看到同一份数据，逻辑只写一份。[br]
 ## [br][b]本文件只做一件事[/b]：指定本场景归属（[constant SCENE_ID] 与 .tscn 的
 ## [code]screen_id[/code] 对齐），便于后续按场景差异化展示时在此覆写。[br]
-## [br][b]占位契约不变[/b]：标题 / 状态 / 返回按钮 / 返回探索经 SceneManager 全部
-## 继承自 [code]PlaceholderScene[/code]。[br]
+## [br][b]占位契约不变[/b]：标题 / 状态 / 返回按钮经 SceneManager 全部继承自
+## [code]PlaceholderScene[/code]。出口文案与目的地按屏取
+## [code]BattleRecordExit[/code]——本屏是[b]胜利结算[/b]，回探索（继续玩下去）。[br]
 ## [br]来源: production/session-state/active.md（Sprint 18 结算回流）、ADR-0031。
 
 ## 本场景的 SceneID（[code]SceneManager.SceneID.RESULT_SCREEN[/code]——与 .tscn 同值）。

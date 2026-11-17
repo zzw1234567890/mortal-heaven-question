@@ -8,7 +8,7 @@ extends GutTest
 ##   2. 胜负两向都能被结算场景读到（标题 / 剩余 HP / 回合数）；[br]
 ##   3. 没有战绩数据时场景不崩，状态行明确写「本场无战绩数据」；[br]
 ##   4. 换源 / 退订后不再发布（战斗容器释放后不能继续往缓存写本场数据）；[br]
-##   5. 结算场景的占位契约（标题 / 状态 / 返回按钮 / 返回探索）不因接入战绩而失效。[br]
+##   5. 结算场景的占位契约（标题 / 状态 / 返回按钮 / 逐屏的去向）不因接入战绩而失效。[br]
 ## [br][b]桩**：战斗系统用 [code]Node[/code] 桩（只需 [code]battle_ended[/code] 信号），
 ## SceneManager 用记录型桩——不触发真实转场。
 
@@ -219,3 +219,42 @@ func test_brief_is_before_return_button() -> void:
 	var brief: Label = screen.get("brief_label") as Label
 	var button: Button = screen.get("return_button") as Button
 	assert_lt(brief.get_index(), button.get_index(), "摘要应排在返回按钮之前")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. 战败屏的去向与胜利屏不同（2026-11-17）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+func test_defeat_screen_returns_to_main_menu() -> void:
+	## 战败不是「继续探索」——本局已结束，玩家该回主菜单
+	## （design/ux/pause-menu.md §Events Fired 战斗投降链 / design/gdd/audio-system.md
+	## §9 把「战败→任意非主菜单状态」列为 N/A 转换）。接入战绩不影响这条出口。
+	# Arrange
+	bridge.call(&"bind", combat)
+	combat.battle_ended.emit(2, _rewards("defeat", 2, 0, 8))
+	sm.current_id = 9
+	var screen: Control = _mount(DEFEAT_SCREEN)
+	var button: Button = screen.get("return_button") as Button
+	# Act
+	button.emit_signal("pressed")
+	# Assert
+	assert_eq(button.text, "返回主菜单", "战败屏按钮应写明回主菜单，而不是含糊的「返回」")
+	assert_eq(sm.requests.size(), 1, "返回应发出一次转场请求")
+	assert_eq(int(sm.requests[0]["to"]), 0, "战败屏目标应为主菜单")
+	assert_eq(int(sm.requests[0]["type"]), 2, "战败屏转场类型应为 GAME_TO_MENU")
+
+
+func test_retreat_screen_returns_to_main_menu() -> void:
+	## 撤退与战败共用战败屏（战斗系统对两者都发 DEFEAT_SCREEN），出口同样回主菜单
+	## ——投降链的终点就是这里，出口错了整条链等于白接。
+	# Arrange
+	bridge.call(&"bind", combat)
+	combat.battle_ended.emit(3, _rewards("retreat", 3, 6, 5))
+	sm.current_id = 9
+	var screen: Control = _mount(DEFEAT_SCREEN)
+	var button: Button = screen.get("return_button") as Button
+	# Act
+	button.emit_signal("pressed")
+	# Assert
+	assert_true(button.text.contains("主菜单"), "撤退同样回主菜单：" + button.text)
+	assert_eq(int(sm.requests[0]["to"]), 0, "撤退屏目标应为主菜单")

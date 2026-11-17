@@ -3,8 +3,25 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: 暂停菜单（hud 005）
-Task: 战斗中「返回主菜单」走投降结算 + 「查看卡组」只读面板；下一步 战斗态入存档（读档回得到战斗）
+Task: 结算屏出口按屏分流（战败→主菜单）+ 卡组查看画卡面；下一步 战斗态入存档（读档回得到战斗）
 <!-- /STATUS -->
+
+## Session Extract — 结算屏出口分流 + 卡组查看画卡面（2026-11-17）
+- 任务：接上一轮留下的两条——① 战败屏「返回」按 UX 规格应回主菜单（本局已结束，不该继续探索），而胜利屏按既有语义回探索；② 暂停菜单的卡组详情是纯文本，改成画卡面（至少卡名/类型/费用/效果摘要），键盘可导航
+- **审计断点（第 1 项产出）**：① 四块占位屏（卡组编辑 2 / 坊市 6 / 胜利结算 8 / 战败 9 / 修为 10）共用 `PlaceholderScene._on_return_pressed()` 一个出口，一律跳 EXPLORATION + `COMBAT_TO_EXPLORE`——**战败屏与胜利屏目的地理应相反却共用同一个出口，这就是断点**；② `battle_record_scene._hint_for_result()` 是 hint 文案的唯一来源（覆写 `PlaceholderScene.HINTS`，按 `is_victory` + `RESULT_RETREAT` 分三档），出口改向不影响它；③ 卡牌在别处已有渲染：`HandCard`（自绘 `Control`，100×140，稀有度色边框）与 `LootOptionCard`（自绘、可聚焦）——但 `HandCard` 的 `mouse_filter = IGNORE` 且**不是 Button**，不能直接当列表行复用，故本轮做的是「字段层复用 + 行组件新写」
+- **出口判据收进一个纯逻辑模块**：`battle_record_exit.gd`（71 行，全 static）——`target_scene` / `transition_type` / `button_text` / `returns_to_exploration` 四个函数同进同退，`SceneID` 与 `TransitionType` 的引用只此一份，`PlaceholderScene` 不再自己比较枚举
+- **文案不再是含糊的「返回」**：`TEXT_RETURN_EXPLORE = "返回探索"` / `TEXT_RETURN_MAIN_MENU = "返回主菜单"`，每块屏都写明回的是哪一层；做成函数 `return_button_text(screen_id)` 而不是常量——写成常量就还得在这里再抄一份「哪个 ID 对应哪句话」的判定，那正是要消灭的第二份真理
+- **胜利那侧的收尾必须跟着走**：`_on_return_pressed` 里 `returns_to_exploration(screen_id)` 为真才跑 `_mark_battle_node_cleared_if_victory()`——战败回主菜单这条路跳过它，顺带免了「在主菜单里标一格已清」这种说不通的写入（Boss 通关结算同样只挂在探索那条路上）
+- **卡面字段也是纯逻辑**：`card_face_rules.gd`（162 行）从 `CardTemplate` + 实例 ID 产出 `face` 字典（卡名/类型名/费用/稀有/稀有度等级/效果摘要），效果摘要保留换行折叠、超 32 字符截断加省略号；稀有度配色**复用 `HandCard.RARITY_BORDER_COLORS`**（不另写一份色表——两处色表必然漂移）
+- **行组件 `DeckCardRow`（151 行，`extends Button`）**：自绘卡底矩形 + 左侧稀有度色条 + 1px 边框，`alignment = LEFT` / `focus_mode = FOCUS_ALL`。自绘 `_draw()` 与 Button 自身 stylebox 共存——按需给 normal/disabled 用 `StyleBoxEmpty`（**只给 hover/pressed 用带色 `StyleBoxFlat`**，否则会盖住卡面）
+- **踩到的两个坑**：① `StyleBoxEmpty` **没有 `bg_color` 属性**（只有 content margins），往里写颜色报 `Invalid assignment of property or key 'bg_color'`（19 处，11 个用例红）——拆成 `_empty_box()` 与 `_tint_box(color)` 两个工厂；② 断言「零尺寸不绘制」的用例被删掉了——Godot 的 Button 在零尺寸下**照样**发 `draw`，这个守卫没有可断言的对外行为，硬测就是测实现细节（用例内已注明删因）
+- **组行与读取层按职责拆分**：`deck_card_rows.gd`（74 行，`add_rows`：有 `face` 就建 `DeckCardRow`，没有就回退纯文本行）、`deck_view_readout.gd`（136 行，只读查询面）、`deck_view_sources.gd`（63 行，取数与文案）——`pause_menu_deck_view.gd` 从 302 → **284 行**（只剩挂载与转发），`deck_view_rows.gd` 199 → 224 行（新增 `KEY_FACE` / `KEY_MARKER` 两个载荷键）
+- **卡面与行文案同源**：`key="marker"`（已抽出 / 仍在牌库）由 `deck_view_rows` 产出、卡面行拼进第二行，测试专门钉「行文案里的词与标注是同一个」——一处说「仍在牌库」另一处为空就自相矛盾
+- **测试：新增 59 例（5 文件）+ 既有文件补例**——`test_battle_record_exit.gd`（14 例：目的地/转场类型/按钮文案/三方一致/与音频矩阵一致）、`test_card_face_rules.gd`（19 例：字段读取与降级、摘要截断、meta 行、稀有度配色对齐 HandCard 表）、`test_deck_card_row.gd`（11 例：四要素齐全、焦点环、状态样式盒不遮卡面、边框色随稀有度）、`test_deck_view_rows.gd`（6 例：卡面字段与标注）、`test_deck_card_faces.gd`（9 例端到端：行确为 `DeckCardRow`、卡面四项可见、键盘可聚焦、确认仍只展开详情、缺卡面时回退文本行）；`test_placeholder_scenes.gd` 改为按屏断言去向（`EXITS` 表，断言按钮文案 `!= "返回"`）、`test_combat_result_bridge.gd` 补战败/撤退回主菜单两例。既有用例零改名零删除零跳过
+- **确认新增用例真的逐条执行**：从 GUT 输出的 `* test_...` 行逐文件核对（子类重复声明同名常量会让 GUT 静默跳过整个文件，只看汇总数字看不出来）
+- 全量：**5116 tests / 5116 passing / 3 orphans 存量**，零失败零回归（5055 → 净增 61）。既有失败 `test_hud_bootstrap.gd::test_main_menu_does_not_auto_mount_when_not_current_scene` 已用 `git stash` 在 HEAD 上复现，确认与本轮无关（仅单独跑该目录时红，全量跑绿）
+- 已知边界：① 卡面是自绘几何（底色 + 稀有度色条 + 文字），**未接美术卡图**（图片资源不在本 story 范围）；② 效果摘要超 32 字符截断，长描述在行内看不全（详情面板仍是完整文本）；③ 卡组查看仍无分类/筛选与滚动到头提示（牌组规模未到需要它的程度）
+- Next recommended: 战斗态入存档（UX 规格 Open Question #1「战斗暂存」仍开放——读档回不到战斗）；`ExplorationSystem`（686 行）与 `main_menu.gd`（520 行）拆分；卡面接真实卡图资源
 
 ## Session Extract — 战斗暂停菜单两处断链接通（2026-11-17）
 - 任务：接上一轮留下的两条战斗态断链——① 战斗中「返回主菜单」按 UX 规格应先走投降结算（确认 → `COMBAT_RESIGNED` 视为战败 → 战败结算画面 → 玩家自行返回主菜单），此前只是确认后直跳主菜单；② 战斗中「查看卡组」应为只读查看，此前只发一个全库零消费者的信号

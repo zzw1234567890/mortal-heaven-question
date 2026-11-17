@@ -1,5 +1,5 @@
 extends RefCounted
-## DeckViewRows —— 卡组查看面板的[b]取数与行文案组装[/b]（纯逻辑，不碰控件树）。[br]
+## DeckViewRows —— 卡组查看面板的[b]取数与行数据组装[/b]（纯逻辑，不碰控件树）。[br]
 ## [br][b]为什么单独一处[/b]：面板本身要管骨架、焦点、键盘导航与开关配对，
 ## 而「牌库里有哪几张、每张叫什么、哪张已经抽到手上」是另一件事——且它能在没有
 ## 控件树的用例里逐条摆数据断言（同 [code]pause_menu_layout.gd[/code] /
@@ -24,6 +24,9 @@ extends RefCounted
 const CatalogScript := preload("res://src/feature/inventory/inventory_catalog.gd")
 ## 焦点行样式之外，行文案的拼接口径与商店一致（同级分隔符）。
 const ShopLayoutScript := preload("res://src/ui/exploration/shop_panel_layout.gd")
+## 卡面字段与三行文案的拼装（行上的 [code]face[/code] 与 [code]text[/code] 同源
+## 于它——见 [method _row_text] 的注记）。
+const FaceRules := preload("res://src/ui/shared/card_face_rules.gd")
 
 ## 行内各段之间的分隔符（与商店商品行的「 · 」同源）。
 const SEPARATOR: String = " · "
@@ -36,6 +39,11 @@ const TEXT_UNRESOLVED_HINT: String = "（%d 张模板未加载）"
 ## 行载荷的键（面板与测试共用——不裸写字符串）。
 const KEY_INSTANCE_ID: String = "instance_id"
 const KEY_DETAIL: String = "detail"
+## 卡面字段（[method CardFaceRules.fields_of] 的产出）——卡组面板据此画卡面行；
+## 缺这一项的行退回纯文本行（见 [code]deck_card_rows.gd[/code]）。
+const KEY_FACE: String = "face"
+## 本行的牌库标注（空串 = 不标）——卡面行把它拼进第二行。
+const KEY_MARKER: String = "marker"
 
 
 ## 组装全部行。[br]
@@ -43,7 +51,8 @@ const KEY_DETAIL: String = "detail"
 ## [param p_cards] CardSystem 引用（可空——空则全部解析不出）。[br]
 ## [param p_combat] CombatSystem 引用（可空——空则不加牌库标注）。[br]
 ## [br][b]返回[/b]：[code]{rows, total, unresolved}[/code]——[code]rows[/code] 是
-## [code]{text, payload}[/code] 数组（直接喂 [code]InventoryPanelLayout.add_rows[/code]），
+## [code]{text, payload}[/code] 数组（直接喂 [code]DeckCardRows.add_rows[/code]；
+## 载荷带 [code]face[/code] 与 [code]marker[/code] 供卡面行使用），
 ## [code]total[/code] 为卡组张数、[code]unresolved[/code] 为解析不出的张数。
 static func build(p_deck_ids: Array, p_cards: Variant, p_combat: Variant) -> Dictionary:
 	var rows: Array = []
@@ -55,11 +64,14 @@ static func build(p_deck_ids: Array, p_cards: Variant, p_combat: Variant) -> Dic
 		if template == null:
 			unresolved += 1
 			continue
+		var marker: String = _marker_of(instance_id, hand_ids)
 		rows.append({
 			"text": _row_text(template, instance_id, hand_ids),
 			"payload": {
 				KEY_INSTANCE_ID: instance_id,
 				KEY_DETAIL: detail_of(template),
+				KEY_FACE: FaceRules.fields_of(template, instance_id),
+				KEY_MARKER: marker,
 			},
 		})
 	return {"rows": rows, "total": p_deck_ids.size(), "unresolved": unresolved}
@@ -154,7 +166,10 @@ static func resolution_hint(p_total: int, p_resolved: int, p_unresolved: int) ->
 
 ## 一行的文案：名称 · 类型 · 稀有度 · 费用 [+ 牌库标注]。[br]
 ## [br][b]标注写进文本而不是靠颜色**：色盲可读（.claude/rules/ui-code.md 强制项），
-## 也让屏幕阅读器读得出「这张已经抽到手上了」。
+## 也让屏幕阅读器读得出「这张已经抽到手上了」。[br]
+## [br][b]与卡面行同源[/b]：标注由 [method _marker_of] 给出、卡面三行由
+## [code]CardFaceRules[/code] 给出——本方法只是同一批字段的「一行挤满」版本
+## （面板若退回纯文本行，读到的仍是同一张牌的同几项信息）。
 static func _row_text(p_template: Variant, p_instance_id: int, p_hand_ids: Dictionary) -> String:
 	var parts: Array = []
 	var name: String = _field(p_template, "name")
@@ -166,9 +181,19 @@ static func _row_text(p_template: Variant, p_instance_id: int, p_hand_ids: Dicti
 	if not rarity_name.is_empty():
 		parts.append(rarity_name)
 	parts.append("%d 灵力" % _int_field(p_template, "cost"))
-	if not p_hand_ids.is_empty():
-		parts.append(TEXT_IN_HAND if p_hand_ids.has(p_instance_id) else TEXT_IN_DECK)
+	var marker: String = _marker_of(p_instance_id, p_hand_ids)
+	if not marker.is_empty():
+		parts.append(marker)
 	return SEPARATOR.join(parts)
+
+
+## 本行的牌库标注（「已抽出」/「仍在牌库」；非活跃战斗或手牌信息缺失时为空串）。[br]
+## [br][b]为什么单独一个函数[/b]：同一条判定有两个消费者——纯文本行把它拼进行文案、
+## 卡面行把它拼进第二行。各判一遍就会在「空手牌」这类边界上分叉。
+static func _marker_of(p_instance_id: int, p_hand_ids: Dictionary) -> String:
+	if p_hand_ids.is_empty():
+		return ""
+	return TEXT_IN_HAND if p_hand_ids.has(p_instance_id) else TEXT_IN_DECK
 
 
 ## 按实例 ID 查模板（CardSystem 不可用 / 查不到时 null）。

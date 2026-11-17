@@ -6,7 +6,13 @@ extends GutTest
 ## [b]背景[/b]（gate-check 2026-11-08 §B1）：这些 SCENE_PATHS 注册路径此前无资产，
 ## 任何指向它们的转场都落到「目标场景缺失 → 回退 MAIN_MENU」。本文件验证：[br]
 ##   1. 每个占位场景都可实例化且标题/状态/返回按钮齐备；[br]
-##   2. 「返回探索」经 SceneManager 发出 EXPLORATION 请求（ADR-0005 唯一入口）。
+##   2. 「返回」经 SceneManager 发出该屏[b]目的地[/b]的请求（ADR-0005 唯一入口）。[br]
+##
+## [b]「返回」的目的地分两类（2026-11-17）[/b]：战败屏回[b]主菜单[/b]（本局已结束
+## ——design/ux/pause-menu.md §Events Fired「玩家点击「返回」→ 回到主菜单」、
+## design/gdd/audio-system.md §9 把「战败→任意非主菜单状态」列为 N/A 转换），
+## 其余四屏（卡组编辑 / 坊市 / 胜利结算 / 养成）回[b]探索[/b]（继续玩下去）。
+## 判据收在 [code]battle_record_exit.gd[/code]，本文件按屏逐条钉住它的产出。
 ##
 ## SceneManager 以桩替代——不触发真实转场。
 
@@ -31,6 +37,19 @@ const CASES: Dictionary = {
 	"res://src/ui/result_screen/result_screen.tscn": 8,
 	"res://src/ui/defeat_screen/defeat_screen.tscn": 9,
 	"res://src/feature/cultivation/cultivation_scene.tscn": 10,
+}
+
+## SceneID → 本屏「返回」的期望（文案 / 目标 SceneID / 转场类型）。
+## [br][b]逐屏写死而不是算出来[/b]：本文件是结算屏出口口径的回归网——若哪天有人把
+## [code]BattleRecordExit[/code] 改成「所有屏都回主菜单」，期望值跟着实现一起变的
+## 测试不会红。这里的字面值就是规格（design/ux/pause-menu.md §Events Fired、
+## design/gdd/audio-system.md §9）。
+const EXITS: Dictionary = {
+	2: {"text": "返回探索", "to": 3, "type": 4},
+	6: {"text": "返回探索", "to": 3, "type": 4},
+	8: {"text": "返回探索", "to": 3, "type": 4},
+	9: {"text": "返回主菜单", "to": 0, "type": 2},
+	10: {"text": "返回探索", "to": 3, "type": 4},
 }
 
 var sm: SceneManagerStub = null
@@ -66,32 +85,36 @@ func test_placeholder_scenes_instantiate_with_screen_id() -> void:
 func test_placeholder_scene_has_title_status_and_return_button() -> void:
 	for path: String in CASES.keys():
 		var screen: Control = _mount(path)
-		# Then: 标题非空 + 状态提示 + 可点返回按钮
+		var screen_id: int = int(CASES[path])
+		# Then: 标题非空 + 状态提示 + 可点返回按钮 + 本屏明确的去向文案
 		var title: Label = screen.get("title_label") as Label
 		var button: Button = screen.get("return_button") as Button
 		assert_not_null(title, "%s 应有标题标签" % path)
 		assert_true(title.text.length() > 0, "%s 标题不应为空" % path)
 		assert_not_null(button, "%s 应有返回按钮" % path)
-		assert_eq(button.text, "返回探索", "%s 返回按钮文案应为「返回探索」" % path)
+		assert_eq(button.text, str(EXITS[screen_id]["text"]),
+				"%s 返回按钮文案应为「%s」" % [path, str(EXITS[screen_id]["text"])])
+		assert_ne(button.text, "返回", "%s 不得只写含糊的「返回」" % path)
 		screen.queue_free()
 
 
-func test_placeholder_return_requests_exploration_via_scene_manager() -> void:
+func test_placeholder_return_requests_its_own_destination() -> void:
 	for path: String in CASES.keys():
 		# Arrange: 假设玩家已在该场景（current_scene_id = 该场景 ID）
 		sm.requests.clear()
 		sm.current_id = int(CASES[path])
+		var screen_id: int = int(CASES[path])
 		var screen: Control = _mount(path)
 		var button: Button = screen.get("return_button") as Button
 		# Act
 		button.emit_signal("pressed")
-		# Assert: 一次请求，from=当前场景 ID，to=EXPLORATION
+		# Assert: 一次请求，from=当前场景 ID，to / type 取本屏期望
 		assert_eq(sm.requests.size(), 1, "%s 返回应发出一次转场请求" % path)
-		assert_eq(int(sm.requests[0]["from"]), int(CASES[path]),
-				"%s 的 from 应取当前场景 ID" % path)
-		assert_eq(int(sm.requests[0]["to"]), 3, "%s 目标应为 EXPLORATION" % path)
-		assert_eq(int(sm.requests[0]["type"]), 4,
-				"%s 转场类型应为 COMBAT_TO_EXPLORE" % path)
+		assert_eq(int(sm.requests[0]["from"]), screen_id, "%s 的 from 应取当前场景 ID" % path)
+		assert_eq(int(sm.requests[0]["to"]), int(EXITS[screen_id]["to"]),
+				"%s 目标应为 %d" % [path, int(EXITS[screen_id]["to"])])
+		assert_eq(int(sm.requests[0]["type"]), int(EXITS[screen_id]["type"]),
+				"%s 转场类型应为 %d" % [path, int(EXITS[screen_id]["type"])])
 		screen.queue_free()
 
 

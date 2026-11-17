@@ -3,7 +3,7 @@ extends Control
 ## PlaceholderScene —— SCENE_PATHS 占位场景共用实现（Sprint 18 场景补链）。
 ##
 ## [b]职责[/b]：闭合 [constant SceneManager.SCENE_PATHS] 中尚无对应 story 交付的
-## 场景路径——深色底 + 场景标题 + 「尚未开放」状态 + 「返回探索」按钮。核心循环
+## 场景路径——深色底 + 场景标题 + 「尚未开放」状态 + 「返回」按钮。核心循环
 ## 转场（探索→商店、战斗→结算/战败、HUD→卡组编辑/修为养成）不再落到
 ## [code]scene_transition.gd[/code] 的「目标场景缺失 → 回退 MAIN_MENU」失败路径。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不读不写任何游戏状态——只承载标题文案与
@@ -12,11 +12,16 @@ extends Control
 ## [br][b]导航[/b]：唯一出口经 [code]SceneManager.request_scene_change[/code]
 ## （ADR-0005——禁止直调 [code]change_scene_to_file[/code]）；[code]from[/code] 取
 ## [code]get_current_scene_id()[/code]（同 MainMenu/PauseMenu 先例，不写魔数）。[br]
+## [br][b]出口按屏而异[/b]（2026-11-17）：战败屏「返回」回[b]主菜单[/b]，其余屏回
+## [b]探索[/b]——目的地 / 转场类型 / 按钮文案三件事同进同退，判据收在
+## [code]battle_record_exit.gd[/code]（见 [method _on_return_pressed]）。[br]
 ## [br][b]文案本地化豁免[/b]：项目暂无本地化系统——全部文案集中在本文件
-## [constant TITLES] / [constant HINTS] / [constant TEXT_RETURN_BUTTON]，本地化
-## epic 入库后替换为 key（同 S16/S17 TEXT_* 口径）。[br]
-## [br][b]战斗节点胜利标记[/b]：从战斗结算/战败返回探索时，若结果为胜利，
-## 标记战斗开始的节点为已清（GSM visited_nodes）。[br]
+## [constant TITLES] / [constant HINTS] 与
+## [code]BattleRecordExit[/code] 的两个按钮词条，本地化 epic 入库后替换为 key
+## （同 S16/S17 TEXT_* 口径）。[br]
+## [br][b]战斗节点胜利标记[/b]：从战斗[b]胜利结算[/b]返回探索时，若结果为胜利，
+## 标记战斗开始的节点为已清（GSM visited_nodes）。战败屏回主菜单那条路不跑这段
+## 收尾（见 [method BattleRecordExit.returns_to_exploration]）。[br]
 ## [br][b]Boss 战胜利 = 本图通关[/b]：开战上下文里记的 [code]combat_type[/code]
 ## 为 [code]boss[/code] 时不走「标一格已清」，而是经
 ## [code]ExplorationSystem.end_exploration(BOSS_DEFEATED)[/code] 走完整通关结算
@@ -26,9 +31,10 @@ extends Control
 ## ADR-0014 §决策 1 状态分层模型、GDD exploration-system.md §5、
 ## GDD exploration-ui-system.md §7。
 
-## SceneManager 脚本常量——SceneID / TransitionType 单一真理来源
-## （preload 而非 Autoload 全局名——与 identity_select / node_popup_host 同源）。
-const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
+## 结算屏出口裁决（战败回主菜单 / 其余回探索——见 [BattleRecordExit]）。[br]
+## [br][b]SceneID / TransitionType 的引用收在它那里[/b]：本文件只传 [member screen_id]，
+## 不再自己比较枚举——三块屏共用一份判定，出口口径才只有一个地方可改。
+const ExitScript := preload("res://src/ui/shared/battle_record_exit.gd")
 ## 开战上下文（跨场景读回「这场是不是 Boss 战」——见
 ## [method _mark_battle_node_cleared_if_victory]）。
 const LaunchScript := preload("res://src/feature/combat/combat_launch_context.gd")
@@ -45,10 +51,21 @@ const HINT_FONT_SIZE: int = 16
 ## 内容块纵向间距（px）。
 const CONTENT_SEPARATION: int = 16
 
-## 固定 UI 词条（项目暂无本地化系统——S16/S17 TEXT_* 同源豁免注记）。
-const TEXT_RETURN_BUTTON: String = "返回探索"
+## 固定 UI 词条（项目暂无本地化系统——S16/S17 TEXT_* 同源豁免注记）。[br]
+## [br][b]返回按钮文案不在这里[/b]：它是[b]随屏而异[/b]的（战败屏回主菜单、其余回
+## 探索），单一真理来源是 [code]BattleRecordExit.button_text[/code]——见
+## [method return_button_text]。
 const TEXT_NOT_AVAILABLE: String = "该界面尚未开放"
 const TEXT_FALLBACK_TITLE: String = "占位场景"
+
+## 本屏「返回」按钮的文案（转发 [code]BattleRecordExit[/code]——两屏目的地不同、
+## 措辞随之不同）。[br]
+## [br]做成函数而不是常量：占位期这一条文案随 [member screen_id] 变，写成常量就
+## 必须在这里再抄一份「哪个 ID 对应哪句话」的判定——那正是要消灭的第二份真理。[br]
+## [br][b]恒非含糊的「返回」二字[/b]：每块屏都写明回的是哪一层
+## （「返回探索」/「返回主菜单」）。
+static func return_button_text(p_screen_id: int) -> String:
+	return ExitScript.button_text(p_screen_id)
 
 ## SceneID → 标题（键为 SceneManager.SceneID 字面值——const Dictionary 不可引用
 ## 脚本常量，镜像口径同 hud.gd SCENE_VISIBILITY / state_transition_matrix.gd）。
@@ -121,32 +138,38 @@ func _build() -> void:
 
 	return_button = Button.new()
 	return_button.name = "ReturnButton"
-	return_button.text = TEXT_RETURN_BUTTON
+	return_button.text = return_button_text(screen_id)
 	return_button.custom_minimum_size = Vector2(160, 44)
 	return_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	return_button.pressed.connect(_on_return_pressed)
 	box.add_child(return_button)
 
 
-## 返回探索——[b]唯一[/b]导航出口（ADR-0005 单一仲裁）。[br]
-## [br][b]转场类型[/b]：COMBAT_TO_EXPLORE（音频矩阵唯一的「→探索」行，
-## 1.0s 淡出淡入——结算/战败/商店/事件/养成共用）。[br]
+## 离开本屏——[b]唯一[/b]导航出口（ADR-0005 单一仲裁）。[br]
+## [br][b]目的地与转场类型由 [BattleRecordExit] 裁决[/b]：战败屏回[b]主菜单[/b]
+## （GAME_TO_MENU——本局已结束），其余（胜利结算 / 卡组编辑 / 坊市 / 养成）回
+## [b]探索[/b]（COMBAT_TO_EXPLORE）。两屏此前共用「一律回探索」一个出口，而规格上
+## 战败必须回主菜单（见 [BattleRecordExit] 类文档的规格引用）。[br]
 ## [br][b]from 动态取当前场景[/b]：不写魔数（PauseMenu M-2 先例）。[br]
 ## [br][b]结算必须先于转场[/b]：通关结算会 publish 面板视图（跨场景缓存），
-## 面板挂在转场[b]之后[/b]的探索场景里——顺序反了面板就是空的。[br]
-## [br]来源: ADR-0005、ADR-0014 §决策 1 状态分层模型。
+## 面板挂在转场[b]之后[/b]的探索场景里——顺序反了面板就是空的。战败回主菜单那条路
+## 不需要探索侧收尾（[method BattleRecordExit.returns_to_exploration] 判据），
+## 跳过它也就免了「在主菜单里标一格已清」这种说不通的写入。[br]
+## [br]来源: ADR-0005、ADR-0014 §决策 1 状态分层模型、design/ux/pause-menu.md
+## （§Events Fired 战斗投降链）、design/gdd/audio-system.md（§9 N/A 转换）。
 func _on_return_pressed() -> void:
 	var sm: Node = _scene_manager()
 	if sm == null or not sm.has_method(&"request_scene_change"):
-		push_error("PlaceholderScene: SceneManager 不可用——返回探索中止")
+		push_error("PlaceholderScene: SceneManager 不可用——返回中止")
 		return
 	var from_id: int = screen_id
 	if sm.has_method(&"get_current_scene_id"):
 		from_id = int(sm.call(&"get_current_scene_id"))
-	_mark_battle_node_cleared_if_victory()
+	if ExitScript.returns_to_exploration(screen_id):
+		_mark_battle_node_cleared_if_victory()
 	sm.call(&"request_scene_change", from_id,
-		SceneManagerScript.SceneID.EXPLORATION,
-		SceneManagerScript.TransitionType.COMBAT_TO_EXPLORE)
+		ExitScript.target_scene(screen_id),
+		ExitScript.transition_type(screen_id))
 
 
 ## 战斗胜利的收尾（既有调用点与本方法名保持不变——它就是入口）。[br]

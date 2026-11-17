@@ -1,6 +1,6 @@
 extends "res://src/ui/shared/placeholder_scene.gd"
 ## BattleRecordScene —— 结算回流占位场景基类（Sprint 18）。[br]
-## [br][b]职责[/b]：在占位契约（标题 / 状态 / 返回按钮 / 返回探索经 SceneManager）
+## [br][b]职责[/b]：在占位契约（标题 / 状态 / 返回按钮经 SceneManager）
 ## 之上，把本场战绩（[code]CombatResultView[/code]）读出来并展示——
 ## 「能拿到数据」是本轮要求，「做正式 UI」不是。[br]
 ## [br][b]数据来源[/b]：[method CombatResultView.last]（战斗场景在
@@ -12,9 +12,9 @@ extends "res://src/ui/shared/placeholder_scene.gd"
 ## 打印口径完全一致——各写一份必然漂移。[br]
 ## [br][b]没有数据时[/b]：沿用占位文案，把状态行改为「本场无战绩数据」——
 ## 不臆造数字，也不把「读不到」变成崩溃。[br]
-## [br][b]占位契约不变[/b]：标题非空、返回按钮文案与导航路径（EXPLORATION /
-## COMBAT_TO_EXPLORE）全部继承自 [code]PlaceholderScene[/code]，本文件只覆写
-## 构建期文案并追加一段摘要。[br]
+## [br][b]占位契约不变[/b]：标题非空、返回按钮文案与导航路径（战败屏回主菜单 /
+## 其余回探索，判据在 [code]battle_record_exit.gd[/code]）全部继承自
+## [code]PlaceholderScene[/code]，本文件只覆写构建期文案并追加一段摘要。[br]
 ## [br]来源: production/session-state/active.md（Sprint 18 结算回流）、ADR-0031。
 
 
