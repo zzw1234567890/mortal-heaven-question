@@ -1149,3 +1149,16 @@ Task: 行动力（AP）消耗闭环——移动按地图配置扣、不足拒绝
 - 全量：**4193 tests / 4192 passing / 1 pending 存量 / 3 orphans 存量**，零失败、零回归（4173 → 净增 20，全过）
 - 已知边界（见下方「遗留」段）：`NodeInteractionRules.rest_heal_amount` 与 `ExplorationRest.heal_for` 已合并为转发，但 `NodeInteractionRules` 仍留一层包装（既有测试锁定该 API，未删）；`ExplorationSystem` 686 行（既有超限，本轮 +22）；商店面板商品行无键盘/手柄导航（焦点停留首行）；`stock` 每次重进地图重置；`NodePopupStage` 与商店各持一份冻结基线（弹窗在商店期间开合的语义已在文档说明但无测试覆盖）
 - Next recommended: 商店面板的键盘/手柄导航（UI 规则要求所有交互元素双输入）；回复点/商店的结算写入是否要进存档快照口径核对；`ExplorationSystem` 拆分（686 行，超 300 软上限）
+
+## Session Extract — 通关之后能继续玩下去（2026-11-17）
+- 任务：闭合「打完 Boss 通一张图之后」的三处断路，并给「通关 → 回选图 → 进下一张图」这条链路补真实断言测试（断言 GSM 状态与奖励口径，不只是界面可见性）
+- **三处断链（第 1 项审计的产出）**：① `MapCard._status_text` 读的 `is_first_clear` 字段 `ExplorationMapList._entry_for` 从未产出（死代码），条目也没有通关次数——「通关一次」与「刷了十次」界面上完全一样；② `MapSelectScreen.reentry_requested` **全库零消费者**——重入确认弹窗点「确认传送」既不扣费也不进图，点击看起来像失灵；③ 通关后无「下一张」引导，17 张卡里最显眼的仍是刚通完那张（还亮着「已通关」），默认动作变成原地重刷
+- **已验证无需改动**（重入语义本就成立）：`ExplorationSystem.enter_map` 已把行动力重置为境界上限、已访问重置为入口、`entry_count` 递增，Boss 节点重新生成；重复通关只给基础奖励（`ExplorationMapFlush._settle_boss_defeated` 的 `is_first_clear` 分支）——重入与首入走同一条进图路径，不存在第二条发奖分支
+- **新增生产文件**：`exploration_reentry.gd`（152 行，资格判定 + 扣费，拒绝路径一律不扣、`cost` 恒 0）、`map_select_reentry_flow.gd`（111 行，接上无消费者的 `reentry_requested`，进图出口是 `_enter_map` 的 `bind(false)`）、`exploration_clear_report.gd`（83 行，结算载荷组装含 `next_playable` 求值）、`exploration_reward_notice.gd`（46 行）、`map_clear_card_detail.gd`（55 行）、`map_select_cards.gd`（99 行，卡片行构建 + 推荐高亮，重建时重放推荐态）、`exploration_entry_flow.gd`（86 行，从 `exploration_scene` 拆出）、`map_select_interaction.gd`（172 行，从 `map_select_screen` 拆出）
+- **`ExplorationMapGate.next_playable`**（纯函数）：表序即推荐序，优先未通关且已解锁的图，无可玩时退而给第一张未通关但锁着并带上 `locked_hint`，全图通关返回空字典
+- **顺带修正**：`evaluate` 的 `is_unlocked` 放宽为 `already_cleared or (realm_ok and prerequisite_ok)`——通关记录即入场证明。不认这一条时，老档里只写了后一张的图会灰显挂锁，玩家打过的图突然点不动（`prerequisite_cleared` 仍如实报前置的态）
+- **踩到并修正的坑**：`Callable.bind` 把绑定参数接在调用参数**之后**——`Callable(self, &"emit_signal").bind(&"enter_map_requested")` 会让信号名落到地图 ID 的位置，发出去的是 `emit_signal(map_id, "信号名")`，引擎报 `ERR_UNAVAILABLE` 且节点图静默挂不上（三个用例同时红）。改回唯一的包装方法
+- **测试**：新增 `test_clear_to_next_map_flow.gd`（8 例端到端）、`test_exploration_reentry.gd`（21 例）、`test_map_card_status.gd`（11 例）、`test_map_next_playable.gd`（8 例，从 `test_map_unlock_gate.gd` 分出以守文件长度，用例一条未删）；`map_clear_settlement_fixture` 的 `enter_map` / `map_state` 参数化以支持换图
+- 全量：**4940 tests / 4940 passing / 3 orphans 存量**，零失败、零回归（4896 → 4940，净增 44 全过）
+- 已知边界（见下方「遗留」段）：`ExplorationSystem` 686 行仍超限（既有）；推荐态是瞬态不入存档，重进场景即消失（下次通关会重新点亮）；`MapSelectScreen` 恰 300 行、`map_select_screen.gd` 的 `pending_reentry_id` 查询是仅转发的一层
+- Next recommended: `ExplorationSystem` 拆分（686 行，超 300 软上限）；推荐高亮在「从暂停菜单回选图」等无通关动作的路径上是否也该给（现只由结算确认触发）
