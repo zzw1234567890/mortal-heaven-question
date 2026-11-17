@@ -77,6 +77,13 @@ func resource_system() -> Node:
 	return _autoload(&"ResourceSystem")
 
 
+## 存档（GSM）——重入编排要判「本图是否已通关」（[code]map_states[/code] 的持有者）。[br]
+## [br][b]没有注入点[/b]：GSM 是全局单例且没有任何测试替身（全库用例都直接用真实
+## Autoload），故这里只按常驻路径查找；不可用时返回 null，调用方按「存档不可用」拒绝。
+func game_state_manager() -> Node:
+	return _autoload(&"GameStateManager")
+
+
 ## Autoload 查找——宿主未进树 / headless 测试时返回 null（调用方降级）。
 func _autoload(p_name: StringName) -> Node:
 	if _host != null and _host.is_inside_tree():

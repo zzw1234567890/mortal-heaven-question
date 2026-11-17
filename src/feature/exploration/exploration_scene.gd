@@ -10,8 +10,11 @@ extends Control
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：本容器不持有游戏状态，仅负责子界面
 ## 挂载与意图转发。[method MapSelectScreen] 的 [signal MapSelectScreen.enter_map_requested]
 ## 已连 [method _on_enter_map_requested]（挂载 NodeGraphScreen 并把玩家选中的
-## 地图 ID 转交给它）；[signal MapSelectScreen.reentry_requested] 意图仍无下游
-## 消费者（重入实际编排归探索系统）。[br]
+## 地图 ID 转交给它）；[signal MapSelectScreen.reentry_requested] 连
+## [method _mount_reentry_flow]（扣费与进图归 Feature 层，本容器只接线）。[br]
+## [br][b]通关之后去哪[/b]：结算面板确认时刷新列表并高亮「下一张」
+## （[method _on_map_clear_confirmed]）——没有这一步，17 张卡里最显眼的仍然是
+## 刚通完那张，玩家的默认动作是原地重刷。[br]
 ## [br][b]退出探索闭环[/b]：节点图的 [signal NodeGraphScreen.back_to_map_select_requested]
 ## 连到 [method _on_exit_exploration_requested]——走既有
 ## [code]ExplorationMapFlush.end_exploration(PLAYER_QUIT)[/code] 结算，再拆界面回到
@@ -29,19 +32,21 @@ extends Control
 const MapSelectScreenScene := preload("res://src/ui/exploration/map_select_screen.tscn")
 ## NodeGraphScreen 场景常量——节点图主界面（story 003 主交付）。
 const NodeGraphScreenScene := preload("res://src/ui/exploration/node_graph_screen.tscn")
-## 结算对象（战斗奖励文案的跨场景缓存——回探索提示读它）。
-const ResultViewScript := preload("res://src/feature/combat/combat_result_view.gd")
-## HUD 通知入口（战斗奖励到账提示——HUD 未挂载时静默降级）。
-const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
+## 战斗奖励到账提示（取走即清 + HUD 通知出口，见该类文档）。
+const RewardNoticeScript := preload("res://src/feature/exploration/exploration_reward_notice.gd")
 ## 探索系统脚本——[code]EndReason[/code] 枚举的真理来源（preload 避免 headless 下
 ## 的全局名解析问题，同 [code]node_interaction_popup_host.gd[/code] 的 SceneManager 口径）。
 const ExplorationSystemScript := preload("res://src/feature/exploration_system.gd")
 ## 地图通关结算面板的接线（Boss 胜利 → 本场景挂载时弹出结算 overlay）。
 const MapClearPresenterScript := preload("res://src/ui/exploration/map_clear_presenter.gd")
-## 卡牌模板查询入口（结算面板点开奖励卡牌时的详情来源；缺失时面板只显示载荷字段）。
-const CardSystemPath: StringName = &"/root/CardSystem"
-## 跨场景进入意图（新开局直落第一张图 / 读档续玩回上次那张图——见该模块类文档）。
-const IntentScript := preload("res://src/feature/exploration/exploration_entry_intent.gd")
+## 结算面板的文案内核（「下一张去哪」的读取口——键名归它，这里不裸写）。
+const MapClearRulesScript := preload("res://src/ui/exploration/map_clear_panel_rules.gd")
+## 重入确认之后的落地接线（扣费 → 进图 / 拒绝提示，见该类文档）。
+const ReentryFlowScript := preload("res://src/ui/exploration/map_select_reentry_flow.gd")
+## 卡牌详情来源（按模板 ID 查 description / flavor_text——见该类文档）。
+const CardDetailScript := preload("res://src/ui/exploration/map_clear_card_detail.gd")
+## 跨场景进入意图的落地编排（新开局直落第一张图 / 读档续玩回上次那张图）。
+const EntryFlowScript := preload("res://src/feature/exploration/exploration_entry_flow.gd")
 
 ## 地图选择界面实例（挂载子节点）。
 var map_select_screen: Control = null
@@ -49,6 +54,8 @@ var map_select_screen: Control = null
 var node_graph_screen: Control = null
 ## 地图通关结算接线（未挂载为 null）。
 var map_clear_presenter: RefCounted = null
+## 重入确认之后的下游接线（未挂载为 null）。
+var reentry_flow: RefCounted = null
 ## [b]测试注入[/b]：通知请求入口 [code]func(type: String, text: String) -> int[/code]。
 ## 为 null 时按 SceneManager → PersistentLayer/HUD 查找（生产路径）。
 var notify_cb: Callable = Callable()
@@ -60,6 +67,8 @@ func _ready() -> void:
 	# 节点图构建（story 003）：MapSelectScreen 进入意图 → 挂载 NodeGraphScreen
 	# 并触发地图加载（真实源走 enter_map / 降级源发 stub 信号）
 	map_select_screen.enter_map_requested.connect(_on_enter_map_requested)
+	# 重入意图（S16-2 起就存在、此前全库无消费者）——扣费与进图归 Feature 层
+	_mount_reentry_flow()
 	# 战斗奖励回探索提示——一次性取走（取不到 = 本场无奖励/没打过战斗）
 	_flush_battle_reward_notice()
 	# 地图通关结算（Boss 胜利的那一局）——同一条「回到探索时检查一次」的时序
@@ -68,79 +77,39 @@ func _ready() -> void:
 	_consume_entry_intent()
 
 
+## 重入接线——[signal MapSelectScreen.reentry_requested] → 扣费放行 / 拒绝提示。[br]
+## [br][b]本方法补的断链[/b]：该信号自 S16-2 起就摆在那里，而[b]全库无消费者[/b]
+## ——玩家在重入确认弹窗上点「确认传送」，扣费与进图两件事都不会发生（弹窗关掉、
+## 界面停在原地，点击看起来像失灵）。[br]
+## [br][b]进图出口是 [method _enter_map] 的 [code]false[/code] 分支[/b]：重入要的是
+## 新 seed、新 DAG、行动力回满（[code]enter_map[/code] 口径），不是读档续玩的快照重建
+## ——参数在这里绑死，重入路径就不可能误走续玩分支。[br]
+## [br][b]依赖与判定都在别处[/b]：费用公式归 [code]ExplorationEconomy[/code]、
+## 资格与扣费归 [code]ExplorationReentry[/code]、文案出口归 [code]MapSelectNotice[/code]
+## ——本容器只把三方接起来（见 [code]map_select_reentry_flow.gd[/code]）。[br]
+## [br]来源: design/gdd/exploration-ui-system.md §1 重入确认弹窗、ADR-0014 §决策 4、
+## ADR-0031 §2。
+func _mount_reentry_flow() -> void:
+	reentry_flow = ReentryFlowScript.new()
+	reentry_flow.call(&"attach", self, map_select_screen,
+			Callable(self, &"_enter_map").bind(false))
+	reentry_flow.call(&"connect_screen")
+
+
 ## 消费「本次进探索要干什么」的意图（[ExplorationEntryIntent]——取走即清）。[br]
-## [br][b]为什么要这条路径[/b]：本容器是「新开局」「读档续玩」「从别处回来」三条
-## 路径的共同终点，而它挂载那一刻无从分辨自己是被谁叫来的——不消费意图的话，
-## 无论从哪条路进来，玩家都停在选图界面，得再点一次地图卡才看到节点图
-## （新开局因此要多两跳，读档则完全回不到上次那张图）。[br]
-## [br][b]FIRST_MAP[/b]：新开局——直接进第一张图（探明表首项，[b]表序即剧情序[/b]）。
-## 地图 ID 不在这里硬编码，取 [method ExplorationEntryIntent.first_map_id]。[br]
-## [br][b]RESUME[/b]：读档续玩——GSM 里 [code]current_map[/code] 非空才进（且走
-## [method NodeGraphScreen.trigger_map_load] 的续玩分支：从存档快照重建，不重生成）；
-## 为空则[b]停在选图界面[/b]（存档没有进行中的图，让玩家自己挑一张）。[br]
-## [br][b]NONE[/b]：其余路径（占位场景/暂停菜单回来）——维持现状。[br]
+## [br][b]实现见 [ExplorationEntryFlow][/b]（新开局落点 / 读档续玩口径都在那边，
+## 本容器只把进图出口交出去）。[br]
 ## [br][b]返回[/b]：实际消费到的模式（[enum ExplorationEntryIntent.EntryMode]；
 ## 测试断言用——无意图时为 NONE）。
 func _consume_entry_intent() -> int:
-	var mode: int = IntentScript.take_entry_mode()
-	match mode:
-		IntentScript.EntryMode.FIRST_MAP:
-			var first: StringName = IntentScript.first_map_id()
-			if first != &"":
-				_on_enter_map_requested(first)
-		IntentScript.EntryMode.RESUME:
-			_resume_last_map()
-	return mode
+	return EntryFlowScript.consume(Callable(self, &"_enter_map"))
 
-
-## 读档续玩——回到存档里那张图（[code]current_map[/code] 为空则停在选图界面）。[br]
-## [br][b]为什么读 GSM 而不是从意图里带地图 ID[/b]：意图只持一个枚举（见
-## [code]ExplorationEntryIntent[/code] 类文档「只持一个枚举」），地图 ID 是存档里的
-## 事实——UI 层缓存一份就会与存档漂移。[br]
-## [br][b]返回[/b]：实际进入的地图 ID（空 = 没有可续玩的图，停在选图界面）。
-func _resume_last_map() -> StringName:
-	var gsm: Node = get_node_or_null(NodePath("/root/GameStateManager"))
-	if gsm == null:
-		push_warning("ExplorationScene: GSM 不可用，读档续玩中止")
-		return &""
-	var map_id: StringName = gsm.exploration.get("current_map", &"")
-	if map_id == &"" or str(map_id).is_empty():
-		# 存档里没有进行中的图（在选图界面存的档/第一次进探索）——不臆造一张
-		return &""
-	_enter_map(map_id, true)
-	return map_id
-
-## 战斗奖励到账提示。[br]
-## [br][b]时机[/b]：本场景每次挂载（= 从战斗/结算/战败回到探索）检查一次；
-## 文案由 [code]CombatResultView.publish[/code] 在战斗结束时备好，取走即清，
-## 因此同一场不会重复弹、反复进出地图也不会重放旧奖励。[br]
-## [br][b]为什么在探索侧弹[/b]：结算/战败场景是全屏占位界面且随即退场，玩家真正
-## 继续游玩的位置是节点图；提示落在这里才与「已到账」的认知对齐。[br]
-## [br][b]降级[/b]：HUD 未挂载 / 通知入口不可用时静默跳过（不把缺 UI 变成崩溃）。[br]
-## [br][b]返回[/b]：实际展示的文案（空串 = 没有可提示的奖励——测试断言用）。
+## 战斗奖励到账提示——取走即清（取不到 = 本场无奖励/没打过战斗）。[br]
+## [br][b]返回[/b]：实际展示的文案（空串 = 没有可提示的奖励——测试断言用）。[br]
+## [br]实现见 [ExplorationRewardNotice]（HUD 未挂载 / 通知入口不可用时静默跳过，
+## 不把缺 UI 变成崩溃）。
 func _flush_battle_reward_notice() -> String:
-	var notice: String = ResultViewScript.take_pending_notice()
-	if notice.is_empty():
-		return ""
-	var sink: Callable = _notification_sink()
-	if not sink.is_valid():
-		return ""
-	# 类型固定 item（「获得/正向」语义——见 CombatRewardLines.notification_type 口径）
-	sink.call("item", notice)
-	return notice
-
-
-## 通知入口——注入优先，否则取常驻 HUD 的 [method Hud.request_notification]。
-func _notification_sink() -> Callable:
-	if notify_cb.is_valid():
-		return notify_cb
-	var sm: Node = get_node_or_null(NodePath("/root/SceneManager"))
-	if sm == null:
-		return Callable()
-	var hud: Node = HudBootstrapScript.mounted(sm)
-	if hud == null or not hud.has_method(&"request_notification"):
-		return Callable()
-	return Callable(hud, &"request_notification")
+	return RewardNoticeScript.flush(self)
 
 
 ## 地图通关结算面板——Boss 战胜利后本场景挂载时弹出（GDD exploration-ui-system.md §7）。[br]
@@ -163,16 +132,40 @@ func _mount_map_clear_settlement() -> void:
 	map_clear_presenter.call(&"show_pending")
 
 
-## 通关结算已确认——刷新地图选择界面（列表 + 余额）。[br]
+## 通关结算已确认——刷新地图选择界面（列表 + 余额）并高亮「下一张去哪」。[br]
 ## [br][b]为什么要显式刷新[/b]：与 [method _unmount_node_graph] 同源理由——
 ## [method MapSelectScreen._refresh_map_list] / [method MapSelectScreen._refresh_balance]
 ## 只在 [code]_ready[/code] 与 [code]resource_changed[/code] 时跑，而 [code]_ready[/code]
 ## 早在本局开始前就跑过了；不刷新的话卡片上的「已通关」标记与余额停在进图那一刻。[br]
+## [br][b]为什么要高亮[/b]：刷新之后 17 张卡里最显眼的仍是[b]刚通完那张[/b]（它亮着
+## 「已通关」），玩家的默认动作是原地重刷；点亮推荐卡把「下一张在哪」摆到眼前。[br]
+## [br][b]顺序：先刷新再点亮[/b]——刷新会重建全部卡片（推荐态由
+## [code]MapSelectCards[/code] 持有并在重建时重放），反过来先点亮会被重建抹掉。[br]
+## [br][b]推荐 ID 从面板载荷读[/b]：它由 Feature 层算出随 [code]MapClearView[/code]
+## 发布（见 [code]ExplorationClearReport[/code]）；键名归
+## [code]MapClearPanelRules.next_map_id[/code]，本容器不裸写字符串。[br]
 ## [br][b]不结算[/b]：BOSS_DEFEATED 的结算已经在转场前完成（本容器只负责收尾展示）。
 func _on_map_clear_confirmed() -> void:
-	if map_select_screen != null:
-		map_select_screen.call(&"_refresh_map_list")
-		map_select_screen.call(&"_refresh_balance")
+	if map_select_screen == null:
+		return
+	map_select_screen.call(&"_refresh_map_list")
+	map_select_screen.call(&"_refresh_balance")
+	_highlight_next_map()
+
+
+## 点亮「下一张」卡片（[param p_view] 为面板本次展示的结算载荷）。[br]
+## [br][b]返回[/b]：是否真的点亮了某一张（无结算载荷 / 全图通关 / 推荐图不在列表里
+## 时为 false——此时不臆造一张「看起来像推荐」的卡）。[br]
+## [br][b]卡片数组从屏幕现取[/b]：刷新之后卡片是新建的，缓存一份旧引用会点到一个
+## 已 [code]queue_free[/code] 的节点上。
+func _highlight_next_map(p_view: Dictionary = {}) -> bool:
+	if map_select_screen == null:
+		return false
+	var view: Dictionary = p_view
+	if view.is_empty() and map_clear_presenter != null:
+		view = map_clear_presenter.call(&"view")
+	return bool(map_select_screen.call(&"highlight_next_map",
+			MapClearRulesScript.next_map_id(view)))
 
 
 ## 通关结算面板是否正开着（宿主查询/测试断言用）。
@@ -184,22 +177,10 @@ func map_clear_panel_open() -> bool:
 ## 卡牌详情补充字段——按模板 ID 查卡牌系统（面板点击奖励卡牌时调用）。[br]
 ## [br][b]返回[/b]：[code]{description, flavor_text}[/code]；查不到模板时为空字典
 ## （面板只用载荷里的名称/稀有度/类型，不编造描述）。[br]
-## [br][b]只读查询[/b]：本方法不改任何状态（ADR-0031 §2——UI 零状态所有权）。
+## [br][b]只读查询[/b]：本方法不改任何状态（ADR-0031 §2——UI 零状态所有权）。[br]
+## [br]实现见 [MapClearCardDetail]（CardSystem 未挂载 / 无该模板时如实返回空字典）。
 func _card_detail_extra(p_entry: Variant) -> Dictionary:
-	var entry: Dictionary = p_entry if p_entry is Dictionary else {}
-	var card_id: String = str(entry.get("template_id", entry.get("card_id", "")))
-	if card_id.is_empty():
-		return {}
-	var card_system: Node = get_node_or_null(NodePath(CardSystemPath))
-	if card_system == null or not card_system.has_method(&"get_template"):
-		return {}
-	var template: Variant = card_system.call(&"get_template", StringName(card_id))
-	if template == null:
-		return {}
-	return {
-		"description": str(template.get("description")),
-		"flavor_text": str(template.get("flavor_text")),
-	}
+	return CardDetailScript.extra_of(self, p_entry)
 
 
 ## 进入地图意图（[signal MapSelectScreen.enter_map_requested]）——挂载节点图主界面

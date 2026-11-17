@@ -38,6 +38,9 @@ const LINE_HEIGHT: int = 26
 const INDENT_CARD: int = 12
 const INDENT_FIRST: int = 24
 
+## 「下一张去哪」行的字色（同推荐卡边框的金色——两处指向同一件事）。
+const NEXT_MAP_COLOR: Color = Color("#C8A84E")
+
 ## 首通行的金色边框（GDD §7 明文要求；色值同 node_graph_renderer 的已访问边）。
 const FIRST_CLEAR_BORDER_COLOR: Color = Color("#C8A84E")
 const FIRST_CLEAR_BORDER_WIDTH: int = 2
@@ -151,6 +154,50 @@ static func add_card_row(p_target: Node, p_text: String,
 	var margin := _indent_of(button, INDENT_FIRST if p_gold else INDENT_CARD)
 	p_target.add_child(margin)
 	return button
+
+
+## 按结算载荷填两个奖励段（基础段 + 首通段）——[b]段与行的排版全在本模块[/b]。[br]
+## [br][b]为什么整段下放到这里[/b]：面板脚本要守在 300 行软上限内，而「每段画成什么
+## 样」本身就是排版（本模块的职责）；面板只拿到画好的行去登记游标。[br]
+## [br][param p_rules] 文案内核脚本（[code]map_clear_panel_rules.gd[/code]——段标题、
+## 段内行文本都由它给，本模块不另写措辞）。[br]
+## [param p_on_card] 卡牌行被点击/确认的回调 [code]func(index: int) -> void[/code]
+## ——[code]index[/code] 是本方法返回的行序（基础段在前、首通段在后）。[br]
+## [br][b]返回[/b]：[code]{titles: Array, buttons: Array, entries: Array}[/code]——
+## 三者同序；[code]entries[/code] 是各卡牌行的载荷条目（面板点开详情时取它）。[br]
+## [br][b]首通段只在载荷要求时画[/b]（判据是 [code]is_first_clear[/code]，见 Rules 类文档
+## ——用「奖励是否为空」当判据会把「首通但配置漏写」也一并藏掉）。
+static func fill_sections(p_item_box: VBoxContainer, p_view: Dictionary,
+		p_rules: GDScript, p_on_card: Callable) -> Dictionary:
+	var result: Dictionary = {"titles": [], "buttons": [], "entries": []}
+	var flags: Array = [false]
+	if p_rules.shows_first_section(p_view):
+		flags.append(true)
+	for first: Variant in flags:
+		var gold: bool = bool(first)
+		var title: String = p_rules.TEXT_FIRST_SECTION if gold else p_rules.TEXT_BASE_SECTION
+		var section: VBoxContainer = add_section(p_item_box, title, gold)
+		(result["titles"] as Array).append(title)
+		for line: Variant in p_rules.section_amount_lines(p_view, gold):
+			add_reward_line(section, str(line), gold)
+		for entry: Variant in p_rules.section_cards(p_view, gold):
+			var index: int = (result["buttons"] as Array).size()
+			(result["entries"] as Array).append(entry)
+			(result["buttons"] as Array).append(add_card_row(section,
+					p_rules.card_row_text(entry),
+					func() -> void: p_on_card.call(index), gold))
+	return result
+
+
+## 追加「下一张去哪」引导行（GDD §7 面板之后的去向——措辞由 Rules 给）。[br]
+## [br][b]不可点[/b]：它是导航提示而非入口（点了既不会进图也不该关面板）；
+## 真正的入口是底下的地图卡片。[br]
+## [br][b]空文本不出行[/b]：调用方与 Rules 之间多一层保护，空串不占版面。
+static func add_next_line(p_item_box: VBoxContainer, p_text: String) -> Label:
+	var label: Label = add_status_line(p_item_box, p_text)
+	if label != null:
+		label.add_theme_color_override(&"font_color", NEXT_MAP_COLOR)
+	return label
 
 
 ## 首通段的金色标记样式（边框 + 淡金底——双通道，不只靠颜色）。[br]

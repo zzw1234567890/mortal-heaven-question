@@ -19,6 +19,10 @@ extends RefCounted
 ##   · [code]difficulty: int[/code] —— 1~4（低/中/高/极高，卡片 ⭐ 数）；[br]
 ##   · [code]realm_requirement: int[/code] —— 解锁所需境界（tooltip「需X境界」）；[br]
 ##   · [code]is_cleared: bool[/code] —— 是否已通关（GSM 的 [code]is_first_clear[/code]）；[br]
+##   · [code]clear_count: int[/code] —— 通关次数（0 = 未通关，1 = 刚首通，≥2 = 刷过几次）；
+##     卡片据此显示「⭐首次通关」与「已通关·第N次」——[b]没有这个数就只剩
+##     「已通关」三个字[/b]，玩家分不清自己通过一次还是刷了十次（首通标记此前读的
+##     [code]is_first_clear[/code] 字段条目里根本没有，那一格是死代码）；[br]
 ##   · [code]is_unlocked: bool[/code] —— 解锁条件是否[b]全部[/b]达成（境界 ×
 ##     前置通关，判定见 [code]exploration_map_gate.gd[/code]）；[br]
 ##   · [code]locked_hint: String[/code] —— 未解锁时的中文条件文案（如「需筑基期」
@@ -69,11 +73,13 @@ func build() -> Array:
 		if resources is Dictionary:
 			ling_shi = int((resources as Dictionary).get("ling_shi", 0))
 	var cleared: Dictionary = cleared_maps(gsm)
+	var clear_counts: Dictionary = clear_counts_of(gsm)
 
 	var entries: Array = []
 	for raw_id: Variant in CatalogScript.MAPS.keys():
 		var map_id: StringName = StringName(str(raw_id))
-		entries.append(_entry_for(map_id, player_realm, ling_shi, gsm, cleared))
+		entries.append(_entry_for(map_id, player_realm, ling_shi, gsm, cleared,
+				int(clear_counts.get(map_id, 0))))
 	return entries
 
 
@@ -87,11 +93,13 @@ func build() -> Array:
 ## [param p_ling_shi] 当前灵石余额（[code]can_reenter[/code] 的预判依据）。[br]
 ## [param p_gsm] GSM 引用（可空——空时视作未通关）。[br]
 ## [param p_cleared] 各图通关态集合（[method cleared_maps] 的产物——前置条件判它）。[br]
+## [param p_clear_count] 本图的累计通关次数（[method clear_counts_of] 的产物——
+## 卡片用它区分首通与刷图）。[br]
 ## [br][b]解锁态不在这里算[/b]：境界 × 前置通关的求值与文案一律走
 ## [code]ExplorationMapGate.evaluate[/code]——卡片灰显、悬停 tooltip、点击提示
 ## 三处消费同一份结果，加一条解锁条件只需要改那一处。[br]
 func _entry_for(p_map_id: StringName, p_player_realm: int, p_ling_shi: int,
-		p_gsm: Node, p_cleared: Dictionary) -> Dictionary:
+		p_gsm: Node, p_cleared: Dictionary, p_clear_count: int) -> Dictionary:
 	var config: Dictionary = CatalogScript.MAPS.get(p_map_id, {})
 	var gate: Dictionary = GateScript.evaluate(p_map_id, p_player_realm, p_cleared)
 	var cost: int = _reentry_total(p_map_id)
@@ -102,6 +110,7 @@ func _entry_for(p_map_id: StringName, p_player_realm: int, p_ling_shi: int,
 		"difficulty": int(config.get("difficulty", 0)) + 1,
 		"realm_requirement": int(gate.get("realm_requirement", FALLBACK_REALM)),
 		"is_cleared": bool(p_cleared.get(p_map_id, false)),
+		"clear_count": int(p_clear_count),
 		"is_unlocked": bool(gate.get("is_unlocked", false)),
 		"locked_hint": str(gate.get("locked_hint", "")),
 		"unlock_after_clear": gate.get("unlock_after_clear", &""),
@@ -128,6 +137,24 @@ func cleared_maps(p_gsm: Node) -> Dictionary:
 		var map_id: StringName = StringName(str(raw_id))
 		cleared[map_id] = _is_cleared(p_gsm, map_id)
 	return cleared
+
+
+## 各图累计通关次数——[code]{地图ID: 次数}[/code]，与 [method cleared_maps] 同一次
+## 刷新里现取（同一份 [code]map_states[/code]，不各读一遍）。[br]
+## [br][b]未登记的旧图不进本集合[/b]（同 [method cleared_maps]）：卡片只画探明表里的图。[br]
+## [br][b]缺 [code]clear_count[/code] 的存档按 [code]is_first_clear[/code] 折算[/b]：
+## 只写了通关标记的老档（[code]ExplorationMapFlush._mark_map_cleared[/code] 的旧写法）
+## 至少报 1 次，而不是让卡片显示「已通关·第0次」。
+func clear_counts_of(p_gsm: Node) -> Dictionary:
+	var counts: Dictionary = {}
+	for raw_id: Variant in CatalogScript.MAPS.keys():
+		var map_id: StringName = StringName(str(raw_id))
+		var state: Dictionary = _map_state(p_gsm, map_id)
+		var count: int = int(state.get("clear_count", 0))
+		if count <= 0 and bool(state.get("is_first_clear", false)):
+			count = 1
+		counts[map_id] = count
+	return counts
 
 
 ## 重入总费用——委托 [code]ExplorationEconomy.calculate_reentry_cost[/code]

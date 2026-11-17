@@ -91,10 +91,14 @@ func after_each() -> void:
 # 装置
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 进一张真实地图（[code]current_map[/code] 就位——结算要有活跃地图才跑得起来）。
-func enter_map() -> void:
-	es.call(&"enter_map", MAP_ID, 1, 10)
-	assert_eq(gsm.exploration.get("current_map"), MAP_ID, "前置：已进入 %s" % MAP_ID)
+## 进一张真实地图（[code]current_map[/code] 就位——结算要有活跃地图才跑得起来）。[br]
+## [br][param p_map_id] 目标地图（缺省 [constant MAP_ID]；重入链路的用例换用收费地图）。[br]
+## [br][b]不走解锁门禁[/b]：门禁是选图界面的事（[code]ExplorationMapGate[/code]），
+## 本装置直调系统侧 [code]enter_map[/code]——用例要的是「在图里」这个前提，
+## 不是再验一遍解锁。
+func enter_map(p_map_id: StringName = MAP_ID) -> void:
+	es.call(&"enter_map", p_map_id, 1, 10)
+	assert_eq(gsm.exploration.get("current_map"), p_map_id, "前置：已进入 %s" % p_map_id)
 
 
 ## 造一场胜利结算（走真实结算场景的收尾入口，与生产同一条路径）。[br]
@@ -125,10 +129,12 @@ func run_boss_clear(p_mount_scene: bool = true) -> void:
 		add_child_autofree(scene)
 
 
-## 本图在 [code]map_states[/code] 里的状态（结算写的就是它）。
-func map_state() -> Dictionary:
+## 某图在 [code]map_states[/code] 里的状态（结算写的就是它）。[br]
+## [br][param p_map_id] 目标地图（缺省 [constant MAP_ID]——重入链路的用例换图读）。[br]
+## [br][b]读的是 GSM 现取[/b]：结算写完立刻可读，用例不必等信号。
+func map_state(p_map_id: StringName = MAP_ID) -> Dictionary:
 	var states: Dictionary = gsm.exploration.get("map_states", {})
-	var state: Variant = states.get(MAP_ID, {})
+	var state: Variant = states.get(p_map_id, {})
 	return state if state is Dictionary else {}
 
 

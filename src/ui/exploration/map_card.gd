@@ -30,12 +30,25 @@ const LOCKED_ALPHA: float = 0.45
 ## 固定 UI 词条（项目暂无本地化系统——S16-1 TEXT_* 同源豁免注记）。
 const TEXT_CLEARED: String = "已通关"
 const TEXT_UNCLEARED: String = "未通关"
-const TEXT_FIRST_CLEAR: String = "首次通关"
+const TEXT_FIRST_CLEAR: String = "⭐首次通关"
 const TEXT_NO_REENTRY: String = "已通关·不可重入"
 const TEXT_FREE_REENTRY: String = "免费重入"
 const TEXT_REENTRY_SUFFIX: String = "灵石"
 const TEXT_REALM_PREFIX: String = "需"
 const TEXT_REALM_SUFFIX: String = "境界"
+## 通关次数格式——第 2 次起显示（首通走 [constant TEXT_FIRST_CLEAR] 的 ⭐ 标记）。
+const TEXT_CLEAR_COUNT: String = "已通关·第%d次"
+## 通关后推荐下一张——卡面上的箭头前缀（[method set_recommended] 写入）。
+const TEXT_RECOMMEND: String = "▶ 推荐下一张"
+## 已通关卡的重入说明——点名「能重复玩，但只有基础奖励」（GDD exploration-ui-system.md
+## §7「非首次通关不显示首次通关奖励」）：不给这句话，玩家会以为再打一次就能再拿彩头。
+const TEXT_REPEAT_REWARD: String = "可重复挑战·仅基础奖励"
+## 推荐卡的边框色（取节点图已访问边的金色档，与结算面板首通行同色）。
+const RECOMMEND_BORDER_COLOR: Color = Color("#C8A84E")
+const RECOMMEND_BORDER_WIDTH: int = 3
+## 基础常态边框色（未推荐时恢复——[method set_recommended] 的另一半）。
+const NORMAL_BORDER_COLOR: Color = Color(0.24, 0.24, 0.28, 1.0)
+const NORMAL_BORDER_WIDTH: int = 1
 
 ## 当前卡片的地图载荷条目（只读视图数据，主界面刷新时重建）。
 var entry: Dictionary = {}
@@ -50,6 +63,10 @@ var _status_label: Label
 var _cost_label: Label
 ## 解锁条件标签（未解锁时显示「需筑基期」等；已解锁为空且不占位）。
 var _lock_label: Label
+## 重复挑战说明标签（已通关卡显示「可重复挑战·仅基础奖励」；未通关为空）。
+var _repeat_label: Label
+## 推荐标记标签（[method set_recommended] 写入；未推荐为空且不占位）。
+var _recommend_label: Label
 
 
 ## 初始化卡片视觉——[param map_entry] 为 [code]get_map_list()[/code] 载荷
@@ -110,6 +127,22 @@ func _build() -> void:
 	_lock_label.text = locked_hint_text()
 	box.add_child(_lock_label)
 
+	# 重复挑战说明——已通关卡写清「再打一次拿什么」（见 [constant TEXT_REPEAT_REWARD]）。
+	_repeat_label = Label.new()
+	_repeat_label.text = repeat_hint_text()
+	_repeat_label.add_theme_font_size_override(&"font_size", 14)
+	box.add_child(_repeat_label)
+
+	# 推荐标记行（默认空——[method set_recommended] 在通关确认后点亮）。
+	_recommend_label = Label.new()
+	_recommend_label.text = ""
+	_recommend_label.add_theme_font_size_override(&"font_size", 16)
+	_recommend_label.add_theme_color_override(&"font_color", RECOMMEND_BORDER_COLOR)
+	box.add_child(_recommend_label)
+
+	# 常态边框（显式给一份——推荐态的边框覆盖它，[method set_recommended] 要能换回来）。
+	apply_border(NORMAL_BORDER_COLOR, NORMAL_BORDER_WIDTH)
+
 	# 视觉状态：锁定卡半透明遮罩 + 🔒 标记；tooltip 显示解锁条件/不可重入。
 	if is_unlocked_card():
 		modulate = Color(1.0, 1.0, 1.0, 1.0)
@@ -121,6 +154,45 @@ func _build() -> void:
 	gui_input.connect(_on_gui_input)
 
 
+## 点亮/熄灭「推荐下一张」标记——通关后主界面用它高亮下一张可玩地图。[br]
+## [br][b]双通道标记[/b]：金色描边（[constant RECOMMEND_BORDER_COLOR]）+ 卡面文字
+## 「▶ 推荐下一张」——色盲玩家不靠颜色也能看出推荐的是哪张（.claude/rules/ui-code.md）。[br]
+## [br][b]幂等[/b]：重复点亮/熄灭不叠加（每次都重写同两个样式槽与同一行文本）。[br]
+## [br][param p_recommended] true = 点亮，false = 恢复常态边框并清空该行。
+func set_recommended(p_recommended: bool) -> void:
+	if _recommend_label != null:
+		_recommend_label.text = TEXT_RECOMMEND if p_recommended else ""
+	apply_border(RECOMMEND_BORDER_COLOR if p_recommended else NORMAL_BORDER_COLOR,
+			RECOMMEND_BORDER_WIDTH if p_recommended else NORMAL_BORDER_WIDTH)
+
+
+## 卡面是否处于推荐态（测试/主界面查询用）。
+func is_recommended() -> bool:
+	return _recommend_label != null and not _recommend_label.text.is_empty()
+
+
+## 重复挑战说明文案——已通关给出「可重复挑战·仅基础奖励」，未通关为空串。[br]
+## [br][b]为什么写在卡面上[/b]：重复通关不发首通彩头（GDD exploration-ui-system.md §7），
+## 而玩家在选图这一步看不到任何说明时，会默认「再打一次还能再拿一次稀有卡」。
+## 三种已通关卡（可重入 / 永久免费 / 不可重入）都吃这一行——区别只在费用行。
+func repeat_hint_text() -> String:
+	if not bool(entry.get(&"is_cleared", false)):
+		return ""
+	return TEXT_REPEAT_REWARD
+
+
+## 应用边框样式（常态与推荐态共用一处——两处各写一份必然出现「换得回来一半」）。[br]
+## [br][b]为什么显式建 StyleBoxFlat[/b]：卡片是 [code]MapCardScript.new()[/code]
+## 动态创建的 [Panel]，没有主题样式可覆盖——不建一份就没有边框可谈。
+func apply_border(p_color: Color, p_width: int) -> void:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.129, 0.129, 0.153, 1.0)
+	style.set_border_width_all(p_width)
+	style.border_color = p_color
+	style.set_corner_radius_all(6)
+	add_theme_stylebox_override(&"panel", style)
+
+
 ## 难度⭐文本——难度等级 1-4 映射，越界安全回退「—」。
 func _difficulty_text() -> String:
 	var difficulty: int = int(entry.get(&"difficulty", 0))
@@ -129,12 +201,23 @@ func _difficulty_text() -> String:
 	return "—"
 
 
-## 状态文本——首次通关⭐ / 已通关 / 未通关。
+## 状态文本——未通关 / ⭐首次通关 / 已通关·第N次 / 已通关。[br]
+## [br][b]首通与刷图分开[/b]：判据是通关次数（1 = 首通、≥2 = 刷过），而不是
+## 「是否已通关」——只报「已通关」的话，玩家看不出这张图自己是初通还是回来刷的，
+## 首通彩头那一次也没有任何留痕（GDD exploration-ui-system.md §1
+## 「初次通关的地图有⭐标记」）。[br]
+## [br][b]次数缺失回退「已通关」[/b]：条目不带 [code]clear_count[/code] 时不知道通过
+## 几次，[b]不能报「⭐首次通关」也不能报「第 0 次」[/b]——前者是编造一个「你是首通」
+## 的claim，后者读不通。退回原来那三个字即可（列表载荷会把老档折算为 1 次，
+## 见 [code]ExplorationMapList.clear_counts_of[/code]；这里是条目本身的兜底）。
 func _status_text() -> String:
 	if not bool(entry.get(&"is_cleared", false)):
 		return TEXT_UNCLEARED
-	if bool(entry.get(&"is_first_clear", false)):
+	var count: int = int(entry.get(&"clear_count", 0))
+	if count == 1:
 		return TEXT_FIRST_CLEAR
+	if count >= 2:
+		return TEXT_CLEAR_COUNT % count
 	return TEXT_CLEARED
 
 

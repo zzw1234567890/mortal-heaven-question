@@ -266,3 +266,9 @@ func test_map_display_name_falls_back_to_id() -> void:
 			"未登记地图的名字应回退地图 ID")
 	assert_eq(GATE.map_display_name(&""), "", "空 ID 应返回空串（无前置时不出现占位字）")
 	assert_eq(GATE.map_display_name(GK_PREREQ), "苍玄古战场", "登记地图应给中文名")
+
+
+## 「下一张去哪」（[method ExplorationMapGate.next_playable]）的用例[b]已移出本文件[/b]
+## ——见 [code]test_map_next_playable.gd[/code]。两者同属门槛模块，但回答的是两个问题
+## （「这张图能不能进」与「下一张该进哪张」），合在一起会越过 300 行软上限
+## （.claude/docs/coding-standards.md）。用例本身一条未删。

@@ -18,8 +18,8 @@ const PLAYER_QUIT: int = 3
 ## 通关状态标记与卡牌发放（[code]is_first_clear[/code] / [code]clear_count[/code]
 ## 同一次写入；卡牌走既有发放器）。
 const MapClear := preload("res://src/feature/exploration/exploration_map_clear.gd")
-## 通关结算的跨场景视图缓存（面板在场景切换之后才挂载——见该文件类文档）。
-const ClearView := preload("res://src/feature/exploration/map_clear_view.gd")
+## 结算面板的视图组装（含「下一张去哪」的求值——与发奖分开，见该类文档）。
+const ClearReport := preload("res://src/feature/exploration/exploration_clear_report.gd")
 
 ## 通关基础奖励的修为来源标记（[code]summary[/code] 与存档审计读它）。
 const SOURCE_CLEAR: String = "map_clear"
@@ -217,21 +217,10 @@ func _settle_boss_defeated(p_gsm: Node, p_map_id: StringName,
 	# 转移已收集资源（在通关奖励之后——两者都加在 player.* 上，顺序不影响总额）
 	_flush_map_state(p_map_id)
 
-	# 备好结算面板的视图（跨场景缓存——面板在场景切换之后才挂载）
-	ClearView.publish({
-		ClearView.KEY_MAP_ID: p_map_id,
-		ClearView.KEY_MAP_NAME: _map_display_name(p_map_id),
-		ClearView.KEY_IS_FIRST_CLEAR: is_first,
-		ClearView.KEY_CLEAR_COUNT: clear_count,
-		ClearView.KEY_LING_SHI: int(rewards.get("ling_shi", 0)),
-		ClearView.KEY_CULTIVATION: int(rewards.get("cultivation", 0)),
-		ClearView.KEY_FIRST_LING_SHI: first_ling_shi,
-		ClearView.KEY_FIRST_CULTIVATION: first_cultivation,
-		ClearView.KEY_CARDS: base_cards.get("cards", []),
-		ClearView.KEY_FIRST_CARDS: first_cards.get("cards", []),
-		ClearView.KEY_CARDS_FAILED: (base_cards.get("cards_failed", []) as Array)
-				+ (first_cards.get("cards_failed", []) as Array),
-	})
+	# 备好结算面板的视图（跨场景缓存——面板在场景切换之后才挂载）。
+	# 「下一张去哪」的求值在报告模块（读探明表 × 境界 × 已通关集合），与发奖分开。
+	ClearReport.publish(p_gsm, p_map_id, is_first, clear_count, rewards, extra,
+			base_cards, first_cards)
 
 
 ## 首通额外奖励——重复通关时 [code]rewards[/code] 里没有 [code]extra[/code] 键
@@ -256,11 +245,9 @@ func _grant_cultivation(p_gsm: Node, p_amount: int, p_source: String) -> void:
 	p_gsm.add_cultivation(p_amount, p_source)
 
 
-## 地图中文名——探明表登记名优先，未登记地图回退地图 ID（不臆造名字）。
-func _map_display_name(p_map_id: StringName) -> String:
-	var config: Dictionary = _parent.call("_get_map_config", p_map_id, _get_player_realm())
-	var name: String = str(config.get("name", ""))
-	return name if not name.is_empty() else str(p_map_id)
+## 地图中文名——[b]已随视图组装迁到 [code]exploration_clear_report.gd[/code][/b]
+## （[code]ExplorationMapGate.map_display_name[/code] 是登记名读取的唯一实现）。
+## 此处曾有一份同口径的副本，与探明表读取重复——删掉免得两处漂移。
 
 
 # === 辅助查询 ================================================================

@@ -33,19 +33,16 @@ const TEXT_BALANCE_PREFIX: String = "灵石"
 ## （title / ok_button_text / cancel_button_text）与 [MapSelectReentryDialog]。此处曾各存
 ## 一份从无读取方的副本——留着只会与真源漂移（.claude/rules 禁止重复）。
 
-## MapCard 脚本常量——动态构建卡片用（class_name 在动态加载下不可靠）。
-const MapCardScript := preload("res://src/ui/exploration/map_card.gd")
+## 卡片行构建与推荐高亮（见 [MapSelectCards]——「推荐下一张」的落点）。
+const CardsScript := preload("res://src/ui/exploration/map_select_cards.gd")
 ## 数据读取面（地图列表 / 灵石 / 输入锁栈——只读，见 [MapSelectData]）。
 const DataScript := preload("res://src/ui/exploration/map_select_data.gd")
+## 卡片点击的落地效果（进图 / 重入确认 / 条件提示——见 [MapSelectInteraction]）。
+const InteractionScript := preload("res://src/ui/exploration/map_select_interaction.gd")
 ## 入场动画编排（逐张飞入 + 锁定卡遮罩不变量，见 [MapSelectAnimator]）。
 const AnimatorScript := preload("res://src/ui/exploration/map_select_animator.gd")
-## 重入确认弹窗的文案填充（见 [MapSelectReentryDialog]）。
-const ReentryDialogScript := preload(
-		"res://src/ui/exploration/map_select_reentry_dialog.gd")
 ## 手柄横向滚动（见 [MapSelectScroll]——设备限定逻辑只在一处）。
 const ScrollScript := preload("res://src/ui/exploration/map_select_scroll.gd")
-## 未解锁卡的中文提示出口（见 [MapSelectNotice]——文案与出口都在那边）。
-const NoticeScript := preload("res://src/ui/exploration/map_select_notice.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -61,17 +58,18 @@ var animate: bool = true
 var notify_cb: Callable = Callable()
 
 ## === 瞬态交互状态（ADR-0031 §2.1）=============================================
-
-## 待重入地图 ID（重入确认弹窗打开期间）——场景内瞬态状态，不进存档。
-var _pending_reentry_id: StringName = &""
+## 待重入地图 ID 已移到 [MapSelectInteraction]（与弹窗同生共死——查询走
+## [method pending_reentry_id]）。下面是本屏幕自己的几个懒构建引用。
 ## 数据读取面（惰性构建——_init 时宿主尚未就绪）。
 var _data: RefCounted = null
 ## 入场动画编排（惰性构建）。
 var _animator: RefCounted = null
-## 重入确认弹窗的文案填充（惰性构建 + 首次使用时绑定控件）。
-var _reentry: RefCounted = null
+## 卡片点击的落地效果（惰性构建 + 首次使用时绑定弹窗控件与两个意图出口）。
+var _interaction: RefCounted = null
 ## 手柄横向滚动（惰性构建 + 首次使用时绑定滚动容器）。
 var _scroll_helper: RefCounted = null
+## 卡片行构建与推荐高亮（惰性构建——见 [MapSelectCards]）。
+var _cards: RefCounted = null
 
 ## === 信号 ======================================================================
 
@@ -173,19 +171,28 @@ func _connect_signals() -> void:
 ## === 数据刷新（零状态所有权——每信号周期从源系统读取）======================
 
 ## 刷新地图卡片列表——消费 [code]get_map_list()[/code]（探明表 × GSM）。[br]
-## [b]空列表不兜底[/b]：数据源不可用时列表就是空的——塞假地图会让玩家点进一张不存在的图。
+## [b]空列表不兜底[/b]：数据源不可用时列表就是空的——塞假地图会让玩家点进一张不存在的图。[br]
+## [br][b]重建后重放推荐态[/b]：推荐高亮由 [MapSelectCards] 持有，重建时自动重放
+## ——否则「通关确认后刷新一次列表」就会把刚点亮的那张卡抹掉。
 func _refresh_map_list() -> void:
-	for child: Node in card_row.get_children():
-		card_row.remove_child(child)
-		child.queue_free()
-	for entry: Dictionary in _data_ref().call(&"map_list"):
-		var card: MapCard = MapCardScript.new()
-		card.setup(entry)
-		card.card_activated.connect(_on_card_activated)
-		card_row.add_child(card)
+	_cards_ref().call(&"rebuild", card_row, _data_ref().call(&"map_list"),
+			Callable(self, &"_on_card_activated"))
 	if animate:
 		_animator_ref().call(&"play_intro", self, card_row,
 				Callable(self, &"should_show_lock"))
+
+
+## 高亮「推荐下一张」——通关结算确认后由宿主调用（[param p_map_id] 为空串 = 全部熄灭）。[br]
+## [br][b]调用前提[/b]：列表已是最新（宿主先 [method _refresh_map_list] 再调本方法
+## ——刷新会重建卡片，本方法负责重放推荐态，两步顺序不能反）。[br]
+## [br][b]返回[/b]：是否真的点亮了某一张（推荐 ID 不在列表里时为 false——不臆造高亮）。
+func highlight_next_map(p_map_id: StringName) -> bool:
+	return bool(_cards_ref().call(&"highlight", p_map_id))
+
+
+## 当前被点亮的地图 ID（空串 = 没有推荐——测试断言与宿主查询用）。
+func recommended_map_id() -> StringName:
+	return _cards_ref().call(&"recommended_id")
 
 
 ## 刷新灵石余额——只读消费 [code]ResourceSystem.get_resource(&"ling_shi")[/code]，
@@ -193,48 +200,35 @@ func _refresh_map_list() -> void:
 func _refresh_balance() -> void:
 	var ling_shi: int = int(_data_ref().call(&"ling_shi"))
 	balance_label.text = "%s: %d" % [TEXT_BALANCE_PREFIX, ling_shi]
-	_reentry_ref().call(&"refresh_balance", ling_shi)
+	_interaction_ref().call(&"refresh_balance", ling_shi)
 
 
 ## === 卡片交互分流 ==============================================================
 
 ## 卡片点击分流（MapCard.card_activated）——消费 [method entry_action] 决策。[br]
-## [b]改变游戏状态的分支[/b]（进入/重入确认）必须先过输入锁栈判定。[br]
-## [br][b]锁定卡给中文条件提示[/b]（不进场）：[method entry_action] 的 IGNORE 同时覆盖
-## 「未解锁」与「已通关不可重入」两种卡，[method MapSelectNotice.notify_locked] 只对前者
-## 出声（后者是设计而非缺陷）——分流决策本身不变，既有断言不受影响。
+## [br][b]决策在这里、效果在 [MapSelectInteraction][/b]：本方法只把纯函数的判定结果
+## 连同「灵石够不够」一起交出去（谁是真理来源仍在这一处），落地动作归那边。
 func _on_card_activated(entry: Dictionary) -> void:
-	match entry_action(entry):
-		EntryAction.REENTER:
-			if _is_input_allowed():
-				_show_reentry_dialog(entry)
-		EntryAction.ENTER:
-			if _is_input_allowed():
-				enter_map_requested.emit(entry.get(&"map_id", &""))
-		_:
-			NoticeScript.notify_locked(self, entry)
+	_interaction_ref().call(&"activate", entry_action(entry), entry,
+			can_confirm_reentry(entry))
 
 
 ## === 重入确认弹窗 ==============================================================
 
-## 弹出重入确认窗口。[br]
-## [b]文案与启用态的填充在 [MapSelectReentryDialog][/b]——本方法只决定弹哪张卡。
-func _show_reentry_dialog(entry: Dictionary) -> void:
-	_pending_reentry_id = entry.get(&"map_id", &"")
-	_reentry_ref().call(&"show_for", entry, int(_data_ref().call(&"ling_shi")),
-			can_confirm_reentry(entry))
-
-
+## 重入确认——发出重入意图（扣费与进图归 Feature 层）。[br]
+## [br][b]由 tscn 的 [code]confirmed[/code] 信号直连[/b]，故保持无参。
 func _on_reentry_confirmed() -> void:
-	if _pending_reentry_id.is_empty():
-		return
-	if _is_input_allowed():
-		reentry_requested.emit(_pending_reentry_id)
-	_pending_reentry_id = &""
+	_interaction_ref().call(&"confirm")
 
 
+## 重入取消——丢弃待办 ID（弹窗关闭 / 取消按钮）。
 func _on_reentry_canceled() -> void:
-	_pending_reentry_id = &""
+	_interaction_ref().call(&"cancel")
+
+
+## 当前待重入的地图 ID（空串 = 弹窗未开或已确认/取消——宿主查询与测试断言用）。
+func pending_reentry_id() -> StringName:
+	return _interaction_ref().call(&"pending_id")
 
 
 ## === 输入 ======================================================================
@@ -263,13 +257,21 @@ func _animator_ref() -> RefCounted:
 	return _animator
 
 
-## 重入弹窗填充器（惰性构建 + 绑定弹窗控件——控件由场景提供，引用交它持有）。
-func _reentry_ref() -> RefCounted:
-	if _reentry == null:
-		_reentry = ReentryDialogScript.new()
-		_reentry.call(&"bind", reentry_dialog, reentry_map_label, reentry_cost_label,
-				reentry_balance_label, reentry_warn_label, reentry_confirm_button)
-	return _reentry
+## 重入弹窗填充器与点击落地的接线（惰性构建 + 绑定弹窗控件与两个意图出口）。[br]
+## [br][b]出口为什么是 lambda 而不是 [method Object.emit_signal] 直绑[/b]：
+## [method Callable.bind] 把绑定参数接在调用参数[b]之后[/b]——直绑会让信号名落到
+## 地图 ID 的位置，发出去的是 [code]emit_signal(map_id, "信号名")[/code]。[br]
+## [br][b]为什么是本屏幕持有[/b]：弹窗控件由本屏幕的场景提供，意图出口也是本屏幕的
+## 信号——都交给 [MapSelectInteraction] 之后，屏幕自己只留一个引用。
+func _interaction_ref() -> RefCounted:
+	if _interaction == null:
+		_interaction = InteractionScript.new()
+		_interaction.call(&"bind", self, reentry_dialog, reentry_map_label,
+				reentry_cost_label, reentry_balance_label, reentry_warn_label,
+				reentry_confirm_button,
+				func(p_id: StringName) -> void: enter_map_requested.emit(p_id),
+				func(p_id: StringName) -> void: reentry_requested.emit(p_id))
+	return _interaction
 
 
 ## 手柄滚动助手（惰性构建 + 绑定滚动容器）。
@@ -280,18 +282,16 @@ func _scroll_ref() -> RefCounted:
 	return _scroll_helper
 
 
-## 第一张已解锁卡（初始焦点目标）。
+## 卡片行构建与推荐高亮（惰性构建——无依赖，见 [MapSelectCards]）。
+func _cards_ref() -> RefCounted:
+	if _cards == null:
+		_cards = CardsScript.new()
+	return _cards
+
+
+## 第一张已解锁卡（初始焦点目标）——卡片数组归 [MapSelectCards] 持有。
 func _first_unlocked_card() -> MapCard:
-	for i: int in range(card_row.get_child_count()):
-		var card: MapCard = card_row.get_child(i) as MapCard
-		if card != null and not should_show_lock(card.entry):
-			return card
-	return null
-
-
-## 输入锁栈判定——改变游戏状态的点击必须过 InputManager（ADR-0004）。
-func _is_input_allowed() -> bool:
-	return bool(_data_ref().call(&"input_allowed"))
+	return _cards_ref().call(&"first_unlocked") as MapCard
 
 
 ## GSM resource_changed——仅灵石变更刷新余额（HUD lingshi_deck_bar G1 先例）。

@@ -44,6 +44,15 @@ const KEY_FIRST_CULTIVATION: String = "first_cultivation"
 const KEY_CARDS: String = "cards"
 const KEY_FIRST_CARDS: String = "first_cards"
 const KEY_CARDS_FAILED: String = "cards_failed"
+## 通关后推荐去哪——按剧情顺序的下一张未通关地图（[code]ExplorationMapGate.next_playable[/code]
+## 的求值结果，发布时已折算成展示字段）。[br]
+## [br][b]为什么算好再存[/b]：面板与选图界面都不该自己去推解锁条件——推荐态是
+## （境界 × 已通关集合）的函数，重算一次就要把探明表与门槛判定各拉一遍（UI 零状态
+## 所有权）。全图通关时这四个键全缺/为空，面板据此不出推荐行（不臆造下一张）。
+const KEY_NEXT_MAP_ID: String = "next_map_id"
+const KEY_NEXT_MAP_NAME: String = "next_map_name"
+const KEY_NEXT_IS_UNLOCKED: String = "next_is_unlocked"
+const KEY_NEXT_LOCKED_HINT: String = "next_locked_hint"
 
 ## 待展示的通关结算（空字典 = 没有待展示的结算）。
 static var _pending: Dictionary = {}

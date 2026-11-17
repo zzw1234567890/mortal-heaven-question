@@ -41,6 +41,14 @@ const TEXT_TAG_TWO: String = "（%s·%s）"
 const TEXT_TAG_ONE: String = "（%s）"
 ## 确认按钮文案（GDD §7 线框尾行；也是「回到地图选择」的唯一出口）。
 const TEXT_CONFIRM: String = "确认"
+## 下一张地图引导行——已解锁（直接可玩）与仍锁着（给出缺什么）两种措辞。[br]
+## [br][b]为什么必须有这一行[/b]：面板确认之后玩家回到选图界面，面对 17 张卡片，
+## 而「刚通完的那张」正是最显眼的一张（它还亮着已通关）。没有这一行时，
+## 玩家的默认动作是再点回同一张图重刷，「下一张图在哪」全靠自己逐张比对。
+const TEXT_NEXT_UNLOCKED: String = "▶ 下一张：%s"
+const TEXT_NEXT_LOCKED: String = "🔒 下一张：%s（%s）"
+## 无可推荐时的兜底（全图通关——明说，不留白）。
+const TEXT_NEXT_NONE: String = "已通关全部地图"
 ## 本段无任何奖励时的兜底（不显示空段标题，见 [method has_any_reward]）。
 const TEXT_NOTHING: String = "本次无额外奖励"
 ## 卡牌名兜底（模板与载荷都没给名字）。
@@ -83,6 +91,38 @@ static func shows_first_section(p_view: Dictionary) -> bool:
 	if p_view == null or p_view.is_empty():
 		return false
 	return bool(p_view.get(ClearView.KEY_IS_FIRST_CLEAR, false))
+
+
+## 下一张地图引导行（GDD §7 面板之后的去向）。[br]
+## [br][b]两种措辞[/b]：[code]next_is_unlocked[/code] 为真 → 「▶ 下一张：血渊秘境」；
+## 为假（下一张还锁着）→ 「🔒 下一张：碎星外环（需筑基期 · 需通关苍玄古战场）」，
+## 把 [code]next_locked_hint[/code] 原样带出来——玩家才知道该去解锁什么。[br]
+## [br][b]未解锁但缺什么没算出来时退化为已解锁措辞[/b]：宁可少一句括号，
+## 也不显示「🔒 下一张：X（）」这种半截话。[br]
+## [br][b]无可推荐时给 [constant TEXT_NEXT_NONE][/b]：全图通关是事实，明说比留白有用。[br]
+## [br][b]UI 零数值计算[/b]：推荐哪张与它的解锁态由 Feature 层算好（见
+## [code]ExplorationClearReport[/code]），本函数只负责措辞。
+static func next_map_text(p_view: Dictionary) -> String:
+	if p_view == null:
+		return TEXT_NEXT_NONE
+	var name: String = str(p_view.get(ClearView.KEY_NEXT_MAP_NAME, ""))
+	if name.strip_edges().is_empty():
+		return TEXT_NEXT_NONE
+	if bool(p_view.get(ClearView.KEY_NEXT_IS_UNLOCKED, false)):
+		return TEXT_NEXT_UNLOCKED % name
+	var hint: String = str(p_view.get(ClearView.KEY_NEXT_LOCKED_HINT, ""))
+	if hint.strip_edges().is_empty():
+		return TEXT_NEXT_UNLOCKED % name
+	return TEXT_NEXT_LOCKED % [name, hint]
+
+
+## 推荐地图的 ID（面板确认后由宿主据此高亮卡片；无推荐时空串）。[br]
+## [br][b]为什么单独暴露[/b]：宿主（[code]ExplorationScene[/code]）只知道「该高亮
+## 哪一张」，不该自己去翻载荷键名——键名是 ClearView 的契约，读它归本模块。
+static func next_map_id(p_view: Dictionary) -> StringName:
+	if p_view == null:
+		return &""
+	return StringName(str(p_view.get(ClearView.KEY_NEXT_MAP_ID, "")))
 
 
 ## 本次结算是否有任何奖励可展示（基础段或首通段）。[br]

@@ -87,13 +87,13 @@ func present(p_view: Dictionary) -> void:
 		return
 	_map_label.text = Rules.map_name(p_view)
 	_add_status_line(Rules.clear_count_text(p_view))
+	# 「下一张去哪」——无论这一局有没有奖励都要给（重复刷图的玩家更需要它）
+	_add_status_line(Rules.next_map_text(p_view), true)
 	if not Rules.has_any_reward(p_view):
 		_add_status_line(Rules.TEXT_NOTHING)
 		_navigator.call(&"reset")
 		return
-	_fill_section(p_view, false)
-	if Rules.shows_first_section(p_view):
-		_fill_section(p_view, true)
+	_fill_sections(p_view)
 	_navigator.call(&"reset")
 
 
@@ -219,27 +219,25 @@ func _build_layout() -> void:
 	_confirm_button = parts.get("leave_button")
 
 
-## 填一个奖励段（基础 / 首通）——段标题 + 灵石修为行 + 卡牌行。[br]
-## [br][b]首通段整段套金色[/b]（GDD §7「首次通关额外奖励高亮展示（金色边框）」）：
-## 段标题带金框、行文字用金色、卡牌行常态样式换成金框——三处同一份样式。
-func _fill_section(p_view: Dictionary, p_first: bool) -> void:
-	var title: String = Rules.TEXT_FIRST_SECTION if p_first else Rules.TEXT_BASE_SECTION
-	var section: VBoxContainer = LayoutScript.add_section(_item_box, title, p_first)
-	_section_titles.append(title)
-	for line: Variant in Rules.section_amount_lines(p_view, p_first):
-		LayoutScript.add_reward_line(section, str(line), p_first)
-	for entry: Variant in Rules.section_cards(p_view, p_first):
-		var index: int = _card_buttons.size()
-		_card_entries.append(entry)
-		_card_buttons.append(LayoutScript.add_card_row(section,
-				Rules.card_row_text(entry), func() -> void: _on_card_pressed(index), p_first))
+## 填充两个奖励段（基础 / 首通）——段与行的排版在 [code]MapClearPanelLayout[/code]，
+## 本方法只把画好的行登记进游标（[member _card_buttons] 是游标的行数组）。
+func _fill_sections(p_view: Dictionary) -> void:
+	var filled: Dictionary = LayoutScript.fill_sections(_item_box, p_view, Rules,
+			Callable(self, &"_on_card_pressed"))
+	_section_titles = filled.get("titles", [])
+	_card_buttons = filled.get("buttons", [])
+	_card_entries = filled.get("entries", [])
 
 
-## 追加一行只读文本并登记（次数行 / 无奖励兜底）。
-func _add_status_line(p_text: String) -> void:
+## 追加一行只读文本并登记（次数行 / 下一张引导 / 无奖励兜底）。[br]
+## [br][param p_next] true 走「下一张」样式（金色，排版归 Layout）。
+func _add_status_line(p_text: String, p_next: bool = false) -> void:
 	if p_text.strip_edges().is_empty():
 		return
-	LayoutScript.add_status_line(_item_box, p_text)
+	if p_next:
+		LayoutScript.add_next_line(_item_box, p_text)
+	else:
+		LayoutScript.add_status_line(_item_box, p_text)
 	_reward_texts.append(p_text)
 
 

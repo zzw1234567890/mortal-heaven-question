@@ -21,6 +21,14 @@ extends RefCounted
 ## 「读档后重算，不依赖一次性写入」由本设计保证：本模块[b]没有任何写入路径[/b]）。[br]
 ## [br][b]缺省语义[/b]：未登记地图按最保守值处理（门槛 [constant FALLBACK_REALM]、
 ## 无前置）——不静默借用别的地图的解锁规则。[br]
+## [br][b]已通关的图恒为已解锁[/b]：解锁判定回答的是「玩家能不能进这张图」，
+## 而通关记录本身就证明他进去过。不认这一条会出两种读不通的界面：[br]
+##   1. 存档里只有后一张图的通关记录（前置那张被重置 / 老档只写了后一张），
+##      已通关的图会灰显挂锁，连「重入」入口都没有——玩家打过的图突然点不动；[br]
+##   2. 探明表调整前置顺序（剧情重排）后，旧存档里已通关的图会重新锁上，
+##      玩家被挡在自己打通过的图外面。[br]
+## [code]prerequisite_cleared[/code] 仍如实报前置本身的通关态（那是关于前置的
+## 事实，不因本图的通关记录而变），只有 [code]is_unlocked[/code] 放宽。[br]
 ##
 ## 来源: design/gdd/exploration-system.md §1 地图选择 / §8 地图初始解锁顺序 /
 ## §公式 1 地图解锁判定、design/gdd/exploration-ui-system.md §1（灰色锁 + 悬停
@@ -80,10 +88,12 @@ static func evaluate(p_map_id: StringName, p_player_realm: int,
 	var prerequisite: StringName = prerequisite_of(map_id)
 	var prerequisite_ok: bool = prerequisite.is_empty() \
 			or bool(p_cleared.get(prerequisite, false))
+	# 通关记录即入场证明——已通关的图不再被境界/前前置挡住（见类文档）。
+	var already_cleared: bool = bool(p_cleared.get(map_id, false))
 
 	var result: Dictionary = {
 		"map_id": map_id,
-		"is_unlocked": realm_ok and prerequisite_ok,
+		"is_unlocked": already_cleared or (realm_ok and prerequisite_ok),
 		"realm_ok": realm_ok,
 		"realm_requirement": requirement,
 		"unlock_after_clear": prerequisite,
@@ -144,6 +154,51 @@ static func map_display_name(p_map_id: StringName) -> String:
 	var config: Dictionary = registered_config(p_map_id)
 	var name: String = str(config.get("name", ""))
 	return name if not name.is_empty() else str(p_map_id)
+
+
+## 通关之后该去哪——[b]按剧情顺序取下一张值得玩的图[/b]。[br]
+## [br][b]为什么需要它[/b]：打完 Boss 回到选图界面时，玩家面对 17 张卡片，
+## 而「刚通完的这张」是最显眼的那张（它还亮着「已通关」）。没有任何引导时，
+## 玩家的默认动作是再点回同一张图重刷，新内容要靠自己逐张比对解锁条件才能找到
+## （GDD exploration-ui-system.md §1 的卡片网格里，已解锁与未解锁视觉差别只有
+## 一个半透明遮罩）。[br]
+## [br][param p_cleared_map] 刚通关的那张（不作为候选——否则「下一张」就是原地踏步）。[br]
+## [param p_player_realm] 玩家当前境界。[br]
+## [param p_cleared] [code]{地图ID: 是否已通关}[/code]。[br]
+## [br][b]返回[/b]：[code]{map_id, name, is_unlocked, locked_hint}[/code]；[br]
+##   · 优先未通关且[b]已解锁[/b]的图（按探明表顺序 = 剧情顺序，表序即推荐序）；[br]
+##   · 没有可玩的（全通了）时退而给[b]第一张未通关但锁着[/b]的图——玩家仍能看到
+##     「下一步该去解锁哪张」以及缺什么（[code]locked_hint[/code] 已备好），
+##     比一句「暂无」有用；[br]
+##   · 全部通关时返回[b]空字典[/b]（不臆造一张图）。[br]
+## [br][b]纯函数[/b]：不读 GSM、不写任何东西（同 [method evaluate]），故可直调单测。[br]
+##
+## 来源: design/gdd/exploration-ui-system.md §1 地图选择界面 / §7 通关结算、
+## design/gdd/exploration-system.md §8 地图初始解锁顺序、ADR-0014 §get_map_list 契约。
+static func next_playable(p_cleared_map: StringName, p_player_realm: int,
+		p_cleared: Dictionary) -> Dictionary:
+	var skipped: StringName = CatalogScript.canonical_id(p_cleared_map)
+	var locked_candidate: Dictionary = {}
+	for raw_id: Variant in CatalogScript.MAPS.keys():
+		var map_id: StringName = StringName(str(raw_id))
+		if map_id == skipped or bool(p_cleared.get(map_id, false)):
+			continue
+		var gate: Dictionary = evaluate(map_id, p_player_realm, p_cleared)
+		if bool(gate.get("is_unlocked", false)):
+			return _candidate(map_id, gate)
+		if locked_candidate.is_empty():
+			locked_candidate = _candidate(map_id, gate)
+	return locked_candidate
+
+
+## 候选条目（[method next_playable] 的返回形状——判定与名字同一次求值里取）。[br]
+static func _candidate(p_map_id: StringName, p_gate: Dictionary) -> Dictionary:
+	return {
+		"map_id": p_map_id,
+		"name": map_display_name(p_map_id),
+		"is_unlocked": bool(p_gate.get("is_unlocked", false)),
+		"locked_hint": str(p_gate.get("locked_hint", "")),
+	}
 
 
 ## 登记配置副本——未登记地图返回空字典（[code]MAPS.get[/code] 命中非字典时同样
