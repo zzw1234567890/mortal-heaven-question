@@ -121,7 +121,7 @@ func get_identity_preview(identity_id: StringName) -> Dictionary:
 		"description": tmpl["description"],
 		"flavor_text": tmpl["flavor_text"],
 		"style_tag": tmpl["style_tag"],
-		"initial_deck_cards": tmpl["initial_deck"]["cards"],
+		"initial_deck_cards": _with_card_names(tmpl["initial_deck"]["cards"]),
 		"character_slots": tmpl["initial_deck"]["character_slots"],
 		"character_details": tmpl["character_details"],
 		"initial_ling_shi": tmpl["initial_resources"]["ling_shi"],
@@ -130,6 +130,32 @@ func get_identity_preview(identity_id: StringName) -> Dictionary:
 		"playstyle_hint": tmpl.get("playstyle_hint", ""),
 	}
 
+
+## 给卡组条目补上中文卡名——UI 只显示 name，card_id 仅作回退。[br]
+## [br][param cards] 形如 [{"card_id": ..., "count": ...}] 的模板原始条目。[br]
+## [br][b]返回[/b]: 逐条补齐 "name" 的新数组（不修改入参）。
+func _with_card_names(cards: Array) -> Array:
+	var card_sys: Node = _get_card_system()
+	var out: Array = []
+	for raw: Dictionary in cards:
+		var entry: Dictionary = raw.duplicate()
+		var cid: StringName = StringName(str(entry.get("card_id", "")))
+		var display: String = ""
+		if card_sys != null and card_sys.has_method("get_template"):
+			var tmpl: Resource = card_sys.call(&"get_template", cid)
+			if tmpl != null:
+				display = str(tmpl.get(&"name"))
+		if display.is_empty():
+			# CardSystem 的模板是异步线程加载的，开局第一屏可能还没就绪；
+			# 直接按约定路径同步读一份，避免界面回退成英文 ID。
+			var path: String = "res://assets/cards/templates/%s.tres" % str(cid)
+			if ResourceLoader.exists(path):
+				var direct: Resource = ResourceLoader.load(path)
+				if direct != null:
+					display = str(direct.get(&"name"))
+		entry["name"] = display if not display.is_empty() else str(cid)
+		out.append(entry)
+	return out
 
 # === 工具方法 ===================================================================
 

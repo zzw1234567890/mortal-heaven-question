@@ -136,8 +136,10 @@ static func blocked_toast_title(entry: Dictionary) -> String:
 static func deck_summary(preview: Dictionary) -> String:
 	var parts: Array[String] = []
 	for card_entry: Dictionary in preview.get(&"initial_deck_cards", []):
-		parts.append("%s×%d" % [str(card_entry.get(&"card_id", "")),
-				int(card_entry.get(&"count", 0))])
+		var label: String = str(card_entry.get(&"name", ""))
+		if label.is_empty():
+			label = str(card_entry.get(&"card_id", ""))
+		parts.append("%s×%d" % [label, int(card_entry.get(&"count", 0))])
 	return "、".join(parts)
 
 
