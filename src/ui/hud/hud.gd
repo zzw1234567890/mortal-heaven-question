@@ -99,12 +99,16 @@ func setup(scene_manager: Node) -> void:
 	_setup_pause_menu()
 
 ## 暂停菜单组件初始化（Story 005——依赖注入职责）。[br]
-## 注入 SceneManager/SaveLoadSystem/音频 adapter 引用（依赖注入而非直引——
-## 测试可替换）。[code]InputManager.pause_requested[/code] 信号接线在
-## [method _ready]（GAP-1 裁决——挂载即响应 ESC），不在本方法。
+## 注入 SceneManager/SaveLoadSystem/GameStateManager/音频 adapter 引用（依赖注入
+## 而非直引——测试可替换）。[code]InputManager.pause_requested[/code] 信号接线在
+## [method _ready]（GAP-1 裁决——挂载即响应 ESC），不在本方法。[br]
+## [br][b]GSM 也走注入[/b]：暂停菜单的「存档」按钮要一份存档载荷、进度行要读探索
+## 层数——两者都由 GSM 现取（零状态所有权）。注入后暂停菜单那条链（含测试）
+## 不必再去 [code]/root[/code] 找 Autoload 名字。
 func _setup_pause_menu() -> void:
 	_pause_menu.scene_manager = _scene_manager
 	_pause_menu.save_load = SaveLoadSystem
+	_pause_menu.gsm = GameStateManager
 	_pause_menu.audio_adapter = PauseAudioAdapter.new()
 
 ## InputManager.pause_requested 信号回调——ESC 路径入口（GAP-1 裁决）。[br]
