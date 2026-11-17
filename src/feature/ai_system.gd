@@ -150,11 +150,14 @@ func _create_by_id(template_id: StringName) -> Object:
 ##   2. [code]front_slot=true[/code] 的敌人强制前排[br]
 ##   3. 其余按防御降序 → 前排（前排容量 3）；攻击降序 → 后排[br]
 ## [br][param template_ids] 模板 ID 列表。[br]
-## [br][param player_realm] 玩家当前境界（Story 004 难度缩放时使用）。[br]
+## [br][param player_realm] 玩家当前境界（Story 004 追赶缩放的输入）。[br]
+## [br][param map_realm] 地图敌人基准境界档（节点的 [code]enemy_level[/code]；
+## 0 = 未定档 → 档位系数 1.0，与两参调用逐位一致）。[br]
 ## [br][b]返回[/b]: Array——元素为 EnemyBattleState（已缩放 + 已分配 field_position + is_front_row + 已注册预配置绑定）。
 ## [br]来源: ADR-0017 §关键接口 create_enemy_roster / GDD ai-system.md §3/§9 / Story 004 AC-005~009。
-func create_enemy_roster(template_ids: Array, player_realm: int) -> Array:
-	return _get_roster_factory().create_enemy_roster(template_ids, player_realm)
+func create_enemy_roster(template_ids: Array, player_realm: int,
+		map_realm: int = 0) -> Array:
+	return _get_roster_factory().create_enemy_roster(template_ids, player_realm, map_realm)
 
 
 ## 阵位自动分配——修改 roster 中每个 EnemyBattleState 的 field_position + is_front_row。[br]
@@ -215,9 +218,12 @@ func _apply_difficulty_scaling(template, player_realm: int) -> Dictionary:
 
 ## 对整个 roster 应用难度缩放——遍历每个 EnemyBattleState 写入缩放后属性。[br]
 ## 缩放在阵位分配前应用（不影响分配逻辑——分配基于 defense 原值由 template 读取，[br]
-## 缩放值写入实例 max_hp/attack/defense）。
-func _apply_difficulty_scaling_to_roster(roster: Array, player_realm: int) -> void:
-	_get_roster_factory()._apply_difficulty_scaling_to_roster(roster, player_realm)
+## 缩放值写入实例 max_hp/attack/defense）。[br]
+## [br][param map_realm] 地图敌人基准境界档（0 = 未定档 → 档位系数 1.0）。
+func _apply_difficulty_scaling_to_roster(roster: Array, player_realm: int,
+		map_realm: int = 0) -> void:
+	_get_roster_factory()._apply_difficulty_scaling_to_roster(
+			roster, player_realm, map_realm)
 
 
 ## 注册预配置绑定——遍历 template.preconfigured_bindings 调用 BindingManager.bind_card（AC-006~009）。[br]

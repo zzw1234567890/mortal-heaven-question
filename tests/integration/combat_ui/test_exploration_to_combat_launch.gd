@@ -15,10 +15,16 @@ extends "res://tests/integration/combat_ui/full_battle_fixture.gd"
 const ContextScript := preload("res://src/feature/combat/combat_launch_context.gd")
 const PopupHostScript := preload("res://src/ui/exploration/node_interaction_popup_host.gd")
 const ViewScript2 := preload("res://src/feature/combat/combat_result_view.gd")
+## 难度系数表——敌方属性断言不手抄系数（改表即改断言口径）。
+const CurveScript := preload("res://assets/enemies/difficulty_curve.gd")
 
 ## 节点遭遇：散修 ×2、等级 2（与默认遭遇的「散修 ×1、炼气」刻意区分）。
 const NODE_TEMPLATES: Array[StringName] = [&"san_xiu", &"san_xiu"]
 const NODE_ENEMY_LEVEL: int = 2
+## 散修出厂基准（[code]assets/enemies/san_xiu.tres[/code]）——档位缩放的输入。
+const SAN_XIU_HP: int = 16
+const SAN_XIU_ATK: int = 2
+const SAN_XIU_REALM: int = 1
 const NODE_REWARDS: Dictionary = {"lingshi": 9, "cultivation": 3, "cards": []}
 const NODE_ID: int = 101
 
@@ -70,8 +76,14 @@ func test_node_encounter_reaches_battle_with_matching_rosters() -> void:
 	for entry: Variant in roster:
 		assert_eq(StringName(str(entry.get("template_id"))), &"san_xiu",
 				"敌方模板与节点遭遇一致")
-		# 散修 base_hp 16；玩家境界 1 < 节点等级 2 → 不缩放（仅玩家更高时缩放）
-		assert_eq(int(entry.get("max_hp")), 16, "敌方 HP 来自散修模板")
+		# 散修 base_hp 16；节点等级 2 > 玩家境界 1 → 档位「吃力」（×1.30）→ 21。
+		# [b]这条断言本轮被改写过[/b]：改造前节点的 enemy_level 只进开战配置、不参与
+		# 缩放，故此处原本断的是模板原值 16——那正是「地图境界对战斗数值零影响」这个
+		# 缺陷的固化。现在档位轴把地图境界档算进敌方属性，断言随实现改口径。
+		assert_eq(int(entry.get("max_hp")),
+				CurveScript.apply(SAN_XIU_HP, SAN_XIU_ATK, 0, SAN_XIU_REALM, 1,
+						NODE_ENEMY_LEVEL)["max_hp"],
+				"敌方 HP 按节点等级与玩家境界的档位差缩放")
 	# Assert——玩家阵容 = 探索侧带进来的阵容
 	assert_eq(cs.get("_battle_player_roster"), char_ids, "开战名册 = 探索侧玩家阵容")
 	assert_eq(deployment_setups(), [char_ids], "setup_field 收到的正是该阵容")

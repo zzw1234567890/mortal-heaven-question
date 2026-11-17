@@ -9,6 +9,8 @@ extends RefCounted
 
 const _EnemyBattleState = preload("res://src/feature/ai/enemy_battle_state.gd")
 const _EnemyTemplate = preload("res://assets/enemies/enemy_template.gd")
+## 难度系数表——追赶轴 × 地图档位轴的唯一系数来源（本文件不写任何系数）。
+const CurveScript := preload("res://assets/enemies/difficulty_curve.gd")
 
 ## 父节点引用——AISystem Autoload 实例。
 var _parent: Node = null
@@ -58,17 +60,25 @@ func _create_by_id(template_id: StringName) -> Object:
 ##   2. [code]front_slot=true[/code] 的敌人强制前排[br]
 ##   3. 其余按防御降序 → 前排（前排容量 3）；攻击降序 → 后排[br]
 ## [br][param template_ids] 模板 ID 列表。[br]
-## [br][param player_realm] 玩家当前境界（Story 004 难度缩放时使用）。[br]
+## [br][param player_realm] 玩家当前境界（Story 004 追赶缩放的输入）。[br]
+## [br][param map_realm] 地图的敌人基准境界档（节点的 [code]enemy_level[/code]）。[br]
+## [br][b]为什么有 [param map_realm][/b]：不传时难度只跟玩家境界走（追赶轴），
+## 于是「炼气玩家打归墟」与「炼气玩家打青云剑宗」面对同样强度的散修——地图境界档
+## 只体现在人数与掉落上。传进来后档位轴（[code]地图档 − 玩家境界[/code]）才生效。[br]
+## [br][b]缺省 0 = 未定档[/b]（渡劫 / 无探索上下文的开战路径）→ 档位系数 1.0，
+## 与改造前的两参调用逐位一致（出厂用例按该口径断言）。[br]
 ## [br][b]返回[/b]: Array——元素为 EnemyBattleState（已缩放 + 已分配 field_position + is_front_row + 已注册预配置绑定）。
-## [br]来源: ADR-0017 §关键接口 create_enemy_roster / GDD ai-system.md §3/§9 / Story 004 AC-005~009。
-func create_enemy_roster(template_ids: Array, player_realm: int) -> Array:
+## [br]来源: ADR-0017 §关键接口 create_enemy_roster / GDD ai-system.md §3/§9 / Story 004 AC-005~009、
+## GDD exploration-system.md §7（回旧地图按地图境界定强度）。
+func create_enemy_roster(template_ids: Array, player_realm: int,
+		map_realm: int = 0) -> Array:
 	var roster: Array = []
 	for tid: StringName in template_ids:
 		var state = _create_by_id(tid)
 		if state != null:
 			roster.append(state)
 	# AC-005：缩放在阵位分配前应用（不影响分配逻辑）
-	_apply_difficulty_scaling_to_roster(roster, player_realm)
+	_apply_difficulty_scaling_to_roster(roster, player_realm, map_realm)
 	_assign_positions(roster)
 	# AC-006~009：预配置绑定注册（精英/Boss）
 	for enemy in roster:
@@ -151,31 +161,31 @@ func _compare_by_attack_desc(a, b) -> bool:
 	return a.template.base_attack > b.template.base_attack
 
 
-## 难度缩放公式——`scale = 1.0 + (player_realm - enemy_realm) × 0.3`（AC-001/002）。[br]
-## 玩家境界高于敌人基准时应用，否则返回基础值（AC-003）。[br]
+## 难度缩放——`scale = 1.0 + (player_realm - enemy_realm) × 0.3`（AC-001/002）。[br]
+## 玩家境界高于敌人基准时按档追平，否则返回基础值（AC-003）。[br]
+## [br][b]公式已搬到 [code]difficulty_curve.gd[/code][/b]（含地图档位轴）——本方法
+## 保留为两参入口，只做转发：系数只在一处写，测试与审计脚本读同一份表。[br]
 ## [br][param template] EnemyTemplate——读取 base_hp/base_attack/base_defense/realm。[br]
-## [br][param player_realm] 玩家当前境界等级。[br]
+## [param player_realm] 玩家当前境界等级。[br]
 ## [br][b]返回[/b]: [code]{max_hp, attack, defense}[/code]——缩放后数值。[br]
-## [br]公式: `player_realm > enemy_realm → round(base × (1.0 + gap × 0.3))`，否则 base 原值。[br]
 ## [br]来源: ADR-0017 §关键接口 _apply_difficulty_scaling / GDD ai-system.md §9 / §公式 5。
 func _apply_difficulty_scaling(template, player_realm: int) -> Dictionary:
-	var enemy_realm: int = int(template.realm)
-	if player_realm <= enemy_realm:
-		return {"max_hp": int(template.base_hp), "attack": int(template.base_attack), "defense": int(template.base_defense)}
-	var scale: float = 1.0 + (player_realm - enemy_realm) * 0.3
-	return {
-		"max_hp": int(round(float(template.base_hp) * scale)),
-		"attack": int(round(float(template.base_attack) * scale)),
-		"defense": int(round(float(template.base_defense) * scale)),
-	}
+	return CurveScript.apply(int(template.base_hp), int(template.base_attack),
+			int(template.base_defense), int(template.realm), player_realm)
 
 
 ## 对整个 roster 应用难度缩放——遍历每个 EnemyBattleState 写入缩放后属性。[br]
 ## 缩放在阵位分配前应用（不影响分配逻辑——分配基于 defense 原值由 template 读取，[br]
-## 缩放值写入实例 max_hp/attack/defense）。
-func _apply_difficulty_scaling_to_roster(roster: Array, player_realm: int) -> void:
+## 缩放值写入实例 max_hp/attack/defense）。[br]
+## [br][param roster] EnemyBattleState 列表。[br]
+## [param player_realm] 玩家当前境界（追赶轴）。[br]
+## [param map_realm] 地图敌人基准境界档（档位轴；0 = 未定档 → 系数 1.0）。
+func _apply_difficulty_scaling_to_roster(roster: Array, player_realm: int,
+		map_realm: int = 0) -> void:
 	for state in roster:
-		var scaled: Dictionary = _apply_difficulty_scaling(state.template, player_realm)
+		var scaled: Dictionary = CurveScript.apply(int(state.template.base_hp),
+				int(state.template.base_attack), int(state.template.base_defense),
+				int(state.template.realm), player_realm, map_realm)
 		state.max_hp = int(scaled["max_hp"])
 		state.current_hp = state.max_hp
 		state.attack = int(scaled["attack"])

@@ -51,6 +51,17 @@ const POOL_LIANQI: Array = [        # 山野：散修 + 妖兽
 	{"template_id": &"san_xiu", "weight": 60},
 	{"template_id": &"yao_shou", "weight": 40},
 ]
+## 首图池（青云剑宗）——只出散修。[br]
+## [br][b]为什么首图要单开一份池[/b]：青云剑宗唯一「炼气玩家一进游戏就能进」
+## （[code]unlock_realm = 1[/code]、无前置），此前与慕兰草原 / 万妖谷共用
+## [constant POOL_LIANQI]。而 [code]yao_shou[/code]「撕裂」威力 ×1.8、ATK 5——
+## 两个敌人时每回合打我 11 点，炼气两人队总 HP 只有 15~17，实测第 2 回合全灭；
+## 首图只出最弱的散修（ATK 2 / 威力 ×1.0）每回合只挨 4 点。[br]
+## [br][b]妖兽不在首图消失[/b]：它仍在慕兰草原与万妖谷的池里——「新手第一战不难」
+## 与「妖兽是威胁」由不同地图承担。
+const POOL_FIRST_MAP: Array = [
+	{"template_id": &"san_xiu", "weight": 100},
+]
 const POOL_BLOOD: Array = [         # 血渊：魔修主场
 	{"template_id": &"mo_xiu", "weight": 50},
 	{"template_id": &"san_xiu", "weight": 30},
@@ -125,7 +136,7 @@ const MAPS: Dictionary = {
 	&"qing_yun_jian_zong": {
 		"name": "青云剑宗", "difficulty": 0, "unlock_realm": 1, "max_realm": 1,
 		"enemy_realm": 1,
-		"enemy_pool": POOL_LIANQI, "enemy_count_min": 1, "enemy_count_max": 2,
+		"enemy_pool": POOL_FIRST_MAP, "enemy_count_min": 1, "enemy_count_max": 1,
 	},
 	&"xue_yuan_mi_jing": {
 		"name": "血渊秘境", "difficulty": 1, "unlock_realm": 1, "max_realm": 1,

@@ -152,6 +152,11 @@ func test_different_maps_use_different_pools() -> void:
 	var ghost: Dictionary = CatalogScript.config_for(&"cang_xuan_gu_zhan_chang")
 	# Assert——配比不同（不是所有图共用一份权重表）
 	assert_ne(forest["enemy_pool"], blood["enemy_pool"], "青云剑宗与血渊秘境的敌人池应不同")
+	# 首图只出散修——炼气两人队（总 HP 15~17）扛不住妖兽「撕裂」×1.8（详见
+	# POOL_FIRST_MAP 注释）。
+	assert_eq(forest["enemy_pool"].size(), 1, "首图池只有一类敌人（最弱的散修）")
+	assert_eq(StringName(str((forest["enemy_pool"][0] as Dictionary)["template_id"])),
+			&"san_xiu", "首图池唯一的模板是散修")
 	assert_ne(blood["enemy_pool"], ghost["enemy_pool"], "血渊秘境与苍玄古战场的敌人池应不同")
 	# 主题可断言：血渊以魔修为主、古战场以鬼修为主
 	assert_eq(_top_template(blood["enemy_pool"]), &"mo_xiu", "血渊秘境主刷魔修")

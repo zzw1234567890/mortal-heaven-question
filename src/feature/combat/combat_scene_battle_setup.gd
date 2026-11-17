@@ -126,13 +126,16 @@ func _deck_ids() -> Array:
 ## 只把阵容塞进 battle_start config 的话，敌方回合会拿到空候选池、选不出目标。[br]
 ## [br][b]为什么覆盖优先于现有名册[/b]：现有名册可能是上一场留下的（敌人已阵亡），
 ## 直接沿用会让第二场开局就判胜利——每场必须重新生成。[br]
-## [br][b]缩放口径[/b]：难度缩放读[b]玩家境界[/b]——公式
-## [code]scale = 1 + (player_realm - enemy_realm) × 0.3[/code] 是「玩家境界更高时
-## 敌人追平」的追赶机制，不是难度旋钮。节点的 [code]enemy_level[/code] 只作
-## 元数据写进开战配置（展示 / 结算消费），不参与缩放。
+## [br][b]缩放口径[/b]：两条轴都传给 [code]AISystem.create_enemy_roster[/code]——[br]
+##   · [b]玩家境界[/b]：追赶轴（玩家练得越高，敌人跟得越高）；[br]
+##   · [b]节点 [code]enemy_level[/code][/b]：档位轴（地图境界档 − 玩家境界）。
+##     缺了它，「炼气玩家打归墟」与「炼气玩家打青云剑宗」面对同样强度的散修
+##     ——地图境界档只体现在人数与掉落上（DEBT-EQT-001）。[br]
+## [br][b]未定档不臆造[/b]：[code]enemy_level <= 0[/code]（渡劫 / 无探索上下文）时
+## 传 0，档位系数 1.0——与改造前的行为逐位一致。
 func _resolve_roster(p_realm: int) -> Array:
 	var roster: Array = []
-	var scale_realm: int = p_realm
+	var map_realm: int = maxi(_enemy_level, 0)
 	if not _roster_override.is_empty():
 		roster = _roster_override.duplicate()
 	else:
@@ -142,7 +145,7 @@ func _resolve_roster(p_realm: int) -> Array:
 			templates = ids if ids is Array else []
 		if not templates.is_empty() and _ai != null \
 				and _ai.has_method(&"create_enemy_roster"):
-			roster = _ai.call(&"create_enemy_roster", templates, scale_realm)
+			roster = _ai.call(&"create_enemy_roster", templates, p_realm, map_realm)
 		elif _ai != null and _ai.has_method(&"get_enemy_roster"):
 			var existing: Variant = _ai.call(&"get_enemy_roster")
 			roster = (existing as Array).duplicate() if existing is Array else []
