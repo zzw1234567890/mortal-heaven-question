@@ -27,6 +27,8 @@ extends RefCounted
 
 const LayoutScript := preload("res://src/ui/hud/pause_menu_layout.gd")
 const ConfirmScript := preload("res://src/ui/hud/pause_menu_confirm.gd")
+## 战斗中「返回主菜单」的投降收尾（见 [PauseMenuCombatExit] 的类文档）。
+const CombatExitScript := preload("res://src/ui/hud/pause_menu_combat_exit.gd")
 
 ## 确认框类型（[PauseMenuConfirm] 是真理来源，此处为调用侧的具名入口）。
 const CONFIRM_SAVE_EXIT: int = 0
@@ -40,6 +42,8 @@ var _save_exit_button: Button = null
 var _return_button: Button = null
 ## 确认框实例（复用式单例——懒建一次）。
 var _confirm: Control = null
+## 投降收尾模块（懒建一次——见 [method get_combat_exit]）。
+var _combat_exit: RefCounted = null
 
 
 ## 绑定宿主与两个退出按钮（宿主 [code]_ready[/code] 后调一次；重复调用覆盖）。[br]
@@ -134,17 +138,24 @@ func close_confirm() -> void:
 
 
 ## ESC 分层处理（返回「这一下 ESC 是否已被本模块消化」）。[br]
-## [br][b]顺序即优先级[/b]：确认框在最上层、读档面板在其下、菜单在最底——
-## 打开确认框时读档面板必然已收起（两个入口互斥），但顺序写死成「先问最上层」
-## 才不会被将来新增的覆盖层插队打乱。[br]
-## [br][b]读档面板那一层委托宿主[/b]：面板的开合归 [PauseMenuActions]（本模块不持
-## 面板引用），宿主已有 [code]get_actions().close_load_panel()[/code] 这条链。
+## [br][b]顺序即优先级[/b]：确认框在最上层、卡组查看面板在其下、读档面板再下、
+## 菜单在最底——打开确认框时另两个必然已收起（三个入口互斥），但顺序写死成
+## 「先问最上层」才不会被将来新增的覆盖层插队打乱。[br]
+## [br][b]读档 / 卡组两层的开合委托宿主[/b]：面板开合归各自的编排层（本模块不持
+## 面板引用），宿主已有 [code]close_load_panel_if_open[/code] /
+## [code]close_deck_view_if_open[/code] 两条链。[br]
+## [br][b]卡组面板那一层通常轮不到[/b]：面板自己就在 [code]_input[/code] 里吃掉
+## 取消键（那里能拦住引擎的焦点导航）。这里是[b]兜底[/b]——直调
+## [code]_unhandled_input[/code] 的路径与将来多一层覆盖的路径都还退得出去。
 func handle_esc() -> bool:
 	if cancel_confirm():
 		focus_default()
 		return true
 	if _host == null or not is_instance_valid(_host):
 		return false
+	if bool(_host.call(&"close_deck_view_if_open")):
+		focus_default()
+		return true
 	if bool(_host.call(&"close_load_panel_if_open")):
 		focus_default()
 		return true
@@ -186,24 +197,77 @@ func resolve_outcome(outcome: int) -> void:
 
 ## 存档并离开：存档成功才走；失败留在菜单里给原因。[br]
 ## [br][b]不再多存一次[/b]：这次动作本身就是存档，转场前的自动存档由
-## [method PauseMenuActions.auto_save_first] 在「返回主菜单」那条路上负责。
+## [method PauseMenuActions.auto_save_first] 在「返回主菜单」那条路上负责。[br]
+## [br][b]存档成功之后的离开链分场景[/b]（见 [method leave_after_save]）：探索里
+## 是转场主菜单，战斗里先投降——一条「离开」链路两种落地，分叉只此一处。
 func save_and_exit() -> void:
 	var actions: RefCounted = get_actions()
 	var outcome: Dictionary = actions.call(&"save_now")
 	if not bool(outcome.get("ok", false)):
 		_host.call(&"_show_status", str(outcome.get("message", "")), false)
 		return
-	actions.call(&"navigate_main_menu")
-	_host.call(&"_release_pause")
+	leave_after_save()
 
 
-## 返回主菜单——先自动存档一次再转场（不判存档结果，见动作层注记）。
+## 返回主菜单——[b]战斗先投降[/b]，其余场景先自动存档一次再转场。[br]
+## [br][b]为什么要分叉[/b]（design/ux/pause-menu.md §Events Fired）：战斗中点
+## 「返回主菜单」是一次[b]战败结算[/b]而不是一次导航——确认后必须先触发投降、
+## 走到战败画面，再由玩家从那块「返回探索」出来。绕过结算直接跳主菜单会留下
+## 「战斗域没清、战果没落库、该扣的修为没扣」三笔烂账（详见 [PauseMenuCombatExit]）。[br]
+## [br][b]非战斗场景一字未改[/b]：仍是「顺手存一次底 → 转场主菜单」，
+## 自动存档失败也不拦（动作层注记）。
 func return_to_main_menu() -> void:
-	get_actions().call(&"request_main_menu")
+	if not get_combat_exit().can_resign(current_scene_id()):
+		get_actions().call(&"request_main_menu")
+		_host.call(&"_release_pause")
+		return
+	resign_in_combat()
+
+
+## 存档成功之后的离开（[method save_and_exit] 与返回主菜单的「确认保存」共用）。[br]
+## [br][b]为什么也判战斗[/b]：确认框里的「确认保存」与「不保存」是同一个
+## 「返回主菜单」意图的两种存档态度，[b]不是两条不同的退出路[/b]——只让「不保存」
+## 走投降，「确认保存」照旧直跳主菜单，等于给玩家留了一条绕过结算的后门
+## （规格要求「战斗中放弃」一律经战败画面）。[br]
+## [br][b]玩家显式要的存档照写[/b]：[method save_and_exit] 已写盘，这里不再
+## 判断存不存；推进结算的写盘时机仍归转场管线。
+func leave_after_save() -> void:
+	if get_combat_exit().can_resign(current_scene_id()):
+		resign_in_combat()
+		return
+	get_actions().call(&"navigate_main_menu")
 	_host.call(&"_release_pause")
+
+
+## 投降（战斗中「返回主菜单」的落地）。[br]
+## [br][b]顺序不可反[/b]：先 [code]_release_pause()[/code]（解除冻结 + pop MODAL 锁
+## + 恢复音频），[b]再[/b]触发投降——[code]confirm_retreat[/code] 会同步走到
+## [code]SceneManager.request_scene_change[/code]，而转场管线不含「恢复暂停」的
+## 职责，冻结态下发起转场会让新场景停在冻结帧（同 [PauseMenu] 关闭序列的注记）。[br]
+## [br][b]不用动作层的转场出口[/b]：投降的转场由战斗系统按结算结果自己发
+## （[code]DEFEAT_SCREEN[/code]，与正常战败同一画面——规格要求「与正常战败一致」）。
+## 这里再发一次会撞在 [code]SceneManager._transitioning[/code] 的并发守卫上。[br]
+## [br][b]不补自动存档[/b]：撤退结算会改写修为与资源，此时存下的是「仗输了但还没
+## 结算」的中间态，会把上一份干净存档盖掉——写盘归转场管线的 Phase 2。[br]
+## [br][b]投降失败（战斗刚好已结束）不做事[/b]：菜单已收起，玩家回到战斗场景，
+## 战斗系统自己那条结束链会把画面带向结算——此处不臆造第二条出口。
+func resign_in_combat() -> void:
+	_host.call(&"_release_pause")
+	get_combat_exit().resign()
 
 
 ## 宿主的动作编排层（每次现取——宿主可能在 [code]_ready[/code] 之前就绑定了本层，
 ## 而动作层是懒建的）。
 func get_actions() -> RefCounted:
 	return _host.call(&"get_actions")
+
+
+## 投降收尾模块——懒建一次，注入引用每次透传（一条即断，同
+## [method get_actions] 的口径）。[br]
+## [br][b]combat_system 的现取[/b]：宿主在 [code]_ready[/code] 之后才拿到注入值
+## （HUD 的 [code]_setup_pause_menu[/code]），只认构造那一刻会让它永远是 null。
+func get_combat_exit() -> RefCounted:
+	if _combat_exit == null:
+		_combat_exit = CombatExitScript.new()
+	_combat_exit.combat_system = _host.get("combat_system")
+	return _combat_exit

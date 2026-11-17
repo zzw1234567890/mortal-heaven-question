@@ -104,12 +104,20 @@ func setup(scene_manager: Node) -> void:
 ## [method _ready]（GAP-1 裁决——挂载即响应 ESC），不在本方法。[br]
 ## [br][b]GSM 也走注入[/b]：暂停菜单的「存档」按钮要一份存档载荷、进度行要读探索
 ## 层数——两者都由 GSM 现取（零状态所有权）。注入后暂停菜单那条链（含测试）
-## 不必再去 [code]/root[/code] 找 Autoload 名字。
+## 不必再去 [code]/root[/code] 找 Autoload 名字。[br]
+## [br][b]战斗 / 卡组 / 卡牌系统三份也注入[/b]（本轮补）：战斗中「返回主菜单」要先
+## 走投降（[code]CombatSystem.confirm_retreat[/code]），「查看卡组」要读卡组
+## （[code]DeckEditingSystem.get_deck_cards[/code]）、模板（[code]CardSystem[/code]）
+## 与手牌标注（[code]CombatSystem.get_hand[/code]）。注入后暂停菜单不必在运行时
+## 去 [code]/root[/code] 猜 Autoload 名字，测试也能逐个替换。
 func _setup_pause_menu() -> void:
 	_pause_menu.scene_manager = _scene_manager
 	_pause_menu.save_load = SaveLoadSystem
 	_pause_menu.gsm = GameStateManager
 	_pause_menu.audio_adapter = PauseAudioAdapter.new()
+	_pause_menu.combat_system = CombatSystem
+	_pause_menu.deck_system = DeckEditingSystem
+	_pause_menu.card_system = CardSystem
 
 ## InputManager.pause_requested 信号回调——ESC 路径入口（GAP-1 裁决）。[br]
 ## source 标识为 [code]&"esc"[/code]——统一汇入 [method request_pause]。

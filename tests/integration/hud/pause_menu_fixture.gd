@@ -112,11 +112,77 @@ class MockAudioAdapter:
 		resume_calls += 1
 
 
+## CombatSystem 替身——只提供暂停菜单真正会碰的那几个面：[br]
+##   · [method is_battle_active] / [method confirm_retreat]（投降收尾）；[br]
+##   · [method get_hand] / [method get_deck]（卡组查看的「已抽出/仍在牌库」标注）。[br]
+## [br][b]为什么只给这几个方法[/b]：真实 [CombatSystem] 有 1600+ 行与一堆 Autoload
+## 依赖，整场战斗跑起来才能问「撤回按钮接对没有」不划算；判据与调用都在被测代码里
+## （[PauseMenuCombatExit] / [DeckViewRows] 都做能力探测），替身只如实记账。[br]
+## [br][b]retreat_calls 是核心断言面[/b]：「战斗中点返回主菜单有没有真的走投降」
+## 唯一的客观证据就是这一笔。
+class MockCombat:
+	extends Node
+
+	## 是否有活跃战斗（决定「返回主菜单」走投降还是走导航）。
+	var active: bool = true
+	## [method confirm_retreat] 被调用的次数。
+	var retreat_calls: int = 0
+	## 投降那一刻的暂停 / 锁快照——「先解除暂停再投降」的顺序断言面（顺序反了
+	## 新场景会停在冻结帧，而那是个只在真机上看得见的症状）。
+	var tree_paused_at_retreat: bool = false
+	var lock_held_at_retreat: bool = false
+	## 手牌（卡组查看据此标「已抽出」）。
+	var hand: Array = []
+	## 牌库（本替身只用于「两个读取面都在」的能力探测，内容不参与断言）。
+	var deck: Array = []
+
+	func is_battle_active() -> bool:
+		return active
+
+	func confirm_retreat() -> void:
+		retreat_calls += 1
+		tree_paused_at_retreat = get_tree().paused
+		lock_held_at_retreat = InputManager.has_lock(&"pause_menu")
+
+	func get_hand() -> Array:
+		return hand.duplicate()
+
+	func get_deck() -> Array:
+		return deck.duplicate()
+
+
+## DeckEditingSystem 替身——只提供 [method get_deck_cards]（卡组查看的取数面）。
+class MockDeck:
+	extends Node
+
+	var cards: Array = []
+
+	func get_deck_cards() -> Array:
+		return cards.duplicate()
+
+
+## CardSystem 替身——按实例 ID 给模板（[method get_template_by_instance_id]）。[br]
+## [br][b]模板是真 [CardTemplate] 资源[/b]（不是又一层替身）：行文案读的是它的
+## [code]name[/code] / [code]type[/code] / [code]rarity[/code] / [code]cost[/code]
+## 字段，用真资源才能验证「名字真的出现在行里」而不是验证替身自己编的字符串。
+class MockCards:
+	extends Node
+
+	var templates: Dictionary = {}
+
+	func get_template_by_instance_id(card_instance_id: int) -> CardTemplate:
+		var raw: Variant = templates.get(card_instance_id)
+		return raw if raw is CardTemplate else null
+
+
 var menu: Control = null
 var sl: MockSaveLoad = null
 var sm: MockSceneManager = null
 var gsm: MockGsm = null
 var adapter: MockAudioAdapter = null
+## 用例按需装的替身（[method attach_combat] / [method attach_deck]）——由
+## [method after_each] 统一回收（见那边的注记）。
+var _extras: Array[Node] = []
 
 
 func before_each() -> void:
@@ -145,6 +211,12 @@ func after_each() -> void:
 	for node: Node in [menu, sl, sm, gsm]:
 		if node != null and is_instance_valid(node):
 			node.free()
+	# 用例按需装的替身（战斗 / 卡组 / 卡牌）同样要收——留一个活跃替身在树上，
+	# 下一条用例的 [code]attach_combat[/code] 会叠出第二个。
+	for extra: Node in _extras:
+		if extra != null and is_instance_valid(extra):
+			extra.free()
+	_extras.clear()
 	menu = null
 	sl = null
 	sm = null
@@ -216,3 +288,49 @@ func esc_event() -> InputEventKey:
 	event.pressed = true
 	event.echo = false
 	return event
+
+
+## 只读卡组查看面板（未打开过时为 null——不触发建树）。
+func deck_view() -> Control:
+	return menu.get_deck_host().view()
+
+
+## 菜单里某个按钮（名称取自 PauseMenu.tscn 的 [code]Panel/VBox[/code] 树序）。
+func menu_button(button_name: String) -> Button:
+	return menu.get_node("Panel/VBox/" + button_name) as Button
+
+
+## 装一台战斗替身并注入菜单（返回替身本身——断言 [member MockCombat.retreat_calls]）。
+func attach_combat() -> MockCombat:
+	var combat: MockCombat = MockCombat.new()
+	add_child(combat)
+	_extras.append(combat)
+	menu.combat_system = combat
+	return combat
+
+
+## 装一套卡组查看依赖（卡组 + 模板）并注入菜单。[br]
+## [br][param p_cards] 实例 ID → [CardTemplate] 的映射。
+func attach_deck(p_cards: Dictionary) -> MockDeck:
+	var deck: MockDeck = MockDeck.new()
+	var cards: MockCards = MockCards.new()
+	deck.cards = p_cards.keys()
+	cards.templates = p_cards
+	add_child(deck)
+	add_child(cards)
+	_extras.append(deck)
+	_extras.append(cards)
+	menu.deck_system = deck
+	menu.card_system = cards
+	return deck
+
+
+## 造一张卡牌模板（行文案读它的字段——见 [MockCards] 的注记）。
+func make_template(p_name: String, p_rarity: int = 1, p_cost: int = 1,
+		p_type: int = 0) -> CardTemplate:
+	var template: CardTemplate = CardTemplate.new()
+	template.name = p_name
+	template.rarity = p_rarity
+	template.cost = p_cost
+	template.type = p_type
+	return template
