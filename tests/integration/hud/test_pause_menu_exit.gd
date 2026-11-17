@@ -4,6 +4,11 @@ extends "res://tests/integration/hud/pause_menu_fixture.gd"
 ## （失败留在菜单里给原因），「返回主菜单」先顺手存一次底再走（失败也放行，因为
 ## 它是「留个底」而不是玩家显式要求的存档）。两条路都要解除暂停再转场：
 ## 转场管线不含暂停恢复职责，冻结态下新场景会停在冻结帧。[br]
+## [br][b]本轮补二次确认[/b]：两条路都不可逆，无障碍要求防误触——按下按钮只弹确认框，
+## 点「确认保存」才走上面那条链。故本文件每个用例在 [code]Act[/code] 里多走一步
+## [code]confirm_button("ConfirmButton").pressed.emit()[/code]；「只弹框不动作」
+## 与「取消 / ESC 不动作」是新增的独立断言面（见
+## [code]test_pause_menu_confirm.gd[/code]）。[br]
 ## [br][b]覆盖[/b]：[br]
 ##   1. 保存并退出：成功 → 转场 MAIN_MENU（from 取当前场景）+ 解除暂停 + pop 锁；[br]
 ##   2. 保存并退出失败：留在菜单、保持暂停、不转场，给出带错误码的原因；[br]
@@ -25,6 +30,7 @@ func test_save_exit_writes_slot_then_returns_to_menu() -> void:
 	open_menu()
 	# Act
 	menu._on_save_exit_pressed()
+	confirm_button("ConfirmButton").pressed.emit()
 	# Assert
 	assert_eq(sl.save_calls.size(), 1, "保存并退出应真实写盘一次")
 	assert_eq(int(sl.save_calls[0][0]), SLS.SaveSlotType.AUTOSAVE, "写自动槽")
@@ -41,6 +47,7 @@ func test_save_exit_releases_pause_before_navigating() -> void:
 	open_menu()
 	# Act
 	menu._on_save_exit_pressed()
+	confirm_button("ConfirmButton").pressed.emit()
 	# Assert
 	assert_false(get_tree().paused, "转场前应解除暂停")
 	assert_false(menu.visible, "转场前应收起菜单")
@@ -54,6 +61,7 @@ func test_save_exit_failure_keeps_menu_open() -> void:
 	open_menu()
 	# Act
 	menu._on_save_exit_pressed()
+	confirm_button("ConfirmButton").pressed.emit()
 	# Assert
 	assert_eq(status_text(), "存档失败（错误码 2）", "应给出带错误码的原因")
 	assert_true(menu.visible, "存档失败应保持菜单打开（不丢进度、不退出）")
@@ -71,6 +79,7 @@ func test_return_to_menu_auto_saves_first_then_navigates() -> void:
 	open_menu()
 	# Act
 	menu._on_return_main_menu_pressed()
+	confirm_button("LeaveButton").pressed.emit()
 	# Assert
 	assert_eq(sl.auto_save_calls, 1, "返回主菜单应先自动存档一次（顺手留个底）")
 	assert_eq(sm.change_calls.size(), 1, "应请求一次转场")
@@ -86,6 +95,7 @@ func test_return_to_menu_goes_even_when_auto_save_fails() -> void:
 	open_menu()
 	# Act
 	menu._on_return_main_menu_pressed()
+	confirm_button("LeaveButton").pressed.emit()
 	# Assert
 	assert_eq(sl.auto_save_calls, 1, "仍应尝试自动存档一次")
 	assert_eq(sm.change_calls.size(), 1, "自动存档失败不应拦住转场")
@@ -99,6 +109,7 @@ func test_return_to_menu_without_scene_manager_releases_pause() -> void:
 	open_menu()
 	# Act
 	menu._on_return_main_menu_pressed()
+	confirm_button("LeaveButton").pressed.emit()
 	# Assert
 	assert_eq(sm.change_calls.size(), 0, "SceneManager 缺失时不应有转场请求")
 	assert_false(get_tree().paused, "依赖缺失也应解除暂停（不把玩家锁在冻结帧里）")
@@ -112,6 +123,7 @@ func test_save_exit_does_not_double_write_via_auto_save() -> void:
 	open_menu()
 	# Act
 	menu._on_save_exit_pressed()
+	confirm_button("ConfirmButton").pressed.emit()
 	# Assert
 	assert_eq(sl.save_calls.size(), 1, "保存并退出只写一次")
 	assert_eq(sl.auto_save_calls, 0, "保存并退出不应再触发一次自动存档")

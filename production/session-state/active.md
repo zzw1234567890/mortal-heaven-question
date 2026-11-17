@@ -3,8 +3,24 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: 暂停菜单（hud 005）
-Task: 存档/读档两按钮接入 + 锁在树变后被清的真缺陷修复；下一步 战斗/商店等场景变体的按钮可见性（「保存并退出」按 UX 规格该在战斗中隐藏，目前恒显示）
+Task: 场景变体（战斗/商店隐藏「保存并退出」）+ 焦点起点跳过不可选按钮 + 两个退出按钮的二次确认；下一步 战斗态入存档（读档回得到战斗）
 <!-- /STATUS -->
+
+## Session Extract — 暂停菜单场景变体与二次确认（2026-11-17）
+- 任务：接上一轮留下的三处 §遗留——① 按当前场景决定按钮可见性（战斗中隐藏「保存并退出」），并保证键盘焦点起点跳过隐藏/disabled 的按钮；② 补 GAP-5 的二次确认弹窗（「保存并退出」「返回主菜单」防误触，ESC 可取消、焦点默认落在「取消」）；③ 战斗态不入存档（读档回不到战斗）本轮**不做**，仅确认现状
+- **拆出三个新生产文件**（`pause_menu.gd` 347 行、仍在 300 软上限之上——本轮新增职责已尽量外移，剩下的行数主要是既有文档注释）：`pause_menu_layout.gd`（81 行，纯 static 判定：场景→可见性、`first_focusable` 挑焦点起点）、`pause_menu_state.gd`（209 行，变体落地 + 确认编排 + 退出链 + ESC 三层分层）、`pause_menu_confirm.gd`（211 行，确认框本体，纯代码构建，同 `LoadSlotPanel` 口径不用 `AcceptDialog`）
+- **可见性口径**（UX 规格 §States & Variants）：战斗 + 渡劫（战斗变体）、商店、事件面板、结算屏、战败屏一律隐藏「保存并退出」；探索/卡组编辑/修炼室显示。**未知场景 ID 按最宽松处理**（显示）——藏掉一个本该可用的按钮比多显示一个更糟，后者由动作层的失败反馈兜底；判定不在本层做存档合法性终审
+- **焦点起点跳过不可选按钮**（`PauseMenuLayout.first_focusable`）：判据是「在树内 + `is_visible_in_tree()` + 未 disabled + `focus_mode != FOCUS_NONE`」。用 `is_visible_in_tree` 而非 `visible`——按钮可能在隐藏的父容器里。候选来源是 `Panel/VBox` 的子节点（树序本身就是 UX 规格的焦点顺序，不再抄一份常量数组与 tscn 各自漂移），非 Button 的（HSeparator / 两个 Label）自动跳过
+- **读档面板返回时的焦点回锚也走同一条判定**：战斗中硬抓「保存并退出」等于把焦点扔回一个看不见的按钮上（`_on_load_panel_back` → `state.focus_default()`）
+- **二次确认**（无障碍 AC）：按下「保存并退出」/「返回主菜单」只弹框、不动作（断言写盘/转场/暂停/锁栈四项均未发生）。确认框变体——保存并退出两键（确认保存 / 取消），返回主菜单三键（确认保存 / 不保存 / 取消）+ 战斗中补一行朱砂红「当前战斗进度将丢失——视为战败」
+- **ESC 由两层变三层**（`PauseMenuState.handle_esc`）：确认框 → 读档面板 → 暂停菜单，一次只退一层。确认框的取消（按钮 / ESC）与 ESC 收读档面板后都回锚焦点（框一收起焦点就悬空，键盘玩家会觉得「什么都按不动」）
+- **确认框是复用式单例**（同 LoadSlotPanel）：反复开合不叠第二个；`_release_pause()` 里一并收起——留一个「开着」的框在隐藏的菜单里，下次打开会看到它浮在菜单上
+- **测试：新增 44 例（4 文件 + 1 共享步骤模块）**——`tests/unit/hud/test_pause_menu_variant.gd`（14 例，纯判定：各场景可见性 + `first_focusable` 各分支）、`tests/integration/hud/test_pause_menu_variant_focus.gd`（11 例，落地：控件 `visible` 与真实 `grab_focus`/`gui_get_focus_owner`）、`tests/integration/hud/test_pause_menu_confirm.gd`（19 例，取消/ESC/确认/三键/分层/复用/清理）、`tests/integration/hud/pause_confirm_step.gd`（共享步骤模块，确认框按钮路径的唯一真理来源——三处共用）
+- **既有用例的适配**（零改名零删除零跳过）：`pause_menu_fixture` 的 `MockSceneManager` 加 `scene_id` 字段（缺省 EXPLORATION，可配成 COMBAT 等）、新增 `confirm_dialog()` / `confirm_button()` / `focus_owner()` 辅助；`test_pause_menu_exit.gd` 每个用例在 Act 多走一步确认（保存并退出走 `ConfirmButton`、返回主菜单走 `LeaveButton`——「不保存」才是不显式写盘的那条路，与既有断言口径一致）；`test_pause_menu.gd` 补 `confirm_step()` 与 `ConfirmStep` preload
+- **两条被测试抓出来的修正**：① 返回主菜单确认框的「确认保存」是「先存档再离开」，与既有「先自动存档一次再走」的断言口径不同——既有用例该走 `LeaveButton`（`confirm_button` 的缺省仍是 `ConfirmButton`，只有这条路显式传参）；② 取消路径原本什么都不做，导致 `has_focus() == null`——取消后必须回锚焦点
+- 全量：**5037 tests / 5037 passing / 3 orphans 存量**，零失败、零回归（4993 → 净增 44，全部跑到了——新增用例逐条出现在 GUT 的 `* test_...` 运行输出里，非只对汇总数字）
+- 已知边界（见下方「遗留」段更新）：`pause_menu.gd` 347 行仍超 300 软上限（本轮外移了职责但新增了文档注释）；确认框无 reduce-motion 开关（`PauseMenu.animate` 的开关只作用于模糊 Tween，确认框无动画故不受影响，但将来加动画需接同理的开关）；战斗中「查看卡组」只读模式未实现（本轮只做可见性与确认，只读归 deck-editing-ui epic）
+- 遗留（本轮确认现状，未做）：**战斗态不入存档**——`GsmSerializer.serialize()` 明确排除 `battle` / `session` 两域（`NON_PERSISTABLE_DOMAINS`），存档里只有探索/玩家等持久域。故读档回不到战斗中间状态（与 UX 规格 Open Question #1「战斗暂存」一致，仍是 PO 决策项）
 
 ## Session Extract — 暂停菜单接上存档读档（2026-11-17）
 - 任务：把上一轮写好但没接线的 `pause_menu_actions.gd` 接进 `PauseMenu.tscn` 与 `pause_menu.gd`，补测试，全量零失败后提交；单文件 ≤300 行、不删/不改名既有测试、不 pass_test

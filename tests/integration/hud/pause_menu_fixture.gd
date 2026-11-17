@@ -29,6 +29,8 @@ const SLS := preload("res://src/foundation/save_load_system.gd")
 const SM := preload("res://src/foundation/scene_manager.gd")
 ## 跨场景进入意图（读档成功后应留下 RESUME 意图）。
 const IntentScript := preload("res://src/feature/exploration/exploration_entry_intent.gd")
+## 二次确认那一步的共享实现（按钮路径的唯一真理来源——见该文件）。
+const ConfirmStep := preload("res://tests/integration/hud/pause_confirm_step.gd")
 
 
 ## SaveLoadSystem 替身——[code]save_result[/code] / [code]load_result[/code] 可配置，
@@ -65,14 +67,18 @@ class MockSaveLoad:
 		return save_result
 
 
-## SceneManager 替身——记录转场请求（真转场会换掉测试进程的主场景）。
+## SceneManager 替身——记录转场请求（真转场会换掉测试进程的主场景）。[br]
+## [br][b]场景 ID 可配[/b]（[member scene_id]）：暂停菜单按当前场景调按钮可见性
+## （战斗中隐藏「保存并退出」），默认给探索——那是暂停菜单最典型的调用场景。
 class MockSceneManager:
 	extends Node
 
 	var change_calls: Array = []
+	## 当前场景 ID（缺省 EXPLORATION——探索中暂停是默认变体）。
+	var scene_id: int = SM.SceneID.EXPLORATION
 
 	func get_current_scene_id() -> int:
-		return SM.SceneID.EXPLORATION  # 暂停菜单的典型调用场景
+		return scene_id
 
 	func request_scene_change(from: int, to: int, type: int) -> bool:
 		change_calls.append([from, to, type])
@@ -173,6 +179,25 @@ func progress_text() -> String:
 ## 读档面板（未打开过时为 null）。
 func load_panel() -> Control:
 	return menu.get_actions().get("_panel")
+
+
+## 二次确认框（未弹出过时为 null）。
+func confirm_dialog() -> Control:
+	return menu.get_state().get("_confirm")
+
+
+## 确认框里的某个按钮（路径归 [code]pause_confirm_step.gd[/code]——三处共用一个
+## 真理来源，路径一改只改那一处）。
+func confirm_button(button_name: String) -> Button:
+	var dialog: Control = confirm_dialog()
+	if dialog == null or not is_instance_valid(dialog):
+		return null
+	return dialog.get_node_or_null(ConfirmStep.BUTTONS_PATH + button_name) as Button
+
+
+## 当前键盘/手柄焦点持有者（菜单内的按钮——4.6 双焦点下 grab_focus 只影响它）。
+func focus_owner() -> Control:
+	return menu.get_viewport().gui_get_focus_owner()
 
 
 ## 一格「有档」的槽位元数据（list_slots 返回契约镜像）。

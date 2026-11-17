@@ -19,7 +19,12 @@ extends Control
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：探索进度行与存档反馈都由动作层现取现算，
 ## 打开时刷新、关闭后不缓存。[br]
 ## [br][b]退出语义[/b]（GAP-5 裁决）：保存并退出 = 存档成功后返主菜单（失败留在菜单
-## 里给原因）；返回主菜单 = 先自动存档一次再转场（从简无二次确认）。[br]
+## 里给原因）；返回主菜单 = 先自动存档一次再转场。[br]
+## [br][b]两条都需要二次确认[/b]（无障碍要求）：按下先弹 [PauseMenuConfirm]，
+## 确认后才走上面那条链；「取消」与 ESC 同义。确认编排在 [PauseMenuState]。[br]
+## [br][b]按场景调按钮可见性[/b]（本轮补）：战斗中/商店事件中隐藏「保存并退出」
+## （不可存档），焦点起点自动跳过隐藏与置灰的按钮——判定纯函数在 [PauseMenuLayout]，
+## 落地在 [PauseMenuState.apply_variant]。[br]
 ## [br][b]导航请求[/b]：查看卡组/系统设置目标界面不在本 story——发信号留桩，
 ## 不实现界面本体（Out of Scope）。[br]
 ## [br][b]引擎注记[/b]：[code]grab_focus()[/code] 在 4.6 双焦点下只影响键盘/手柄
@@ -32,7 +37,8 @@ extends Control
 ## PAUSABLE 冻结 + MODAL 锁阻断（不 emit [code]pause_requested[/code]），
 ## 本组件在 [code]_unhandled_input[/code] 兜底接收 ESC——模态拥有者自判模式
 ## （[code]is_input_allowed[/code] MODAL 分支注释声明的设计：拥有者经
-## [code]has_lock()[/code] 自行判定输入）。ESC 分层：读档面板开着时先收面板。
+## [code]has_lock()[/code] 自行判定输入）。ESC 分层（三层）：确认框开着时先收确认框
+## → 读档面板开着时先收面板 → 都没有才关菜单（判定归 [PauseMenuState.handle_esc]）。
 ##
 ## @experimental
 ## 来源: ADR-0031 §1.1、design/ux/pause-menu.md、hud Story 005（2026-09-11）。
@@ -56,6 +62,15 @@ const LOCK_SOURCE: StringName = &"pause_menu"
 
 ## 存档 / 读档 / 返回主菜单三条动作的编排层（见类文档「三条动作不在本文件」）。
 const ActionsScript := preload("res://src/ui/hud/pause_menu_actions.gd")
+
+## 场景变体 + 二次确认的编排层（本轮拆出——见类文档「按场景调按钮可见性」）。
+const StateScript := preload("res://src/ui/hud/pause_menu_state.gd")
+## 确认框结果取值镜像——[code]PauseMenuConfirm[/code] 是真理来源。
+const OUTCOME_SAVE_EXIT: int = 0
+const OUTCOME_LEAVE: int = 1
+## 确认框类型镜像（两个按钮各自对应一种）。
+const CONFIRM_SAVE_EXIT: int = 0
+const CONFIRM_RETURN: int = 1
 
 ## 反馈行成功态色——松石青 #4A9494（与通知区域 green 档同源「正向」编码）。
 const COLOR_STATUS_OK: Color = Color("#4A9494")
@@ -84,7 +99,8 @@ var animate: bool = true
 
 @onready var _blur_rect: ColorRect = $MaskLayer/BlurRect
 @onready var _mask: Control = $MaskLayer
-@onready var _continue_button: Button = $Panel/VBox/ContinueButton
+@onready var _save_exit_button: Button = $Panel/VBox/SaveExitButton
+@onready var _return_button: Button = $Panel/VBox/ReturnButton
 @onready var _progress_label: Label = $Panel/VBox/ProgressLabel
 @onready var _status_label: Label = $Panel/VBox/StatusLabel
 
@@ -94,11 +110,16 @@ var _blur_tween: Tween = null
 ## 动作编排层实例（懒建一次；注入引用每次透传）。
 var _actions: RefCounted = null
 
+## 场景变体 + 二次确认编排层实例（懒建一次，见 [PauseMenuState]）。
+var _state: RefCounted = null
+
 ## === 生命周期 ==================================================================
 
 func _ready() -> void:
 	visible = false
 	_blur_rect.material.set(&"shader_parameter/blur_amount", 0.0)
+	# 变体编排层绑定（按钮引用在此一次性交给它——路径只在本文件写一遍）
+	get_state().bind(self, _save_exit_button, _return_button)
 	# 树拓扑变化时认领回自己的 MODAL 锁（见 _on_tree_changed 的原因说明）
 	if not get_tree().tree_changed.is_connected(_on_tree_changed):
 		get_tree().tree_changed.connect(_on_tree_changed)
@@ -129,8 +150,9 @@ func _on_tree_changed() -> void:
 ## 兜底接收 ESC。先经 [method InputManager.has_lock] 确认自己仍是活跃模态
 ## 拥有者（[code]is_input_allowed[/code] MODAL 分支声明的 owner-check 设计），
 ## 再关闭并标记输入已处理（阻止后续节点重复响应）。[br]
-## [br][b]分层[/b]：读档面板开着时 ESC 先收面板（取消选槽），不关整个菜单——
-## 两件事共用一个键时必须一层层退。
+## [br][b]分层[/b]（本轮由两层变三层）：确认框开着时第一下先收确认框（取消），
+## 读档面板开着时先收面板（取消选槽），都没有才关整个菜单——三件事共用一个键时
+## 必须一层层退。分层判定与焦点回锚都归 [method PauseMenuState.handle_esc]。
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible or not (event is InputEventKey):
 		return
@@ -139,10 +161,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not InputManager.has_lock(LOCK_SOURCE):
 		return
 	get_viewport().set_input_as_handled()
-	if get_actions().is_load_panel_open():
-		get_actions().close_load_panel()
+	if get_state().handle_esc():
 		_clear_status()
-		_continue_button.grab_focus()
 		return
 	request_close()
 
@@ -163,13 +183,13 @@ func request_open(source: StringName) -> void:
 	visible = true
 	_clear_status()
 	_refresh_progress_row()
+	# 场景变体：按当前场景落定「保存并退出」可见性 + 焦点起点（顺序在 grab 之前）
+	get_state().apply_variant()
 	if animate:
 		if _blur_tween != null:
 			_blur_tween.kill() # 防悬挂 Tween 回调（T-1——快速重开场景）
 		_blur_tween = create_tween()
 		_blur_tween.tween_method(_set_blur, 0.0, 1.0, BLUR_DURATION)
-	# 键盘导航起点锚定（4.6 双焦点：grab_focus 只影响键盘/手柄焦点——Engine Notes）
-	_continue_button.grab_focus()
 
 ## 关闭暂停菜单（严格逆序——pop 锁在最后）。[br]
 ## [br]未打开时幂等：不暂停、不动锁栈、不调 adapter（G-3）。
@@ -218,26 +238,41 @@ func _on_load_slot_chosen(p_slot_type: int, p_slot_id: int) -> void:
 
 ## 读档面板「返回」——面板已自行收起。收起后把键盘/手柄焦点还给菜单的默认按钮：
 ## 面板按钮一隐藏，焦点就悬空，键盘玩家会觉得「什么都按不动」（4.6 双焦点下
-## 鼠标不受影响，只有键盘/手柄能感觉到）。
+## 鼠标不受影响，只有键盘/手柄能感觉到）。[br]
+## [br]回锚走 [method PauseMenuState.focus_default]（跳过隐藏/置灰者）——战斗中
+## 「保存并退出」是隐藏的，硬抓它等于把焦点扔回一个看不见的按钮上。
 func _on_load_panel_back() -> void:
 	_clear_status()
-	_continue_button.grab_focus()
+	get_state().focus_default()
 
-## 保存并退出（GAP-5 裁决）——存档成功才走；失败留在菜单里给原因。[br]
-## [br][b]不再多存一次[/b]：这次动作本身就是存档，转场前的自动存档由
-## [method PauseMenuActions.auto_save_first] 在「返回主菜单」那条路上负责。
+## 读档面板若开着则收起；返回「是否真的收掉了」（ESC 分层的第二层）。[br]
+## [br][b]为什么要这一层包装[/b]：分层判定归 [PauseMenuState]（它不持面板引用），
+## 面板开合归动作层——包一层让两边都不必知道对方的细节。
+func close_load_panel_if_open() -> bool:
+	if not get_actions().is_load_panel_open():
+		return false
+	get_actions().close_load_panel()
+	return true
+
+## 保存并退出（GAP-5 裁决 + 二次确认）——先弹确认框；确认后才存档并离开。[br]
+## [br][b]为什么不在按下时就存[/b]：这是不可逆动作（存档后结束本次会话），
+## 无障碍要求防误触（design/ux/pause-menu.md §Accessibility）。
 func _on_save_exit_pressed() -> void:
-	var outcome: Dictionary = get_actions().save_now()
-	if not bool(outcome.get("ok", false)):
-		_show_status(str(outcome.get("message", "")), false)
-		return
-	get_actions().navigate_main_menu()
-	_release_pause()
+	_clear_status()
+	get_state().request_confirm(CONFIRM_SAVE_EXIT)
 
-## 返回主菜单（GAP-5 裁决）——先自动存档一次再转场（本 story 从简无二次确认）。
+## 返回主菜单（GAP-5 裁决 + 二次确认）——先弹确认框。确认框里的三键对应：
+## 确认 = 先存档再离开；不保存 = 直接离开（自动存档仍会顺手存一次底）；
+## 取消 / ESC = 留在菜单。
 func _on_return_main_menu_pressed() -> void:
-	get_actions().request_main_menu()
-	_release_pause()
+	_clear_status()
+	get_state().request_confirm(CONFIRM_RETURN)
+
+## 确认框结果落地（[signal PauseMenuConfirm.outcome_chosen] 的唯一消费者——
+## 委托 [PauseMenuState.resolve_outcome]）。本方法只做转发：宿主是信号接收端，
+## 「确认之后走哪条退出链」是变体编排层的知识。
+func _on_confirm_outcome(outcome: int) -> void:
+	get_state().resolve_outcome(outcome)
 
 ## 遮罩点击——等效「继续游戏」（UX 规格退出点表）。
 func _on_mask_gui_input(event: InputEvent) -> void:
@@ -256,6 +291,9 @@ func _release_pause() -> void:
 		_blur_tween.kill()
 		_blur_tween = null
 	_set_blur(0.0) # 复位模糊强度——下次打开从 0 起始
+	# 确认框若还开着则一并收起——留一个「开着」的框在隐藏的菜单里，
+	# 下次打开会看到上一次的确认框浮在菜单上（状态串味）
+	get_state().close_confirm()
 	if audio_adapter != null:
 		audio_adapter.resume()
 	get_tree().paused = false
@@ -297,3 +335,12 @@ func get_actions() -> RefCounted:
 	_actions.save_load = save_load
 	_actions.gsm = gsm_ref
 	return _actions
+
+## 场景变体 + 二次确认编排层——懒建一次，宿主引用在此一次性交给它（同
+## [method get_actions] 的口径：一条即断，避免持有过期引用）。[br]
+## [br][b]scene_manager 的现取[/b]：本层每次都读宿主当前的 [member scene_manager]
+## 注入值（测试可在开菜单前替换它——见 [method PauseMenuState.current_scene_id]）。
+func get_state() -> RefCounted:
+	if _state == null:
+		_state = StateScript.new()
+	return _state

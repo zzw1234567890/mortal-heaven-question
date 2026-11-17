@@ -15,6 +15,8 @@ extends GutTest
 ## （HUD 实例化 + 注入模式）。
 
 const HUD_SCENE: PackedScene = preload("res://src/ui/hud/HUD.tscn")
+## 二次确认那一步的共享实现（本文件不继承 pause_menu_fixture——它是 HUD 侧的用例）。
+const ConfirmStep := preload("res://tests/integration/hud/pause_confirm_step.gd")
 
 ## mock 音频 adapter——记录 suspend/resume 调用次数（AC-3 桩阶段断言）。
 class MockAudioAdapter:
@@ -76,6 +78,17 @@ func after_each() -> void:
 	hud = null
 	pause_menu = null
 	mock_adapter = null
+
+
+## 走完二次确认那一步（按确认框里指定的那颗按钮——缺省「确认保存」）。[br]
+## [br][b]为什么本文件也要有[/b]：本轮给两个退出按钮加了确认框（无障碍防误触），
+## 按下按钮只弹框、不动锁栈与暂停。本文件的三条退出路径用例测的是「确认之后」的
+## 行为，故在 Act 里补这一步。[br]
+## [br][param button_name] 确认框里的按钮名：保存并退出走
+## [code]ConfirmButton[/code]；返回主菜单那条路既要「先存一底」故走
+## [code]LeaveButton[/code]（不保存直接离开）。
+func confirm_step(button_name: String = "ConfirmButton") -> void:
+	ConfirmStep.press(pause_menu, button_name)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -236,6 +249,7 @@ func test_save_exit_failure_keeps_menu_open() -> void:
 	hud.request_pause(&"esc")
 	# Act
 	pause_menu._on_save_exit_pressed()
+	confirm_step()
 	# Assert —— 失败分支：不退出、不解除暂停、不释放锁
 	assert_true(pause_menu.visible, "存档失败应保持菜单打开（不丢进度）")
 	assert_true(get_tree().paused, "存档失败应保持暂停中")
@@ -250,6 +264,7 @@ func test_save_exit_null_save_load_keeps_menu_open() -> void:
 	hud.request_pause(&"esc")
 	# Act
 	pause_menu._on_save_exit_pressed()
+	confirm_step()
 	# Assert
 	assert_true(pause_menu.visible, "save_load 缺失应保持菜单打开")
 	assert_true(get_tree().paused, "save_load 缺失应保持暂停中")
@@ -264,6 +279,7 @@ func test_return_to_main_menu_releases_pause_and_lock() -> void:
 	hud.request_pause(&"esc")
 	# Act
 	pause_menu._on_return_main_menu_pressed()
+	confirm_step("LeaveButton")
 	# Assert
 	assert_false(get_tree().paused, "返回主菜单后应解除暂停")
 	assert_false(pause_menu.visible, "返回主菜单后菜单应隐藏")
