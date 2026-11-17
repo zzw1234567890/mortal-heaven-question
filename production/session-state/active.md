@@ -3,8 +3,27 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: 暂停菜单（hud 005）
-Task: 场景变体（战斗/商店隐藏「保存并退出」）+ 焦点起点跳过不可选按钮 + 两个退出按钮的二次确认；下一步 战斗态入存档（读档回得到战斗）
+Task: 战斗中「返回主菜单」走投降结算 + 「查看卡组」只读面板；下一步 战斗态入存档（读档回得到战斗）
 <!-- /STATUS -->
+
+## Session Extract — 战斗暂停菜单两处断链接通（2026-11-17）
+- 任务：接上一轮留下的两条战斗态断链——① 战斗中「返回主菜单」按 UX 规格应先走投降结算（确认 → `COMBAT_RESIGNED` 视为战败 → 战败结算画面 → 玩家自行返回主菜单），此前只是确认后直跳主菜单；② 战斗中「查看卡组」应为只读查看，此前只发一个全库零消费者的信号
+- **审计断点（第 1 项产出）**：① 直转场断点在 `PauseMenuState.return_to_main_menu()`——无分支直调动作层 `request_main_menu()`；② 撤退入口是 `CombatSystem.confirm_retreat()`（`src/feature/combat_system.gd:507`，即 `battle_end(CombatResult.RETREAT)`，与战斗场景自己的「撤退」按钮 `combat_scene_exits.gd.on_retreat_confirmed` 同一条链），**本项目没有 `COMBAT_RESIGNED` 这个符号——`CombatResult.RETREAT` 就是它**（RETREAT 携带 DEFEAT 语义，`_settle_result` 给 `retain_ratio = 0.5`）；③ 战败画面由战斗系统自己在 `battle_end` 末段发（`_request_scene_change` → `target_scene = 8 if VICTORY else 9`，即 `DEFEAT_SCREEN`），`SettlementHost.on_battle_ended` 对 RETREAT **刻意不开面板**，故投降直接落到战败屏——正是规格要的「与正常战败一致」；④ 卡组断点是 `deck_view_requested` 信号零消费者（面板本体不在任何 story 范围内）
+- **投降链单源**：`PauseMenuCombatExit`（91 行，纯逻辑）只回答「该不该投降」与「触发它」——`can_resign(scene_id)` 要求「场景是战斗变体（含渡劫）**且**战斗确实活跃」（后者不是多余守卫：战斗场景在备战确认前就已存在，此时判成投降会凭空造一场败仗）；`resign()` 委托 `confirm_retreat`，**绝不再发一次转场**（两条转场会撞 `SceneManager._transitioning` 并发守卫）
+- **顺序不可反**：先 `_release_pause()`（解冻 + pop MODAL 锁 + 恢复音频）再触发投降——转场管线不含「恢复暂停」职责，冻结态下转场新场景会停在冻结帧。替身在 `confirm_retreat` 里记下「被调那一刻」的暂停/锁快照，顺序错了这条断言会亮红
+- **不补自动存档**：撤退结算会改写修为与资源，此时写盘存下的是「仗输了但还没结算」的中间态，会把上一份干净存档盖掉——写盘时机归转场管线 Phase 2
+- **确认框三键统一走投降**（测试抓出来的修正）：最初只让「不保存」走投降，「确认保存」仍直跳主菜单——等于留了一条绕过结算的后门（玩家显式要的存档照写，但推进结算的路径必须唯一）。抽出 `leave_after_save()` 供两条路共用
+- **降级路径**：非战斗场景一字未改（仍是「顺手自动存档一次 → 转场主菜单」）；战斗不活跃 / HUD 未注入 `combat_system` 时回退普通返回——链没接上时比把玩家锁在一场关不掉的战斗里强
+- **只读卡组查看**：`PauseMenuDeckView`（302 行）+ `DeckViewRows`（199 行，取数与行文案纯逻辑，无控件树也能断言）。复用商店/背包面板骨架（`ShopPanelLayout.build` + `InventoryPanelLayout.add_rows/fill_detail` + `ShopPanelNavigator`），不新造一套控件语言
+- **「只读」落在三处**：不提供任何编辑入口（「返回」是唯一出口）；行的确认动作只展开详情文本（不发系统调用、不写状态）；无分类切换（卡组不是分类清单）。测试用「只装 `get_deck_cards` 的替身」钉住——面板若试图走任何写入口会以 `ERR_UNAVAILABLE` 失败
+- **按实例逐张出行、不按模板合并**：背包合并同名是为回答「我有几张」；卡组查看要回答「**哪几张已经抽到手**」——同名的两张可能一张在手上、一张还在牌库，合并就把这条信息抹平了。标注写进**文本**（`已抽出` / `仍在牌库`）而非靠颜色（色盲可读）。非活跃战斗一律不标（此时 `get_hand()` 本就是空，全标「仍在牌库」等于凭空断言）
+- **ESC 分层由三层变四层**：确认框 → 卡组面板 → 读档面板 → 菜单，一次只退一层
+- **拆文件守 300 行**：`pause_menu_pause_cycle`（134，开合五步与锁栈配对）、`pause_menu_state`（273，变体/确认/退出链分叉）、`pause_menu_combat_exit`（91）、`pause_menu_deck_host`（81，面板挂载与依赖透传）、`pause_menu_handlers`（215，按钮按下之后做什么 + 反馈行两档配色）、`deck_view_rows`（199）；`pause_menu.gd` 从 346 → **324 行**（只剩控件路径与瘦转发）。**常量 `COLOR_STATUS_OK/FAIL` 刻意留在 `PauseMenu`**——既有用例按 `menu.COLOR_STATUS_*` 读，搬家会把一处引用拆成两处真理来源（`PauseMenuHandlers` 经宿主转发）
+- **测试：新增 18 例**（`test_pause_menu_resign.gd` 8 例端到端投降链 / `test_pause_menu_deck_view.gd` 10 例只读查看与焦点回锚）+ 夹具扩 `MockCombat`（含 `retreat_calls` 与投降时刻的暂停/锁快照）/`MockDeck`/`MockCards`（给**真** `CardTemplate` 资源——行文案读它的字段，用真资源才验证得了「名字真的出现在行里」）与 `attach_combat`/`attach_deck`/`make_template`/`deck_view`/`menu_button` 辅助，并按需装的替身统一回收（`_extras`）；既有用例零改名零删除零跳过
+- **踩到并记下的两个坑**：① 我一度让 `PauseMenuHandlers` 也声明 `COLOR_STATUS_*` / `CONFIRM_*` 常量——**同文件里重复声明同名常量是解析错误**（和子类重复声明夹具成员同一个坑的另一面），`pause_menu.gd` 于是 `Could not preload resource script`，GUT 报「Nonexistent function 'request_open' in base 'Control'」——症状离病根很远，靠一个临时 `load()` 探针脚本才定位；② 手写 `pause_menu.gd` 时把 `get_deck_host()` 的文档注释换行抄漏，误插了三行游离 `##`，同一探针也能查出
+- 全量：**5055 tests / 5055 passing / 3 orphans 存量**，零失败零回归（5037 → 净增 18，全部跑到了——两条新文件逐条出现在 GUT 的 `* test_...` 输出里）
+- 已知边界（见下方「遗留」段更新）：① `pause_menu_deck_view.gd` 302 行、`pause_menu.gd` 324 行、`pause_menu_fixture.gd` 336 行仍略超 300 软上限（本轮已把能外移的职责全部外移，剩下的是文档注释与控件路径，再拆会把一处改动摊成三处）；② 卡组查看的「详情」是纯文本，不画卡面（美术资源与本 story 范围外）；③ 投降后玩家落到的战败屏与正常战败同一块，但**战败屏的「返回」按钮当前回探索而非主菜单**——规格里「玩家点击返回 → 回到主菜单」与既有战败出口的语义有出入，未在本轮改动（属战斗 UX 规范域）
+- Next recommended: 战败屏「返回」出口语义与规格对齐；`ExplorationSystem`（686 行）与 `main_menu.gd`（520 行）拆分；战斗态入存档（UX 规格 Open Question #1「战斗暂存」仍开放）
 
 ## Session Extract — 暂停菜单场景变体与二次确认（2026-11-17）
 - 任务：接上一轮留下的三处 §遗留——① 按当前场景决定按钮可见性（战斗中隐藏「保存并退出」），并保证键盘焦点起点跳过隐藏/disabled 的按钮；② 补 GAP-5 的二次确认弹窗（「保存并退出」「返回主菜单」防误触，ESC 可取消、焦点默认落在「取消」）；③ 战斗态不入存档（读档回不到战斗）本轮**不做**，仅确认现状
