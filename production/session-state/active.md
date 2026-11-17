@@ -2,9 +2,24 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: Sprint 18（表现层接真实数据）
-Task: 行动力（AP）消耗闭环——移动按地图配置扣、不足拒绝且零写入、回复夹上限；下一步 灵泉/渡劫台等豁免节点的 UI 提示与 AP 上限的可视化核对
+Feature: 暂停菜单（hud 005）
+Task: 存档/读档两按钮接入 + 锁在树变后被清的真缺陷修复；下一步 战斗/商店等场景变体的按钮可见性（「保存并退出」按 UX 规格该在战斗中隐藏，目前恒显示）
 <!-- /STATUS -->
+
+## Session Extract — 暂停菜单接上存档读档（2026-11-17）
+- 任务：把上一轮写好但没接线的 `pause_menu_actions.gd` 接进 `PauseMenu.tscn` 与 `pause_menu.gd`，补测试，全量零失败后提交；单文件 ≤300 行、不删/不改名既有测试、不 pass_test
+- **接入**：tscn 新增「存档」「读档」（树序在「系统设置」之后、分隔线之前——与 UX 规格的键盘焦点顺序一致）与 `StatusLabel` 反馈行（排在进度行之后）；面板高度 380 → 560（`offset_top/bottom` ±280）。按钮走场景 `[connection]`，测试从 tscn 出发按真实 `pressed` 信号断言
+- **`pause_menu.gd` 299 行**：删掉自己那份存档/进度实现，改为委托动作层；新增 `_on_save_pressed` / `_on_load_pressed` / `_on_load_slot_chosen` / `_on_load_panel_back` 四条路由 + 反馈行着色（成功松石青 #4A9494 / 失败朱砂红 #B3424A，与通知区域 green 档同源）；`_release_pause()` 收拢「关闭菜单」与「转场前离开」两条对称路径（Tween 清理只此一处）
+- **动作层扩接口**：`request_main_menu`（先自动存档一次再转场）与 `navigate_main_menu`（纯转场出口，供「保存并退出」复用）——两条路都不重复写第二遍盘（「保存并退出」刚写过、「返回主菜单」的 auto_save 已跑过）
+- **读档两层语义**：面板开着时 ESC 先收面板（取消选槽）不关菜单；选中一格后**成功才解除暂停**——动作层在能续玩时已发出转场请求，而转场管线不含暂停恢复职责，冻结态下新场景会停在冻结帧
+- **🔴 修掉一处真缺陷（本轮最重要的发现）**：`InputManager._on_tree_changed` 对 `SceneTree.tree_changed` 挂的「场景切换就清锁」安全网**分不清「换场景」与「同一场景里插了个子节点」**，而暂停期间必然有树变（本菜单自己插读档面板、通知区域弹 Toast）。锁一没，「暂停中屏蔽下层输入」与 `_unhandled_input` 的 ESC owner-check **同时失效**——ESC 被 InputManager 吃掉并走到幂等分支，**玩家被卡在一个关不掉的菜单里**。修法：`PauseMenu` 也订阅 `tree_changed`，树一变就认领回自己的 MODAL 锁（**仅当栈空**——不抢别人的模态；Autoload 的 `_ready` 先于场景节点，故顺序确定、栈深恒回 1 不累积）。前后对比用探针实测：修前点「读档」后 `has_lock=false`、ESC 后 `menu_visible=true`（关不掉）；修后锁在、ESC 分两层正常退出
+- **测试：48 例新用例（5 文件 + 1 装置）**——`pause_menu_fixture.gd`（193 行，直挂 `PauseMenu.tscn` 而非 `HUD.tscn`：测的是菜单自己那条链，整棵 HUD 会把「菜单的错」和「HUD 的错」混在一起）+ `test_pause_menu_save.gd`（11）`test_pause_menu_load.gd`（10）`test_pause_menu_input_lock.gd`（13）`test_pause_menu_exit.gd`（7）`test_pause_menu_buttons.gd`（7）
+- **踩到并记下的两个坑**：① **子类重复声明同名成员是解析错误**——用例里写 `const SLS := preload(...)` 而夹具也有，GUT 会 `Ignoring script … because it does not extend GutTest` **静默跳过整个文件**（第一轮全量里三个文件共 39 例根本没跑，总数却是绿的）；② **`pressed.emit()` 对 `disabled` 的 Button 也会触发**（引擎只在鼠标派发时判禁用），所以「空槽位点了没反应」只能断言「按钮 disabled + 焦点起点跳过它」，不能靠 emit 复现
+- **`hud.gd`**：把 `GameStateManager` 也注入暂停菜单（存档载荷与进度行都由它现取，测试可直连替换）
+- **`design/ux/pause-menu.md`** 同步：7 按钮（含两个新按钮的形态与结果）/ 操作反馈区 / 面板 320×560 / ASCII 图 / 键盘焦点顺序 / 退出点表（新增「读档面板」一行 + 「存档 vs 保存并退出 vs 返回主菜单 vs 读档」四者区分）/ 数据依赖表（存档多处触发、新增读档行）/ 3 条新 AC；GAP-5 的二次确认弹窗仍按 story 从简未实现（与本轮无关的既有偏离）
+- 全量：**4993 tests / 4993 passing / 3 orphans 存量**，零失败、零回归（4945 → 净增 48，全部跑到了——第一轮那 39 例被静默跳过时总数 4960 也是绿的，这正是「绿不等于跑到了」的样本）
+- 已知边界：① 按钮可见性按场景变体调整（战斗中隐藏「保存并退出」等）**未实现**——UX 规格 §States & Variants 要求，属存量；② GAP-5 的二次确认弹窗（「保存并退出」/「返回主菜单」的防误触）仍未实现，与本轮读档路径无交集；③ 读档把世界重置到某一格时**战斗态不还原**（`battle` 域不入存档，UX 规格 Open Question #1 的「战斗暂存」仍开放）；④ `test_hud_bootstrap` 的 `test_main_menu_does_not_auto_mount_when_not_current_scene` 在**目录级隔离跑时红、全量跑绿**（存量，stash 后跑 HEAD 同样红，与本轮改动域零交集）；⑤ 动作层仍有一层 `get_actions()` 每次透传注入引用（一条即断，不缓存句柄——代价是四次赋值，换的是不会持有过期引用）
+- Next recommended: 按 UX 规格补场景变体的按钮可见性（战斗中隐藏「保存并退出」/「查看卡组」转只读）；二次确认弹窗（防误触是无障碍 AC）；`src/ui/main_menu/main_menu.gd`（520 行）仍超 300 软上限
 
 ## Session Extract — 行动力消耗闭环（2026-11-14）
 - 任务：① 审计行动力现状（存哪、谁读写、各动作有无扣减）；② 节点间移动按**地图配置**扣 AP，不足时拒绝并给中文提示「行动力不足」（不静默失败）；③ 灵泉回复与上限夹取一致，不出现 AP 超上限；④ 单测/集成覆盖正常扣减、不足拒绝且不扣、回复夹上限；⑤ 单文件 ≤300 行；⑥ 全量零失败后提交
