@@ -74,7 +74,10 @@ func _init() -> void:
 	# Enter 跳过需要焦点（审查 H7——无 focus_mode 时键盘事件永不到达本控件）
 	focus_mode = FOCUS_ALL
 	_label = Label.new()
-	_label.set_anchors_preset(Control.PRESET_CENTER)
+	# 提示贴底居中：原先锚在正中，直接盖在节点图上（玩家反馈「字挡着、显示不全」）。
+	_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_label.offset_top = -152.0
+	_label.offset_bottom = -112.0
 	_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

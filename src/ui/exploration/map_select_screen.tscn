@@ -24,11 +24,16 @@ color = Color(0.071, 0.071, 0.086, 1)
 
 [node name="LayoutAnchor" type="Control" parent="."]
 layout_mode = 1
-anchors_preset = 0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 offset_left = 96.0
 offset_top = 64.0
-offset_right = 1824.0
-offset_bottom = 1016.0
+offset_right = -96.0
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="TitleLabel" type="Label" parent="LayoutAnchor"]
 layout_mode = 1
@@ -51,16 +56,21 @@ horizontal_alignment = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="LayoutAnchor"]
 layout_mode = 1
-anchors_preset = 0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 offset_top = 96.0
-offset_right = 1728.0
-offset_bottom = 620.0
-horizontal_scroll_mode = 1
-vertical_scroll_mode = 0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 2
 
-[node name="CardRow" type="HBoxContainer" parent="LayoutAnchor/ScrollContainer"]
+[node name="CardRow" type="GridContainer" parent="LayoutAnchor/ScrollContainer"]
 layout_mode = 2
-theme_override_constants/separation = 20
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 20
+columns = 4
 
 [node name="ReentryDialog" type="ConfirmationDialog" parent="."]
 title = "重入地图"

@@ -65,7 +65,9 @@ var input_frozen: bool = false:
 ## 注入 stub DAG 并初始整图适配（透传 renderer.setup）。
 func setup(graph: Dictionary, nodes: Dictionary, visited: Array = [], current_node: int = -1) -> void:
 	renderer.setup(graph, nodes, visited, current_node)
+	# 进树前 size 可能为 0/设计尺寸，延后一帧按真实视口再适配一次
 	fit_to_content(true)
+	call_deferred(&"fit_to_content", true)
 
 
 ## 整图适配——内容包围盒缩放至视口内并居中。[br]
@@ -94,6 +96,13 @@ func _init(p_renderer: NodeGraphRenderer = null) -> void:
 func _ready() -> void:
 	# 键盘复位（空格）走未处理输入——_gui_input 仅收鼠标事件
 	set_process_unhandled_key_input(true)
+
+func _notification(what: int) -> void:
+	# 视口尺寸变化后重新整图适配：setup 时的 size 可能还是设计尺寸或 0
+	# （进树前的布局尺寸），只适配一次会让内容停在左上角并被裁掉——窗口缩放、
+	# 全屏切换、分辨率不同都会踩到（玩家反馈「节点只显示一部分、挤在左边」）。
+	if what == NOTIFICATION_RESIZED and renderer != null:
+		fit_to_content(true)
 
 func _gui_input(event: InputEvent) -> void:
 	if input_frozen:

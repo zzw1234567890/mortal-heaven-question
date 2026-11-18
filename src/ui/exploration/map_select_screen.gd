@@ -4,7 +4,7 @@ extends Control
 ##
 ## [b]节点形态[/b]（ADR-0031 §1）：场景内 Control 树（零新增 Autoload），挂载于
 ## [code]exploration_scene.tscn[/code] 薄容器（闭合 SCENE_PATHS EXPLORATION 占位）。[br]
-## [b]结构[/b]：标题 + 灵石余额 + 横向滚动卡片列表（ScrollContainer + HBoxContainer，
+## [b]结构[/b]：标题 + 灵石余额 + 横向滚动卡片列表（ScrollContainer + Container，
 ## MapCard 动态构建）+ 重入确认弹窗（ConfirmationDialog）。[br]
 ## [b]Logic 内核[/b]（BLOCKING 单测目标）：[method should_show_lock] /
 ## [method is_reenterable] / [method can_confirm_reentry] /
@@ -84,7 +84,7 @@ signal reentry_requested(map_id: StringName)
 @onready var title_label: Label = $LayoutAnchor/TitleLabel
 @onready var balance_label: Label = $LayoutAnchor/BalanceLabel
 @onready var scroll: ScrollContainer = $LayoutAnchor/ScrollContainer
-@onready var card_row: HBoxContainer = $LayoutAnchor/ScrollContainer/CardRow
+@onready var card_row: Container = $LayoutAnchor/ScrollContainer/CardRow
 @onready var reentry_dialog: ConfirmationDialog = $ReentryDialog
 @onready var reentry_map_label: Label = $ReentryDialog/VBox/MapLineLabel
 @onready var reentry_cost_label: Label = $ReentryDialog/VBox/CostDetailLabel

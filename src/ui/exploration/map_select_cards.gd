@@ -27,7 +27,7 @@ var _recommended_id: StringName = &""
 
 
 ## 重建卡片行——按条目数组逐张建卡并接点击回调。[br]
-## [br][param p_card_row] 卡片行容器（[code]HBoxContainer[/code]）。[br]
+## [br][param p_card_row] 卡片行容器（[code]Container[/code]）。[br]
 ## [param p_entries] 地图条目数组（[code]get_map_list()[/code] 的产物）。[br]
 ## [param p_on_activated] 点击回调 [code]func(entry: Dictionary) -> void[/code]。[br]
 ## [br][b]返回[/b]：新建的卡片数组（顺序同条目——只读副本）。[br]

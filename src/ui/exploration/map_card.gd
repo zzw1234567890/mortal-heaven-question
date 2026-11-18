@@ -76,8 +76,9 @@ var _recommend_label: Label
 ## 被 ScrollContainer 内容高度撑到 524 而非 420）。
 func setup(map_entry: Dictionary) -> void:
 	entry = map_entry
-	custom_minimum_size = Vector2(360, 420)
-	size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	custom_minimum_size = Vector2(300, 232)
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	# 双焦点：纯 Control 默认 FOCUS_NONE，显式开启才能 grab_focus。
 	focus_mode = Control.FOCUS_ALL

@@ -206,6 +206,10 @@ func _on_map_generated(_map_id: StringName, map_data: Dictionary) -> void:
 	# S17-005：快照注入交互侧组件 + 教程首次进入入口（键名归装配器，见 push_snapshot）
 	ComponentAssemblyScript.push_snapshot(_components, map_data)
 	ComponentAssemblyScript.notify_map_entered(_components)
+	# 整图适配：_on_map_generated 直接喂 renderer，绕过了 NodeGraphViewport.setup()，
+	# 不补这一句 zoom/offset 就停在上一次的值（首进 1.0/0），节点会挤在左上角
+	# 且大部分被裁掉。延后一帧等布局定好尺寸再适配。
+	viewport.call_deferred(&"fit_to_content", true)
 	# 新地图不保留上一张的键盘焦点（审查 L5）
 	renderer().set_focused_node(-1)
 
