@@ -275,7 +275,13 @@ func _atomic_write(path: String, data: Dictionary) -> int:
 ## === Story 003: 存档容器 schema + 完整性校验 =====================================
 
 ## 当前存档格式版本——递增整数，唯一驱动迁移链的字段。
-## [br][b]v3（本轮）[/b]：「回到这场战斗」的存档段进容器
+## [br][b]v4（本轮）[/b]：续战段补上[b]牌面与 debuff[/b]——v3 的续战段只记
+## 「谁、多少血、第几回合、什么阶段、还有多少费」，读档回来时手牌与牌堆会被
+## [code]battle_start[/code] 重洗一遍、挂在敌人身上的 debuff 随状态表清空蒸发。
+## v4 段里多了 [code]cards[/code]（三堆牌面）与 [code]debuffs[/code]（逐条剩余回合）。
+## v3 档读入时给[b]正在进行的[/b]战斗段补两个空形状——空即「这份档没存过牌面」，
+## 读侧据此走自然发牌那条老路（手牌重抽，与升级前的行为一致）。[br]
+## [br][b]v3[/b]：「回到这场战斗」的存档段进容器
 ## （[code]game_state.battle_resume[/code]）——战斗域不可持久化，玩家在战斗中存的档
 ## 此前读回来只有探索地图，那场仗连同残血静默消失。v2 档读入时补一个空段
 ## （[code]{}[/code] 即「没有进行中的战斗」，与探索域补 [code]events_shown[/code]
@@ -286,7 +292,7 @@ func _atomic_write(path: String, data: Dictionary) -> int:
 ## 补空的 [code]events_shown[/code]（旧档没有这个键，等价于「本图什么都还没弹过」，
 ## 不改变玩家已获得的任何东西）。[br]
 ## [br][b]v1[/b]：ADR-0002 定义的第 1 版存档容器格式。[br]
-const CURRENT_SCHEMA_VERSION: int = 3
+const CURRENT_SCHEMA_VERSION: int = 4
 
 ## 迁移函数注册表（[b]覆盖层[/b]）——键为迁移前的 schema_version，值为迁移函数
 ## （纯函数 Dictionary → Dictionary）。[br]
@@ -305,9 +311,11 @@ static var MIGRATIONS: Dictionary[int, Callable] = {}
 ## [br]已登记：[br]
 ## [code]  1: _migrate_v1_to_v2,[/code]  # 探索域新增 events_shown[br]
 ## [code]  2: _migrate_v2_to_v3,[/code]  # GSM 新增 battle_resume 段[br]
+## [code]  3: _migrate_v3_to_v4,[/code]  # 续战段新增 cards / debuffs[br]
 static var DEFAULT_MIGRATIONS: Dictionary[int, Callable] = {
 	1: _migrate_v1_to_v2,
 	2: _migrate_v2_to_v3,
+	3: _migrate_v3_to_v4,
 }
 
 
@@ -367,6 +375,38 @@ static func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
 	if not (game_state as Dictionary).has("battle_resume"):
 		(game_state as Dictionary)["battle_resume"] = {}
 	return data
+
+
+## v3 → v4 迁移——续战段补 [code]cards[/code] / [code]debuffs[/code] 两个形状
+## （纯函数，无副作用）。[br]
+## [br][b]只补「正在进行的」战斗段[/b]：空段（[code]{}[/code]）的含义是
+## 「这份档不是在战斗中存的」，往里塞两个空形状会把「没有战斗」变成一个带内容的段，
+## 读侧与既有断言都按空字典判「没有进行中的战斗」。故先确认这个段是战斗中的那份。[br]
+## [br][b]补的是空形状，不是数据[/b]：空 = 「这份档没存过牌面 / debuff」，读侧
+## （[code]battle_resume_cards.has_state[/code] 等）据此走自然发牌那条老路——
+## 手牌按开局手牌重抽、debuff 为空，与升级前的行为逐位一致（旧档不许丢档）。[br]
+## [br][b]已有键不覆盖[/b]：手改档 / 提前写盘若已带这两个键，迁移保持它——
+## 迁移的职责是补缺，不是重置。[br]
+## [br][b]形状的真理来源在特征层[/b]（[code]battle_resume_cards.gd[/code] /
+## [code]battle_resume_debuffs.gd[/code]）：本层只写字面量，因为 Foundation 不得
+## 依赖 Feature（分层方向：foundation ← feature）。两处一旦漂移，症状是
+## [code]has_state[/code] 判不出「没存过」——本迁移只写空值，漂移面为零。[br]
+## [br]来源: ADR-0002 §迁移链纯函数契约、本轮「牌面与 debuff 进存档」。
+static func _migrate_v3_to_v4(data: Dictionary) -> Dictionary:
+	var game_state: Variant = data.get("game_state", null)
+	if not (game_state is Dictionary):
+		return data
+	var resume: Variant = (game_state as Dictionary).get("battle_resume", null)
+	# 空段 / 缺段 / 非字典一律不动——见「只补正在进行的战斗段」
+	if not (resume is Dictionary) or (resume as Dictionary).is_empty():
+		return data
+	if not (resume as Dictionary).has("cards"):
+		(resume as Dictionary)["cards"] = {}
+	if not (resume as Dictionary).has("debuffs"):
+		(resume as Dictionary)["debuffs"] = []
+	return data
+
+
 ##
 ## [b]参数[/b]: [param serialized_gsm] GSM.serialize() 的输出（Dictionary）。[br]
 ## [b]参数[/b]: [param meta] 展示用元信息——缺失字段以默认值填充。[br]

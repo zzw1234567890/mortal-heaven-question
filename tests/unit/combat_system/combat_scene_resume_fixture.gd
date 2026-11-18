@@ -8,19 +8,29 @@ extends GutTest
 ## 由本夹具提供，子类若要扩展需先 [code]super()[/code]。[br]
 ## [br][b]文件前缀[/b]：本文件不以 [code]test_[/code] 开头——GUT 按前缀收集，它只作为
 ## 基类被继承，不会被当作用例文件单独执行。[br]
-## [br][b]四个替身全部由本夹具提供[/b]（战斗 / 布阵 / AI / 战场根 + 出牌交互）——
-## 子类重复声明同名成员在 GDScript 里是解析错误，整个子类文件会被 GUT 静默忽略
+## [br][b]替身本体在 [code]combat_scene_resume_stubs.gd[/code][/b]（六个替身分家到
+## 单独一处，两份文件各自守在 300 行软上限内）——本文件只负责「摆一套舞台 + 造一份
+## 可续战的存档段」。[br]
+## [br][b]子类不要重复声明本夹具的成员[/b]：GDScript 里子类重复声明同名成员是解析错误，
+## 整个子类文件会被 GUT 静默忽略
 ## （[code]Ignoring script … because it does not extend GutTest[/code]），用例一条都不跑。[br]
 ## [br][b]为什么全用替身[/b]：本组用例要验的是「先调谁后调谁、取哪个数」——跑一场真实
 ## 战斗既拿不到这条流水，还会把编排的错和战斗系统的错混在一起。[br]
 ## [br]来源: ADR-0008 §GSM 边界、ADR-0017 §EnemyFactory、
 ## 本轮「战斗中存档 → 读档回到战斗」（B 项）。
 
-## 贡献者：被测模块与它依赖的三个形状模块。
+## 贡献者：被测模块与它依赖的几个形状模块。
 const ResumeSceneScript := preload("res://src/feature/combat/combat_scene_resume.gd")
+## 替身集（记账面与形状——与「怎么铺场景」分家）。
+const Stubs := preload("res://tests/unit/combat_system/combat_scene_resume_stubs.gd")
 const IntentScript := preload("res://src/feature/combat/battle_resume_intent.gd")
 const PayloadScript := preload("res://src/feature/combat/battle_resume_payload.gd")
 const ContextScript := preload("res://src/feature/combat/combat_launch_context.gd")
+## 牌面 / debuff 两段的形状模块（本夹具不重写一份键名——两处各写一遍必然漂移）。
+const CardsScript := preload("res://src/feature/combat/battle_resume_cards.gd")
+const DebuffsScript := preload("res://src/feature/combat/battle_resume_debuffs.gd")
+## 真实 debuff 管理器（替身不必模仿它的状态机——它是独立单测覆盖的对象）。
+const DebuffManagerScript := preload("res://src/feature/combat/combat_debuff_manager.gd")
 
 ## 用例角色 ID 段（远离其它套件，防串场）。
 const CHAR_A: int = 8851
@@ -36,137 +46,38 @@ const COST: int = 1
 const MAX_COST: int = 4
 ## 敌方残血（重建出来的替身默认满血 99——覆盖有没有生效一眼可见）。
 const ENEMY_HP: int = 6
+## 三堆牌（顺序刻意打乱——顺序错了「顺序也一致」这条断言才会红）。
+const HAND_IDS: Array[int] = [9011, 9012]
+const DRAW_IDS: Array[int] = [9001, 9002, 9003]
+const DISCARD_IDS: Array[int] = [9004]
+## 存档里挂着的一条 debuff（目标 / 类型 / 剩余回合 / 数值 / 来源都不是出厂值）。
+const DEBUFF_TARGET: int = 100000
+const DEBUFF_DURATION: int = 2
+const DEBUFF_AMOUNT: int = 3
 
 
-## 战斗系统替身——记账每一步（顺序断言面）并如实作答。[br]
-## [br][b]为什么手写而不是用 mock 库[/b]：本组用例要断言的正是「先调谁后调谁」，
-## 记账顺序本身就是被测对象。
-class CombatStub:
-	extends Node
-
-	## 调用流水（按发生顺序）——顺序断言的唯一证据。
-	var calls: Array = []
-	var config: Dictionary = {}
-	var turn: int = -1
-	var phase: int = -1
-	var cost: int = -1
-	var max_cost: int = -1
-	var deck: Array = []
-	## 自动推进开关的当前值（[method set_auto_advance] 改写它）。
-	var auto_advance: bool = true
-
-	func battle_start(p_config: Dictionary) -> void:
-		calls.append("battle_start")
-		config = p_config.duplicate(true)
-
-	func set_auto_advance(enabled: bool) -> void:
-		calls.append("auto=%s" % enabled)
-		auto_advance = enabled
-
-	func restore_battle_state(p_turn: int, p_phase: int, p_current: int,
-			p_max: int) -> bool:
-		calls.append("restore")
-		turn = p_turn
-		phase = p_phase
-		cost = p_current
-		max_cost = p_max
-		return true
-
-	func resume_auto_advance() -> void:
-		calls.append("resume_auto")
-
-	func init_deck(p_cards: Array) -> void:
-		calls.append("init_deck")
-		deck = p_cards.duplicate()
-
-
-## 布阵替身——记账 [method setup_field] 的阵容与 layout。
-class DeploymentStub:
-	extends Node
-
-	var setups: Array = []
-	var accepted: bool = true
-
-	func setup_field(p_ids: Array, p_layout: Dictionary = {}) -> bool:
-		setups.append({"ids": p_ids.duplicate(), "layout": p_layout.duplicate(true)})
-		return accepted
-
-
-## AI 替身——模板表可配（键为模板 ID 字符串），记账写回的敌方名册。
-class AiStub:
-	extends Node
-
-	var templates: Dictionary = {}
-	var roster_written: Array = []
-
-	func get_template(p_id: StringName) -> Variant:
-		return templates.get(str(p_id))
-
-	func create_state(p_template: Variant) -> Variant:
-		return StateStub.new(str(p_template))
-
-	func set_enemy_roster(p_roster: Array) -> void:
-		roster_written = p_roster.duplicate()
-
-
-## 敌态替身——只带重建后要被覆盖的那几个字段（默认值与存档值刻意不同）。
-class StateStub:
-	extends RefCounted
-
-	var template_id: String = ""
-	var current_hp: int = 99
-	var max_hp: int = 99
-	var is_alive: bool = true
-	var field_position: int = -1
-
-	func _init(p_template_id: String) -> void:
-		template_id = p_template_id
-
-
-## 战场根替身——记账建卡调用。[br]
-## [br][b]extends Control 而不是 RefCounted[/b]：[code]start[/code] 的战场根参数是带类型的
-## [Control]（生产的 [code]CombatRoot[/code] 就是），替身不满足类型会在调用那一刻直接报错
-## ——而那会掩盖本组用例真正要验的顺序断言。
-class RootStub:
-	extends Control
-
-	var built: Array = []
-
-	func build_battle_roster(p_ids: Array) -> void:
-		built = p_ids.duplicate()
-
-
-## 出牌交互替身——记账放行。
-class InteractionStub:
-	extends RefCounted
-
-	var enabled: int = 0
-
-	func enable() -> void:
-		enabled += 1
-
-
-var combat: CombatStub = null
-var deployment: DeploymentStub = null
-var ai: AiStub = null
-var root: RootStub = null
-var interaction: InteractionStub = null
+var combat: Stubs.CombatStub = null
+var deployment: Stubs.DeploymentStub = null
+var ai: Stubs.AiStub = null
+var root: Stubs.RootStub = null
+var interaction: Stubs.InteractionStub = null
 var resume: RefCounted = null
 
 
 func before_each() -> void:
 	IntentScript.clear()
 	ContextScript.clear()
-	combat = CombatStub.new()
-	deployment = DeploymentStub.new()
-	ai = AiStub.new()
+	combat = Stubs.CombatStub.new()
+	combat.roster = Stubs.RosterStub.new()
+	deployment = Stubs.DeploymentStub.new()
+	ai = Stubs.AiStub.new()
 	ai.templates[TEMPLATE] = {"id": TEMPLATE}
 	add_child_autofree(combat)
 	add_child_autofree(deployment)
 	add_child_autofree(ai)
-	root = RootStub.new()
+	root = Stubs.RootStub.new()
 	add_child_autofree(root)  # Control 也要进树回收（否则收尾报孤儿）
-	interaction = InteractionStub.new()
+	interaction = Stubs.InteractionStub.new()
 	resume = ResumeSceneScript.new()
 
 
@@ -214,4 +125,31 @@ func payload() -> Dictionary:
 			"enemy_level": 2,
 			"rewards": {"lingshi": 30},
 		},
+		CardsScript.KEY_CARDS: {
+			CardsScript.KEY_HAND: _card_entries(HAND_IDS),
+			CardsScript.KEY_DRAW_PILE: _card_entries(DRAW_IDS),
+			CardsScript.KEY_DISCARD_PILE: _card_entries(DISCARD_IDS),
+		},
+		DebuffsScript.KEY_DEBUFFS: [{
+			DebuffsScript.KEY_TARGET_ID: DEBUFF_TARGET,
+			DebuffsScript.KEY_TYPE: DebuffManagerScript.TYPE_ATK,
+			DebuffsScript.KEY_DURATION: DEBUFF_DURATION,
+			DebuffsScript.KEY_AMOUNT: DEBUFF_AMOUNT,
+			DebuffsScript.KEY_SOURCE_ID: CHAR_A,
+		}],
 	}
+
+
+## 一堆牌的存档条目（形状与写侧折叠的产出同一口径）。[br]
+## [br][b]等级刻意不全为 1[/b]：升级与否要能被读侧区分——全 1 的话
+## 「等级也一致」这条断言证明不了任何事。
+func _card_entries(p_ids: Array) -> Array:
+	var out: Array = []
+	for idx: int in range(p_ids.size()):
+		var cid: int = int(p_ids[idx])
+		out.append({
+			CardsScript.KEY_CARD_INSTANCE_ID: cid,
+			CardsScript.KEY_TEMPLATE_ID: "card_%d" % cid,
+			CardsScript.KEY_LEVEL: 1 if idx == 0 else 2,
+		})
+	return out

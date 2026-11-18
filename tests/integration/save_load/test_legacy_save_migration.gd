@@ -9,6 +9,8 @@ extends "res://tests/integration/save_load/save_round_trip_fixture.gd"
 ## 的整条路（[code]_atomic_read → _validate_version → _migrate_if_needed →
 ## gsm.deserialize[/code]），任何一环少一步都在本文件里变红。[br]
 ## [br][b]覆盖[/b]：[br]
+##   0. v3 档（有战斗中存档段、无牌面 / debuff）→ 读档成功、判为战斗中、两个新判据
+##      都为「没有快照」（读档走自然发牌那条老路）；[br]
 ##   1. v1 档（带探索进度、无 [code]events_shown[/code]）→ 读档成功且进度原样；[br]
 ##   2. 迁移补出的 [code]events_shown[/code] 为空数组（不是 null——空值会让判定炸）；[br]
 ##   3. 迁移不改动已有进度字段（通关次数 / 已访问 / 已采 / 灵泉次数）；[br]
@@ -17,10 +19,14 @@ extends "res://tests/integration/save_load/save_round_trip_fixture.gd"
 ##   6. 连 schema_version 都没有的档 → 走失败路径而非被当最新版硬读；[br]
 ##   7. 迁移后能再存一次（存档可继续用，不是「只读的博物馆」）。[br]
 ## [br]来源: ADR-0002 §JSON + 迁移链、ADR-0019 §向前兼容、本轮任务书第 2/3 条、
-## 本轮「战斗中存档 → 读档回到战斗」（v2 → v3 补 [code]battle_resume[/code] 段）。
+## 「战斗中存档 → 读档回到战斗」（v2 → v3 补 [code]battle_resume[/code] 段）、
+## 本轮「牌面与 debuff 进存档」（v3 → v4 补 [code]cards[/code] / [code]debuffs[/code]）。
 
 ## 续战载荷模块——本文件只用它的[b]读侧判据[/b]（「这份档在不在战斗中」）。
 const PayloadScript := preload("res://src/feature/combat/battle_resume_payload.gd")
+## 牌面 / debuff 两段的判据（「有没有快照」——读档侧据此决定要不要接管）。
+const CardsScript := preload("res://src/feature/combat/battle_resume_cards.gd")
+const DebuffsScript := preload("res://src/feature/combat/battle_resume_debuffs.gd")
 
 ## 用例存档根目录——专用子目录，避免与往返用例互相清场。
 const LEGACY_ROOT: String = "user://test_legacy_migration_saves/"
@@ -193,6 +199,72 @@ func test_v2_migration_leaves_exploration_state_untouched() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 2.6 v3 档：有战斗中存档段，但没有牌面 / debuff（本轮新增字段的兼容半边）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## v3 档的续战段只记「谁、多少血、第几回合、什么阶段、还有多少费」——没有牌面与
+## debuff。[br]
+## [br][b]为什么必须钉[/b]：读档侧的判据是「这一段有没有牌面快照」——判错一头，
+## 玩家读档回来会面对一副被清空的手牌（照空数组接管）；判错另一头更隐蔽：
+## 迁移顺手往[b]空段[/b]里塞两个形状，把「这份档不是在战斗中存的」变成一个带内容的段，
+## 「继续游戏」就会把玩家送进一场根本不存在的仗。[br]
+## [br][b]断言的是读侧口径[/b]：迁移补出的是空形状 → 牌面 / debuff 两个判据都为 false
+## → 续战走自然发牌那条老路（与升级前逐位一致）。
+func test_v3_save_with_battle_section_gets_empty_card_and_debuff_shapes() -> void:
+	# Arrange——v3 形态：有正在进行的战斗段，没有本轮新增的两个键
+	var game_state: Dictionary = _v1_game_state()
+	game_state["battle_resume"] = _v3_battle_section()
+	assert_false((game_state["battle_resume"] as Dictionary).has("cards"),
+			"前置：v3 档确实没有牌面段")
+	assert_false((game_state["battle_resume"] as Dictionary).has("debuffs"),
+			"前置：v3 档确实没有 debuff 段")
+	_write_legacy_save(3, game_state)
+	# Act
+	assert_eq(_load_legacy(), SLS.LoadResult.SUCCESS, "v3 档必须读得进来")
+	# Assert——迁移补出了两个空形状，且这一份档仍被判为「在战斗中」
+	var loaded: Dictionary = gsm.battle_resume
+	assert_true(PayloadScript.is_in_battle(loaded), "有战况的 v3 档仍应判为战斗中")
+	assert_true(PayloadScript.is_resumable_payload(loaded), "名册齐备的 v3 档仍可续战")
+	assert_true(CardsScript.has_state(loaded) == false,
+			"v3 档没有牌面内容——读侧必须走自然发牌（照空数组接管会清空手牌）")
+	assert_false(DebuffsScript.has_state(loaded), "v3 档没有 debuff 内容")
+
+
+## 迁移往[b]正在进行的[/b]战斗段补形状时，不得动它已有的进度字段。[br]
+## [br][b]为什么单独一条[/b]：迁移是「就地改 game_state 字典」的写法，多写一个键
+## 就可能连带把进度改掉——而那种损坏只会在读档后体现为「回合数回去了」。
+func test_v3_migration_leaves_battle_progress_untouched() -> void:
+	# Arrange
+	var game_state: Dictionary = _v1_game_state()
+	game_state["battle_resume"] = _v3_battle_section()
+	_write_legacy_save(3, game_state)
+	# Act
+	assert_eq(_load_legacy(), SLS.LoadResult.SUCCESS)
+	# Assert——进度逐项与盘上那份一致
+	var loaded: Dictionary = gsm.battle_resume
+	assert_eq(int(loaded[PayloadScript.KEY_TURN]), 4, "回合数不受迁移影响")
+	assert_eq(int(loaded[PayloadScript.KEY_PHASE]), 3, "阶段不受迁移影响")
+	assert_eq(int(loaded[PayloadScript.KEY_CURRENT_COST]), 2, "当前费用不受迁移影响")
+	assert_eq(int(loaded[PayloadScript.KEY_MAX_COST]), 5, "费用上限不受迁移影响")
+	assert_eq(PayloadScript.player_ids(loaded), [8801, 8802], "阵容不受迁移影响")
+
+
+## v2 → v3 → v4 连走时，第三步不得给[b]空[/b]段补形状。[br]
+## [br][b]为什么必须钉[/b]：空段的含义是「这份档不是在战斗中存的」——给它塞两个形状
+## 会让主菜单的导航判据改道（把玩家送进战斗场景，而那里没有可续的仗）。
+func test_v2_save_keeps_empty_battle_section_after_full_chain() -> void:
+	# Arrange——v2 档（根本没有 battle_resume 键），要连走 v2→v3→v4
+	var game_state: Dictionary = _v1_game_state()
+	_write_legacy_save(2, game_state)
+	# Act
+	assert_eq(_load_legacy(), SLS.LoadResult.SUCCESS)
+	# Assert——还是空段，没有被补上形状
+	assert_eq(gsm.battle_resume, {}, "空段在四级迁移后仍应是空段")
+	assert_false(PayloadScript.is_in_battle(gsm.battle_resume),
+			"老档不得被判为「在战斗中」（否则继续游戏会被送进战斗场景）")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 3. 迁移后仍是可存档状态
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -260,6 +332,44 @@ func _v1_game_state() -> Dictionary:
 			"current_chapter_progress": {"completed_required_events": [],
 				"boss_unlocked": false, "boss_defeated": false, "ending_chosen": ""},
 			"completed_chapters": [], "story_flags": {}},
+	}
+
+
+## v3 形态的续战段——有战况，没有本轮新增的牌面 / debuff 两个键。[br]
+## [br][b]形状照抄 v3 的实现口径[/b]（[code]battle_resume_payload.build[/code] 当时
+## 的产出），不抄一份「精简版」——精简版会被读侧的宽容处理放过去，用例就证明不了
+## 「真实 v3 档能读」。
+func _v3_battle_section() -> Dictionary:
+	return {
+		PayloadScript.KEY_IS_ACTIVE: true,
+		PayloadScript.KEY_SCENE_ID: 4,
+		PayloadScript.KEY_PHASE: 3,
+		PayloadScript.KEY_TURN: 4,
+		PayloadScript.KEY_CURRENT_COST: 2,
+		PayloadScript.KEY_MAX_COST: 5,
+		PayloadScript.KEY_ORIGIN_NODE_ID: 42,
+		PayloadScript.KEY_ORIGIN_COMBAT_TYPE: "battle",
+		PayloadScript.KEY_PLAYER_ROSTER: [
+			{PayloadScript.KEY_CHARACTER_ID: 8801, PayloadScript.KEY_CURRENT_HP: 3,
+				PayloadScript.KEY_MAX_HP: 12, PayloadScript.KEY_IS_ALIVE: true,
+				PayloadScript.KEY_SLOT_INDEX: 0, PayloadScript.KEY_IS_FRONT: true},
+			{PayloadScript.KEY_CHARACTER_ID: 8802, PayloadScript.KEY_CURRENT_HP: 5,
+				PayloadScript.KEY_MAX_HP: 9, PayloadScript.KEY_IS_ALIVE: true,
+				PayloadScript.KEY_SLOT_INDEX: 1, PayloadScript.KEY_IS_FRONT: true},
+		],
+		PayloadScript.KEY_ENEMY_ROSTER: [
+			{PayloadScript.KEY_CHARACTER_ID: 100000,
+				PayloadScript.KEY_TEMPLATE_ID: "san_xiu",
+				PayloadScript.KEY_CURRENT_HP: 6, PayloadScript.KEY_MAX_HP: 16,
+				PayloadScript.KEY_IS_ALIVE: true,
+				PayloadScript.KEY_SLOT_INDEX: 0, PayloadScript.KEY_IS_FRONT: true},
+		],
+		PayloadScript.KEY_CONFIG: {
+			"character_ids": [8801, 8802],
+			"enemy_template_ids": ["san_xiu"],
+			"enemy_level": 1,
+			"rewards": {},
+		},
 	}
 
 

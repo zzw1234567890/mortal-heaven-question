@@ -76,9 +76,9 @@ func test_migrate_if_needed_single_step() -> void:
 
 
 # === AC-004 边界情况：多步迁移 ==================================================
-# CURRENT_SCHEMA_VERSION 提升到 3 之后，v0 档要依次走过 v0→v1、v1→v2 与 v2→v3 三级。
-# 本用例注册 MIGRATIONS[0] / MIGRATIONS[1]（覆盖层），v2→v3 走生产链
-# （SaveLoadSystem.DEFAULT_MIGRATIONS）——三级都必须真的被调用。
+# CURRENT_SCHEMA_VERSION 提升到 4 之后，v0 档要依次走过 v0→v1、v1→v2、v2→v3 与 v3→v4
+# 四级。本用例注册 MIGRATIONS[0] / MIGRATIONS[1]（覆盖层），后两级走生产链
+# （SaveLoadSystem.DEFAULT_MIGRATIONS）——四级都必须真的被调用。
 
 func test_migrate_if_needed_multi_step() -> void:
 	# Arrange：v0 档 + 注册 v0→v1 迁移
@@ -114,6 +114,8 @@ func test_migrate_if_needed_multi_step() -> void:
 			"迁移不得改动已有进度字段")
 	assert_eq(result["game_state"]["battle_resume"], {},
 			"第三级（生产链）应补空的 battle_resume 段——空 = 这份档不是在战斗中存的")
+	assert_eq(result["schema_version"], sls.CURRENT_SCHEMA_VERSION,
+			"四级迁移后应落在 CURRENT（v3→v4 也要真的被走过）")
 
 
 # === AC-005：迁移链缺失 ==========================================================
@@ -410,8 +412,8 @@ func test_migration_failure_in_chain_is_isolated() -> void:
 # === AC-001：CURRENT_SCHEMA_VERSION 常量存在 =====================================
 
 func test_current_schema_version_constant_exists() -> void:
-	assert_eq(sls.CURRENT_SCHEMA_VERSION, 3,
-			"本轮新增 battle_resume 段（战斗中存档 → 读档回到战斗），schema 版本提升到 3")
+	assert_eq(sls.CURRENT_SCHEMA_VERSION, 4,
+			"本轮续战段新增 cards / debuffs（牌面与减益接续），schema 版本提升到 4")
 	assert_true(typeof(sls.CURRENT_SCHEMA_VERSION) == TYPE_INT, "应为 int 类型")
 
 
@@ -432,7 +434,7 @@ func test_default_migrations_registry_holds_production_chain() -> void:
 	assert_eq(typeof(sls.DEFAULT_MIGRATIONS), TYPE_DICTIONARY,
 			"DEFAULT_MIGRATIONS 应为 Dictionary 类型")
 	assert_eq(sls.DEFAULT_MIGRATIONS.size(), sls.CURRENT_SCHEMA_VERSION - 1,
-			"生产链应覆盖 1..CURRENT-1 的每一级（v1→v2、v2→v3 共 2 级）")
+			"生产链应覆盖 1..CURRENT-1 的每一级（v1→v2、v2→v3、v3→v4 共 3 级）")
 	for from_version: int in range(1, sls.CURRENT_SCHEMA_VERSION):
 		assert_true(sls.DEFAULT_MIGRATIONS.has(from_version),
 				"生产链应登记 v%d→v%d 迁移" % [from_version, from_version + 1])

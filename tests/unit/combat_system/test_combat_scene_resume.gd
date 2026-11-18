@@ -65,7 +65,8 @@ func test_start_rebuilds_battle_from_saved_state() -> void:
 	assert_eq(combat.max_cost, MAX_COST, "费用上限应落回存档值")
 
 
-## 顺序错了症状各异：布阵晚于开战 → 阵型被重排；落位早于开战 → 被开战的出厂值盖掉。
+## 顺序错了症状各异：布阵晚于开战 → 阵型被重排；落位早于开战 → 被开战的出厂值盖掉；
+## 牌面接管早于开战 → 被 [code]battle_start[/code] 的发牌与状态表清空盖掉。
 func test_start_orders_field_roster_then_launch_then_restore() -> void:
 	# Arrange
 	IntentScript.request(payload())
@@ -86,6 +87,119 @@ func test_start_orders_field_roster_then_launch_then_restore() -> void:
 	assert_eq(ai.roster_written.size(), 1, "敌方名册应写回 AISystem")
 	assert_eq(int(ai.roster_written[0].get("current_hp")), ENEMY_HP,
 			"写回的应是存档残血（满血重开等于白存）")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 牌面接续（本轮：手牌 / 抽牌堆 / 弃牌堆按存档还原）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 三堆牌逐 ID、逐顺序取存档值——顺序就是抽牌顺序，接错了等于换了一副牌。
+func test_start_restores_three_piles_from_save() -> void:
+	# Arrange
+	IntentScript.request(payload())
+	resume.call(&"consume")
+	# Act
+	resume.call(&"start", combat, root, interaction, deps(), 1)
+	# Assert——三堆各自逐 ID 与顺序
+	assert_eq(combat.hand, HAND_IDS, "手牌应按存档原样接管（顺序即存档顺序）")
+	assert_eq(combat.draw_pile, DRAW_IDS, "抽牌堆应按存档原样接管")
+	assert_eq(combat.discard_pile, DISCARD_IDS, "弃牌堆应按存档原样接管")
+
+
+## 接管的时机必须在开战[b]之后[/b]：开战会按开局手牌发一轮牌，早于它的接管会被覆盖。
+func test_start_restores_piles_after_battle_start() -> void:
+	# Arrange
+	IntentScript.request(payload())
+	resume.call(&"consume")
+	# Act
+	resume.call(&"start", combat, root, interaction, deps(), 1)
+	# Assert
+	assert_true(combat.calls.has("restore_piles"), "应接管三堆牌")
+	assert_lt(combat.calls.find("battle_start"), combat.calls.find("restore_piles"),
+			"牌面接管必须在开战之后（否则被开局手牌覆盖）")
+
+
+## 没有牌面快照的档（v3 老档经迁移补出的空形状）不得接管——接管会把刚发的开局手牌清空。
+func test_start_without_card_snapshot_keeps_opening_hand() -> void:
+	# Arrange——把牌面段换成空形状（老档迁移后的形态）
+	var legacy: Dictionary = payload()
+	legacy[CardsScript.KEY_CARDS] = {}
+	IntentScript.request(legacy)
+	resume.call(&"consume")
+	# Act
+	resume.call(&"start", combat, root, interaction, deps(), 1)
+	# Assert——不接管（战斗照常，手牌是开战发的那一轮）
+	assert_false(combat.calls.has("restore_piles"),
+			"没有牌面快照时不得接管（照空数组接管会把开局手牌清成空手）")
+	assert_true(combat.calls.has("battle_start"), "老档仍应能续战")
+
+
+## 战斗系统不支持接管时的降级：不崩、不开空手，战斗照常（老实现的兼容半边）。
+func test_start_without_pile_api_degrades_to_opening_hand() -> void:
+	# Arrange——换成没有 [method restore_piles] 的替身（半截接线的实现）
+	var legacy_combat: Node = PilelessCombatStub.new()
+	add_child_autofree(legacy_combat)
+	IntentScript.request(payload())
+	resume.call(&"consume")
+	# Act
+	var reason: String = resume.call(&"start", legacy_combat, root, interaction, deps(), 1)
+	# Assert
+	assert_eq(reason, "", "缺少牌面 API 不该阻断续战（缺的是牌面接续，不是整场仗）")
+	assert_true(legacy_combat.calls.has("battle_start"), "战斗仍应开起来")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# debuff 接续（本轮：逐条灌回状态表）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 存档里的 debuff 要逐条灌回——不灌的话 [code]battle_start[/code] 清表后凭空蒸发。
+func test_start_restores_debuffs_into_state_table() -> void:
+	# Arrange
+	IntentScript.request(payload())
+	resume.call(&"consume")
+	# Act
+	resume.call(&"start", combat, root, interaction, deps(), 1)
+	# Assert——层数 / 剩余回合 / 数值三项都按存档落位
+	var manager: RefCounted = (combat.roster as RosterStub).debuff
+	assert_eq(int(manager.call(&"get_stacks", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)), 1,
+			"存档里的一条降攻应还原成 1 层")
+	assert_eq(int(manager.call(&"get_duration", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)),
+			DEBUFF_DURATION, "剩余回合应取存档值")
+	# Assert——数值真的作用到战斗取数上（不是只挂在表里）
+	var base_atk: int = 20
+	assert_eq(int(manager.call(&"get_atk_with_debuff", DEBUFF_TARGET, base_atk)),
+			base_atk - DEBUFF_AMOUNT,
+			"降攻应真的从攻击力里扣掉（挂上了但数值不生效等于没存）")
+
+
+## debuff 接续同样必须在开战之后——[code]battle_start[/code] 会清空状态表。
+func test_start_applies_debuffs_after_battle_start() -> void:
+	# Arrange
+	IntentScript.request(payload())
+	resume.call(&"consume")
+	# Act
+	resume.call(&"start", combat, root, interaction, deps(), 1)
+	# Assert
+	var manager: RefCounted = (combat.roster as RosterStub).debuff
+	assert_gt(int(manager.call(&"get_duration", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)), 0,
+			"debuff 必须在开战清表之后才灌回（早于开战会被清掉）")
+	assert_lt(combat.calls.find("battle_start"), combat.calls.find("restore"),
+			"前置：落位在开战之后（同一批接管的顺序口径）")
+
+
+## 没有 debuff 快照的老档不得灌——空段表示「存档那一刻本来就没有 debuff」。
+func test_start_without_debuff_snapshot_leaves_state_clean() -> void:
+	# Arrange
+	var legacy: Dictionary = payload()
+	legacy[DebuffsScript.KEY_DEBUFFS] = []
+	IntentScript.request(legacy)
+	resume.call(&"consume")
+	# Act
+	resume.call(&"start", combat, root, interaction, deps(), 1)
+	# Assert——表里没有凭空多出的 debuff
+	var manager: RefCounted = (combat.roster as RosterStub).debuff
+	assert_eq(int(manager.call(&"get_stacks", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)), 0,
+			"老档读回来不应挂着任何 debuff（空段 = 当时没有）")
 
 
 ## 落位期间必须有自动推进关着——否则开战那一刻排下的推进会在落位前先跑掉一格。

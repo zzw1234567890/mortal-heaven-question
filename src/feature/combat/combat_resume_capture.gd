@@ -104,7 +104,63 @@ func _gather(p_scene_id: int) -> Dictionary:
 		"player_hp": _player_hp(),
 		"enemy_roster": _enemy_roster(),
 		"config": _battle_config(),
+		"hand": _pile(&"get_hand"),
+		"draw_pile": _pile(&"get_deck"),
+		"discard_pile": _pile(&"get_discard_pile"),
+		"owned_cards": _owned_cards(),
+		"debuffs": _debuff_snapshot(),
 	}
+
+
+## 战斗系统上的一堆牌（手牌 / 抽牌堆 / 弃牌堆——同一取数口径）。[br]
+## [br][b]返回原数组本身而不是副本[/b]：载荷侧只读不写（[code]fold[/code] 逐条折新
+## 字典），拷贝一份等于每存一次档多走一遍全牌堆。[br]
+func _pile(p_method: StringName) -> Array:
+	var cs: Node = _combat()
+	if cs == null or not cs.has_method(p_method):
+		return []
+	var raw: Variant = cs.call(p_method)
+	return raw if raw is Array else []
+
+
+## 收藏快照——三堆里的裸 ID 条目靠它补出模板与等级（见载荷侧「是否升级」）。[br]
+## [br][b]读的是 GSM 而不是 CardSystem[/b]：收藏是 GSM 的持久域，与存档同一份
+## 真理来源；[code]CardSystem.get_template_by_instance_id[/code] 查的是模板不是
+## 实例（拿不到 [code]level[/code]）。[br]
+## [br][b]GSM [code]collection[/code] 域不在同一次序列化里[/b]：本节只是给三堆补
+## 展示字段，值不对也不会让牌面重建出错（读侧只吃实例 ID）。
+func _owned_cards() -> Array:
+	if gsm == null:
+		return []
+	var collection: Variant = gsm.get("collection")
+	if not (collection is Dictionary):
+		return []
+	var owned: Variant = (collection as Dictionary).get("owned_cards", [])
+	return owned if owned is Array else []
+
+
+## 本场 debuff 状态快照——[code]CombatRosterState.get_debuff_manager().snapshot()[/code]。[br]
+## [br][b]取数走状态表的 RBAC[/b]：debuff 管理器是状态表的一部分（同一处持有），
+## 另开一条从战斗系统直读的路径等于把「谁管 debuff」这件事写两遍。
+func _debuff_snapshot() -> Dictionary:
+	var manager: Variant = _debuff_manager()
+	if manager == null or not (manager is Object) \
+			or not (manager as Object).has_method(&"snapshot"):
+		return {}
+	var raw: Variant = (manager as Object).call(&"snapshot")
+	return raw if raw is Dictionary else {}
+
+
+## debuff 管理器——战斗系统的状态表持有（缺席时 null，见 [method _debuff_snapshot]）。
+func _debuff_manager() -> Variant:
+	var cs: Node = _combat()
+	if cs == null or not cs.has_method(&"get_roster_state"):
+		return null
+	var state: Variant = cs.call(&"get_roster_state")
+	if state == null or not (state is RefCounted) \
+			or not (state as RefCounted).has_method(&"get_debuff_manager"):
+		return null
+	return (state as RefCounted).call(&"get_debuff_manager")
 
 
 ## 本场开战配置（战斗系统持有的那份副本；缺席时为空——载荷按白名单折叠）。

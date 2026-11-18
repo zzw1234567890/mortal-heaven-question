@@ -429,7 +429,10 @@ func battle_start(config: Dictionary) -> void:
 
 	# GDD §2 开局手牌（先手 4 / 后手 5）——「先手第 1 回合不抽牌」的前提。
 	# 牌堆尚未就绪（调用方未 init_deck）时发 0 张，不报错：本场的抽牌阶段
-	# 会照常走牌堆为空的分支（GDD §边缘情况「抽空牌库」）。
+	# 会照常走牌堆为空的分支（GDD §边缘情况「抽空牌库」）。[br]
+	# [b]读档续战走的是同一条[/b]：那一路的发牌结果会被随后的
+	# [method restore_piles] 原样换掉（顺序上接管在最后）；存档里没有牌面快照时
+	# （v3 老档）发出来的这几张正是玩家读到的手牌——老档因此不必另开一条路。
 	deal_opening_hand()
 
 	# AC-005 / DEBT-CBT-018-11：动画锁不再整场持有——改由阶段 4/5 的
@@ -1334,6 +1337,25 @@ func set_deck_state(deck: Array, discard: Array, hand: Array) -> void:
 	_deck = deck.duplicate()
 	_discard_pile = discard.duplicate()
 	_hand = hand.duplicate()
+
+
+## 按存档快照原样恢复三堆牌——读档续战专用（顺序与内容都取存档值）。[br]
+## [br][b]与 [method init_deck] 的分工[/b]：[code]init_deck[/code] 是「开一场新仗」——
+## 拿本局卡组洗一遍再清空手牌；本方法是「接着打」——牌面已经在存档里了，
+## 洗牌会把它洗没（玩家攥着的那两张关键牌、已经垫进弃牌堆的那几张，全都会变）。[br]
+## [br][b]不洗牌、不发牌[/b]：顺序就是抽牌顺序（[method _draw_cards] 取
+## [code]_deck[0][/code]），动了顺序等于换了一副牌；开局手牌也已经在 [code]hand[/code] 里，
+## 再发一次等于凭空多几张。[br]
+## [br][b]参数顺序与 [method set_deck_state] 不同[/b]（那里是牌库 / 弃牌堆 / 手牌）：
+## 本方法的调用方（读档重建）按「手上 / 待抽 / 已弃」的自然顺序给，且带名字的类型
+## 让写错的调用点在编译期就红。[br]
+## [br][param p_hand] 存档里的手牌（实例 ID 列表，顺序即存档顺序）。[br]
+## [param p_draw_pile] 存档里的抽牌堆。[br]
+## [param p_discard_pile] 存档里的弃牌堆。
+func restore_piles(p_hand: Array, p_draw_pile: Array, p_discard_pile: Array) -> void:
+	_hand = p_hand.duplicate()
+	_deck = p_draw_pile.duplicate()
+	_discard_pile = p_discard_pile.duplicate()
 
 
 ## 设置攻击队列（测试桩注入——Story 003 接线 play_card 后替换）。

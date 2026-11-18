@@ -18,6 +18,15 @@ const MAX_STACKS: int = 5
 const TYPE_ATK: int = 0  ## 降低攻击
 const TYPE_DEF: int = 1  ## 降低防御
 
+## 类型 → 状态表键名（[b]唯一真理来源[/b]：状态的键、[method type_of_key] 的反查、
+## 存档侧折叠都读它——各写一遍必然有一处漂移，而漂移的症状是「debuff 存了但读不回」）。
+## [br][b]未知键[/b]：不在本表内的返回 [constant NO_TYPE]。
+const NO_TYPE: int = -1
+const TYPE_KEYS: Dictionary = {
+	TYPE_ATK: "atk_down",
+	TYPE_DEF: "def_down",
+}
+
 ## 状态表——[code]{character_id: {type: [ {stacks, duration, amount, source_id} ]}}[/code]。[br]
 ## 每个角色每种 debuff 类型维护一个列表，每条记录代表一次施加的 debuff。[br]
 ## [br]字段说明：[br]
@@ -155,6 +164,21 @@ func snapshot() -> Dictionary:
 	return _states.duplicate(true)
 
 
+## DebuffType → 字典键名（见 [constant TYPE_KEYS] 的「唯一真理来源」注记）。
+static func key_of_type(p_type: int) -> String:
+	return str(TYPE_KEYS.get(p_type, "unknown"))
+
+
+## 字典键名 → DebuffType（[method key_of_type] 的反查；认不出的给 [constant NO_TYPE]）。[br]
+## [br][b]为什么要有反查[/b]：存档侧拿到的是一份快照，只有键名没有枚举；
+## 让那边自己维护一张「键名 → 类型」表等于把本表抄第二遍。
+static func type_of_key(p_key: String) -> int:
+	for known_type: Variant in TYPE_KEYS.keys():
+		if str(TYPE_KEYS[known_type]) == p_key:
+			return int(known_type)
+	return NO_TYPE
+
+
 # === 内部 ====================================================================
 
 ## 计算指定类型的总降低量——层数 × 每层数值。[br]
@@ -176,12 +200,7 @@ func _total_reduction(p_target_id: int, p_type: int) -> int:
 	return total
 
 
-## DebuffType → 字典键名。
+## DebuffType → 字典键名（转发 [method key_of_type]——本方法原先是实现处，
+## 改由 [constant TYPE_KEYS] 供数后只留这层转发，调用点一字未改）。
 func _type_key(p_type: int) -> String:
-	match p_type:
-		TYPE_ATK:
-			return "atk_down"
-		TYPE_DEF:
-			return "def_down"
-		_:
-			return "unknown"
+	return key_of_type(p_type)

@@ -38,6 +38,13 @@ const KEY_PLAYER_ROSTER: String = "player_roster"
 const KEY_ENEMY_ROSTER: String = "enemy_roster"
 const KEY_CONFIG: String = "config"
 
+## 牌面段与 debuff 段的[b]形状[/b]归各自的模块（本模块只把它们的产出并进载荷，
+## 不重写一份键名——两处各写一遍必然漂移，而漂移的症状是「存了但读不回」）。
+## 读侧同样直接问那两个模块（[code]battle_resume_cards.gd[/code] /
+## [code]battle_resume_debuffs.gd[/code]）。
+const CardsScript := preload("res://src/feature/combat/battle_resume_cards.gd")
+const DebuffsScript := preload("res://src/feature/combat/battle_resume_debuffs.gd")
+
 ## 条目字段（我方 / 敌方共用同名者）。
 const KEY_CHARACTER_ID: String = "character_id"
 const KEY_TEMPLATE_ID: String = "template_id"
@@ -66,7 +73,10 @@ const SAFE_CONFIG_KEYS: PackedStringArray = [
 ##   · [code]player_field[/code]：阵位快照（含 character_id / is_front / slot_index）；[br]
 ##   · [code]player_hp[/code]：[code]{character_id: {current_hp, max_hp, is_alive}}[/code]；[br]
 ##   · [code]enemy_roster[/code]：本场敌方名册（对象或字典条目）；[br]
-##   · [code]config[/code]：本场 [code]battle_start[/code] 配置（按白名单折叠）。[br]
+##   · [code]config[/code]：本场 [code]battle_start[/code] 配置（按白名单折叠）；[br]
+##   · [code]hand[/code] / [code]draw_pile[/code] / [code]discard_pile[/code]：三堆
+##     牌面（[code]owned_cards[/code] 为收藏快照，用于补模板与等级）；[br]
+##   · [code]debuffs[/code]：[code]CombatDebuffManager.snapshot()[/code] 的状态快照。[br]
 ## [br][b]返回[/b]：载荷字典；不可续玩（无探索来源）时返回空字典——调用方据此
 ## 走 [method reason] 的提示路径，而不是写一份读不回来的档。
 static func build(p_state: Dictionary) -> Dictionary:
@@ -84,6 +94,8 @@ static func build(p_state: Dictionary) -> Dictionary:
 		KEY_PLAYER_ROSTER: _player_entries(p_state),
 		KEY_ENEMY_ROSTER: enemy_entries(p_state.get("enemy_roster", [])),
 		KEY_CONFIG: _safe_config(p_state.get("config", {})),
+		CardsScript.KEY_CARDS: CardsScript.fold(p_state),
+		DebuffsScript.KEY_DEBUFFS: DebuffsScript.fold(p_state.get("debuffs", {})),
 	}
 
 

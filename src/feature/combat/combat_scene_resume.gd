@@ -11,13 +11,19 @@ extends RefCounted
 ##   2. 敌方名册换成存档形态（满血重开等于白存）；[br]
 ##   3. [code]battle_start[/code]（HP 种子由 [code]player_stats[/code] 注入——比模板
 ##      [code]base_hp[/code] 优先）；[br]
-##   4. 阶段 / 回合 / 费用按存档落位（[code]restore_battle_state[/code]）。[br]
-## [br][b]存档里不记手牌 / 牌堆 / debuff[/b]：它们要么每回合自然重建（牌堆从本局卡组
-## 重发），要么是回合内的短效应——记了反而要求「逐张牌还原实例」这一整套机制，
-## 与本轮「最小闭环」的取态不符。存的是[b]这一仗的进展[/b]（谁、多少血、第几回合、
-## 什么阶段、还有多少费）。[br]
+##   4. [b]三堆牌与 debuff 接管[/b]（[code]restore_piles[/code] /
+##      [code]debuff.restore[/code]）——必须在开战之后：开战会清状态表并按开局手牌
+##      发一轮牌，顺序反了接管结果就被覆盖；[br]
+##   5. 阶段 / 回合 / 费用按存档落位（[code]restore_battle_state[/code]）。[br]
+## [br][b]为什么牌面与 debuff 也要接续[/b]：不接管的话，玩家存档时攥着的两张关键牌
+## 会被洗回一副新牌（[code]battle_start[/code] 开局手牌重发），而挂在敌人身上的
+## 「降攻 3 层还剩 2 回合」会随着状态表清空凭空蒸发——读回来的仗[b]人对了、牌不对、
+## 数值也不对[/b]。三堆牌存的是[b]牌面本身[/b]（不是种子重放：洗牌消耗的随机数次数
+## 随对局走向变化，重放必然换一副牌序），debuff 存的是[b]逐条[/b]的剩余回合
+## （合并成总量会让两批到期的时点塌成一个）。[br]
 ## [br]来源: ADR-0008 §GSM 边界、ADR-0002 §存档容器、ADR-0017 §EnemyFactory、
-## [code]battle_resume_payload.gd[/code] §「能不能回到这场战斗」。
+## [code]battle_resume_payload.gd[/code] §「能不能回到这场战斗」、
+## [code]battle_resume_cards.gd[/code] / [code]battle_resume_debuffs.gd[/code] §形状。
 
 ## 载荷模块（形状与解析的唯一真理来源）。
 const PayloadScript := preload("res://src/feature/combat/battle_resume_payload.gd")
@@ -27,6 +33,10 @@ const IntentScript := preload("res://src/feature/combat/battle_resume_intent.gd"
 const RestoreScript := preload("res://src/feature/combat/battle_resume_restore.gd")
 ## 开战上下文模块（把存档里的来源折回四份输入——战斗场景的既有消费链要吃它）。
 const ContextScript := preload("res://src/feature/combat/combat_launch_context.gd")
+## 牌面快照模块（三堆的条目形状与 ID 序列解析）。
+const CardsScript := preload("res://src/feature/combat/battle_resume_cards.gd")
+## debuff 快照模块（逐条灌回状态表）。
+const DebuffsScript := preload("res://src/feature/combat/battle_resume_debuffs.gd")
 
 ## 守卫失败文案（玩家可读——本地化 epic 后替换为 key）。
 const TEXT_NO_COMBAT: String = "CombatSystem 不可用——无法续战"
@@ -88,6 +98,10 @@ func start(p_combat: Node, p_root: Control, p_interaction: RefCounted,
 	p_combat.call(&"set_auto_advance", false)
 	_init_deck(p_combat, p_deps.get("deck"))
 	p_combat.call(&"battle_start", _config(ids, roster))
+	# 牌面与 debuff 必须在开战[b]之后[/b]接管：battle_start 会清空状态表
+	# （debuff 随之归零）并按开局手牌发一轮牌——顺序反了，接管的结果会被开战覆盖。
+	_restore_cards(p_combat)
+	_restore_debuffs(p_combat)
 	p_combat.call(&"restore_battle_state",
 			int(_payload.get(PayloadScript.KEY_TURN, 1)),
 			int(_payload.get(PayloadScript.KEY_PHASE, 0)),
@@ -148,6 +162,60 @@ func _init_deck(p_combat: Node, p_deck: Node) -> void:
 		return
 	if p_combat.has_method(&"init_deck"):
 		p_combat.call(&"init_deck", (raw as Array).duplicate())
+
+
+## 三堆牌按存档原样接管——手牌 / 抽牌堆 / 弃牌堆，顺序与内容都取存档值。[br]
+## [br][b]为什么这件事必须做[/b]：不接管就只剩开战刚发的那一轮开局手牌——
+## 玩家存档时攥着的牌、已经打出去垫进弃牌堆的牌，读档回来全被洗回一副新牌里。[br]
+## [br][b]没有牌面快照时跳过[/b]（v3 老档 / 空段）：照空数组接管会把刚发的开局手牌
+## 清成空手——那比不接管更糟（玩家读档回来无牌可出）。[br]
+## [br][b]战斗系统不支持时降级[/b]：老实现没有 [code]restore_piles[/code] 时保持
+## 开局手牌（战斗照常进行，缺的是「牌面接续」）。
+func _restore_cards(p_combat: Node) -> void:
+	if not CardsScript.has_state(_payload):
+		return
+	if not p_combat.has_method(&"restore_piles"):
+		push_warning("CombatSceneResume: 战斗系统不支持牌面接管——手牌将按开局手牌重发")
+		return
+	p_combat.call(&"restore_piles",
+			CardsScript.ids_of(_payload, CardsScript.KEY_HAND),
+			CardsScript.ids_of(_payload, CardsScript.KEY_DRAW_PILE),
+			CardsScript.ids_of(_payload, CardsScript.KEY_DISCARD_PILE))
+
+
+## 回合内 debuff 逐条灌回状态表。[br]
+## [br][b]为什么要灌[/b]：[code]battle_start[/code] 在种子状态表时清过一遍，
+## 存档里那些「降攻 3 层还剩 2 回合」若不灌回来就凭空蒸发——玩家读档后面对的是
+## 一场敌我数值与存档那一刻不同的仗。[br]
+## [br][b]没有 debuff 快照时跳过[/b]：空段表示存档那一刻本来就没有 debuff
+## （不是「没存」——形状归一后两者同形，读侧按「没有」处理是唯一安全的解释）。[br]
+## [br][b]管理器取不到时降级[/b]：填不上 debuff 不阻断续战（战斗照常，
+## 缺的是那几条减益）。
+func _restore_debuffs(p_combat: Node) -> void:
+	if not DebuffsScript.has_state(_payload):
+		return
+	var manager: Variant = _debuff_manager(p_combat)
+	if manager == null:
+		push_warning("CombatSceneResume: 取不到 debuff 管理器——本场 debuff 未接续")
+		return
+	var applied: int = DebuffsScript.restore(manager, _payload)
+	var expected: int = DebuffsScript.entries_of(_payload).size()
+	if applied < expected:
+		push_warning("CombatSceneResume: debuff 接续不完整（%d/%d）" % [applied, expected])
+
+
+## 本场 debuff 管理器——走战斗系统的状态表（与存档抓取同一取数路径）。[br]
+## [br][b]为什么经 [code]get_roster_state[/code] 而不是直读[/b]：debuff 归状态表持有，
+## 另开一条路径等于把「谁管 debuff」写两遍（抓取侧同一口径，见
+## [code]combat_resume_capture.gd[/code]）。
+func _debuff_manager(p_combat: Node) -> Variant:
+	if p_combat == null or not p_combat.has_method(&"get_roster_state"):
+		return null
+	var state: Variant = p_combat.call(&"get_roster_state")
+	if state == null or not (state is RefCounted) \
+			or not (state as RefCounted).has_method(&"get_debuff_manager"):
+		return null
+	return (state as RefCounted).call(&"get_debuff_manager")
 
 
 ## 战斗系统当前的自动推进开关（落位阶段前后要原样还原它）。
