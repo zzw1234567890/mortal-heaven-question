@@ -11,6 +11,11 @@ extends RefCounted
 ##     （GDD ai-system.md §9，保留既有 1.3/级 的口径与数值，出厂测试锁定）；[br]
 ##   · [b]档位轴[/b][method tier_of]——[code]地图境界档 − 玩家境界[/code] 给
 ##     HP/ATK 乘系数：玩家落后一档明显吃力、追平为基线、压级轻松。[br]
+## [br][b]人数轴[/b][method count_range_of]：同一个 [code]gap[/code] 还产出敌方
+## [b]人数区间[/b]——追平 2~3 人、越级 3~4 人、压级 1~2 人（[constant TIER_TABLE]
+## 的 [code]count_min[/code] / [code]count_max[/code] 两列）。改造前人数写死在每张
+## 地图配置的 [code]enemy_count_min/max[/code] 里，与玩家境界无关；现在地图配置的
+## [code]enemy_count_max[/code] 只剩「上限兜底」一个用途（[param p_map_cap]）。[br]
 ## [br][b]同时只用一条轴[/b]（[method multipliers_of]）：给了地图档就只走档位轴，
 ## 没给（渡劫 / 无探索上下文）才走追赶轴。[b]不叠加[/b]——地图档本身就是「这张图
 ## 该有多强」的基准，玩家相对它的位置已由 [code]gap[/code] 表达（玩家练得越高
@@ -34,21 +39,25 @@ extends RefCounted
 ## 出厂敌人模板境界恒为 1~2，故这条轴承担「玩家练到哪里，敌人跟到哪里」。
 const CATCH_UP_PER_REALM: float = 0.3
 
-## 档位系数表——键为 [code]地图境界档 − 玩家境界[/code]（夹到
-## [constant TIER_MIN_GAP] ~ [constant TIER_MAX_GAP]）。[br]
+## 档位表——键为 [code]地图境界档 − 玩家境界[/code]（夹到
+## [constant TIER_MIN_GAP] ~ [constant TIER_MAX_GAP]）。[b]一行同时给属性与人数[/b]：
+## 同一个 [code]gap[/code] 的「敌人多硬」与「敌人几个」不该分两张表各写一遍键。[br]
 ## [br][code]hp[/code] / [code]atk[/code] 是乘数；[code]label[/code] 是该档的
 ## 中文档位名（调试 / 战报文案与测试断言共用，不另立词表）。[br]
+## [br][code]count_min[/code] / [code]count_max[/code] 是本档的敌方[b]人数区间[/b]
+## （绝对人数，不是乘数——人数没有「模板原值」可乘）。[br]
 ## [br][b]为什么防御跟着 HP 走[/b]：出厂模板的 [code]base_defense[/code] 多为 0~2，
 ## 单列一列系数只会在 0 上乘出 0；防御强度随「这张图多硬」同向变化即可，
 ## 避免再引入一条没人验证的系数。[br]
 ## [br][b]夹取范围[b]：超出 ±2 档按端点取值——境界差 3 档以上与 2 档的体验差异
-## 由数量/技能池承担，继续放大系数只会让压级变成「无收益」、越级变成「必败」。
+## 由技能池承担，继续放大系数只会让压级变成「无收益」、越级变成「必败」。
+## 人数轴同理夹在 ±2（端点 1~1 与 4~5），再往上加人只会变成“排队挨打”。
 const TIER_TABLE: Dictionary = {
-	-2: {"hp": 0.60, "atk": 0.70, "label": "碾压"},
-	-1: {"hp": 0.80, "atk": 0.90, "label": "轻松"},
-	0: {"hp": 1.00, "atk": 1.00, "label": "均势"},
-	1: {"hp": 1.30, "atk": 1.25, "label": "吃力"},
-	2: {"hp": 1.60, "atk": 1.50, "label": "苦战"},
+	-2: {"hp": 0.60, "atk": 0.70, "label": "碾压", "count_min": 1, "count_max": 1},
+	-1: {"hp": 0.80, "atk": 0.90, "label": "轻松", "count_min": 1, "count_max": 2},
+	0: {"hp": 1.00, "atk": 1.00, "label": "均势", "count_min": 2, "count_max": 3},
+	1: {"hp": 1.30, "atk": 1.25, "label": "吃力", "count_min": 3, "count_max": 4},
+	2: {"hp": 1.60, "atk": 1.50, "label": "苦战", "count_min": 4, "count_max": 5},
 }
 
 ## 档位键下界（更低的 gap 按本档取值）。
@@ -59,6 +68,20 @@ const TIER_MAX_GAP: int = 2
 ## 属性下限——夹取后敌人的 HP / ATK 不低于此值（0 血敌人会让战斗无法结束）。
 const MIN_ENEMY_HP: int = 1
 const MIN_ENEMY_ATK: int = 1
+
+## 人数硬边界——任何档位、任何地图兜底都不得越出（GDD 战斗规模上限）。[br]
+## [br][b]为什么边界写在本文件而不是地图配置[/b]：人数由「档位区间 → 地图上限 →
+## 出战名额余量」三层夹出来，最后一层必须有一个不依赖外部数据的绝对边界——
+## 否则一张配错 [code]enemy_count_max[/code] 的地图就能把区间抬到任意大。
+const COUNT_MIN: int = 1
+const COUNT_MAX: int = 5
+
+## 人数相对玩家出战名额的余量——敌人最多 [code]max_deploy + 1[/code] 个。[br]
+## [br][b]为什么允许比玩家多一个[/b]：敌方站位不吃玩家阵位，且回合制里「目标数」
+## 本身就是难度的一部分；多出的一人让玩家在集火与分摊之间做取舍。再多就变成
+## 「玩家无论怎么打都挨满」——那不叫难度，叫数值惩罚。[br]
+## [br]玩家境界读不到（[code]max_deploy <= 0[/code]）时不启用这条夹取。
+const COUNT_OVER_DEPLOY: int = 1
 
 
 ## 追赶系数——玩家境界高于模板基准时按 [constant CATCH_UP_PER_REALM] 逐档追平；
@@ -95,6 +118,42 @@ static func tier_of(p_map_realm: int, p_player_realm: int) -> Dictionary:
 ## 档位中文名（调试面板 / 战报 / 测试断言共用的唯一词表）。
 static func tier_label_of(p_map_realm: int, p_player_realm: int) -> String:
 	return str(tier_of(p_map_realm, p_player_realm).get("label", ""))
+
+
+## 人数区间——本档（[code]地图境界档 − 玩家境界[/code]）的敌方人数 [code][min, max][/code]。[br]
+## [br][b]三层夹取[/b]（顺序即优先级，后者只会把区间压小）：[br]
+##   1. [b]档位区间[/b]——[constant TIER_TABLE] 的 [code]count_min[/code] / [code]count_max]
+##      （追平 2~3、越级 3~4、压级 1~2）；[br]
+##   2. [b]出战名额余量[/b]——最多 [code]max_deploy + COUNT_OVER_DEPLOY[/code]；[br]
+##   3. [b]地图上限兜底[/b]——地图配置的 [code]enemy_count_max[/code]（首图靠它保持 1 人）；[br]
+##   4. [b]硬边界[/b]——最终夹到 [[constant COUNT_MIN], [constant COUNT_MAX]]。[br]
+## [br][b]min 也被压[/b]：地图上限低于档位下限时区间收成一点（首图：档位说 2~3、
+## 地图说至多 1 → 1~1）。只压 max 会产出 [code]min > max[/code] 的空区间，
+## 掷骰处再补一次夹取就等于把同一件事写两遍。[br]
+## [br][b]缺省即不启用[/b]：[param p_map_cap] / [param p_max_deploy] 传 ≤0 表示
+## 「这一层没有约束」——单测与无探索上下文的路径不必编造一个最大值。[br]
+## [br][param p_map_realm] 地图境界档（节点的 [code]enemy_level[/code]；≤0 = 未定档）。[br]
+## [param p_player_realm] 玩家当前境界。[br]
+## [param p_map_cap] 地图配置的 [code]enemy_count_max[/code]（≤0 = 不限制）。[br]
+## [param p_max_deploy] 玩家出战名额（[code]RealmSystem.realm_table[境界].max_deploy[/code]，
+## ≤0 = 读不到，不启用该层夹取）。[br]
+## [br][b]返回[/b]：[code]{min, max, gap}[/code]——已夹取，[code]min <= max[/code] 恒成立。
+static func count_range_of(p_map_realm: int, p_player_realm: int,
+		p_map_cap: int = 0, p_max_deploy: int = 0) -> Dictionary:
+	var key: int = tier_key_of(p_map_realm, p_player_realm)
+	var row: Dictionary = TIER_TABLE[key]
+	var bound: int = COUNT_MAX
+	if p_max_deploy > 0:
+		bound = mini(bound, p_max_deploy + COUNT_OVER_DEPLOY)
+	if p_map_cap > 0:
+		bound = mini(bound, p_map_cap)
+	bound = maxi(bound, COUNT_MIN)
+	# 逐项夹取——clampi 单调，故 lo <= hi 在夹取后仍成立（无需再补一次交换）。
+	return {
+		"min": clampi(int(row["count_min"]), COUNT_MIN, bound),
+		"max": clampi(int(row["count_max"]), COUNT_MIN, bound),
+		"gap": key,
+	}
 
 
 ## 三轴乘数——[code]{hp, atk, defense, gap, label}[/code]。[br]

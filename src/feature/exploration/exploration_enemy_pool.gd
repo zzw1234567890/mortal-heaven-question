@@ -6,6 +6,11 @@ extends RefCounted
 ## 直接失败（DEBT-EUI-006-5）。本模块把「地图敌人池 → 名册」这条生产链路补齐。[br]
 ## [br][b]名册形态[/b]：预览字典 [code]{template_id, name, realm}[/code]——与
 ## [code]RosterEntries[/code] 的字典分支同构，弹窗与开战上下文都能直接读。[br]
+## [br][b]人数不进地图配置[/b]：人数由 [code]DifficultyCurve.count_range_of[/code]
+## 按「地图境界档 − 玩家境界」给出，本模块只负责掷骰——[b]系数与区间只许一处[/b]
+## （[code]assets/enemies/difficulty_curve.gd[/code]）。地图配置的
+## [code]enemy_count_max[/code] 退居「上限兜底」（首图靠它保持 1 人），
+## [code]enemy_count_min[/code] 在生成路径[b]不再被读取[/b]（见该类文档的遗留说明）。[br]
 ## [br][b]掉落不进名册[/b]：掉落由 [code]EncounterFields.rewards[/code] 按模板
 ## [code]reward_config[/code] 聚合（同一事实只在一处派生）。[br]
 ## [br][b]模板缺失不崩溃[/b]：池里登记的模板 ID 在 AISystem 注册表里查不到时
@@ -17,7 +22,16 @@ extends RefCounted
 ## 扩展（回调签名是探索系统既有契约，本轮不改）。[br]
 ##
 ## 来源: GDD exploration-system.md §3 步骤⑥（阵容在节点生成时确定）、
-## §7 回旧地图、DEBT-EUI-006-5。
+## §7 回旧地图、DEBT-EUI-006-5、DEBT-EQT-001（人数轴）。
+
+## 难度曲线（人数区间与属性系数的唯一来源——本模块不自己写系数）。
+const CurveScript := preload("res://assets/enemies/difficulty_curve.gd")
+
+## 境界表（[code]max_deploy[/code] 的单一来源——人数上限「玩家出战名额 + 1」读它）。
+## [br][b]为什么直接读表而不是 Autoload[/b]：名册生成跑在 DAG 生成期，此时
+## RealmSystem 未必已就绪（[code]-s[/code] 脚本 / 单测桩环境无 Autoload）；
+## 境界表是编译期常量，静态读它零依赖。同 [code]exploration_breakthrough_table.gd[/code] 先例。
+const RealmSystemScript := preload("res://src/core/realm_system.gd")
 
 ## 名册条目的模板 ID 键（与 [code]RosterEntries.template_id[/code] 同源）。
 const KEY_TEMPLATE_ID: String = "template_id"
@@ -46,10 +60,10 @@ func set_seed(p_seed: int) -> void:
 
 
 ## 生成一份名册。[br]
-## [br][param p_map_id] 地图 ID（池与数量范围来自地图配置）。[br]
-## [param p_player_realm] 玩家境界（参与种子派生）。[br]
+## [br][param p_map_id] 地图 ID（决定敌人池与随机种子）。[br]
+## [param p_player_realm] 玩家境界（人数轴的一端 + 种子派生）。[br]
 ## [param p_is_elite] 精英节点（数量 +[code]elite_bonus[/code]）。[br]
-## [param p_config] 地图配置（[code]enemy_pool[/code] / [code]enemy_count_min[/code]
+## [param p_config] 地图配置（[code]enemy_pool[/code] / [code]enemy_realm[/code]
 ## / [code]enemy_count_max[/code] / [code]elite_bonus[/code]）。[br]
 ## [br][b]返回[/b]：名册条目数组（空数组 = 池为空或模板全缺失）。[br]
 func make_roster(p_map_id: StringName, p_player_realm: int, p_is_elite: bool,
@@ -59,7 +73,7 @@ func make_roster(p_map_id: StringName, p_player_realm: int, p_is_elite: bool,
 	var pool: Array = p_config.get("enemy_pool", [])
 	if pool.is_empty():
 		return []
-	var count: int = _roll_count(p_config, p_is_elite)
+	var count: int = _roll_count(p_player_realm, p_is_elite, p_config)
 	var roster: Array = []
 	for i in range(count):
 		var tid: StringName = _pick(pool)
@@ -72,14 +86,32 @@ func make_roster(p_map_id: StringName, p_player_realm: int, p_is_elite: bool,
 	return roster
 
 
-## 掷名册人数——[code][min, max] + 精英加成[/code]，至少 1。
-func _roll_count(p_config: Dictionary, p_is_elite: bool) -> int:
-	var lo: int = maxi(int(p_config.get("enemy_count_min", 1)), 1)
-	var hi: int = maxi(int(p_config.get("enemy_count_max", lo)), lo)
-	var count: int = _rng.randi_range(lo, hi)
+## 掷名册人数——区间来自 [code]DifficultyCurve.count_range_of[/code]（唯一来源），
+## 精英再加 [code]elite_bonus[/code]，最后夹到硬边界。[br]
+## [br][b]为什么不再读 [code]enemy_count_min[/code][/b]：区间现在是「境界差」的函数，
+## 地图配置的下限若还参与，同一张图会同时被两套口径拉扯（改一处不生效）；
+## 配置只剩 [code]enemy_count_max[/code] 作上限兜底（首图靠它保持 1 人）。[br]
+## [br][b]精英加成也受硬边界约束[/b]：越级档本身可掷到 5 人，精英再加就爆表——
+## 夹到 [constant DifficultyCurve.COUNT_MAX] 而不是让战斗规模失控。[br]
+## [br][param p_player_realm] 玩家境界（人数轴与 [code]max_deploy[/code] 夹取的一端）。[br]
+func _roll_count(p_player_realm: int, p_is_elite: bool, p_config: Dictionary) -> int:
+	var span: Dictionary = CurveScript.count_range_of(
+			int(p_config.get("enemy_realm", 0)), p_player_realm,
+			int(p_config.get("enemy_count_max", 0)), _max_deploy_of(p_player_realm))
+	var count: int = _rng.randi_range(int(span["min"]), int(span["max"]))
 	if p_is_elite:
 		count += maxi(int(p_config.get("elite_bonus", 1)), 0)
-	return maxi(count, 1)
+	return clampi(count, CurveScript.COUNT_MIN, CurveScript.COUNT_MAX)
+
+
+## 玩家出战名额——境界表 [code]max_deploy[/code]（人数上限 = 它 + 1）。[br]
+## [br][b]读不到返回 0[/b]：境界非法（≤0 / 越界）时[code]DifficultyCurve[/code]
+## 会跳过这层夹取，而不是按「0 个名额」把敌人压成 1 人。[br]
+func _max_deploy_of(p_player_realm: int) -> int:
+	var row: Variant = RealmSystemScript.realm_table.get(int(p_player_realm), null)
+	if not (row is Dictionary):
+		return 0
+	return maxi(int((row as Dictionary).get("max_deploy", 0)), 0)
 
 
 ## 按权重抽一个模板 ID——权重全 0 / 池非法时返回空（调用方跳过该条目）。

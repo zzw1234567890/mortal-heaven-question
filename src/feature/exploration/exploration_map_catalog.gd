@@ -26,7 +26,13 @@ const FirstClearRewards := preload(
 ## 「每格消耗 1，安全范围 1-2」——出厂全档 1，键存在是为了让「按地图配置扣」走配置读取
 ## 而非硬编码；单张地图可覆盖）。[br]
 ## [code]action_spring_count[/code]：本档灵泉的每图限次（同 GDD「每图限次 1 次」口径，
-## 读取侧是 [code]exploration_action_spring.gd[/code] 的 [code]limit_of[/code]）。
+## 读取侧是 [code]exploration_action_spring.gd[/code] 的 [code]limit_of[/code]）。[br]
+## [br][b][code]enemy_count_*[/code] 的语义（本轮变更）[/b]：人数区间现在由
+## [code]DifficultyCurve.count_range_of[/code] 按「地图境界档 − 玩家境界」给出，
+## 本表[b]只剩 [code]enemy_count_max[/code] 一个用途——本图人数上限兜底[/b]
+## （首图正是靠它保持 1 人）。[code]enemy_count_min[/code] 在生成路径[b]不再被读取[/b]，
+## 保留键是为了让「这张图原本怎么配的」留在表里（[code]test_map_catalog_and_pool.gd[/code]
+## 的完整性断言也读它），清理归后续 schema 收敛。
 const DIFFICULTY_DEFAULTS: Array = [
 	{"layers": 4, "min_nodes": 2, "max_nodes": 3, "elite_count": 1, "shop_count": 1,
 		"enemy_realm": 1, "enemy_count_min": 1, "enemy_count_max": 2, "elite_bonus": 1,

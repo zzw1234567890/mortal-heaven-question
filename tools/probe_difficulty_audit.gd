@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_print_realm_table()
 	_print_character_ranking(characters)
 	_print_curve_table()
+	_print_headcount_table()
 	print("")
 	_print_scenarios(characters, lookup)
 	quit()
@@ -64,16 +65,48 @@ func _print_character_ranking(p_characters: Array) -> void:
 	print("")
 
 
-## 难度系数表——档位 × 系数（全库唯一系数来源）。
+## 难度系数表——档位 × 系数 × 人数区间（全库唯一系数来源）。
 func _print_curve_table() -> void:
 	print("--- 难度系数表（DifficultyCurve.TIER_TABLE，gap = 地图境界档 − 玩家境界）---")
 	for gap: int in range(CurveScript.TIER_MIN_GAP, CurveScript.TIER_MAX_GAP + 1):
 		var key: int = clampi(gap, CurveScript.TIER_MIN_GAP, CurveScript.TIER_MAX_GAP)
 		var row: Dictionary = CurveScript.TIER_TABLE[key]
-		print("  gap=%+d：HP ×%.2f  ATK ×%.2f  档位「%s」"
-				% [gap, float(row["hp"]), float(row["atk"]), str(row["label"])])
+		print("  gap=%+d：HP ×%.2f  ATK ×%.2f  人数 %d~%d  档位「%s」"
+				% [gap, float(row["hp"]), float(row["atk"]),
+				int(row["count_min"]), int(row["count_max"]), str(row["label"])])
 	print("  追赶轴：玩家每高出模板基准 1 档 → ×%.2f（%s）"
 			% [1.0 + CurveScript.CATCH_UP_PER_REALM, "GDD §9 既有口径"])
+	print("")
+
+
+## 人数表——「每个玩家境界 × 每张地图」进图时的敌方人数区间与地图上限兜底。[br]
+## [br][b]这是本轮汇报里那张表的唯一来源[/b]（手推一遍容易漏掉夹取层：档位区间 →
+## 出战名额余量 → 地图上限 → 硬边界）。
+func _print_headcount_table() -> void:
+	var table: Dictionary = RealmScript.realm_table
+	print("--- 人数表（行 = 玩家境界，列 = 地图；格 = 该图该境界的敌方人数区间）---")
+	var header: Array = ["玩家\\地图"]
+	for map_id: StringName in CatalogScript.MAPS.keys():
+		header.append(str(CatalogScript.MAPS[map_id].get("name", map_id)))
+	print("  %s" % " | ".join(header))
+	for realm: int in range(1, 6):
+		var cells: Array = ["L%d(max_deploy=%d)" % [realm,
+				TempoModel.max_deploy_of(table, realm)]]
+		for map_id: StringName in CatalogScript.MAPS.keys():
+			var config: Dictionary = CatalogScript.config_for(map_id, realm)
+			var span: Dictionary = CurveScript.count_range_of(
+					int(config.get("enemy_realm", 0)), realm,
+					int(config.get("enemy_count_max", 0)),
+					TempoModel.max_deploy_of(table, realm))
+			# 未被任何一层夹取的档位区间——与它比较才知道这一格有没有被压低
+			var raw_row: Dictionary = CurveScript.TIER_TABLE[
+					CurveScript.tier_key_of(int(config.get("enemy_realm", 0)), realm)]
+			var squeezed: bool = int(span["max"]) < int(raw_row["count_max"])
+			cells.append("%d~%d%s" % [int(span["min"]), int(span["max"]),
+					"*" if squeezed else ""])
+		print("  %s" % " | ".join(cells))
+	print("  * = 该格被兜底压过（地图的 enemy_count_max，或「出战名额 + %d」）——首图对低境界玩家即此类"
+			% CurveScript.COUNT_OVER_DEPLOY)
 	print("")
 
 
@@ -90,11 +123,16 @@ func _print_scenarios(p_characters: Array, p_lookup: Callable) -> void:
 		var player: Dictionary = result["player"]
 		var enemy: Dictionary = result["enemy"]
 		var config: Dictionary = CatalogScript.config_for(map_id, realm)
+		var span: Dictionary = CurveScript.count_range_of(
+				int(config.get("enemy_realm", 0)), realm,
+				int(config.get("enemy_count_max", 0)),
+				TempoModel.max_deploy_of(table, realm))
 		print("")
-		print("  [%s] 地图=%s（%s）difficulty=%d enemy_realm=%d 人数区间=%d~%d"
+		print("  [%s] 地图=%s（%s）difficulty=%d enemy_realm=%d 人数区间=%d~%d 地图上限兜底=%d"
 				% [label, map_id, str(config.get("name", "")),
 				int(config.get("difficulty", -1)), int(config.get("enemy_realm", 0)),
-				int(config.get("enemy_count_min", 0)), int(config.get("enemy_count_max", 0))])
+				int(span["min"]), int(span["max"]),
+				int(config.get("enemy_count_max", 0))])
 		print("    玩家：出战 %d 人 → 总 HP %d，每回合伤害 %d"
 				% [player["chars"].size(), int(player["total_hp"]), int(player["atk_sum"])])
 		var roster_desc: Array = []
