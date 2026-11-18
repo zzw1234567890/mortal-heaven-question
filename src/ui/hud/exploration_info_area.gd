@@ -66,6 +66,24 @@ const TEXT_LAYER_PREFIX: String = "层"
 const PATH_AP: String = "exploration.action_points"
 const PATH_MAX_AP: String = "exploration.max_action_points"
 
+## === 布局常量（数据驱动——面板宽度随 AP 段数长，不写死像素）=====================
+## [b]为什么要随内容变宽[/b]：分段格每格 1 AP，而境界越高段数越多（化神 13 格）。
+## 段落文本的真实像素宽由字体度量决定（中文/块字符都不是「字符数 × 字号」），
+## 面板 Fixed 宽度一旦小于它，段条会顶出面板并压住右侧计数——这正是玩家在
+## 右下角看到的「文字显示不全」。宽度改为每次刷新技术算得，面板向右上锚点
+## 反向生长（[code]grow_horizontal = BEGIN[/code]），贴边留白不变。
+##
+## 面板内左右留白（内容不贴面板边）。
+const PANEL_PAD: float = 12.0
+## 分段格与计数之间的最小间隙。
+const AP_GAP: float = 8.0
+## 计数区预留宽（「13/13」类文本的最大占用——与 tscn 的 ApCountLabel 锚点同宽）。
+const AP_COUNT_WIDTH: float = 60.0
+## 面板最小宽度（段数少时地图名/层数仍要完整显示）。
+const PANEL_MIN_WIDTH: float = 200.0
+## 面板高度（三行各 28px——与 tscn 的行偏移配套）。
+const PANEL_HEIGHT: float = 90.0
+
 ## === 依赖注入 ==================================================================
 
 ## 注入的 GSM 引用——null 时回退 GameStateManager Autoload
@@ -164,7 +182,9 @@ func _apply_map_name(map_id: StringName) -> void:
 	map_label.text = display
 
 ## 应用 AP 显示：分段格文本 + 计数文本 + 颜色（ApDisplayRules 共享纯函数
-## 判定——禁止内联阈值）。分段格每格 1 AP、已消耗熄灭（AC 第 4 条）。
+## 判定——禁止内联阈值）。分段格每格 1 AP、已消耗熄灭（AC 第 4 条）。[br]
+## [br][b]同时把面板按段数撑到够宽[/b]（见 [method _fit_width]）——段条文本一旦
+## 宽过面板，它会顶出面板右缘并压住计数（玩家反馈的「右下角文字显示不全」）。
 func _apply_ap(current: int, max_val: int) -> void:
 	var state: Dictionary = ApDisplayRules.get_ap_color_threshold(current, max_val)
 	var segments: Array = state[&"segments"]
@@ -176,6 +196,7 @@ func _apply_ap(current: int, max_val: int) -> void:
 		seg_text += SEGMENT_ON if on else SEGMENT_OFF
 	ap_segment_label.text = seg_text
 	ap_count_label.text = "%d/%d" % [current, max_val]
+	_fit_width(seg_text)
 
 	var ap_key: String = "%d/%d" % [current, max_val]
 	if ap_key == _last_ap_key:
@@ -183,6 +204,28 @@ func _apply_ap(current: int, max_val: int) -> void:
 	_last_ap_key = ap_key
 	_set_label_color(ap_segment_label, AP_COLORS.get(state[&"color"], AP_COLORS["normal"]))
 	_set_label_color(ap_count_label, AP_COLORS.get(state[&"color"], AP_COLORS["normal"]))
+
+## 按当前段条文本把面板撑到够宽（宽度 = 左右留白 + 段条 + 间隙 + 计数区）。[br]
+## [br][b]为什么算而不用 [method Control.get_minimum_size][/b]：段条标签开了
+## [code]clip_text[/code]（防它自己顶破面板），此时最小尺寸恒为 1px——量不出内容。
+## 字体的 [method Font.get_string_size] 给的是渲染实际宽度（探针实测与未裁切时的
+## 最小尺寸逐位相同），是此处可用的真实度量。[br]
+## [br][b]最小宽度兜底[/b]：段数少（炼气 5 格）时不能让面板缩得比地图名还窄。
+func _fit_width(p_seg_text: String) -> void:
+	var seg_width: float = _text_width(ap_segment_label, p_seg_text)
+	var need: float = PANEL_PAD * 2.0 + seg_width + AP_GAP + AP_COUNT_WIDTH
+	custom_minimum_size = Vector2(maxf(need, PANEL_MIN_WIDTH), PANEL_HEIGHT)
+
+## 文本的渲染像素宽——字号取 [code]label_settings[/code] 优先（它覆盖主题字号，
+## 只读主题会把宽度算小——探针初版即栽在这里）。字体取不到时返回 0（按最小宽度走）。
+func _text_width(p_label: Label, p_text: String) -> float:
+	var font: Font = p_label.get_theme_font(&"font")
+	if font == null:
+		return 0.0
+	var size: int = p_label.get_theme_font_size(&"font_size")
+	if p_label.label_settings != null:
+		size = p_label.label_settings.font_size
+	return font.get_string_size(p_text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 
 ## 应用层数显示：当前层 layer+1（0 基转 1 基——story AC 第 1 条）/
 ## 总层数（ExplorationSystem.get_total_layers() 唯一许可入口——LP 条件③）。

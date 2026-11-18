@@ -50,6 +50,18 @@ const RECOMMEND_BORDER_WIDTH: int = 3
 const NORMAL_BORDER_COLOR: Color = Color(0.24, 0.24, 0.28, 1.0)
 const NORMAL_BORDER_WIDTH: int = 1
 
+## 卡片最小尺寸（横向由网格列宽定，纵向是给内容留的底）。
+const CARD_MIN_SIZE: Vector2 = Vector2(300, 232)
+## 卡面内容盒四周留白（与 [method _build] 里 box 的四个 offset 同源）。
+const CARD_PAD_H: float = 32.0
+const CARD_PAD_V: float = 28.0
+## 名称行字号（全卡最大——名称被截断最难认，故它优先占宽）。
+const FONT_SIZE_NAME: int = 26
+## 重复挑战说明字号。
+const FONT_SIZE_REPEAT: int = 14
+## 推荐标记字号。
+const FONT_SIZE_RECOMMEND: int = 16
+
 ## 当前卡片的地图载荷条目（只读视图数据，主界面刷新时重建）。
 var entry: Dictionary = {}
 
@@ -76,13 +88,23 @@ var _recommend_label: Label
 ## 被 ScrollContainer 内容高度撑到 524 而非 420）。
 func setup(map_entry: Dictionary) -> void:
 	entry = map_entry
-	custom_minimum_size = Vector2(300, 232)
+	custom_minimum_size = CARD_MIN_SIZE
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	# 双焦点：纯 Control 默认 FOCUS_NONE，显式开启才能 grab_focus。
 	focus_mode = Control.FOCUS_ALL
 	_build()
+
+
+## 把一行文本限制在单行 + 超长省略——卡片每行的统一收尾（见 [method _build] 的
+## 排版约束）。[br]
+## [br][b]为什么 clip_text 与省略号一起设[/b]：只设 [code]text_overrun_behavior[/code]
+## 时 Label 的最小宽仍是整段文本宽，盒子会被它顶宽；[code]clip_text[/code] 把最小宽
+## 收敛到 1px，省略号才轮到生效。两者缺一，长文案（如锁定条件行）仍然溢出卡面。
+func _trim_single_line(p_label: Label) -> void:
+	p_label.clip_text = true
+	p_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 
 
 ## 卡片是否锁定（未解锁）——供主界面入场动画/初始焦点判定读取。[br]
@@ -94,31 +116,41 @@ func is_unlocked_card() -> bool:
 	return bool(entry.get(&"is_unlocked", true))
 
 
-## 构建卡片内部结构——名称 + ⭐难度 + 状态 + 费用 + 悬停 tooltip。
+## 构建卡片内部结构——名称 + ⭐难度 + 状态 + 费用 + 悬停 tooltip。[br]
+## [br][b]所有行都只占一行且带省略号兜底[/b]（[code]clip_text[/code] +
+## [code]OVERRUN_TRIM_ELLIPSIS[/code]）：卡片是 [Panel] 而不是容器，卡面高度由
+## [constant CARD_MIN_SIZE] 固定，内容多出一行就会从卡片底下溢出去。换行
+## （autowrap）在这里是有害的——它把「一行放不下」变成「多占一行高度」，正好顶穿
+## 卡片。当前数据下最长的一行是锁定条件「需大乘期 · 需通关归墟·古魔战场」
+## （226px，盒宽 383px），省略号只在万一出现超长文案时兜底。
 func _build() -> void:
 	var box: VBoxContainer = VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 16.0
-	box.offset_top = 14.0
-	box.offset_right = -16.0
-	box.offset_bottom = -14.0
+	box.offset_left = CARD_PAD_H / 2.0
+	box.offset_top = CARD_PAD_V / 2.0
+	box.offset_right = -CARD_PAD_H / 2.0
+	box.offset_bottom = -CARD_PAD_V / 2.0
 	add_child(box)
 
 	_name_label = Label.new()
 	_name_label.text = str(entry.get(&"name", "—"))
-	_name_label.add_theme_font_size_override(&"font_size", 26)
+	_name_label.add_theme_font_size_override(&"font_size", FONT_SIZE_NAME)
+	_trim_single_line(_name_label)
 	box.add_child(_name_label)
 
 	_difficulty_label = Label.new()
 	_difficulty_label.text = _difficulty_text()
+	_trim_single_line(_difficulty_label)
 	box.add_child(_difficulty_label)
 
 	_status_label = Label.new()
 	_status_label.text = _status_text()
+	_trim_single_line(_status_label)
 	box.add_child(_status_label)
 
 	_cost_label = Label.new()
 	_cost_label.text = _cost_text()
+	_trim_single_line(_cost_label)
 	box.add_child(_cost_label)
 
 	# 解锁条件行——未解锁时明确写出缺什么（GDD exploration-ui-system.md §1
@@ -126,19 +158,22 @@ func _build() -> void:
 	# 空文本时 Label 不占高度（GODOT 空 Label 的 min_size 为 0），已解锁卡不受影响。
 	_lock_label = Label.new()
 	_lock_label.text = locked_hint_text()
+	_trim_single_line(_lock_label)
 	box.add_child(_lock_label)
 
 	# 重复挑战说明——已通关卡写清「再打一次拿什么」（见 [constant TEXT_REPEAT_REWARD]）。
 	_repeat_label = Label.new()
 	_repeat_label.text = repeat_hint_text()
-	_repeat_label.add_theme_font_size_override(&"font_size", 14)
+	_repeat_label.add_theme_font_size_override(&"font_size", FONT_SIZE_REPEAT)
+	_trim_single_line(_repeat_label)
 	box.add_child(_repeat_label)
 
 	# 推荐标记行（默认空——[method set_recommended] 在通关确认后点亮）。
 	_recommend_label = Label.new()
 	_recommend_label.text = ""
-	_recommend_label.add_theme_font_size_override(&"font_size", 16)
+	_recommend_label.add_theme_font_size_override(&"font_size", FONT_SIZE_RECOMMEND)
 	_recommend_label.add_theme_color_override(&"font_color", RECOMMEND_BORDER_COLOR)
+	_trim_single_line(_recommend_label)
 	box.add_child(_recommend_label)
 
 	# 常态边框（显式给一份——推荐态的边框覆盖它，[method set_recommended] 要能换回来）。

@@ -58,6 +58,18 @@ const TICK_INTERVAL: float = 0.1
 ## error 类型 blink 闪烁全周期（先例 realm_bar FALLEN_FLICKER_PERIOD 风格）。
 const BLINK_PERIOD: float = 0.8
 
+## === 版式常量（数据驱动——Toast 高度随文本行数走）================================
+## Toast 最小宽度（通知区的设计宽——短提示不缩成一条）。
+const TOAST_MIN_WIDTH: float = 360.0
+## 单行 Toast 高度（与容器 offset 高度同源）。
+const TOAST_LINE_HEIGHT: float = 32.0
+## 通知文本字号。
+const TOAST_FONT_SIZE: int = 13
+## 文本左右留白（Toast 内的内边距——文字不贴面板边）。
+const TOAST_PAD_H: float = 12.0
+## 文本可用宽 = 最小宽度减两侧留白——超长文案在这里折行，不裁字。
+const TOAST_TEXT_WIDTH: float = TOAST_MIN_WIDTH - TOAST_PAD_H * 2.0
+
 ## === 依赖注入 ==================================================================
 
 ## Logic 内核队列实例（测试注入点——集成测试传独立实例断言 get_active；
@@ -174,7 +186,10 @@ func _spawn_toast(id: int) -> void:
 	var holder: Control = Control.new()
 	holder.name = "Toast%d" % id
 	holder.mouse_filter = MOUSE_FILTER_IGNORE
-	holder.custom_minimum_size = Vector2(360, 32)
+	# 高度按文本行数给——通知文案长度不受控（来源是各系统的拼接串），
+	# 固定 32px 单行会把后半句裁掉；短提示仍是单行高，观感不变。
+	holder.custom_minimum_size = Vector2(TOAST_MIN_WIDTH,
+			toast_height(str(entry[&"text"])))
 	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var panel: Panel = _build_toast_panel(entry)
 	holder.add_child(panel)
@@ -183,6 +198,25 @@ func _spawn_toast(id: int) -> void:
 	_play_slide_in(id, panel)
 	if bool(entry[&"blink"]):
 		_start_blink(id, panel)
+
+
+## Toast 应占高度——按文本在可用宽度下折成几行算。[br]
+## [br][b]为什么要算[/b]：内层 Label 开了 [code]autowrap[/code] 后高度由布局决定，
+## 而外层 holder 的高度是 VBox 分配槽位的依据——holder 先按 32px 占位，文本折成
+## 两行时第二行会画到下一个 Toast 上（堆叠重叠）。[br]
+## [br][b]按字符量宽[/b]：中文在 [code]AUTOWRAP_WORD_SMART[/code] 下可逐字折行，
+## 「整串宽 ÷ 可用宽」向上取整即行数（英文单词折行的误差落在一行以内，只多不少——
+## 多给的高度是空白，少给才是裁字）。[br]
+## [br][param p_text] 通知文本。[br]
+## [br][b]返回[/b]：高度（至少一行）。
+func toast_height(p_text: String) -> float:
+	var font: Font = _stack_container.get_theme_font(&"font")
+	var lines: int = 1
+	if font != null and TOAST_TEXT_WIDTH > 0.0:
+		var width: float = font.get_string_size(p_text, HORIZONTAL_ALIGNMENT_LEFT,
+				-1, TOAST_FONT_SIZE).x
+		lines = maxi(1, int(ceil(width / TOAST_TEXT_WIDTH)))
+	return TOAST_LINE_HEIGHT * float(lines)
 
 ## 构建内层 Toast 面板（文本 + 颜色映射 + 点击关闭绑定——B-2 双层结构拆出，
 ## 保持 _spawn_toast 紧凑）。Panel 与 Label 均 FULL_RECT 锚——跟随 holder
@@ -193,14 +227,20 @@ func _build_toast_panel(entry: Dictionary) -> Panel:
 	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	panel.mouse_filter = MOUSE_FILTER_STOP
 	var label: Label = Label.new()
+	label.name = "Text"
 	label.text = str(entry[&"text"])
 	label.mouse_filter = MOUSE_FILTER_IGNORE
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# 超长文案折行而不是被裁：holder 高度已按 [method toast_height] 给足行数，
+	# 折行后的第二行落在面板内，不会画到隔壁 Toast 上。
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.offset_left = TOAST_PAD_H
+	label.offset_right = -TOAST_PAD_H
 	if label.label_settings == null:
 		label.label_settings = LabelSettings.new()
-		label.label_settings.font_size = 13
+		label.label_settings.font_size = TOAST_FONT_SIZE
 	# 颜色 String→Color 映射在 UI 层（G3 裁决——内核不返回 Color）。
 	label.label_settings.font_color = TEXT_COLORS.get(
 			str(entry[&"color"]), TEXT_COLORS["white"])

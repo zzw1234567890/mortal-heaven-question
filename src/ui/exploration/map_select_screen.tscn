@@ -38,8 +38,12 @@ mouse_filter = 2
 [node name="TitleLabel" type="Label" parent="LayoutAnchor"]
 layout_mode = 1
 anchors_preset = 0
-offset_right = 360.0
+anchor_right = 1.0
+offset_right = -420.0
 offset_bottom = 56.0
+grow_horizontal = 2
+clip_text = true
+text_overrun_behavior = 3
 theme_override_font_sizes/font_size = 32
 
 [node name="BalanceLabel" type="Label" parent="LayoutAnchor"]
@@ -47,10 +51,12 @@ layout_mode = 1
 anchors_preset = 0
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -360.0
+offset_left = -400.0
 offset_right = 0.0
 offset_bottom = 56.0
 grow_horizontal = 0
+clip_text = true
+text_overrun_behavior = 3
 theme_override_font_sizes/font_size = 22
 horizontal_alignment = 2
 
@@ -76,29 +82,34 @@ columns = 4
 title = "重入地图"
 ok_button_text = "确认传送"
 cancel_button_text = "取消"
+min_size = Vector2i(520, 260)
 
 [node name="VBox" type="VBoxContainer" parent="ReentryDialog"]
 layout_mode = 0
 offset_left = 8.0
 offset_top = 8.0
-offset_right = 380.0
-offset_bottom = 200.0
+offset_right = 504.0
+offset_bottom = 232.0
 theme_override_constants/separation = 8
 
 [node name="MapLineLabel" type="Label" parent="ReentryDialog/VBox"]
 layout_mode = 2
+autowrap_mode = 3
 theme_override_font_sizes/font_size = 18
 
 [node name="CostDetailLabel" type="Label" parent="ReentryDialog/VBox"]
 layout_mode = 2
+autowrap_mode = 3
 theme_override_font_sizes/font_size = 15
 
 [node name="BalanceLabel" type="Label" parent="ReentryDialog/VBox"]
 layout_mode = 2
+autowrap_mode = 3
 theme_override_font_sizes/font_size = 15
 
 [node name="WarnLabel" type="Label" parent="ReentryDialog/VBox"]
 layout_mode = 2
+autowrap_mode = 3
 theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.9, 0.75, 0.3, 1)
 

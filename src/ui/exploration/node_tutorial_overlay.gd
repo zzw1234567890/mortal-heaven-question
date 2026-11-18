@@ -40,6 +40,12 @@ const DIM_COLOR: Color = Color(0.0, 0.0, 0.0, 0.35)
 const TEXT_COLOR: Color = Color(0.96, 0.94, 0.88)
 ## 提示字号。
 const FONT_SIZE: int = 18
+## 提示条左右留白（像素）——文字宽度按视口宽减两侧留白算，窄屏上自动折行。
+const TEXT_MARGIN: float = 96.0
+## 提示条上边距（相对视口底——贴底但不压住节点图的底边）。
+const TEXT_BOTTOM_OFFSET: float = -112.0
+## 单行提示条高度（[constant FONT_SIZE] 的行高 + 上下呼吸）。
+const TEXT_LINE_HEIGHT: float = 40.0
 
 ## 3 步文案（UX OQ#6 占位——writer 定稿后替换本表，结构不变）。
 const STEP_TEXTS: PackedStringArray = [
@@ -74,13 +80,28 @@ func _init() -> void:
 	# Enter 跳过需要焦点（审查 H7——无 focus_mode 时键盘事件永不到达本控件）
 	focus_mode = FOCUS_ALL
 	_label = Label.new()
+	_label.name = "TutorialLabel"
 	# 提示贴底居中：原先锚在正中，直接盖在节点图上（玩家反馈「字挡着、显示不全」）。
-	_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_label.offset_top = -152.0
-	_label.offset_bottom = -112.0
+	# 宽度按视口宽算（左右各留 [constant TEXT_MARGIN]），而不是量一段够长的固定
+	# 像素——文案是本表的占位串，将来换词变长时固定宽度会把它裁掉。
+	# [b]不能用 PRESET_CENTER_BOTTOM[/b]：那个预设把左右锚都定在 0.5，两个 offset
+	# 只能给出「2×留白」的宽度（实测 192px），文字照样被裁。
+	_label.anchor_left = 0.0
+	_label.anchor_right = 1.0
+	_label.anchor_top = 1.0
+	_label.anchor_bottom = 1.0
+	_label.offset_left = TEXT_MARGIN
+	_label.offset_right = -TEXT_MARGIN
+	_label.offset_top = TEXT_BOTTOM_OFFSET - TEXT_LINE_HEIGHT
+	_label.offset_bottom = TEXT_BOTTOM_OFFSET
+	# 折行后向上长（底边不动）——提示条永远贴在节点图下沿，不会往下顶出屏幕。
 	_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# 长句折行：文案变长时先折行（Label 的最小高度随之长高，提示条向上撑开），
+	# 而不是把后半句裁掉。
+	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label.add_theme_font_size_override("font_size", FONT_SIZE)
 	_label.add_theme_color_override("font_color", TEXT_COLOR)
 	add_child(_label)
