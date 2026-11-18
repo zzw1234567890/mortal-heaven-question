@@ -60,7 +60,8 @@ func test_cost_refills_at_turn_end() -> void:
 
 
 ## 手牌在下一回合的抽牌阶段按抽牌表补充。[br]
-## [br][b]第 2 回合基础 2 张[/b]（先手第 1 回合为 0——开局手牌已单独发给）。
+## [br][b]第 2 回合抽「每名出战角色 1 张，保底 2 张」[/b]——本场 2 人上场，
+## 故与保底同值（先手第 1 回合为 0——开局手牌已单独发给）。
 func test_hand_drawn_next_turn() -> void:
 	# Arrange
 	_start([_enemy_state(&"grunt", 0)])
@@ -71,9 +72,10 @@ func test_hand_drawn_next_turn() -> void:
 	# Act——结束回合，绕回下一回合并进入其抽牌阶段
 	cs.call("confirm_end_turn")
 	_advance_to(1)  # 新回合的 DRAW 阶段
-	# Assert
-	assert_eq(cs.call("get_hand").size(), opening + Economy.DRAW_BASE,
-			"第 2 回合抽牌阶段补充 %d 张" % Economy.DRAW_BASE)
+	# Assert——抽牌数现算（本场 2 人 → 每名角色 1 张 = 2），不手抄数字
+	var expected: int = Economy.draw_count(true, 2, 2)
+	assert_eq(cs.call("get_hand").size(), opening + expected,
+			"第 2 回合抽牌阶段补充 %d 张" % expected)
 
 
 ## 结束出牌阶段后回到我方回合时，再次处于可出牌的阶段（阶段 2）。[br]

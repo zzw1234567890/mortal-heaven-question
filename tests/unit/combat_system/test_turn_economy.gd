@@ -1,9 +1,11 @@
 extends GutTest
 ## 回合经济规则单元测试（combat-ui-interaction 002 / 本轮）。[br]
-## [br][b]覆盖[/b]：GDD §2 抽牌表（先手第 1 回合 0 / 后手第 1 回合 3 / 第 2 回合起 2）、
-## 开局手牌（4 / 5）、手牌上限溢出、先手标志的缺省与脏数据兜底。[br]
+## [br][b]覆盖[/b]：GDD §2 抽牌表（先手第 1 回合 0 / 后手第 1 回合 3 / 第 2 回合起
+## 「每名出战角色 1 张，保底 2 张」）、开局手牌（4 / 5）、手牌上限溢出、
+## 先手标志的缺省与脏数据兜底。[br]
 ## [br][b]为什么单测纯函数[/b]：这些数字是 GDD 明文规则，最容易被后续改动悄悄漂移
-## （旧实现恒返 2 就是漂移的实例）。纯函数测试零依赖、改一处立刻变红。
+## （旧实现恒返 2 就是漂移的实例，而「恒返 2」正是本轮修掉的输出瓶颈）。
+## 纯函数测试零依赖、改一处立刻变红。
 
 const Economy := preload("res://src/feature/combat/combat_turn_economy.gd")
 
@@ -21,9 +23,37 @@ func test_draw_second_player_turn1_is_three() -> void:
 
 
 func test_draw_base_from_turn2() -> void:
-	assert_eq(Economy.draw_count(true, 2), 2, "先手第 2 回合基础 2 张")
-	assert_eq(Economy.draw_count(false, 2), 2, "后手第 2 回合基础 2 张")
-	assert_eq(Economy.draw_count(true, 9), 2, "第 9 回合仍为基础 2 张")
+	assert_eq(Economy.draw_count(true, 2), 2, "先手第 2 回合保底 2 张")
+	assert_eq(Economy.draw_count(false, 2), 2, "后手第 2 回合保底 2 张")
+	assert_eq(Economy.draw_count(true, 9), 2, "第 9 回合仍为保底 2 张")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 抽牌数随出战人数走（本轮修订——GDD §2 抽牌规则表）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 出战 3 人以上时每名角色各得 1 张——「出战名额随境界递增」必须兑现成手牌，
+## 否则第 3~5 名角色整场轮不到出牌。
+func test_draw_scales_with_actor_count() -> void:
+	assert_eq(Economy.draw_count(true, 2, 3), 3, "3 人出战 → 抽 3 张")
+	assert_eq(Economy.draw_count(true, 2, 5), 5, "5 人出战（元婴）→ 抽 5 张")
+	assert_eq(Economy.draw_count(true, 2, 6), 6, "6 人出战（化神）→ 抽 6 张")
+
+
+## 出战 2 人及以下退回保底——首图（炼气 2 人）的节奏因此与修订前逐位一致。
+func test_draw_falls_back_to_floor_for_small_rosters() -> void:
+	assert_eq(Economy.draw_count(true, 2, 2), Economy.DRAW_BASE_MIN, "2 人 = 保底")
+	assert_eq(Economy.draw_count(true, 2, 1), Economy.DRAW_BASE_MIN, "1 人退回保底")
+	assert_eq(Economy.draw_count(true, 2, 0), Economy.DRAW_BASE_MIN,
+			"读不到名册（桩式开战）退回保底")
+	assert_eq(Economy.draw_count(true, 2, -3), Economy.DRAW_BASE_MIN,
+			"脏数据（负数）同样退回保底，不产出负抽牌")
+
+
+## 第 1 回合不受出战人数影响——先后手分岔优先（开局手牌已单独发给）。
+func test_turn1_branch_ignores_actor_count() -> void:
+	assert_eq(Economy.draw_count(true, 1, 6), 0, "先手第 1 回合恒不抽牌")
+	assert_eq(Economy.draw_count(false, 1, 6), 3, "后手第 1 回合恒抽 3 张")
 
 
 func test_draw_turn_below_one_treated_as_turn1() -> void:

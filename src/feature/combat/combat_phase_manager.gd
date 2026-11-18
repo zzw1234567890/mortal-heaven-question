@@ -234,11 +234,22 @@ func _get_field_characters() -> Array:
 
 
 ## 计算抽牌数量——GDD §2 抽牌规则表（先手第 1 回合 0 / 后手第 1 回合 3 /
-## 第 2 回合起基础 2）。[br]
+## 第 2 回合起「每名出战角色 1 张，保底 2 张」）。[br]
 ## [br][b]规则表在 [code]combat_turn_economy.gd[/code][/b]——本方法只负责
-## 「在抽牌阶段问它要数字」，不在这里写条件分支（数值口径单一来源）。
+## 「在抽牌阶段问它要数字」，不在这里写条件分支（数值口径单一来源）。[br]
+## [br][b]出战人数取开战名册快照[/b]：不取「当前存活人数」——那样每阵亡一人手牌就
+## 少一张，先挨打的一方输出越打越低，会把一次失误放大成必败。也不回退现读阵位：
+## 快照就是唯一来源（config 缺名册时 [code]capture_rosters[/code] 已写入阵位快照），
+## 现读会读进上一场留下的阵容。
 func _calculate_draw_count() -> int:
-	return TurnEconomy.draw_count(_is_first_player(), int(_parent.get("_turn")))
+	return TurnEconomy.draw_count(_is_first_player(), int(_parent.get("_turn")),
+			_actor_count())
+
+
+## 本场出战人数——开战名册快照；无名册（桩式开战路径）返回 0 → 抽牌退回保底。
+func _actor_count() -> int:
+	var roster: Variant = _parent.get("_battle_player_roster")
+	return (roster as Array).size() if roster is Array else 0
 
 
 ## 先手标志——开战 config 供数（[code]combat_turn_economy.is_first_player[/code]）。

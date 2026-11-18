@@ -15,27 +15,48 @@ extends RefCounted
 const DRAW_FIRST_PLAYER_TURN_1: int = 0
 ## 后手第 1 回合抽牌数——3（补偿后手劣势）。
 const DRAW_SECOND_PLAYER_TURN_1: int = 3
-## 每回合基础抽牌数（第 2 回合起，双方一致）。
-const DRAW_BASE: int = 2
 
-## 开局手牌张数——先手。
+## 每回合基础抽牌数的[b]保底[/b]——GDD §2 原条款「每回合基础 2 张」。
+## [br][b]为什么是保底而不是定值[/b]：详见 [constant DRAW_PER_ACTOR]。
+const DRAW_BASE_MIN: int = 2
+
+## 每名出战角色每回合应得的手牌数。[br]
+## [br][b]为什么抽牌数随出战人数走[/b]：GDD combat-system.md §6 定「每个己方角色
+## 每回合可攻击 1 次」，而伤害要靠手牌打出去——手牌只够 2 人出手时，第 3~5 名
+## 出战角色整场都轮不到出牌，「出战名额随境界递增」这条成长轴就形同虚设。[br]
+## [br][b]实测证据[/b]（元婴打归墟通道：我方 5 人 43 HP、敌方 2 鬼修 76 HP）：
+## 固定抽 2 张时我方每回合只打得出 3~8 点伤害，需约 10 回合才能清空敌方，
+## 而我方只活 5 回合——「同境界 = 3~5 回合能赢」这条口径在真实战斗里不成立。[br]
+## [br][b]为什么不做成「每人一张牌」的直接映射[/b]：保底 [constant DRAW_BASE_MIN]
+## 让出战 0~2 人的场合（单测桩、无阵容的渡劫路径、炼气期首图）取值与改造前
+## 逐位一致——首图的两条端到端节奏用例因此一个数字都不用改。[br]
+##
+## 来源: GDD combat-system.md §2 抽牌规则（2026-11-18 修订）、§6 攻击规则、
+## §调优参数「每名出战角色每回合手牌数」。
+const DRAW_PER_ACTOR: int = 1
+
+## 开局手牌张数——先手（GDD §2「先手 4 张」）。
 const OPENING_HAND_FIRST: int = 4
-## 开局手牌张数——后手。
+## 开局手牌张数——后手（GDD §2「后手 5 张」，补偿后手劣势）。
 const OPENING_HAND_SECOND: int = 5
 
 ## 手牌上限（GDD card-system.md §手牌限制：超限需弃至 10 张）。
 const HAND_LIMIT: int = 10
 
 
-## 本回合抽牌数（GDD §2 抽牌规则表）。[br]
-## [br]第 1 回合按先后手分岔，第 2 回合起一律 [constant DRAW_BASE]。[br]
-## [param p_turn] 回合编号（从 1 开始；[code]<= 1[/code] 一律按第 1 回合处理——
+## 每回合抽牌数（GDD §2 抽牌规则表）。[br]
+## [br]第 1 回合按先后手分岔（使用开局手牌 / 后手补偿 3 张），第 2 回合起按
+## 「每名出战角色 [constant DRAW_PER_ACTOR] 张，保底 [constant DRAW_BASE_MIN] 张」。[br]
+## [br][param p_turn] 回合编号（从 1 开始；[code]<= 1[/code] 一律按第 1 回合处理——
 ## 桩环境里 turn 可能尚未落定，按第 1 回合从严比按基础值宽松更安全）。[br]
-static func draw_count(p_is_first_player: bool, p_turn: int) -> int:
+## [param p_actor_count] 本场出战名册人数（缺省 0 = 读不到 → 退回保底，
+## 与「每回合基础 2 张」的旧口径逐位一致，桩式单测因此不必编造阵容）。
+static func draw_count(p_is_first_player: bool, p_turn: int,
+		p_actor_count: int = 0) -> int:
 	if p_turn <= 1:
 		return DRAW_FIRST_PLAYER_TURN_1 if p_is_first_player \
 				else DRAW_SECOND_PLAYER_TURN_1
-	return DRAW_BASE
+	return maxi(DRAW_BASE_MIN, maxi(int(p_actor_count), 0) * DRAW_PER_ACTOR)
 
 
 ## 开局手牌张数（GDD §2：先手 4 / 后手 5）。

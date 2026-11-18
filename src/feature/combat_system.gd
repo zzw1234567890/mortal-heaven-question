@@ -303,6 +303,9 @@ func set_battle_active(active: bool, turn: int = 1) -> void:
 	# 被下一场 advance_phase 的收尾逻辑捡起来误执行）
 	_pending_battle_result = 0
 	if active:
+		# 本场我方名册同样只在单场内有意义——桩式开关没有名册可快照，清空后
+		# 抽牌退回保底张数（否则会读进上一场/别的用例留下的阵容，抽牌数漂移）
+		_battle_player_roster = []
 		_turn = turn
 		_phase = CombatPhase.PREPARATION
 		_player_confirmed_end = false
