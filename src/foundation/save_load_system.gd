@@ -275,13 +275,18 @@ func _atomic_write(path: String, data: Dictionary) -> int:
 ## === Story 003: 存档容器 schema + 完整性校验 =====================================
 
 ## 当前存档格式版本——递增整数，唯一驱动迁移链的字段。
-## [br][b]v2（本轮）[/b]：探索域的「已弹事件节点」进存档
+## [br][b]v3（本轮）[/b]：「回到这场战斗」的存档段进容器
+## （[code]game_state.battle_resume[/code]）——战斗域不可持久化，玩家在战斗中存的档
+## 此前读回来只有探索地图，那场仗连同残血静默消失。v2 档读入时补一个空段
+## （[code]{}[/code] 即「没有进行中的战斗」，与探索域补 [code]events_shown[/code]
+## 同一口径：补的是默认值，不改变玩家已获得的任何东西）。[br]
+## [br][b]v2[/b]：探索域的「已弹事件节点」进存档
 ## （[code]map_states[*].events_shown[/code]）——此前该状态只在事件面板的成员变量里
 ## （进程一退就丢，重进同一张图同一节点会再弹一次）。v1 档读入时为每张已存在的图
 ## 补空的 [code]events_shown[/code]（旧档没有这个键，等价于「本图什么都还没弹过」，
 ## 不改变玩家已获得的任何东西）。[br]
 ## [br][b]v1[/b]：ADR-0002 定义的第 1 版存档容器格式。[br]
-const CURRENT_SCHEMA_VERSION: int = 2
+const CURRENT_SCHEMA_VERSION: int = 3
 
 ## 迁移函数注册表（[b]覆盖层[/b]）——键为迁移前的 schema_version，值为迁移函数
 ## （纯函数 Dictionary → Dictionary）。[br]
@@ -299,7 +304,11 @@ static var MIGRATIONS: Dictionary[int, Callable] = {}
 ## 生产迁移链——随版本发布固定，不受测试注入 / [code]clear()[/code] 影响。[br]
 ## [br]已登记：[br]
 ## [code]  1: _migrate_v1_to_v2,[/code]  # 探索域新增 events_shown[br]
-static var DEFAULT_MIGRATIONS: Dictionary[int, Callable] = {1: _migrate_v1_to_v2}
+## [code]  2: _migrate_v2_to_v3,[/code]  # GSM 新增 battle_resume 段[br]
+static var DEFAULT_MIGRATIONS: Dictionary[int, Callable] = {
+	1: _migrate_v1_to_v2,
+	2: _migrate_v2_to_v3,
+}
 
 
 ## 取某个起始版本的迁移函数——覆盖层优先，其次生产链（无则返回空 Callable）。[br]
@@ -340,7 +349,24 @@ static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 	return data
 
 
-## 构造完整存档容器——包含全部 7 个顶层字段。
+## v2 → v3 迁移——GSM 补 [code]battle_resume[/code] 段（纯函数，无副作用）。[br]
+## [br][b]补的是默认值，不是数据[/b]：v2 档没有这个段，读侧按
+## [code]{}[/code]（没有进行中的战斗）处理——功能上已经向后兼容，这里显式补键
+## 是为了让存档形状与 v3 一致（写完一次就是完整 v3 形态）。[br]
+## [br][b]空字典不是「丢了一条命」[/b]：它准确表示「这份档不是在战斗中存的」。
+## 老档玩家读档后回到探索地图，与升级前完全一致（旧档不许丢档）。[br]
+## [br][b]不碰任何已有键[/b]：角色 / 卡组 / 探索 / 叙事各域原样透传。[br]
+## [br][b]容错[/b]：域缺失 / 非字典一律跳过（不是崩溃，也不是臆造）。[br]
+## [br][b]已有段不覆盖[/b]：手动构造的 v2 容器若已带 [code]battle_resume[/code]
+## （测试或提前写盘），迁移保持它——迁移的职责是补缺，不是重置。[br]
+## [br]来源: ADR-0002 §迁移链纯函数契约、本轮「战斗中存档 → 读档回到战斗」。
+static func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
+	var game_state: Variant = data.get("game_state", null)
+	if not (game_state is Dictionary):
+		return data
+	if not (game_state as Dictionary).has("battle_resume"):
+		(game_state as Dictionary)["battle_resume"] = {}
+	return data
 ##
 ## [b]参数[/b]: [param serialized_gsm] GSM.serialize() 的输出（Dictionary）。[br]
 ## [b]参数[/b]: [param meta] 展示用元信息——缺失字段以默认值填充。[br]

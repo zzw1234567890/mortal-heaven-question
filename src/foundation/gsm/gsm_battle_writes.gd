@@ -170,6 +170,42 @@ func _increment_battle_turn() -> void:
 	_gsm._buffer_change("battle.turn", old_turn, old_turn + 1)
 
 
+## 原子写入战斗回合数——仅 CombatSystem 调用（读档回到战斗时按存档值落位）。[br]
+## [br][b]与 [method _increment_battle_turn] 并存[/b]：那条是回合推进（+1），
+## 本方法是「把回合拨到某个值」——读档恢复只有后者能做到。[br]
+## [br][b]下限 1[/b]：回合数从 1 起（存档被改成 0 / 负数时不写进去）。
+func _set_battle_turn(turn: int) -> void:
+	if _gsm.battle == null:
+		push_warning("GSM._set_battle_turn: 无活跃战斗，拒绝写入")
+		return
+
+	var next: int = maxi(turn, 1)
+	var old_turn: int = int(_gsm.battle.get("turn", 1))
+	if old_turn == next:
+		return  # 值无变化——去重
+
+	_gsm.battle.turn = next
+	_gsm._buffer_change("battle.turn", old_turn, next)
+
+
+## 原子写入「进行中战斗」的存档形态——战斗结束时清空、存档前由战斗系统刷新。[br]
+## [br][b]为什么与 [code]battle[/code] 域并存[/b]：[code]battle[/code] 不可持久化
+## （战斗结束即置 null，且含 [code]EnemyBattleState[/code] 对象），而「回到这场战斗」
+## 需要一份 JSON 安全的快照——本方法写的就是它（口径归
+## [code]src/feature/combat/battle_resume_payload.gd[/code]）。[br]
+## [br][b]空字典 = 没有进行中的战斗[/b]：与 [constant battle_resume] 的出厂值同义，
+## 读档侧据此决定「回探索」还是「回战斗」。[br]
+## [br][b]整段替换 + 同值去重[/b]：这是一份自洽快照（名册与 HP 必须同批写），
+## 逐键合并会造出「新名册 + 旧 HP」的中间态。[br]
+## [br]来源: ADR-0002 §存档容器、ADR-0008 §GSM 边界、本轮「战斗中存档 → 读档回战斗」。
+func _set_battle_resume(resume: Dictionary) -> void:
+	var old: Dictionary = _gsm.battle_resume
+	if _gsm._deep_equal(old, resume):
+		return  # 值无变化——去重
+	_gsm.battle_resume = resume.duplicate(true)
+	_gsm._buffer_change("battle_resume", old, resume)
+
+
 ## 原子写入战斗活跃标志——仅 CombatSystem 调用。[br]
 ## [br][b]active=true 时创建 battle 域[/b]：若 battle == null，初始化默认 battle 字典。[br]
 ## [br][b]active=false 时清理 battle 域[/b]：设为 null。[br]

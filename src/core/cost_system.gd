@@ -118,6 +118,23 @@ func init_for_battle(max_cost: int) -> void:
 	cost_changed.emit(_current_cost, _max_cost, _max_cost + _temp_bonus)
 
 
+## 按存档值恢复费用——读档回到战斗时调用（与 [method init_for_battle] 同一激活语义）。[br]
+## [br][b]为什么不能只用 [method init_for_battle][/b]：那条链把
+## [code]_current_cost[/code] 拉满 [code]_max_cost[/code]，而存档里那场仗可能已经
+## 花掉了费用——直接开局会让玩家凭空多出一轮费用。[br]
+## [br][b]上限仍走同一处守卫[/b]（至少 1 费）；[code]current[/code] 夹在
+## [code][0, max][/code] 之间（越界存档值不放大可用费用）。[br]
+## [br][b]临时加成不恢复[/b]：丹药加成是回合内的一次性效果（[method reset_for_turn]
+## 每回合清零），存档里也不记——恢复了才会与「下一回合清零」的口径打架。[br]
+## [br][param current] 存档里的当前可用费用。[br]
+## [param max] 存档里的境界上限（经过缩放前的原值）。
+func restore_for_battle(current: int, max: int) -> void:
+	init_for_battle(max)
+	_current_cost = clampi(current, 0, _max_cost)
+	_write_cost_to_gsm()
+	cost_changed.emit(_current_cost, _max_cost, _max_cost + _temp_bonus)
+
+
 ## 扣除费用——由 CombatSystem.play_card() 调用。[br]
 ## [br][b]非活跃战斗[/b]：push_warning 并返回 false。[br]
 ## [br][b]amount <= 0[/b]：视为空操作，返回 true（与 can_afford 语义一致）。[br]

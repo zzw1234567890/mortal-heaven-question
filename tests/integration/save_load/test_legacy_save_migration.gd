@@ -16,7 +16,11 @@ extends "res://tests/integration/save_load/save_round_trip_fixture.gd"
 ##   5. 缺埋字段的旧档（player 无 character_hp / unavailable_characters）→ 填默认值；[br]
 ##   6. 连 schema_version 都没有的档 → 走失败路径而非被当最新版硬读；[br]
 ##   7. 迁移后能再存一次（存档可继续用，不是「只读的博物馆」）。[br]
-## [br]来源: ADR-0002 §JSON + 迁移链、ADR-0019 §向前兼容、本轮任务书第 2/3 条。
+## [br]来源: ADR-0002 §JSON + 迁移链、ADR-0019 §向前兼容、本轮任务书第 2/3 条、
+## 本轮「战斗中存档 → 读档回到战斗」（v2 → v3 补 [code]battle_resume[/code] 段）。
+
+## 续战载荷模块——本文件只用它的[b]读侧判据[/b]（「这份档在不在战斗中」）。
+const PayloadScript := preload("res://src/feature/combat/battle_resume_payload.gd")
 
 ## 用例存档根目录——专用子目录，避免与往返用例互相清场。
 const LEGACY_ROOT: String = "user://test_legacy_migration_saves/"
@@ -138,6 +142,54 @@ func test_save_without_schema_version_is_rejected_not_assumed_current() -> void:
 			"无登记迁移的 0 版档应走失败路径（而非被当最新版硬读）")
 	assert_push_error_count(1, "应有一条迁移失败的 push_error（玩家据此看到损坏提示）")
 	assert_eq(gsm.exploration.map_states.size(), 0, "失败时内存状态不得被部分写入")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 2.5 老档没有战斗段：读出来「不在战斗中」，探索态一字不动（B 项的兼容半边）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 本轮把 [code]battle_resume[/code] 段加进存档，老档里根本没有这个键。[br]
+## [br][b]为什么必须钉[/b]：读档侧的导航判据是「这份档在不在战斗中」——判错一头，
+## 每次继续游戏都会被送进战斗场景（而那里没有任何可续的仗）；判错另一头更隐蔽：
+## 「读档时把战斗段清一遍」顺手写坏探索域，玩家丢的是整张图的进度。[br]
+## [br][b]断言的是读侧口径[/b]：迁移补出来的是空段 → [method
+## BattleResumePayload.is_in_battle] 为 false、[method
+## BattleResumePayload.is_resumable_payload] 为 false——主菜单据此走探索那条老路。
+func test_v2_save_without_battle_section_reads_as_not_in_battle() -> void:
+	# Arrange——v2 形态（本轮之前的最新版）：有完整 game_state，没有 battle_resume
+	var game_state: Dictionary = _v1_game_state()
+	assert_false(game_state.has("battle_resume"), "前置：老档确实没有这个键")
+	_write_legacy_save(2, game_state)
+	# Act
+	assert_eq(_load_legacy(), SLS.LoadResult.SUCCESS, "v2 老档必须读得进来")
+	# Assert——迁移补出了这一段，且它表示「没有进行中的战斗」
+	assert_true((gsm.get("battle_resume") as Variant) is Dictionary,
+			"迁移应补出 battle_resume 段（缺域不能留 null——读侧会对它取键）")
+	assert_false(PayloadScript.is_in_battle(gsm.battle_resume),
+			"老档不得被判为「在战斗中」（否则继续游戏会把玩家送进战斗场景）")
+	assert_false(PayloadScript.is_resumable_payload(gsm.battle_resume),
+			"老档不得被判为可续战")
+	assert_eq(gsm.battle_resume, {}, "补出来的是空段（不是一份凑出来的假载荷）")
+
+
+## 迁移补战斗段时不得碰探索域的一个字节。[br]
+## [br][b]为什么单独一条[/b]：迁移函数是「就地改 [code]game_state[/code] 字典」的
+## 写法，多写一个键就可能连带把探索条目也改掉——而那种损坏只会在读档后体现为
+## 「进度少了几个节点」，很难反查到迁移。
+func test_v2_migration_leaves_exploration_state_untouched() -> void:
+	# Arrange
+	_write_legacy_save(2, _v1_game_state())
+	# Act
+	assert_eq(_load_legacy(), SLS.LoadResult.SUCCESS)
+	# Assert——探索态逐项与盘上那份一致
+	var state: Dictionary = state_of_a()
+	assert_eq(int(state.get("clear_count", -1)), 2, "通关次数不受迁移影响")
+	assert_eq(int(state.get("entry_count", -1)), 3, "进图次数不受迁移影响")
+	assert_eq(int(state.get("collected_ling_shi", -1)), 45, "已收灵识不受迁移影响")
+	assert_eq(gsm.exploration.visited_nodes, [0, 101], "已访问节点不受迁移影响")
+	assert_eq(gsm.exploration.action_points, 1, "行动力不受迁移影响")
+	assert_eq(str(gsm.exploration.current_map), str(MAP_A), "当前地图不受迁移影响")
+	assert_eq(HarvestScript.harvested_slots(state, 203), [1], "已采槽位不受迁移影响")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -87,7 +87,10 @@ class MockSceneManager:
 
 ## GameStateManager 替身——提供存档载荷（[code]serialize[/code]）与进度行读取面
 ## （[code]exploration[/code] 属性）。[br]
-## [br][b]载荷可置空[/b]：空载荷是「序列化失败」的信号，动作层据此拒绝写盘。
+## [br][b]载荷可置空[/b]：空载荷是「序列化失败」的信号，动作层据此拒绝写盘。[br]
+## [br][b]不做续战段[/b]：战斗快照那半只由
+## [code]test_pause_menu_save_in_battle.gd[/code] 自己带替身进来（本夹具不养一个
+## 用不上的面——它已超 300 行软上限）。
 class MockGsm:
 	extends Node
 

@@ -87,6 +87,12 @@ var combat_system: Node = null
 ## DeckEditingSystem 引用——卡组查看的数据源（HUD 注入；null 时面板回退 Autoload）。
 var deck_system: Node = null
 
+## DeploymentSystem 引用——战斗快照里的我方阵位 / 前后排来源（HUD 注入）。[br]
+## [br][b]为什么要它[/b]：存档侧要抓「我方谁站在前排」，而阵位只在
+## [code]DeploymentSystem.get_field()[/code] 上；缺席时快照缺我方条目，读档侧按
+## 「不可续」处理（宁可不续，也不续一场我方缺席的仗）。
+var deployment_system: Node = null
+
 ## CardSystem 引用——卡组行的名称/稀有度取模板（HUD 注入；null 时同上回退）。
 var card_system: Node = null
 
@@ -302,6 +308,9 @@ func get_actions() -> RefCounted:
 	_actions.scene_manager = scene_manager
 	_actions.save_load = save_load
 	_actions.gsm = gsm_ref
+	# 战斗快照的两个来源（存档侧抓「这一仗打到哪了」）——注入优先、缺席即「没有战斗」
+	_actions.combat = combat_system
+	_actions.deployment = deployment_system
 	return _actions
 
 ## 场景变体 + 二次确认编排层——懒建一次，宿主引用在此一次性交给它（同

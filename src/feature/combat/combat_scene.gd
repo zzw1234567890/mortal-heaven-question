@@ -37,6 +37,8 @@ const ExitsScript := preload("res://src/feature/combat/combat_scene_exits.gd")
 const LaunchScript := preload("res://src/feature/combat/combat_scene_launch.gd")
 ## 开战守卫与执行（布阵 / 牌堆 / 敌方阵容——本容器只负责「何时开战」）。
 const LauncherScript := preload("res://src/feature/combat/combat_scene_battle_launcher.gd")
+## 读档续战（存档段重建这一场——与开战前置并列的第二条开战入口）。
+const ResumeScript := preload("res://src/feature/combat/combat_scene_resume.gd")
 
 ## 备战面板标题（GDD §8 备战阶段 UI）。
 const TEXT_BATTLE_TITLE: String = "⚔ 遭遇战"
@@ -68,6 +70,8 @@ var result_bridge: RefCounted = null
 var bag_mount: RefCounted = null
 ## 探索侧开战上下文（[method _ready] 一次性取走——空 = 无上下文，开战给可读失败）。
 var launch: RefCounted = null
+## 读档续战段（[method _ready] 一次性取走——空 = 常规开战路径，走备战面板）。
+var resume: RefCounted = null
 ## 开战被拒的可读失败文案（空串 = 未失败；UI/测试据此展示原因）。
 var launch_failure: String = ""
 
@@ -96,16 +100,22 @@ func _ready() -> void:
 	combat_root = CombatRootScene.instantiate()
 	add_child(combat_root)
 	_consume_launch_context()
+	# 读档续战：段在哪，哪一场就是要重建的那场（见 [method _consume_resume]）。
+	var resuming: bool = _consume_resume()
 	exits = ExitsScript.new()
 	exits.call(&"setup", _combat(), _scene_manager())
 	# 七组表现层接线（音频 / 面板 / 备战 / 反馈 / 结算回流 / 出牌交互 / 行囊）
 	var mounting: RefCounted = MountingScript.new(self, combat_root)
+	# 续战时不弹备战面板（阵容在存档里）——置位必须在 wire_all 之前
+	mounting.set("skip_deploy_open", resuming)
 	var wired: Dictionary = mounting.call(&"wire_all", _on_deploy_confirmed,
 			_on_deploy_back, _on_retreat_confirmed, _on_defeat_confirmed)
 	result_bridge = wired.get("result_bridge")
 	interaction_wiring = wired.get("interaction_wiring")
 	bag_mount = wired.get("bag_mount")
 	combat_root.call(&"play_entrance", _read_reduce_motion())
+	if resuming:
+		_resume_battle()
 
 
 ## 探索侧开战上下文——一次性取走并做契约校验。[br]
@@ -113,11 +123,41 @@ func _ready() -> void:
 ## 经 [member launch_failure] 暴露，开战时再 push_error 并拒绝开战
 ## （避免带着空敌方阵容打一场判不出胜负的战斗）。[br]
 ## [br][b]为什么不在这里 push_error[/b]：[code]_ready[/code] 阶段的错误会被
-## GUT 归罪到挂载场景的测试用例；失败留给 [method _start_battle] 的可读出口。
+## GUT 归罪到挂载场景的测试用例；失败留给 [method _start_battle] 的可读出口。[br]
+## [br][b]续战优先于探索上下文[/b]（见 [method _consume_resume]）：读档进来的这一跳
+## 没有探索节点带路，开战上下文由存档段现折（[code]combat_scene_resume.gd[/code]）；
+## 先取续战段，它若在，会把折好的上下文重新发布一次，覆盖掉上一次战斗留下的残值。
 func _consume_launch_context() -> void:
 	launch = LaunchScript.new()
 	launch.call(&"consume", launch_context_override)
 	launch_failure = str(launch.call(&"failure_text"))
+
+
+## 读档续战段——一次性取走（**必须在 [method _consume_launch_context] 之后**，
+## 因为取走时会把存档里的来源重新发布成开战上下文）。[br]
+## [br][b]返回[/b]：本次进战斗是否走「回到存档里那一场」这条路。
+func _consume_resume() -> bool:
+	resume = ResumeScript.new()
+	if not bool(resume.call(&"consume")):
+		resume = null
+		return false
+	# 续战段折出的上下文比探索侧的残值权威——重新取一次，让标题 / 阵容口径跟上
+	_consume_launch_context()
+	return true
+
+
+## 重建存档里那一场并跳过备战面板。[br]
+## [br][b]为什么要跳过备战面板[/b]：面板是「这一仗打不打、谁上」的入口，而玩家在
+## 存档那一刻已经回答过了（阵容与前后排就在存档段里）；再问一次等于让他把阵
+## 重新摆一遍，摆得不一样还会得到一场与存档不符的战斗。[br]
+## [br][b]失败不静默[/b]：重建被拒（模板已不存在等）时 push_error 并把原因写进
+## [member launch_failure]——随后落到常规开战路径（面板仍关着，玩家可点返回探索）。
+func _resume_battle() -> void:
+	var reason: String = str(resume.call(&"start", _combat(), combat_root,
+			interaction_wiring, _launch_deps(), _realm_id()))
+	if not reason.is_empty():
+		launch_failure = reason
+		push_error("CombatScene: " + reason)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

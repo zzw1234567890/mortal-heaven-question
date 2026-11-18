@@ -26,6 +26,10 @@ const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
 const SLScript := preload("res://src/foundation/save_load_system.gd")
 ## 跨场景进入意图（读到哪、进哪张图由探索场景自己按 GSM 现取）。
 const IntentScript := preload("res://src/feature/exploration/exploration_entry_intent.gd")
+## 跨场景续战意图（读到进行中的战斗时留下——战斗场景取走并重建那一场）。
+const ResumeIntentScript := preload("res://src/feature/combat/battle_resume_intent.gd")
+## 载荷模块（「存档里这一段能不能读回来」的唯一判据）。
+const ResumePayloadScript := preload("res://src/feature/combat/battle_resume_payload.gd")
 
 ## 宿主节点（[code]get_node_or_null[/code] 回退 Autoload 用）。
 var host: Node = null
@@ -33,6 +37,11 @@ var host: Node = null
 var scene_manager: Node = null
 ## 注入的 SaveLoadSystem（测试替换；null 时回退 Autoload）。
 var save_load: Node = null
+## 注入的 GameStateManager（读「存档里有没有进行中的战斗」；null 时回退 Autoload）。[br]
+## [br][b]为什么读 GSM 而不是翻存档容器[/b]：[code]load_game[/code] 已把整份存档反序列化
+## 进 GSM，[code]battle_resume[/code] 就在那里；再翻一遍 [code]data["game_state"][/code]
+## 等于把同一事实读两处（口径漂移的起点）。
+var gsm: Node = null
 
 
 ## 读档并续玩——成功且载荷非空时请求导航到探索。[br]
@@ -42,6 +51,8 @@ var save_load: Node = null
 ## 而 [code]_ready[/code] 发生在转场之后；反过来则场景挂载时读到的还是 NONE。[br]
 ## [br][b]不导航的两种情况[/b]：读档失败（返回码非 SUCCESS）、载荷为空
 ## （见类文档「为什么读档成功还要再判一次载荷」）。[br]
+## [br][b]存档里有进行中的战斗时改去战斗场景[/b]（[method request_battle_resume]）：
+## 玩家存的是「打了一半的那场仗」，送回探索地图等于把它丢掉。[br]
 ## [br][param p_slot_type] 槽位类型（AUTOSAVE / MANUAL）。[br]
 ## [param p_slot_id] 手动槽编号（自动槽为 0）。
 func load_and_resume(p_slot_type: int, p_slot_id: int) -> int:
@@ -57,9 +68,54 @@ func load_and_resume(p_slot_type: int, p_slot_id: int) -> int:
 		# 成功但空载荷——留在主菜单（不弹损坏框：文件没坏，只是没有可续玩的内容）
 		push_warning("MainMenu: 读档成功但载荷为空——留在主菜单不导航")
 		return code
+	if request_battle_resume():
+		return code
 	IntentScript.request_resume()
 	request_exploration()
 	return code
+
+
+## 存档里若有进行中的战斗，留下续战意图并请求导航到战斗场景。[br]
+## [br][b]返回[/b]：是否走了这条路（false = 没有战斗段，调用方按常走的探索续玩）。[br]
+## [br][b]导航仍经 SceneManager[/b]（ADR-0005）：本模块只决定「去哪」，
+## 转场参数与 from 的取法同 [method request_exploration]。[br]
+## [br][b]载荷不可续时按没有战斗段处理[/b]：清掉意图走探索——玩家最多是「回到地图
+## 重新点一次那个节点」，而不是被带进一场判不出胜负的仗。
+func request_battle_resume() -> bool:
+	var payload: Variant = _battle_resume_payload()
+	if not ResumePayloadScript.is_resumable_payload(payload):
+		return false
+	if not ResumeIntentScript.request(payload):
+		return false
+	request_combat()
+	return true
+
+
+## 请求导航到战斗场景（读档续战路径）。[br]
+## [br][b]不去渡劫场景[/b]：渡劫战没有探索来源，不存在续战段（见
+## [code]battle_resume_payload.gd[/code] §「为什么不渡劫」）。
+func request_combat() -> void:
+	var sm: Node = get_scene_manager()
+	if sm == null or not sm.has_method(&"request_scene_change"):
+		push_error("MainMenu: SceneManager 不可用——续战导航中止")
+		return
+	var from_id: int = SceneManagerScript.SceneID.MAIN_MENU  # 守卫失败回退
+	if sm.has_method(&"get_current_scene_id"):
+		from_id = sm.get_current_scene_id()
+	sm.request_scene_change(from_id,
+			SceneManagerScript.SceneID.COMBAT,
+			SceneManagerScript.TransitionType.EXPLORE_TO_COMBAT)
+
+
+## 当前 GSM 里的续战段（GSM 不可用 / 域缺失时为空字典——按「没有战斗段」处理）。[br]
+## [br][b]读的是 GSM 内存现值[/b]：[code]load_game[/code] 刚刚把它反序列化到位
+## （见 [member gsm] 的注记）。
+func _battle_resume_payload() -> Dictionary:
+	var node: Node = get_gsm()
+	if node == null:
+		return {}
+	var raw: Variant = node.get(&"battle_resume")
+	return raw if raw is Dictionary else {}
 
 
 ## 读档结果里是否真的有可续玩的载荷。[br]
@@ -106,3 +162,12 @@ func get_scene_manager() -> Node:
 	if host == null:
 		return null
 	return host.get_node_or_null("/root/SceneManager")
+
+
+## 获取 GameStateManager——注入优先，否则回退 Autoload。
+func get_gsm() -> Node:
+	if gsm != null:
+		return gsm
+	if host == null:
+		return null
+	return host.get_node_or_null("/root/GameStateManager")

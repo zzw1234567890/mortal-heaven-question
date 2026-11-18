@@ -489,6 +489,9 @@ func battle_end(result: int) -> void:
 	# AC-012：清理 battle 域（在 battle_ended 信号发射之后）
 	_gsm_set_battle_active(false)
 
+	# 「回到这场战斗」的快照随战斗结束作废——否则读档会回到一盘已经打完的棋
+	_gsm_set_battle_resume({})
+
 	# AC-015：切换场景
 	_request_scene_change(result)
 
@@ -671,6 +674,56 @@ func get_battle_enemy_roster() -> Array:
 ## 不因缺数据把角色判死。
 func is_character_alive(character_id: int) -> bool:
 	return bool(_get_roster_state().call(&"is_alive", character_id))
+
+
+## 本场开战配置副本（只读）。[br]
+## [br][b]为什么暴露副本而不是现读调用方[/b]：开战配置在 [method battle_start] 时定格
+## （[member _battle_config]），存档快照要存的正是「这场仗开打时的那份」——
+## 现读探索侧只会拿到节点当前状态，玩家中途换图后两者就不再是同一场仗。[br]
+## [br][b]返回[/b]：配置深拷贝；未开战时为空字典。
+func get_battle_config() -> Dictionary:
+	return _battle_config.duplicate(true)
+
+
+## 按存档值落位本场战况——[b]读档续战专用[/b]（常规开战路径逐字不动）。[br]
+## [br][b]为什么要这个方法[/b]：[method battle_start] 恒定从第 1 回合的
+## PREPARATION 起手，而存档里的那场仗可能停在任意阶段。读档后若不落位，玩家面对的
+## 是「血量和敌人都对、但回合与阶段被重置」的半场仗——费用也一并回满。[br]
+## [br][b]只动内部状态与镜像，不推进阶段[/b]：阶段入口的那些副作用（抽牌 / 结算 /
+## 自动推进）不能重放——玩家已经经历过一遍了。故这里直接改内部字段 + GSM 镜像，
+## 再由调用方（[code]combat_scene_resume.gd[/code]）恢复自动推进。[br]
+## [br][param p_turn] 存档里的回合数（≥1）。[br]
+## [param p_phase] 存档里的阶段（[enum CombatPhase]；越界夹进合法区间）。[br]
+## [param p_current_cost] 存档里的当前可用费用。[br]
+## [param p_max_cost] 存档里的费用上限（0 = 未记录——保留 [method battle_start] 已
+## 按境界算好的上限，不把费用系统打成 0 费）。[br]
+## [br][b]返回[/b]：是否真的落位（未开战时 false——调用方据此报警）。
+func restore_battle_state(p_turn: int, p_phase: int, p_current_cost: int,
+		p_max_cost: int) -> bool:
+	if not _is_active:
+		push_error("CombatSystem.restore_battle_state: 没有活跃战斗，拒绝落位")
+		return false
+	_turn = maxi(p_turn, 1)
+	_phase = clampi(p_phase, CombatPhase.PREPARATION, CombatPhase.END)
+	_gsm_set_battle_turn(_turn)
+	_gsm_set_battle_phase(_phase)
+	if p_max_cost > 0:
+		var cost_system: Node = _get_cost_system()
+		if cost_system != null and cost_system.has_method(&"restore_for_battle"):
+			cost_system.call(&"restore_for_battle", p_current_cost, p_max_cost)
+	return true
+
+
+## 恢复自动推进——读档落位完成后由调用方调用（把落位期间压住的调度放出来）。[br]
+## [br][b]为什么是由调用方显式恢复而不是本方法内部开关[/b]：落位顺序是
+## 「关自动 → battle_start → restore_battle_state → 开自动」，中间那步必须有自动
+## 推进关着，而这个顺序的编排归场景侧重建设置（[code]combat_scene_resume.gd[/code]）；
+## 本方法只补上「开自动之后把下一格排上」这半句——[method set_auto_advance] 只改
+## 字段不排调度，缺了它，玩家读档回来会停在一个永不推进的阶段里。
+func resume_auto_advance() -> void:
+	if not _is_active:
+		return
+	_schedule_auto_advance()
 
 
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]
@@ -1659,11 +1712,31 @@ func _gsm_increment_battle_turn() -> void:
 		gsm._increment_battle_turn()
 
 
+## 通过 GSM 第二层方法落位回合数——读档续战专用（[method restore_battle_state]）。[br]
+## [br][b]为什么不用 [method _gsm_increment_battle_turn][/b]：那一支是「+1」，
+## 而存档里的回合是绝对值（可能比 GSM 镜像的现值大好几轮，也可能一样）；
+## 逐次 +1 既慢又会把中间那些轮次当成真的发生过。
+func _gsm_set_battle_turn(turn: int) -> void:
+	var gsm = _get_gsm()
+	if gsm != null and gsm.has_method("_set_battle_turn"):
+		gsm._set_battle_turn(turn)
+
+
 ## 通过 GSM 第二层方法设置战斗活跃状态。
 func _gsm_set_battle_active(active: bool) -> void:
 	var gsm = _get_gsm()
 	if gsm != null and gsm.has_method("_set_battle_active"):
 		gsm._set_battle_active(active)
+
+
+## 通过 GSM 第二层方法写入 / 清空「进行中战斗」的存档快照。[br]
+## [br][b]存档侧的写入点不在这里[/b]：抓快照要现读布阵与费用（本类之外的持有方），
+## 那是 [code]combat_resume_capture.gd[/code] 的职责；本方法只负责「战斗结束时清空」
+## 这条对称出口（不清的话读档会回到一盘已经打完的棋）。
+func _gsm_set_battle_resume(resume: Dictionary) -> void:
+	var gsm = _get_gsm()
+	if gsm != null and gsm.has_method("_set_battle_resume"):
+		gsm._set_battle_resume(resume)
 
 
 ## 查找 GameStateManager Autoload——返回 null 时调用方静默跳过。

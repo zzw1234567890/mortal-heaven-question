@@ -116,6 +116,7 @@ func _setup_pause_menu() -> void:
 	_pause_menu.gsm = GameStateManager
 	_pause_menu.audio_adapter = PauseAudioAdapter.new()
 	_pause_menu.combat_system = CombatSystem
+	_pause_menu.deployment_system = DeploymentSystem
 	_pause_menu.deck_system = DeckEditingSystem
 	_pause_menu.card_system = CardSystem
 

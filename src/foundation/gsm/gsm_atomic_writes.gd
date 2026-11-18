@@ -114,8 +114,12 @@ func _set_battle_phase(phase: int) -> void:
 	_battle_writes._set_battle_phase(phase)
 func _increment_battle_turn() -> void:
 	_battle_writes._increment_battle_turn()
+func _set_battle_turn(turn: int) -> void:
+	_battle_writes._set_battle_turn(turn)
 func _set_battle_active(active: bool) -> void:
 	_battle_writes._set_battle_active(active)
+func _set_battle_resume(resume: Dictionary) -> void:
+	_battle_writes._set_battle_resume(resume)
 func battle_start(config: Dictionary) -> void:
 	_battle_writes.battle_start(config)
 func battle_end(result: Dictionary) -> void:

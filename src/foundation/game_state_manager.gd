@@ -109,6 +109,16 @@ var player: Dictionary = {}
 var collection: Dictionary = {}
 var deck: Dictionary = {}
 var battle = null
+## 「能不能回到这场战斗」的最小状态（[b]可持久化[/b]——见
+## [code]src/feature/combat/battle_resume_payload.gd[/code] 与 ADR-0008）。[br]
+## [br][b]为什么必须与 [member battle] 分开[/b]：[code]battle[/code] 域不可持久化
+## （战斗结束即置 null），于是「战斗中存档 → 继续游戏」回到的是探索地图、刚打的那场
+## 仗被静默丢弃。本域是那场仗的[b]存档形态[/b]（阶段 / 回合 / 费用 / 双方 HP 与名册 /
+## 战斗来源），空字典 = 当前没有进行中的战斗。计算与折返都归
+## [code]battle_resume_payload.gd[/code]，本类只存。[br]
+## [br][b]字段口径不在本文件[/b]：默认值给空字典，整段按原样透传——在 Foundation
+## 层再写一份字段类型模板，就是第二份真理来源。
+var battle_resume: Dictionary = {}
 var exploration: Dictionary = {}
 var narrative: Dictionary = {}
 var session: Dictionary = {}
@@ -180,8 +190,14 @@ func _set_battle_phase(phase: int) -> void:
 	_atomic_writes._set_battle_phase(phase)
 func _increment_battle_turn() -> void:
 	_atomic_writes._increment_battle_turn()
+## 战斗回合数按存档值落位——仅读档回战斗调用（区别于 +1 递增）。
+func _set_battle_turn(turn: int) -> void:
+	_atomic_writes._set_battle_turn(turn)
 func _set_battle_active(active: bool) -> void:
 	_atomic_writes._set_battle_active(active)
+## 「进行中战斗」的存档形态写入——仅 CombatSystem 调用（空字典 = 没有进行中的战斗）。
+func _set_battle_resume(resume: Dictionary) -> void:
+	_atomic_writes._set_battle_resume(resume)
 func _set_player_unavailable_characters(data: Dictionary) -> void:
 	_atomic_writes._set_player_unavailable_characters(data)
 ## 我方角色 HP 跨战斗持久化写入（DEBT-CBT-018-3）——仅 CombatSystem 战斗结束调用。
@@ -298,8 +314,17 @@ func deserialize(data) -> bool:
 
 # === 域常量 =================================================================
 
-const ALL_DOMAINS: PackedStringArray = ["meta", "player", "collection", "deck", "battle", "exploration", "narrative", "session"]
-const PERSISTABLE_DOMAINS: PackedStringArray = ["meta", "player", "collection", "deck", "exploration", "narrative"]
+## 全部数据域——[method deserialize] 原子替换时按本表逐域落地。[br]
+## [br][b]为什么 [code]battle_resume[/code] 在表内而 [code]battle[/code] 不在
+## 替换之外[/b]：两者都在表内（都要被原子替换），差别只在持久性——见
+## [constant PERSISTABLE_DOMAINS]。
+const ALL_DOMAINS: PackedStringArray = ["meta", "player", "collection", "deck", "battle", "battle_resume", "exploration", "narrative", "session"]
+## 写进存档的域——[method serialize] 只取这些。[br]
+## [br][b]battle_resume 可持久、battle 不可[/b]：前者是「回到这场战斗」所需的
+## 最小状态快照（见 [member battle_resume]），后者是战斗中的活状态（含运行时对象，
+## 过不了 JSON 校验，且战斗结束即置 null）。
+const PERSISTABLE_DOMAINS: PackedStringArray = ["meta", "player", "collection", "deck", "battle_resume", "exploration", "narrative"]
+## 不写进存档的域——读档时原样保留内存现值（不被存档覆盖）。
 const NON_PERSISTABLE_DOMAINS: PackedStringArray = ["battle", "session"]
 
 # === 域初始化与默认值 ========================================================

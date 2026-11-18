@@ -33,6 +33,8 @@ const LaunchScript := preload("res://src/ui/main_menu/main_menu_launch.gd")
 const LoadSlotPanelScript := preload("res://src/ui/main_menu/load_slot_panel.gd")
 ## SceneManager 脚本常量——SceneID / TransitionType 枚举真理来源。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
+## 战斗快照抓取（「战斗中存档 → 读档回到这场战斗」的存侧——见该类文档）。
+const CaptureScript := preload("res://src/feature/combat/combat_resume_capture.gd")
 
 ## 成功存档的反馈文案（需求：存档成功后要有明确反馈）。
 const TEXT_SAVED: String = "已存档"
@@ -44,6 +46,8 @@ const TEXT_LOAD_FAILED: String = "读档失败（错误码 %d）"
 const TEXT_LOAD_EMPTY_PAYLOAD: String = "该存档没有可续玩的内容"
 ## 探索进度行模板（GAP-2 降级裁决——仅显示「层 N」，不建 map_id 映射表）。
 const TEXT_PROGRESS: String = "探索进度：层 %d"
+## 战斗存档已写入的反馈（比「已存档」多说一句，玩家才知道读回来会回到战场上）。
+const TEXT_SAVED_IN_BATTLE: String = "已存档（读取此档将回到当前战斗）"
 
 ## SaveLoadSystem 引用（HUD 注入；测试替换）。
 var save_load: Node = null
@@ -51,6 +55,18 @@ var save_load: Node = null
 var scene_manager: Node = null
 ## GameStateManager 引用（存档载荷来源与进度行读取面）。
 var gsm: Node = null
+## CombatSystem 引用（战斗快照的战斗侧取数面；HUD 注入，测试替换）。[br]
+## [br][b]不查 Autoload 兜底[/b]：与 [code]pause_menu_combat_exit.gd[/code] 同口径——
+## 「有没有战斗」这个判断的真理来源是宿主注入的那一个（生产是常驻 CombatSystem，
+## 测试是替身）；自己去 [code]/root[/code] 摸一个回来，会让「探索中存档」意外读到
+## 别处留下的活跃战斗，把一场早打完的仗写进档。[br]
+## [br][b]null = 没有战斗[/b]：快照退化为「未写入且无原因」，存档照常。
+var combat: Node = null
+## DeploymentSystem 引用（我方阵位 / 前后排快照的来源；HUD 注入，测试替换）。[br]
+## [br][b]为什么不查 Autoload[/b]：同上——替身缺席时阵位块退化为空，快照里没有
+## 我方条目，[code]is_resumable_payload[/code] 便判为不可续（宁可不续，也不续一场
+## 有我方缺席的仗）。生产由 HUD 注入。
+var deployment: Node = null
 
 ## 读档面板实例（复用式单例——建一次，开合只切 visible）。
 var _panel: Control = null
@@ -66,13 +82,19 @@ var _launch: RefCounted = null
 ## [br][b]返回[/b]：[code]{ok: bool, message: String}[/code]——调用方据此决定
 ## 「留在菜单给反馈」还是「可以走了」。[br]
 ## [br][b]为什么失败不抛异常[/b]：写盘失败（磁盘满 / 校验不过）是玩家能理解的
-## 结果，给一句话让他再试一次，比崩掉或静默离开强。
+## 结果，给一句话让他再试一次，比崩掉或静默离开强。[br]
+## [br][b]战斗中的存档要多做一步[/b]（[method capture_battle]）：先抓战斗快照再
+## 序列化——[code]battle[/code] 域不可持久化，不抓的话玩家「打了一半存个档」读回来
+## 只有探索地图，那场仗连同残血静默消失。[br]
+## [br][b]不可续战时给中文提示而不是静默存**（需求 D）**：存档照存（探索进度
+## 是真的），但反馈里带上原因——否则玩家会以为读回来还能接着打。
 func save_now() -> Dictionary:
 	var result: Dictionary = {"ok": false, "message": ""}
 	if save_load == null or not save_load.has_method(&"save_game"):
 		push_error("PauseMenu: SaveLoadSystem 不可用——存档中止")
 		result["message"] = TEXT_SAVE_UNAVAILABLE
 		return result
+	var battle: Dictionary = capture_battle()
 	var payload: Dictionary = serialize_gsm()
 	if payload.is_empty():
 		# 序列化失败（serialize_gsm 已 push_error）——不以空载荷覆盖自动槽
@@ -85,8 +107,53 @@ func save_now() -> Dictionary:
 		result["message"] = TEXT_SAVE_FAILED % code
 		return result
 	result["ok"] = true
-	result["message"] = TEXT_SAVED
+	result["message"] = _saved_message(battle)
 	return result
+
+
+## 抓一次战斗快照写进 GSM（**必须在 [method serialize_gsm] 之前调**）。[br]
+## [br][b]返回[/b]：[code]{written: bool, reason: String}[/code]；不在战斗中时为
+## 「未写入且无原因」（不打扰玩家——没打仗就没什么好说的）。[br]
+## [br][b]为什么在暂停菜单这里抓而不是挂在战斗系统上[/b]：快照只在存档那一刻有意义，
+## 而「状态何时变」有阶段 / 回合 / HP / 费用四条路径；逐处挂钩必然漏改一处，存档时
+## 现拉一次拿到的就是那一刻的真值（同 [code]combat_resume_capture.gd[/code] 类文档）。
+func capture_battle() -> Dictionary:
+	var capture: RefCounted = CaptureScript.new()
+	capture.combat = combat
+	capture.deployment = deployment
+	capture.gsm = gsm
+	return capture.call(&"capture", _scene_id())
+
+
+## 存档反馈文案——战斗快照写入时多说一句，不可续战时把原因摆出来。[br]
+## [br][b]为什么不可续战也要存[/b]：探索进度 / 角色成长都在同一份档里，为一场
+## 续不了的战斗拒绝整次存档是拿玩家的进度陪葬；说清楚比不存更负责。
+func _saved_message(p_battle: Dictionary) -> String:
+	var reason: String = str(p_battle.get("reason", ""))
+	if bool(p_battle.get("written", false)):
+		return TEXT_SAVED_IN_BATTLE
+	if reason.is_empty():
+		return TEXT_SAVED
+	return "%s（当前战斗无法续战：%s）" % [TEXT_SAVED, reason]
+
+
+## 当前场景 ID（存档里记「在哪个场景存的」；SceneManager 不可用时回退 EXPLORATION）。
+func _scene_id() -> int:
+	if scene_manager != null and scene_manager.has_method(&"get_current_scene_id"):
+		return int(scene_manager.get_current_scene_id())
+	return SceneManagerScript.SceneID.EXPLORATION
+
+
+## 战斗系统节点（暂停菜单不注入它——战斗是常驻 Autoload；缺失时快照退化为「无战斗」）。[br]
+## [br][b]为什么不用注入[/b]：暂停菜单在探索 / 战斗两处都会开，注入一份战斗系统引用
+## 会让「探索中存档」也持有一个不该有的句柄；查表失败即视为不在战斗中，语义正确。[br]
+## [br][b]为什么经 Engine.get_main_loop 而不是 gsm.get_tree[/b]：注入的 gsm 在测试里
+## 可能是 RefCounted 替身（没有 get_tree），而本方法只想要「场景树根」。
+func _combat_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null(NodePath("CombatSystem"))
 
 
 ## 转场前先自动存档一次（需求：返回主菜单先存一次再走）。[br]
@@ -234,10 +301,14 @@ func progress_text() -> String:
 # 内部
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 读档编排子模块——懒建一次；每次透传当前注入引用（宿主在 _ready 之后才赋值）。
+## 读档编排子模块——懒建一次；每次透传当前注入引用（宿主在 _ready 之后才赋值）。[br]
+## [br][b]gsm 也要透传[/b]：编排层用它判「这份档在不在战斗中」（读档 → 战斗场景那条
+## 分岔）。不传的话它只能回退 [code]host[/code] 找 Autoload，而暂停菜单这份的
+## [code]host[/code] 是空的——续战段恒读成空，玩家在战斗中读档会被送回探索地图。
 func get_launch() -> RefCounted:
 	if _launch == null:
 		_launch = LaunchScript.new()
 	_launch.scene_manager = scene_manager
 	_launch.save_load = save_load
+	_launch.gsm = gsm
 	return _launch

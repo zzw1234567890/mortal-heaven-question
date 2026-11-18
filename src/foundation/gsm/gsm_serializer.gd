@@ -33,6 +33,7 @@ func _get_domain(domain_name: String) -> Variant:
 		"collection":  return _gsm.collection
 		"deck":        return _gsm.deck
 		"battle":      return _gsm.battle
+		"battle_resume": return _gsm.battle_resume
 		"exploration": return _gsm.exploration
 		"narrative":   return _gsm.narrative
 		"session":     return _gsm.session
@@ -47,6 +48,7 @@ func _set_domain(domain_name: String, value: Variant) -> void:
 		"collection":  _gsm.collection = value
 		"deck":        _gsm.deck = value
 		"battle":      _gsm.battle = value
+		"battle_resume": _gsm.battle_resume = value
 		"exploration": _gsm.exploration = value
 		"narrative":   _gsm.narrative = value
 		"session":     _gsm.session = value
@@ -120,6 +122,11 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"session_remove_count": 0,
 				"deck_limit_modifier": 0,
 			}
+		"battle_resume":
+			# 空字典 = 没有进行中的战斗（见 [code]battle_resume_payload.gd[/code]）。
+			# 空默认字典让 [method GsmSaveTypes.coerce_dict] 原样放行整段——字段口径
+			# 归载荷模块，本层不重复一份类型模板（那会是第二份真理来源）。
+			return {}
 		"exploration":
 			return {
 				"current_map": &"",
@@ -146,13 +153,15 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 	return {}
 
 
-## 初始化全部 8 个数据域（battle 恒为 null——非战斗状态）。由 GSM._ready 调用。
+## 初始化全部 9 个数据域（battle 恒为 null——非战斗状态；battle_resume 恒为空——
+## 没有进行中的战斗）。由 GSM._ready 调用。
 func init_all_domains() -> void:
 	_gsm.meta = _get_default_for_domain("meta")
 	_gsm.player = _get_default_for_domain("player")
 	_gsm.collection = _get_default_for_domain("collection")
 	_gsm.deck = _get_default_for_domain("deck")
 	_gsm.battle = null
+	_gsm.battle_resume = _get_default_for_domain("battle_resume")
 	_gsm.exploration = _get_default_for_domain("exploration")
 	_gsm.narrative = _get_default_for_domain("narrative")
 	_gsm.session = _get_default_for_domain("session")

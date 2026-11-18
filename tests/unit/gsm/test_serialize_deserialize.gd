@@ -39,9 +39,13 @@ func test_ac017_serialize_includes_all_persistent_domains() -> void:
 	assert_true(data.has("player"), "player 域应存在")
 	assert_true(data.has("collection"), "collection 域应存在")
 	assert_true(data.has("deck"), "deck 域应存在")
+	# battle_resume（本轮新增）——「读档回到这场战斗」的最小状态快照。与 battle 域的
+	# 差别只在持久性：battle 是战斗中的活状态（含运行时对象），battle_resume 只存
+	# 能重建那一仗的 JSON 安全字段（见 battle_resume_payload.gd）。
+	assert_true(data.has("battle_resume"), "battle_resume 域应存在（可持久）")
 	assert_true(data.has("exploration"), "exploration 域应存在")
 	assert_true(data.has("narrative"), "narrative 域应存在")
-	assert_eq(data.size(), 6, "仅 6 个持久域")
+	assert_eq(data.size(), 7, "仅 7 个持久域")
 
 
 func test_ac017_serialize_preserves_values() -> void:

@@ -76,9 +76,9 @@ func test_migrate_if_needed_single_step() -> void:
 
 
 # === AC-004 边界情况：多步迁移 ==================================================
-# CURRENT_SCHEMA_VERSION 提升到 2 之后，v0 档要依次走过 v0→v1 与 v1→v2 两级。
-# 本用例注册 MIGRATIONS[0]（覆盖层），v1→v2 走生产链
-# （SaveLoadSystem.DEFAULT_MIGRATIONS）——两级都必须真的被调用。
+# CURRENT_SCHEMA_VERSION 提升到 3 之后，v0 档要依次走过 v0→v1、v1→v2 与 v2→v3 三级。
+# 本用例注册 MIGRATIONS[0] / MIGRATIONS[1]（覆盖层），v2→v3 走生产链
+# （SaveLoadSystem.DEFAULT_MIGRATIONS）——三级都必须真的被调用。
 
 func test_migrate_if_needed_multi_step() -> void:
 	# Arrange：v0 档 + 注册 v0→v1 迁移
@@ -102,15 +102,18 @@ func test_migrate_if_needed_multi_step() -> void:
 	# Act
 	var result: Dictionary = sls._migrate_if_needed(data)
 
-	# Assert：两级各调用一次，最终落在 2
+	# Assert：两级各调用一次，最终落在 CURRENT
 	assert_eq(first_calls[0], 1, "v0→v1 迁移应被调用一次")
 	assert_eq(second_calls[0], 1, "v1→v2 迁移应被调用一次")
-	assert_eq(result["schema_version"], 2, "多步迁移后 schema_version 应为 2")
+	assert_eq(result["schema_version"], sls.CURRENT_SCHEMA_VERSION,
+			"多步迁移后 schema_version 应为 CURRENT")
 	assert_true(result.has("step_one"), "第一级迁移写入的字段应存在")
 	assert_eq(result["game_state"]["exploration"]["map_states"]["map_a"]["events_shown"], [],
 			"第二级（生产链）应给每张图补空的 events_shown")
 	assert_eq(result["game_state"]["exploration"]["map_states"]["map_a"]["entry_count"], 1,
 			"迁移不得改动已有进度字段")
+	assert_eq(result["game_state"]["battle_resume"], {},
+			"第三级（生产链）应补空的 battle_resume 段——空 = 这份档不是在战斗中存的")
 
 
 # === AC-005：迁移链缺失 ==========================================================
@@ -163,7 +166,8 @@ func test_migrate_if_needed_version_mismatch_rejected() -> void:
 	assert_true(result.has("error"), "应包含 error 键")
 	assert_eq(result["error"], "VERSION_MISMATCH", "错误类型应为 VERSION_MISMATCH")
 	assert_eq(result["save_schema"], 99, "应报告存档的 schema 版本")
-	assert_eq(result["current_schema"], 2, "应报告当前的 schema 版本")
+	assert_eq(result["current_schema"], sls.CURRENT_SCHEMA_VERSION,
+			"应报告当前的 schema 版本")
 
 
 # === AC-006 边界情况：save_schema 远大于 CURRENT ================================
@@ -406,8 +410,8 @@ func test_migration_failure_in_chain_is_isolated() -> void:
 # === AC-001：CURRENT_SCHEMA_VERSION 常量存在 =====================================
 
 func test_current_schema_version_constant_exists() -> void:
-	assert_eq(sls.CURRENT_SCHEMA_VERSION, 2,
-			"本轮探索域新增 events_shown，schema 版本提升到 2")
+	assert_eq(sls.CURRENT_SCHEMA_VERSION, 3,
+			"本轮新增 battle_resume 段（战斗中存档 → 读档回到战斗），schema 版本提升到 3")
 	assert_true(typeof(sls.CURRENT_SCHEMA_VERSION) == TYPE_INT, "应为 int 类型")
 
 
@@ -428,7 +432,7 @@ func test_default_migrations_registry_holds_production_chain() -> void:
 	assert_eq(typeof(sls.DEFAULT_MIGRATIONS), TYPE_DICTIONARY,
 			"DEFAULT_MIGRATIONS 应为 Dictionary 类型")
 	assert_eq(sls.DEFAULT_MIGRATIONS.size(), sls.CURRENT_SCHEMA_VERSION - 1,
-			"生产链应覆盖 0..CURRENT-1 中除 0 外的每一级（v1→v2 共 1 级）")
+			"生产链应覆盖 1..CURRENT-1 的每一级（v1→v2、v2→v3 共 2 级）")
 	for from_version: int in range(1, sls.CURRENT_SCHEMA_VERSION):
 		assert_true(sls.DEFAULT_MIGRATIONS.has(from_version),
 				"生产链应登记 v%d→v%d 迁移" % [from_version, from_version + 1])

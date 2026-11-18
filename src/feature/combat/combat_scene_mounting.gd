@@ -22,6 +22,10 @@ const BagScript := preload("res://src/feature/combat/combat_scene_bag.gd")
 var _scene: Control = null
 ## 战场根（容器 [code]_ready[/code] 已挂载）。
 var _root: Control = null
+## 备战线是否跳过打开面板（读档续战用——[method wire_all] 前由容器置位）。[br]
+## [br][b]跳过的只是「打开」[/b]：面板仍照常 setup 与接线（返回探索的出口要留着），
+## 只是不弹出来问「谁上」——阵容在存档里已经回答过了。
+var skip_deploy_open: bool = false
 
 
 ## 构造——传入容器与战场根。
@@ -87,7 +91,9 @@ func wire_panels() -> void:
 
 
 ## 备战面板——注入依赖、下发名册并打开，接上四个出口信号。[br]
-## [br][b]预选[/b]：探索侧带来的玩家阵容在面板打开后由容器点选。
+## [br][b]预选[/b]：探索侧带来的玩家阵容在面板打开后由容器点选。[br]
+## [br][b]续战时只接线不开面板[/b]（[member skip_deploy_open]）：出口信号照接，
+## 但不去问玩家「谁上」——那盘棋已经在存档里下到一半了。
 func wire_deployment(p_deploy_confirmed: Callable, p_deploy_back: Callable,
 		p_retreat: Callable, p_defeat: Callable) -> void:
 	var deploy: Variant = _root.get("deploy_panel")
@@ -97,9 +103,10 @@ func wire_deployment(p_deploy_confirmed: Callable, p_deploy_back: Callable,
 			_deployment_system(), _autoload(&"BindingManager"))
 	deploy.connect(&"confirm_requested", p_deploy_confirmed)
 	deploy.connect(&"back_requested", p_deploy_back)
-	_root.call(&"show_deploy_panel", _scene.call(&"_max_deploy"),
-			_scene.call(&"_realm_id"), _scene.call(&"_deploy_title"))
-	_scene.call(&"_preselect_roster", deploy)
+	if not skip_deploy_open:
+		_root.call(&"show_deploy_panel", _scene.call(&"_max_deploy"),
+				_scene.call(&"_realm_id"), _scene.call(&"_deploy_title"))
+		_scene.call(&"_preselect_roster", deploy)
 	# 结算宿主出口（持久写入归 interaction epic——容器只做最小闭环）
 	var host: Variant = _root.get("settlement_host")
 	if host != null:
