@@ -213,7 +213,29 @@ func _apply(character_id: int, damage: int, side_hint: int,
 		_emit_damaged(character_id, side, delta, died, reduced)
 	if died:
 		_emit_death(character_id, side, binding_ids)
+	_note_record(settled, side, delta, died)
 	return outcome
+
+
+## 战绩记账——本场累计「谁造成了多少伤害 / 击杀了几人」。[br]
+## [br][b]为什么记在这里[/b]：[method _apply] 是唯一写 HP 的落库口，也是全库唯一
+## 知道「这一笔是不是真的发生、落在哪个阵营」的地方——放到信号消费者里记，就得从
+## 广播载荷反推阵营，而载荷的 [code]side[/code] 是给 UI 画飘字用的，不是战报口径。[br]
+## [br][b]只记真的发生的[/b]：未落库（[code]known=false[/code]）不记、零增量不记
+## （与广播同一条规则）；治疗（[code]delta < 0[/code]）由 [code]note_damage[/code]
+## 内部过滤。记的是 [code]delta[/code]——飘字之和就是战报里的那个数。[br]
+## [br][b]降级[/b]：战斗系统未装配战绩累积器时静默跳过（同其余可空依赖口径）。
+func _note_record(settled: bool, side: int, delta: int, died: bool) -> void:
+	if not settled or _parent == null:
+		return
+	if not _parent.has_method(&"_get_battle_record"):
+		return
+	var record: Variant = _parent.call(&"_get_battle_record")
+	if record == null:
+		return
+	record.call(&"note_damage", side, delta)
+	if died:
+		record.call(&"note_kill", side)
 
 
 ## 发射 character_damaged——只广播落库成功（[code]known[/code]）的伤害增量。[br]

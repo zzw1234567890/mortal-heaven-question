@@ -19,6 +19,8 @@ extends RefCounted
 
 ## 敌方 ID / 阵位约定（单一真理来源）。
 const RosterState := preload("res://src/feature/combat/combat_roster_state.gd")
+## 显示名解析（敌方开战名册 → 卡牌模板 → ID 段兜底，回退顺序只有那一处）。
+const NameText := preload("res://src/ui/combat/feedback/enemy_action_text.gd")
 
 ## 战斗系统（名册快照 + HP 读取契约）。
 var _combat: Node = null
@@ -76,6 +78,16 @@ func read_enemy_roster() -> Array:
 		return []
 	var roster: Variant = _combat.call(&"get_battle_enemy_roster")
 	return roster if roster is Array else []
+
+
+## 角色显示名——敌方名册 / 卡牌模板 / ID 段兜底（回退顺序见
+## [code]EnemyActionText.name_of[/code]，本方法只做依赖转发）。[br]
+## [br][b]为什么收在取数入口[/b]：建卡所需的三样（HP / ATK / 名）都要「现读一次」，
+## 三处各接一遍战斗系统与卡牌系统必然漂移；名与播报共用同一个解析器，玩家看到的
+## 卡上名与播报里的名永远是同一个。[br]
+## [br][b]返回[/b]：非空串——最差也是 [code]敌人 #100000[/code] 这样的可读编号。
+func display_name(character_id: int) -> String:
+	return NameText.name_of(character_id, _combat, _card_system)
 
 
 ## HP 读取——战斗系统的 hp_reader 契约（[code]{current, max}[/code]）。

@@ -26,6 +26,8 @@ const TEXT_NO_RECORD: String = "本场无战绩数据"
 const TEXT_RECORDED: String = "战绩已记录"
 ## 摘要标签字号（px）。
 const BRIEF_FONT_SIZE: int = 14
+## 战报区块标题（玩家读的那一版逐行战报；本地化 epic 后替换为 key）。
+const TEXT_REPORT_TITLE: String = "【战报】"
 ## 结算对象类型——载荷折叠与跨场景缓存的单一实现。
 const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
 
@@ -33,6 +35,10 @@ const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
 var result_view: RefCounted = null
 ## 摘要标签（测试断言用）。
 var brief_label: Label = null
+## 战报区块标题标签（无战绩数据时为 null——区块整体不建）。
+var report_title_label: Label = null
+## 战报区块正文标签（逐行：回合数 / 我方逐人 HP / 造成伤害 / 击杀）。
+var report_label: Label = null
 
 
 ## 在占位界面之上追加战绩摘要（[code]super()[/code] 先建标题/状态/提示/按钮）。
@@ -57,11 +63,35 @@ func _build() -> void:
 	# 摘要插在返回按钮之前——键盘/手柄焦点顺序保持「先读数据、再离开」
 	if return_button != null:
 		box.move_child(brief_label, return_button.get_index())
+	_add_battle_report(box)
 	for line: String in lines:
 		print("%s %s" % [LOG_PREFIX, line])
 	# 动态设置提示文案——根据战斗结果
 	if hint_label != null:
 		hint_label.text = _hint_for_result(result_view)
+
+
+## 追加「战报」区块——玩家读的那一版本场明细（回合数 / 我方逐人 HP / 伤害 / 击杀）。[br]
+## [br][b]为什么与 [member brief_label] 并存[/b]：那是诊断口径的完整摘要（含结局枚举、
+## 触发条目数、未知数据后缀），读起来像日志；战报是给玩家看的四项事实。两者取数同源
+## （同一份 [code]CombatResultView[/code]），分两段只是读者的区别。[br]
+## [br][b]没有战绩数据时不建区块[/b]（[code]battle_report_lines()[/code] 返回空）：
+## 显示一排 0 会让玩家以为「打了一场什么都没发生」，比不显示更糟。[br]
+## [br][b]插在摘要与返回按钮之间[/b]：先诊断、再战报、最后离开，焦点顺序与阅读顺序一致。
+func _add_battle_report(p_box: VBoxContainer) -> void:
+	var lines: PackedStringArray = result_view.call(&"battle_report_lines")
+	if lines.is_empty():
+		return
+	report_title_label = _make_label(TEXT_REPORT_TITLE, BRIEF_FONT_SIZE, "ReportTitle")
+	report_label = _make_label("\n".join(lines), BRIEF_FONT_SIZE, "Report")
+	p_box.add_child(report_title_label)
+	p_box.add_child(report_label)
+	# 插到返回按钮之前（摘要 label 之后由 add_child 的顺序自然保证）
+	if return_button != null:
+		p_box.move_child(report_title_label, return_button.get_index())
+		p_box.move_child(report_label, return_button.get_index())
+	for line: String in lines:
+		print("%s %s" % [LOG_PREFIX, line])
 
 
 ## 取占位场景的内容容器（[method PlaceholderScene._build] 里名为 "Content" 的 VBox）。

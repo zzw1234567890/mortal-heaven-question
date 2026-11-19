@@ -134,6 +134,11 @@ func _spawn(p_character_id: int, p_is_front: bool, p_container: Control) -> Cont
 		current = maxi(current, max_hp)
 	card.call(&"apply_atk", int(_reader.call(&"attack", p_character_id)))
 	card.call(&"apply_hp", current, max_hp)
+	# 显示名：敌方此前只有头像，玩家分不清同色敌人谁是谁——名与 HP 条绑在一张卡上，
+	# 玩家才能读懂「这条血是谁的」。解析口径由取数入口转发（播报与卡面同源）；
+	# 取数入口是旧版（无 display_name）时静默跳过——名牌留空，血量照常显示。
+	if _reader.has_method(&"display_name"):
+		card.call(&"apply_name", str(_reader.call(&"display_name", p_character_id)))
 	_register(p_character_id)
 	return card
 

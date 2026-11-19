@@ -47,6 +47,10 @@ const AP_EXEMPT_TYPES: Array[int] = [3, 6, 7]
 ## 战斗类节点类型集合（悬停 tooltip 附敌人详情）——1=COMBAT/2=ELITE/3=BOSS。
 const COMBAT_TYPES: Array[int] = [1, 2, 3]
 
+## 已访问节点的底衬色（暗青绿——与边框的亮绿同族但压暗到不抢图标）。[br]
+## [b]为什么不复用边框绿[/b]：那是描边的亮色，铺满整格会把节点图变成一片绿；
+## 底衬的职责是「这格有主了」，不是「这格在发光」。
+
 ## 拒绝原因词表——[b]与 [code]ExplorationSystem.REASON_*[/code] 逐字同源的 UI 副本[/b]。[br]
 ## [br][b]为什么 UI 也要有一份[/b]：headless 下不加载 Feature 层（同
 ## [constant AP_EXEMPT_TYPES] 的处境），而 UI 侧的 toast 映射表
@@ -60,6 +64,13 @@ const REASON_UNREACHABLE: String = "不可达"
 const REASON_NO_GSM: String = "GSM 不可用"
 const REASON_VISITED: String = "已访问"
 const REASON_AP_SHORT: String = "行动力不足"
+
+## 已访问节点的底衬色（暗青绿——与边框的亮绿同族但压暗到不抢图标）。[br]
+## [b]为什么不复用边框绿[/b]：那是描边的亮色，铺满整格会把节点图变成一片绿；
+## 底衬的职责是「这格有主了」，不是「这格在发光」。
+const PLATE_VISITED: Color = Color(0.10, 0.24, 0.16, 0.85)
+## 当前节点底衬色（暗金——与 [constant PLATE_VISITED] 同一条「压暗描边色」逻辑）。
+const PLATE_CURRENT: Color = Color(0.28, 0.22, 0.06, 0.85)
 
 
 ## 六态分类器（AC-1/AC-2/AC-5 自动化断言目标）。[br]
@@ -160,35 +171,49 @@ static func state_from_verdict(verdict: Dictionary) -> int:
 ##   [code]glow[/code]: String——[code]""[/code] / [code]"pulse_blue"[/code] /
 ##   [code]"gold"[/code]；[br]
 ##   [code]slash[/code]: bool——行动力不足红色斜线；[br]
-##   [code]fogged[/code]: bool——迷雾（不显示类型）。
+##   [code]fogged[/code]: bool——迷雾（不显示类型）；[br]
+##   [code]plate[/code]: Color——节点底衬（不透明色块，画在图标之下）。[br]
+## [br][b]为什么要有底衬[/b]：已访问此前只靠「绿色边框 + ✓ + 压暗」区分，而压暗是
+## 透明度手段、边框只有 2px——节点图标本身有类型主色（战斗红/精英红/商店绿…），
+## 走过与没走过在缩放到 50% 时几乎同色。底衬是一块与类型色无关的[b]实色[/b]，
+## 灰度模式下也能读出「这格走过了」。[br]
+## [br][b]透明 = 不画[/b]（可达/不可达/行动力不足三种）：它们的类型色边框本身
+## 就是信息，压一层底衬只会把类型颜色糊掉。
 static func node_state_style(state: int) -> Dictionary:
 	match state:
 		NodeState.CURRENT:
 			return {"border": Color("#FFD700"), "border_is_type": false,
 					"marker": "player", "dim": false, "glow": "gold",
-					"slash": false, "fogged": false}
+					"slash": false, "fogged": false,
+					"plate": PLATE_CURRENT}
 		NodeState.REACHABLE:
 			return {"border": Color.TRANSPARENT, "border_is_type": true,
 					"marker": "", "dim": false, "glow": "pulse_blue",
-					"slash": false, "fogged": false}
+					"slash": false, "fogged": false,
+					"plate": Color.TRANSPARENT}
 		NodeState.VISITED:
 			return {"border": Color("#44CC66"), "border_is_type": false,
 					"marker": "check", "dim": true, "glow": "",
-					"slash": false, "fogged": false}
+					"slash": false, "fogged": false,
+					"plate": PLATE_VISITED}
 		NodeState.UNREACHABLE:
 			return {"border": Color(0.45, 0.45, 0.48), "border_is_type": false,
 					"marker": "lock", "dim": false, "glow": "",
-					"slash": false, "fogged": false}
+					"slash": false, "fogged": false,
+					"plate": Color.TRANSPARENT}
 		NodeState.AP_INSUFFICIENT:
 			return {"border": Color(0.45, 0.45, 0.48), "border_is_type": false,
 					"marker": "", "dim": false, "glow": "",
-					"slash": true, "fogged": false}
+					"slash": true, "fogged": false,
+					"plate": Color.TRANSPARENT}
 		NodeState.FOGGED:
 			return {"border": Color.TRANSPARENT, "border_is_type": false,
 					"marker": "question", "dim": false, "glow": "",
-					"slash": false, "fogged": true}
+					"slash": false, "fogged": true,
+					"plate": Color.TRANSPARENT}
 	return {"border": Color.TRANSPARENT, "border_is_type": false,
-			"marker": "", "dim": false, "glow": "", "slash": false, "fogged": false}
+			"marker": "", "dim": false, "glow": "", "slash": false, "fogged": false,
+			"plate": Color.TRANSPARENT}
 
 
 ## 节点是否已揭示（迷雾判定）——纯函数。[br]
@@ -234,3 +259,14 @@ static func tooltip_text(detail: Dictionary, is_fogged: bool) -> String:
 ## 前向邻接判定——[code]graph[from][/code] 是否包含 [param node_id]。
 static func _is_reachable(node_id: int, graph: Dictionary, from_node: int) -> bool:
 	return (graph.get(from_node, []) as Array).has(node_id)
+
+
+## 一条连线是否「走过」——两端都已访问。[br]
+## [br][b]为什么收在这一个纯函数里[/b]：渲染层此前直接写 [code]visited.has()[/code]
+## 比较两遍，而六态分类（[method classify_node_state]）看的是同一份 visited——
+## 两处各判一次「什么算走过」，就必然出现「节点已变绿、连着它的线还是虚线」的图。
+## 判定只有一处，渲染层[method NodeGraphRenderer._is_edge_visited] 转发本方法。[br]
+## [br][b]参数顺序[/b]（[param p_visited], [param p_from], [param p_to]）：
+## 判定与方向无关（无向），两个端点谁先谁后结果相同——顺序只影响可读性。
+static func edge_is_walked(p_visited: Array, p_from: int, p_to: int) -> bool:
+	return p_visited.has(p_from) and p_visited.has(p_to)

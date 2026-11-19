@@ -25,6 +25,8 @@ extends Control
 const Rules := preload("res://src/ui/combat/shared/combat_ui_rules.gd")
 const Icons := preload("res://src/ui/combat/shared/combat_icon_atlas.gd")
 const UiFont := preload("res://src/ui/combat/shared/combat_ui_font.gd")
+## 阵亡判定与视觉规格（纯函数——story 003 AC-4 的判定收在那边，本卡只画）。
+const DefeatMarker := preload("res://src/ui/combat/layout/combat_card_defeat_marker.gd")
 
 ## === 卡牌尺寸常量（UX Layout Zones：120×168 前排基准）=======================
 
@@ -75,6 +77,9 @@ const ATK_COLOR: Color = Color(0.96, 0.94, 0.88)
 ## 当前/最大 HP（渲染快照——所有权在战斗系统）。
 var current_hp: int = 0
 var max_hp: int = 0
+## 角色显示名（渲染快照——解析归 [code]EnemyActionText.name_of[/code]，
+## 本卡只存只画：[method apply_name] 写入）。
+var display_name: String = ""
 ## ATK 数值快照。
 var atk_value: int = 0
 ## 功法/法宝图标显示数（L2——绑定数据经 [method set_bindings] 从
@@ -96,6 +101,14 @@ var is_standby: bool = false
 ## is_acted=true 同时驱动遮罩+对勾（[method set_acted_state]），默认 false
 ## 使 is_standby=false 的旧语义（仅对勾）不自动出现遮罩。
 var is_acted: bool = false
+## 阵亡态——[b]由 [method apply_hp] 从 HP 派生[/b]，不是独立写入的状态位。[br]
+## [br][b]为什么派生而不是 set_defeated()[/b]：阵亡的真理来源是战斗状态表
+## （[code]CombatRosterState[/code] 的 [code]current_hp[/code] / [code]is_alive[/code]），
+## 界面上再存一个「我以为他死了」的标志就是第二份真源——两处一旦不同步，
+## 玩家会看到「已阵亡」的角色还满血站着。[br]
+## [br][b]max_hp > 0 才判[/b]：读不到数据的角色（[code]known=false[/code]，HP 全零）
+## 不算阵亡——同 [code]CombatSystem.is_character_alive[/code] 的「不因缺数据判死」。
+var is_defeated: bool = false
 ## 前后排定位（true 前排——边框样式+缩放决策）。
 var is_front_row: bool = true
 ## 减少动态（进场时从设置读取——进场后静态，零轮询）。
@@ -112,6 +125,10 @@ var _badge_alpha: float = 0.0
 var _badge_tween: Tween = null
 ## 名+数值合并 Label（R-02 §3 文字合并——单 Label 不拆多）。
 var _stat_label: Label = null
+## 角色显示名 Label（L5 名牌——[method apply_name] 写入；敌方此前无名可分）。
+var _name_label: Label = null
+## 阵亡戳记 Label（文本取自 [code]CombatCardDefeatMarker.style[/code]，未阵亡时隐藏）。
+var _defeat_label: Label = null
 ## 头像纹理（每角色唯一独立纹理——R-02 §3 头像分组；null 时色块占位）。
 var portrait: Texture2D = null
 
@@ -122,6 +139,13 @@ func _init() -> void:
 	_stat_label = Label.new()
 	_stat_label.name = "StatLabel"
 	add_child(_stat_label)
+	_name_label = Label.new()
+	_name_label.name = "NameLabel"
+	add_child(_name_label)
+	_defeat_label = Label.new()
+	_defeat_label.name = "DefeatStamp"
+	_defeat_label.visible = false
+	add_child(_defeat_label)
 
 
 func _draw() -> void:
@@ -147,6 +171,10 @@ func _draw() -> void:
 	_draw_badges()
 	# L5 左上待命/已行动标记
 	_draw_standby_badge()
+	# 阵亡灰化（story 003 AC-4——压住头像与 HP 条，让「这格倒了」一眼可见；
+	# 画在文字子节点之下、边框之上）。规格与绘制同源，见 DefeatMarker；
+	# 底部条高度由本卡给出，免得那边也写一个 40。
+	DefeatMarker.draw_on(self, size, is_defeated, BOTTOM_BAR_HEIGHT)
 	# 已行动灰色遮罩（story 003 AC-2——顶层覆盖，L5 标记之上边框之下）
 	if is_acted:
 		draw_rect(Rect2(Vector2.ZERO, size), ACTED_OVERLAY_COLOR)
@@ -165,6 +193,7 @@ func _draw() -> void:
 func apply_hp(p_current: int, p_max: int) -> void:
 	current_hp = maxi(p_current, 0)
 	max_hp = maxi(p_max, 0)
+	is_defeated = DefeatMarker.is_defeated(current_hp, max_hp)
 	var target_ratio: float = 1.0 if max_hp == 0 \
 			else clampf(float(current_hp) / float(max_hp), 0.0, 1.0)
 	if reduce_motion:
@@ -175,6 +204,18 @@ func apply_hp(p_current: int, p_max: int) -> void:
 		_hp_tween = create_tween()
 		_hp_tween.tween_method(_set_hp_display_ratio,
 			_hp_display_ratio, target_ratio, HP_TWEEN_SEC)
+	_refresh()
+
+
+## 设置角色显示名（L5 名牌——[code]EnemyActionText.name_of[/code] 口径解析后写入）。[br]
+## [br][b]为什么名要在卡上[/b]：敌方此前只有头像没有名字，玩家分不清两只同色敌人
+## 谁是谁；HP 条挂了名才能读懂「这条血是谁的」。名字是渲染快照（零状态所有权），
+## 解析归调用方（[code]ActorStageRoster[/code] 注入的取数入口）。[br]
+## [br][b]空名不覆盖[/b]：解析失败传空串时保留既有名，避免一次读不到就把名牌抹掉。
+func apply_name(p_name: String) -> void:
+	if p_name.is_empty():
+		return
+	display_name = p_name
 	_refresh()
 
 
@@ -256,6 +297,11 @@ func set_reduce_motion(p_reduce: bool) -> void:
 	reduce_motion = p_reduce
 
 
+## HP 条当前显示比例（只读——测试据此断言血条与数字同步，不靠信号）。
+func get_hp_display_ratio_for_test() -> float:
+	return _hp_display_ratio
+
+
 ## === 内部 ====================================================================
 
 ## HP 显示比例 Tween 插值回调。
@@ -266,15 +312,56 @@ func _set_hp_display_ratio(value: float) -> void:
 
 ## 标记重绘 + 同步合并 Label（文字合批——R-02 §3 单 Label 条款）。
 func _refresh() -> void:
+	var screen_height: int = int(get_viewport_rect().size.y) \
+			if get_viewport() != null else 1080
+	var font_size: int = UiFont.font_size_responsive(14, screen_height)
 	_stat_label.text = "HP %d/%d  ATK %d" % [current_hp, max_hp, atk_value]
-	var font_size: int = UiFont.font_size_responsive(14,
-		int(get_viewport_rect().size.y) if get_viewport() != null else 1080)
 	_stat_label.add_theme_font_size_override("font_size", font_size)
 	_stat_label.add_theme_color_override("font_color", ATK_COLOR)
 	_stat_label.position = Vector2(SIDE_BAR_WIDTH,
 		size.y - BOTTOM_BAR_HEIGHT + 22.0)
 	_stat_label.size = Vector2(size.x - SIDE_BAR_WIDTH * 2.0, 18.0)
+	_refresh_name_label(font_size)
+	_refresh_defeat_stamp(font_size)
 	queue_redraw()
+
+
+## 名牌同步（L5——顶部横条；名字为空时隐藏，不留一条空底色）。
+func _refresh_name_label(p_font_size: int) -> void:
+	if _name_label == null:
+		return
+	_name_label.visible = not display_name.is_empty()
+	_name_label.text = display_name
+	_name_label.add_theme_font_size_override("font_size", p_font_size)
+	_name_label.add_theme_color_override("font_color", ATK_COLOR)
+	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name_label.position = Vector2(SIDE_BAR_WIDTH, 26.0)
+	_name_label.size = Vector2(size.x - SIDE_BAR_WIDTH * 2.0, 18.0)
+
+
+## 阵亡戳记同步——文案与可见性都从纯函数规格取（判定只有一处）。[br]
+## [br][b]为什么戳记与灰化并存[/b]：灰化（[method _draw] 的 overlay）在缩到 50%
+## 时未必读得出，一条写着「已阵亡」的实色横条是灰度模式下也读得到的那一层信息。[br]
+## [br][b]卡被摘除时怎么办[/b]：阵亡动画结束后卡会换成空位框
+## （[code]CombatFeedbackCoordinator._finish_death[/code]），戳记只在动画那 0.5s
+## 与「已阵亡但仍留在场上」两条路径上出现——两条都比没有强。
+func _refresh_defeat_stamp(p_font_size: int) -> void:
+	if _defeat_label == null:
+		return
+	var spec: Dictionary = DefeatMarker.style(is_defeated)
+	var text: String = str(spec.get("text", ""))
+	_defeat_label.visible = not text.is_empty()
+	_defeat_label.text = text
+	if text.is_empty():
+		return
+	_defeat_label.add_theme_font_size_override("font_size", p_font_size)
+	_defeat_label.add_theme_color_override("font_color",
+		spec.get("stamp_text", DefeatMarker.STAMP_TEXT_COLOR))
+	_defeat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_defeat_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var h: float = float(spec.get("stamp_height", DefeatMarker.STAMP_HEIGHT))
+	_defeat_label.position = Vector2(0.0, size.y - BOTTOM_BAR_HEIGHT - h)
+	_defeat_label.size = Vector2(size.x, h)
 
 
 ## HP 条绘制（R-02 §2——draw_rect 纯色三段：底槽/前景/边框省略——§5 实测

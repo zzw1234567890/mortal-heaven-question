@@ -288,6 +288,12 @@ func _draw_node_stated(node_id: int) -> void:
 		draw_texture_rect_region(NodeIconAtlas.get_atlas(), hole_rect,
 				NodeIconAtlas.get_region(FOG_GLYPH_REGION_COL))
 	else:
+		# 状态底衬（已访问/当前——与类型色无关的实色块，见 NodeStateLogic 的 plate 注释）。
+		# 画在图标[b]之下[/b]：图标是节点类型的信息，底衬是「这格有主了」的信息，
+		# 底衬盖住图标就等于用状态把类型抹掉了。
+		var plate: Color = style.get("plate", Color.TRANSPARENT)
+		if plate.a > 0.0:
+			draw_rect(rect.grow(2.0), plate)
 		draw_texture_rect_region(NodeIconAtlas.get_atlas(), rect, NodeIconAtlas.get_region(type_id))
 		# 已访问稍暗（AC-4）——半透黑叠加（draw_texture_rect_region 无 modulate）
 		if bool(style.get("dim", false)):
@@ -478,9 +484,12 @@ func _layout() -> void:
 	_content_rect = bounds.grow(NODE_SIZE)
 
 
-## 边是否已访问（两端均在 visited——走过路径）。
+## 边是否已访问（两端均在 visited——走过路径）。[br]
+## [br][b]判定委托 [NodeStateLogic.edge_is_walked][/b]：六态是节点级的，
+## 「这条路走没走过」是它旁边的另一格——两者必须同源，否则会出现「节点画成已访问、
+## 连着它的线还是虚线」这种自相矛盾的图。本方法只做转发（既有调用点与测试签名不变）。
 func _is_edge_visited(from_id: int, to_id: int) -> bool:
-	return visited.has(from_id) and visited.has(to_id)
+	return NodeStateLogicScript.edge_is_walked(visited, from_id, to_id)
 
 
 ## 节点是否迷雾覆盖（legacy 近似：visited ∪ {current} ∪ 其相邻节点之外均为迷雾）。

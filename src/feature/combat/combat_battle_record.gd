@@ -16,6 +16,11 @@ extends RefCounted
 ## 被拒绝的出牌（阶段/费用/目标校验不过的卡不产生任何条目）。[br]
 ## [br][b]双方剩余 HP[/b]：取自 [method CombatRosterState.snapshot_all]
 ## （本场状态表）——故必须在 [code]battle_end[/code] 清空状态表[b]之前[/b]定格。[br]
+## [br][b]伤害与击杀口径[/b]（[member _damage_dealt] / [member _kills]）：都在
+## [code]combat_damage_settlement.gd[/code] 的[b]落库成功且实际掉血[/b]时各记一笔
+## ——前者累加落库后的实际增量（治疗为负、被减免掉的与溢出的都不算），后者在
+## 「由存活转为阵亡」那一刻计一次（幂等，同一具尸体不会被数两遍）。[b]记在施加方
+## 头上[/b]：落库侧只知道受击方是谁，阵营翻转由 [method note_damage] 内部完成。[br]
 ## [br][b]信息不足不臆造[/b]（同 [code]combat_end_check.gd[/code]）：HP 数据不可信
 ## （[code]known=false[/code]）的条目照实进 [code]roster[/code] 并计入
 ## [code]unknown_count[/code]，但[b]不参与[/b] [code]remaining_hp[/code] 求和——
@@ -43,11 +48,45 @@ const OUTCOME_BY_RESULT: Dictionary = {
 
 ## 本场「进入执行端的效果条目数」。
 var _effect_entries: int = 0
+## 双方造成的总伤害——[code]{SIDE_PLAYER: int, SIDE_ENEMY: int}[/code]，
+## 键是[b]施加方[/b]（伤害记在打出去的一方头上，不是挨打的一方）。
+var _damage_dealt: Dictionary = {}
+## 双方击杀数——同 [member _damage_dealt] 的键口径（记在击杀者头上）。
+var _kills: Dictionary = {}
 
 
 ## 开战重置——每场一份，battle_start 调用。
 func reset() -> void:
 	_effect_entries = 0
+	_damage_dealt = {SIDE_PLAYER: 0, SIDE_ENEMY: 0}
+	_kills = {SIDE_PLAYER: 0, SIDE_ENEMY: 0}
+
+
+## 记一次落到受击方的伤害增量。[br]
+## [br][param victim_side] [b]受击方[/b]阵营（0 己方 / 1 敌方）——本方法内部翻成
+## 施加方入账：落库侧只知道「谁挨了打」，而战报要答的是「谁打了多少」。[br]
+## [param amount] 实际增量（正数 = 掉血）；治疗（负值）由调用方过滤，这里再守一次。[br]
+## [br][b]只统计实际掉血[/b]：与 [code]character_damaged[/code] 的广播口径同源——
+## 被减免掉的、溢出到 0 的都不算，玩家在战报里看到的数字与战斗中飘字总和一致。
+func note_damage(victim_side: int, amount: int) -> void:
+	if amount <= 0:
+		return
+	var by: int = _attacker_side(victim_side)
+	_damage_dealt[by] = int(_damage_dealt.get(by, 0)) + amount
+
+
+## 记一次击杀——计在击杀者的阵营上（口径同 [method note_damage]）。
+func note_kill(victim_side: int) -> void:
+	var by: int = _attacker_side(victim_side)
+	_kills[by] = int(_kills.get(by, 0)) + 1
+
+
+## 受击方阵营 → 施加方阵营。[br]
+## [br][b]只对未知阵营兜底到敌方[/b]：调用方（[code]combat_damage_settlement[/code]）
+## 只在角色可信（[code]known=true[/code]）时才记账，而可信条目的 side 一定取自状态表
+## 的 0/1——这条兜底分支因此只在数据异常时走到，不该静默把它算成我方战果。
+static func _attacker_side(victim_side: int) -> int:
+	return SIDE_PLAYER if victim_side == SIDE_ENEMY else SIDE_ENEMY
 
 
 ## 累计触发的效果条目数（负值忽略——计数只增不减）。
@@ -65,8 +104,12 @@ func effect_entry_count() -> int:
 ## [param turn] 结束时的回合数（[code]CombatSystem._turn[/code]）。[br]
 ## [param entries] [method CombatRosterState.snapshot_all] 的产出（须在状态表清空前取）。[br]
 ## [br][b]返回[/b]：纯数据 Dictionary——[code]{result, outcome, turn_count,
-## effect_entries, player, enemy}[/code]，其中 [code]player[/code] / [code]enemy[/code]
-## 各为 [code]{count, alive_count, remaining_hp, unknown_count, roster} [/code]。[br]
+## effect_entries, player, enemy, damage_dealt, kills}[/code]，其中 [code]player[/code]
+## / [code]enemy[/code] 各为 [code]{count, alive_count, remaining_hp, unknown_count,
+## roster}[/code]。[br]
+## [br][b][code]damage_dealt[/code] / [code]kills[/code][/b] 为
+## [code]{player: int, enemy: int}[/code]——键名与 [code]player[/code] /
+## [code]enemy[/code] 两段战报对齐（不是 0/1），展示端不必再认一遍阵营常量。
 ## [br][b]不含中文文案[/b]：结算对象的展示职责在 UI 侧（[code]CombatResultView[/code]）。
 func build(result: int, turn: int, entries: Array) -> Dictionary:
 	var player: Dictionary = _fold_side(entries, SIDE_PLAYER)
@@ -78,6 +121,14 @@ func build(result: int, turn: int, entries: Array) -> Dictionary:
 		"effect_entries": _effect_entries,
 		"player": player,
 		"enemy": enemy,
+		"damage_dealt": {
+			"player": int(_damage_dealt.get(SIDE_PLAYER, 0)),
+			"enemy": int(_damage_dealt.get(SIDE_ENEMY, 0)),
+		},
+		"kills": {
+			"player": int(_kills.get(SIDE_PLAYER, 0)),
+			"enemy": int(_kills.get(SIDE_ENEMY, 0)),
+		},
 	}
 
 

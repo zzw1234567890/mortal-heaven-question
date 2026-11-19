@@ -50,6 +50,14 @@ var outcome: String = "none"
 var turn_count: int = 0
 ## 本场结算的效果条目数（打出即生效 + 击杀触发）。
 var effect_entries: int = 0
+## 双方[b]造成[/b]的总伤害合计 [code]{player: int, enemy: int}[/code]
+## （键为施加方——与 [member player] / [member enemy] 两段战报同名对齐）。[br]
+## [br][b]为什么记在施加方[/b]：玩家看结算屏问的是「我这局打了多少」，不是
+## 「我挨了多少」——挨打量已经由 [member player] 的 [code]remaining_hp[/code] 体现。[br]
+## 旧载荷缺这两个键时取 [code]{player: 0, enemy: 0}[/code]（展示端判空，不臆造）。
+var damage_dealt: Dictionary = {}
+## 双方击杀数 [code]{player: int, enemy: int}[/code]（同 [member damage_dealt] 的键口径）。
+var kills: Dictionary = {}
 ## 我方战绩 [code]{count, alive_count, remaining_hp, unknown_count, roster}[/code]。
 var player: Dictionary = {}
 ## 敌方战绩（同上结构）。
@@ -131,10 +139,27 @@ func _apply_record(record: Dictionary) -> void:
 	outcome = String(record.get("outcome", "")) if record.has("outcome") else ""
 	turn_count = maxi(int(record.get("turn_count", 0)), 0)
 	effect_entries = maxi(int(record.get("effect_entries", 0)), 0)
+	damage_dealt = _side_totals(record.get("damage_dealt"))
+	kills = _side_totals(record.get("kills"))
 	var p: Variant = record.get("player", {})
 	player = (p as Dictionary).duplicate(true) if p is Dictionary else {}
 	var e: Variant = record.get("enemy", {})
 	enemy = (e as Dictionary).duplicate(true) if e is Dictionary else {}
+
+
+## 双侧整数字典的规范化读取——[code]{player: int, enemy: int}[/code]。[br]
+## [br][b]缺键补 0 而不是补 null[/b]：战报展示端要能无条件相加/格式化；旧载荷
+## （这两个键是后加的）读到的是 0 而不是崩溃。非字典 / 非数字一律按 0 处理，
+## 与 [method _apply_record] 其余字段同一条「读不到就给明确默认值」的口径。[br]
+## [br][b]未知键丢弃[/b]：只取 player / enemy 两把，避免把上游的 0/1 阵营键
+## 混进来让展示端读出一堆没头没尾的数。
+static func _side_totals(raw: Variant) -> Dictionary:
+	var out: Dictionary = {"player": 0, "enemy": 0}
+	if not (raw is Dictionary):
+		return out
+	for key: String in out.keys():
+		out[key] = maxi(int((raw as Dictionary).get(key, 0)), 0)
+	return out
 
 
 ## 结局中文标题（占位场景标题行用）。
@@ -155,6 +180,63 @@ func player_remaining_hp() -> int:
 ## 敌方剩余 HP 合计（同 [method player_remaining_hp] 的口径）。
 func enemy_remaining_hp() -> int:
 	return maxi(int(enemy.get("remaining_hp", 0)), 0)
+
+
+## 我方造成的总伤害（旧载荷无此项时为 0）。
+func player_damage_dealt() -> int:
+	return maxi(int(damage_dealt.get("player", 0)), 0)
+
+
+## 敌方造成的总伤害（同 [method player_damage_dealt] 的口径）。
+func enemy_damage_dealt() -> int:
+	return maxi(int(damage_dealt.get("enemy", 0)), 0)
+
+
+## 我方击杀数（旧载荷无此项时为 0）。
+func player_kills() -> int:
+	return maxi(int(kills.get("player", 0)), 0)
+
+
+## 敌方击杀数（同 [method player_kills] 的口径）。
+func enemy_kills() -> int:
+	return maxi(int(kills.get("enemy", 0)), 0)
+
+
+## 本场战报——结算屏「战报」区块的逐行内容。[br]
+## [br][b]与 [method summary_lines] 的分工[/b]：那条是[b]诊断/日志[/b]用的完整摘要
+## （结局枚举、触发条目数、未知数据后缀都写进去）；本方法是[b]玩家读的那一版[/b]
+## ——回合数 / 我方逐人剩余 HP / 造成伤害 / 击杀数，四项都在卡片区里看得到，
+## 不夹带 result 数字之类的内部字段。[br]
+## [br][b]我方逐人 HP[/b]：[code]roster[/code] 里 [code]known=false[/code] 的条目
+## 不编造数字，标「状态未知」——与 [method _unknown_suffix] 同一条「读不到就说读不到」。[br]
+## [br][b]没有战绩数据时返回空数组[/b]（[member has_record] 为假）：展示端据此不建区块，
+## 而不是显示一排 0 让人以为「打了一场什么都没发生」。
+func battle_report_lines() -> PackedStringArray:
+	var lines := PackedStringArray()
+	if not has_record:
+		return lines
+	lines.append("本场回合数: %d" % turn_count)
+	lines.append("我方剩余 HP:")
+	var roster: Array = player.get("roster", []) if player.get("roster") is Array else []
+	for raw: Variant in roster:
+		if not (raw is Dictionary):
+			continue
+		lines.append("　· %s" % _roster_line(raw as Dictionary))
+	lines.append("我方造成伤害: %d（击杀 %d）" % [player_damage_dealt(), player_kills()])
+	lines.append("敌方造成伤害: %d（击杀 %d）" % [enemy_damage_dealt(), enemy_kills()])
+	return lines
+
+
+## 逐人战报行——[code]角色 #ID: 12/20[/code]；数据不可信时标「状态未知」不编数字。
+func _roster_line(entry: Dictionary) -> String:
+	var name: String = "角色 #%d" % int(entry.get("character_id", -1))
+	if not bool(entry.get("known", false)):
+		return "%s: 状态未知" % name
+	var hp: String = "%d/%d" % [int(entry.get("current_hp", 0)),
+			int(entry.get("max_hp", 0))]
+	if not bool(entry.get("is_alive", true)):
+		return "%s: %s（已阵亡）" % [name, hp]
+	return "%s: %s" % [name, hp]
 
 
 ## 纯文本摘要——占位场景直接 print 的内容（一行一条，便于人工核对与日志检索）。[br]
