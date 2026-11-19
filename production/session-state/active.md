@@ -2,9 +2,18 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: 难度与人数配平（新手能一路玩下去 第一段）
-Task: 难度系数表 + 首图池 + 地图境界档进战斗数值；下一步 敌人数量随境界（headcount 轴）
+Feature: 一周目端到端冒烟（整条路真实走一遍）
+Task: 主菜单 → 身份 → 首图 → Boss → 通关 → 解锁 → 存读档，八步全绿；下一步 敌方数量随境界（headcount 轴）
 <!-- /STATUS -->
+
+## Session Extract — 一周目端到端冒烟（2026-11-19）
+- 任务：写一条「玩家从进游戏到打赢首图 Boss」的端到端冒烟，整条链路真实走一遍，断哪修哪
+- **交付**（8 个新文件，全在 `tests/integration/exploration_ui/`，均 ≤300 行）：装置四层继承链 `one_run_base_fixture.gd`（266，真实 Autoload + 场景管理器桩 + 存档隔离 + 跨用例状态快照还原）→ `one_run_smoke_fixture.gd`（246，主菜单/身份/探索容器三段编排 + 图结构查询）→ `one_run_battle_fixture.gd`（208，点格→弹窗→开战上下文）→ `one_run_combat_fixture.gd`（287，真实战斗场景挂载与推进）；用例四个 `test_one_run_smoke/battle/clear/save.gd`（207/70/102/95），**17 个新用例**（10+3+2+2）
+- **走真路的关键接缝**（都不走捷径）：进图靠 `ExplorationEntryIntent` 落盘 → 容器消费；开战靠真实 `combat_scene.tscn` 的 `_ready` 从 `CombatLaunchContext.take()` 取（**不注入 `launch_context_override`**，否则短路被测接缝）；出牌走真实鼠标命中测试（`CombatInputLayer._handle_button`）；通关靠真实结算屏 `_on_return_pressed`（**不直调 `end_exploration`**）；解锁断言读 `ExplorationSystem.get_map_list()`——界面渲染消费的同一份条目，不是另算一遍门禁
+- **修掉的断点（7 处，全是用例自身缺陷，生产代码一行未改，`git status src/` 为空）**：① `popup_body()` 调不存在的 `body_text()`——`node_interaction_popup.gd:133` 只把文本写进标签，改读命名子节点 `Body`；② `walk_to_boss` 用 `self.call(&"_path_to", ...)` 调一个已改名的函数；③ **`deck.slots` 为空导致「我方出战名单非空」假红**——`enter_first_map()` 跳过了身份那一步，而阵容/初始卡组是 `apply_identity` 写的（`identity_selection_system.gd:257-260`）；**没有放宽断言**，加了 `start_new_run()` 走完真实主菜单→身份→确认→跳过叙事；④ `clear_count()` 缺省参数读「当前图」，而结算已把 `current_map` 清空 → 恒 0，改为显式传首图 ID；⑤ `test_one_run_save.gd` 继承错基类（`click_node` 在战斗装置里）；⑥ **`GateScript` 常量在子类重复声明 → GUT 静默跳过整个文件**（子类重复 const 是解析错误，汇总数字仍然绿——本仓库第二次踩）；⑦ `one_run_smoke_fixture.gd` 涨到 333 行越限 → 拆出底座与战斗装置
+- **修掉的真回归（重要）**：新用例在 `exploration_ui` 目录跑完后，下一条 `hud` 用例 `test_pause_combat_state_preserved` 会死循环刷 `advance_phase() called with no active battle` 直到套件挂死（实测日志涨到 150MB+ 未结束）。**根因**：战斗装置让 Autoload `AISystem` 名册留着「已全灭」的敌人、`DeploymentSystem` 阵位留着上场角色，下一条用例 `battle_start` 后 END 阶段立刻判出胜负结束战斗，而那条用例靠 `_advance_to_turn` 推进回合等待——等待条件永不成立。**修复**：`one_run_combat_fixture.gd` 的 `after_each` 按 `full_battle_fixture.gd:195-224` 口径还原共享单例（撤阵位 / `CostSystem.clear_for_battle_end` / `InputManager.clear_locks` / `AISystem.set_enemy_roster` 还原 / GSM battle 域按「开测前是否存在」还原）。修复后同组合全绿
+- 全量（`.\run_tests.ps1`）：**5282 tests / 5282 passing / 3 orphans / 21131 asserts**，「All tests passed!」。移出这 8 个文件跑对照得 5265 / 5265——净增 17，零失败零回归；两边的 2 条 `advance_phase` 噪音与 24 条 warning 与基线逐位一致
+- 已知边界：① `tests/unit/combat_system/test_combat_scene_resume.gd` 因解析错误（`PilelessCombatStub` / `RosterStub` 未声明）被 GUT 静默跳过——**存量问题**，单独跑同样跳过，不在本轮范围；② `hud` 目录单跑时 `test_hud_bootstrap.gd::test_main_menu_does_not_auto_mount_when_not_current_scene` 会红（HUD 被前序用例留成常驻），全量跑时不复现——跨目录污染存量，与本轮无关；③ `one_run_combat_fixture.gd` 287 行，再长出装置动作就需要再拆一层
 
 ## Session Extract — 难度与人数配平（2026-11-17）
 - 任务：「新手能一路玩下去」第一段——战斗难度此前全靠占位数值，且敌方属性与地图境界档无关（炼气打归墟 ≈ 炼气打青云剑宗）
