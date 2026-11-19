@@ -123,10 +123,18 @@ func _fill_bar(node: Control, right: float) -> void:
 	node.offset_bottom = -6.0
 
 
-## 区域容器工厂（Control——内容后续 story 填充）。
+## 区域容器工厂（Control——内容后续 story 填充）。[br]
+## [br][b]容器一律不接收鼠标[/b]（2026-11-19 修复）：五区域与两个按钮位都只是布局，
+## 真正吃鼠标的只有它们内部的按钮与全屏手势层。[code]Control[/code] 默认是
+## [code]MOUSE_FILTER_STOP[/code]，容器带着这个默认值就等于在画面上铺了五块
+## 看不见的挡板——底部条那 180px 会连手牌一起截住，敌方区那 340px 会截住点选目标，
+## 而界面上完全看不出原因。[br]
+## [b]IGNORE 只作用于容器自身[/b]：子控件（按钮 / 角色卡）照常参与拾取，
+## 不需要父级替它们放行。
 func _make_zone(zone_name: String) -> Control:
 	var zone := Control.new()
 	zone.name = zone_name
+	zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return zone
 
 

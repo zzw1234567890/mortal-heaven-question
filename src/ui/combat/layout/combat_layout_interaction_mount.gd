@@ -35,8 +35,8 @@ func _init(p_layout: Control, p_assembly: RefCounted) -> void:
 
 
 ## 构建并接线（[code]_init[/code] 之后由主类在装配完成后调用）。[br]
-## [br][b]节点次序[/b]：两个节点必须排在备战 / 结算覆盖层[b]之前[/b]（覆盖层打开时
-## 必须盖住输入层；输入层挂在最上面会把面板上的按钮全部挡掉）。[br]
+## [br][b]节点次序[/b]：输入层压在角色卡之上、[b]压在底部条与右上角按钮位之下[/b]
+## （见 [method _place_in_tree]）；覆盖层打开时由上层 [method set_input_enabled] 关掉输入。[br]
 ## [b]选中视觉[/b]：控制器 [code]selection_changed[/code] → 手牌区抬起/描边——
 ## 选中态在真实对局里第一次有视觉落点。
 func build() -> void:
@@ -46,10 +46,9 @@ func build() -> void:
 	input_layer = InputLayerScript.new()
 	input_layer.name = "CombatInputLayer"
 	_layout.add_child(input_layer)
-	_place_below_overlays()
+	_place_in_tree()
 	input_layer.call(&"setup", self, Callable(toast, &"show_message"))
 	_connect_selection()
-
 
 ## 设置减少动态（提示条淡出改瞬时）。
 func set_reduce_motion(p_reduce_motion: bool) -> void:
@@ -143,16 +142,26 @@ func play_card_detailed(p_card_instance_id: int,
 			p_target_indices)
 
 
-# === 内部 =====================================================================
+## === 内部 =====================================================================
 
-## 把提示条与输入层挪到覆盖层之前（顺序即绘制层级）。
-func _place_below_overlays() -> void:
-	var overlay: Node = _layout.get_node_or_null(NodePath("DeployPanel"))
-	if overlay == null:
+## 把提示条与输入层放到该在的层级。[br]
+## [br][b]输入层压在哪、谁压着它[/b]（两个方向都错不得，2026-11-19 修复）：[br]
+##   · [b]要压住[/b]：敌我角色卡与手牌区（前四个区域）——手势要能在战场任意
+##     位置起手，而角色卡是画在区域里的 [code]Control[/code]；[br]
+##   · [b]要被压住[/b]：底部条的「结束出牌」「行囊」与右上角「撤退」按钮位
+##     ——输入层是全屏 [code]MOUSE_FILTER_STOP[/code]，排在这三处之上就把它们
+##     整片吃掉（玩家看得见按钮却点不动，界面上没有任何线索说明为什么）。[br]
+## [br]落点因此是「紧随第四区、排在 BottomBar 之前」，而不是「挪到覆盖层之前」
+## ——后者看起来只让开了面板，实际把底部条整条盖住了。[br]
+## [br][b]覆盖层（备战 / 结算）始终在最后[/b]：它们自带的遮罩会挡住输入层，
+## 再由上层 [method set_input_enabled] 关掉手势，两层保障。
+func _place_in_tree() -> void:
+	if toast == null or input_layer == null:
 		return
-	var index: int = mini(overlay.get_index(), toast.get_index())
-	_layout.move_child(toast, index)
-	_layout.move_child(input_layer, index + 1)
+	var anchor: Node = _layout.get_node_or_null(NodePath("BottomBar"))
+	var base: int = anchor.get_index() if anchor != null else _layout.get_child_count()
+	_layout.move_child(toast, base)
+	_layout.move_child(input_layer, base + 1)
 
 
 ## 控制器选中变化 → 手牌区落视觉（抬起 + 描边）。

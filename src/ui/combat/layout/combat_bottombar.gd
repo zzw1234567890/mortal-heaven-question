@@ -50,14 +50,22 @@ func _init() -> void:
 	_build()
 
 
-## 构建四组件（_init 构建——不依赖场景树时序）。
+## 构建四组件（_init 构建——不依赖场景树时序）。[br]
+## [br][b]组装器自己不接收鼠标[/b]：它只是排布容器（[code]MOUSE_FILTER_IGNORE[/code]），
+## 点击交给真正的按钮。容器留在 [code]STOP[/code]（Control 默认值）时，这条
+## 全宽 180px 的条会先认领事件——手牌区与输入层都在它下面，玩家点到条上的手牌
+## 会落在容器上（2026-11-19 玩家实测「点了没反应」的现场之一）。[br]
+## [b]IGNORE 只作用于容器自身[/b]：四个子控件照常参与拾取。
 func _build() -> void:
 	custom_minimum_size = Vector2(460, 48)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cost_bar = CostBar.new()
 	cost_bar.name = "CostBar"
+	cost_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(cost_bar)
 	deck_counter = DeckCounter.new()
 	deck_counter.name = "DeckCounter"
+	deck_counter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(deck_counter)
 	bag_button = BagButtonScript.new()
 	bag_button.name = "BagButton"
