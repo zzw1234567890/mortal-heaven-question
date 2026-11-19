@@ -222,10 +222,14 @@ func _get_debuff() -> RefCounted:
 
 
 ## 全表快照——结算回流用（Sprint 18）：逐角色一条
-## [code]{character_id, side, current_hp, max_hp, is_alive, known}[/code]，按 ID 升序。[br]
+## [code]{character_id, side, current_hp, max_hp, is_alive, known, display_name}[/code]，
+## 按 ID 升序。[br]
 ## [br][b]必须在 clear() 之前调用[/b]：battle_end 清空状态表后这里读到的就是空数组
 ## （结算对象与 HP 回写都以它为唯一取数来源）。[br]
-## [br][b]不含 ref[/b]：外部持有者（敌方阵容条目）不进快照，避免把对象带进结算数据。
+## [br][b]不含 ref[/b]：外部持有者（敌方阵容条目）不进快照，避免把对象带进结算数据。[br]
+## [br][b]带 display_name[/b]：结算战报要写「谁还剩多少血」，只有 ID 的报表玩家认不出
+## 是谁。名字在建表时已从名册条目/卡牌模板定格（见 [code]combat_roster_seeding.gd[/code]），
+## 本方法只透传——不在这里现读，免得战报里的名字与本场开战时的不一致。
 func snapshot_all() -> Array:
 	var keys: Array = _states.keys()
 	keys.sort()
@@ -239,6 +243,7 @@ func snapshot_all() -> Array:
 			"max_hp": int(st.get("max_hp", 0)),
 			"is_alive": bool(st.get("is_alive", true)),
 			"known": bool(st.get("known", false)),
+			"display_name": str(st.get("display_name", "")),
 		})
 	return out
 

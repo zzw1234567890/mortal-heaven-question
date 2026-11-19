@@ -10,6 +10,10 @@
 ## [br][b]键编码与读取口径仍与状态表同源[/b]：[method enemy_id_of] /
 ## [method enemy_is_front] 的约定由本模块持有，状态表以 [code]const[/code] 转发
 ## 同名常量与静态方法——外部既有引用点（战斗 UI 建卡、敌方行动播报）一字未改。[br]
+## [br][b]显示名也归本模块[/b]：名字长在名册条目与卡牌模板上，而「条目字段怎么读」
+## 已经是本模块的口径（[method entry_raw] / [method read_template_field]）——
+## 名字解析若留在 UI 层，Feature 层的战绩记录就只能写「角色 #ID」。见
+## [method enemy_display_name] / [method resolve_name]。[br]
 ##
 ## 来源: ADR-0008 §Phase 4、ADR-0016 §阵位数据模型、tech-debt DEBT-CBT-018-1、
 ## 先例 [code]combat_roster_state.gd[/code] 的拆分注记。
@@ -22,6 +26,9 @@ const SIDE_ENEMY: int = 1
 const ENEMY_ID_BASE: int = 100000
 ## 敌方角色 ID 步长（每实例一段，避免同模板多实例 ID 冲突）。
 const ENEMY_ID_STRIDE: int = 10000
+
+## 名字全缺时的兜底文案（不让空名把一行战报变成「对『』造成…」）。
+const NAME_UNKNOWN: String = "未知目标"
 
 
 ## 敌方角色 ID 派生——[b]单一来源[/b]：开战种子与战斗 UI 建卡必须落在同一键上，
@@ -58,17 +65,21 @@ static func build_enemy_states(roster: Array) -> Dictionary:
 		var max_hp: int = entry_int(entry, "max_hp", 0)
 		var hp: int = entry_int(entry, "current_hp", max_hp)
 		var known: bool = max_hp > 0
-		states[character_id] = make_state(SIDE_ENEMY, hp, max_hp,
+		var state: Dictionary = make_state(SIDE_ENEMY, hp, max_hp,
 				entry_int(entry, "attack", 0),
 				entry_int(entry, "defense", 0),
 				bool(entry_int(entry, "is_alive", 1)) and (hp > 0 or not known), known, entry)
+		state["display_name"] = enemy_display_name(entry)
+		states[character_id] = state
 	return states
 
 
 ## 建我方阵位状态表——HP/ATK 来源优先级：注入 stats > 卡牌模板基础值 > 未知。[br]
 ## [br][param stats] 可带 [code]atk[/code] / [code]attack[/code]（任选其一）作为攻击力覆盖；
 ## 缺省回退模板 [code]base_attack[/code]（与战斗 UI 的 ATK 取数同源）。[br]
-## [br][member ref] 恒为 null：我方条目的真理来源就是状态表本身（无外部持有者）。
+## [br][member ref] 恒为 null：我方条目的真理来源就是状态表本身（无外部持有者）。[br]
+## [br][b]名字在开战时定格[/b]：从卡牌模板取一次写进状态表——结算战报读的是本场
+## 开战时的名字，中途换绑/换模板不会让战报里的名字与战斗中看到的对不上。
 static func build_player_states(field: Array, stats: Dictionary,
 		card_system: Node = null) -> Dictionary:
 	var states: Dictionary = {}
@@ -97,13 +108,18 @@ static func build_player_states(field: Array, stats: Dictionary,
 		if atk <= 0:
 			atk = read_template_field(card_system, character_id, "base_attack")
 		var known: bool = max_hp > 0 or hp > 0
-		states[character_id] = make_state(SIDE_PLAYER, hp, max_hp, atk, defense,
+		var state: Dictionary = make_state(SIDE_PLAYER, hp, max_hp, atk, defense,
 				hp > 0 or not known, known, null)
+		state["display_name"] = card_display_name(card_system, character_id)
+		states[character_id] = state
 	return states
 
 
 ## 一条状态记录——负值一律夹到 0（不臆造负 HP / 负攻击）。[br]
-## [param ref] 外部持有者（敌方阵容条目）；我方条目为 null。
+## [param ref] 外部持有者（敌方阵容条目）；我方条目为 null。[br]
+## [br][b]不含 display_name[/b]：名字不是「一条状态」的固有属性（同一张表里
+## 敌方从名册条目取、我方从卡牌模板取），由两个 [code]build_*[/code] 各自写入——
+## 塞进本函数就得额外传一个「从哪儿找名字」的参数。
 static func make_state(side: int, hp: int, max_hp: int, atk: int, defense: int,
 		is_alive: bool, known: bool, ref: Variant) -> Dictionary:
 	return {
@@ -116,6 +132,79 @@ static func make_state(side: int, hp: int, max_hp: int, atk: int, defense: int,
 		"known": known,
 		"ref": ref,
 	}
+
+
+# === 显示名解析（Feature 层口径——UI 与战报共用）=============================
+
+## 名册条目的显示名——[code]display_name[/code] 直取优先，其次模板对象/模板 ID。[br]
+## [br][b]为什么 db 层要给名字[/b]：结算战报要写「谁还剩多少血」，只给
+## [code]角色 #12[/code] 的报表玩家读不出是谁；而名册条目与卡牌模板都是本层
+## 的数据，解析留在这里才不必让 Feature 反向依赖 UI 的命名解析器。[br]
+## [br][b]取不到返回空串[/b]：空串 = 「这里没有名字」，交给 [method resolve_name]
+## 决定兜底文案（本方法不擅自编一个）。
+static func enemy_display_name(entry: Variant) -> String:
+	if entry == null:
+		return ""
+	var direct: String = _non_empty(entry_raw(entry, "display_name"))
+	if direct != "":
+		return direct
+	var template_name: String = _template_name(entry_raw(entry, "template"))
+	if template_name != "":
+		return template_name
+	return _non_empty(entry_raw(entry, "template_id"))
+
+
+## 卡牌模板的显示名——[code]display_name[/code] 优先，回退旧字段 [code]name[/code]。[br]
+## [br][b]取不到返回空串[/b]：CardSystem 缺失 / 查不到该实例时同样给空串
+## （「读不到」与「没名字」在展示端是同一条兜底路径）。
+static func card_display_name(card_system: Node, character_id: int) -> String:
+	if card_system == null or not card_system.has_method(&"get_template_by_instance_id"):
+		return ""
+	var template: Variant = card_system.call(&"get_template_by_instance_id", character_id)
+	if template == null:
+		return ""
+	for key: String in ["display_name", "name"]:
+		var value: Variant = template.get(key)
+		if value != null and str(value) != "":
+			return str(value)
+	return ""
+
+
+## 名字解析的[b]唯一兜底入口[/b]：拿到空名字时按 ID 段给可读编号。[br]
+## [br][b]返回[/b]：非空串——最差也是 [code]敌人 #100000[/code] / [code]角色 #12[/code]。[br]
+## [br][b]为什么兜底要分段[/b]：敌方 ID 从 [constant ENEMY_ID_BASE] 起算，玩家看到
+## 「敌人 #100000」知道那是敌人，看到「角色 #12」知道那是自己人——统一叫「角色」
+## 会让敌我两栏认不出谁是谁。
+static func resolve_name(p_display_name: String, p_character_id: int) -> String:
+	if p_display_name != "":
+		return p_display_name
+	return fallback_name(p_character_id)
+
+
+## 兜底名——按 ID 段区分「敌人」与「角色」（保证玩家至少能看到编号）。
+static func fallback_name(p_character_id: int) -> String:
+	if p_character_id < 0:
+		return NAME_UNKNOWN
+	if p_character_id >= ENEMY_ID_BASE:
+		return "敌人 #%d" % p_character_id
+	return "角色 #%d" % p_character_id
+
+
+## 模板对象的显示名（[code]display_name[/code] / [code]name[/code]）。
+static func _template_name(template: Variant) -> String:
+	if not (template is Object):
+		return ""
+	for key: String in ["display_name", "name"]:
+		var value: Variant = (template as Object).get(key)
+		var text: String = _non_empty(value)
+		if text != "":
+			return text
+	return ""
+
+
+## 非空字符串化——null / 空串一律归一成空串（「读不到」与「是空名」同一条兜底路径）。
+static func _non_empty(value: Variant) -> String:
+	return "" if value == null else str(value)
 
 
 ## 卡牌模板字段回退——CardSystem/模板不可用时返回 0（= 未知）。[br]

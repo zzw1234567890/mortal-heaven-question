@@ -1,0 +1,135 @@
+extends RefCounted
+## NodeGraphLayout —— 节点图的几何计算（位置 / 包围盒 / 迷雾集合，纯函数）。[br]
+## [br][b]为什么单独成文件[/b]：[code]node_graph_renderer.gd[/code] 越过单文件
+## 300 行软上限（coding-standards），而「每个节点摆在哪」「哪些格子在雾里」是
+## 纯粹的坐标换算——输入快照、输出数组/字典，与绘制、输入、命中检测都不相交。[br]
+## [br][b]纯函数，不持状态[/b]：本模块一个字段都没有，每次调用返回新结果——
+## 渲染器自己持有 [code]_positions[/code] / [code]_content_rect[/code]，
+## 本模块只负责算出来。[br]
+## [br]来源: ADR-0031 §5、design/gdd/exploration-ui-system.md §2、
+## exploration-ui Story 001 / 003。
+
+## 六态样式查询（迷雾判定的口径来源）。
+const NodeStateLogicScript := preload("res://src/ui/exploration/node_state_logic.gd")
+## 视觉规格（间距常量——布局与绘制共用同一份，不各写一遍）。
+const Style := preload("res://src/ui/exploration/node_graph_style.gd")
+
+
+## 布局计算——layer 纵向、idx 横向居中。[br]
+## [br][param p_nodes] 节点详情 [code]{node_id: {layer, idx}}[/code]。[br]
+## [br][b]返回[/b]：[code]{node_id: Vector2}[/code]（节点中心坐标）；空输入返回空字典。
+static func compute_positions(p_nodes: Dictionary) -> Dictionary:
+	var positions: Dictionary = {}
+	if p_nodes.is_empty():
+		return positions
+	var layer_counts: Dictionary = {}
+	for node_id: int in p_nodes.keys():
+		var layer: int = int(p_nodes[node_id].get("layer", 0))
+		layer_counts[layer] = int(layer_counts.get(layer, 0)) + 1
+	for node_id: int in p_nodes.keys():
+		var layer: int = int(p_nodes[node_id].get("layer", 0))
+		var idx: int = int(p_nodes[node_id].get("idx", 0))
+		var count: int = int(layer_counts.get(layer, 1))
+		var row_width: float = (float(count) - 1.0) * Style.NODE_GAP
+		positions[node_id] = Vector2(
+				(row_width * 0.5) - (float(idx) * Style.NODE_GAP),
+				float(layer) * Style.LAYER_GAP)
+	return positions
+
+
+## 内容包围盒——Viewport 整图适配的计算基准（各节点中心的并集外扩一个节点尺寸）。[br]
+## [br][b]空输入返回空 [Rect2][/b]（渲染器据此走「无内容」分支）。
+static func compute_content_rect(p_positions: Dictionary) -> Rect2:
+	if p_positions.is_empty():
+		return Rect2()
+	var bounds := Rect2()
+	var initialized: bool = false
+	for pos: Vector2 in p_positions.values():
+		if not initialized:
+			bounds = Rect2(pos, Vector2.ZERO)
+			initialized = true
+		else:
+			bounds = bounds.expand(pos)
+	return bounds.grow(Style.NODE_SIZE)
+
+
+## 已揭示集合（legacy 口径）：已访问 + 当前节点 + 当前节点的邻接（前向 + 后向）。[br]
+## [br][b]只是 legacy 近似[/b]：states 注入时迷雾以六态判定为准（见
+## [method fogged_positions]），本集合只在未注入六态时被读。
+static func revealed_set(p_graph: Dictionary, p_visited: Array,
+		p_current_node: int) -> Array:
+	var revealed: Array = p_visited.duplicate()
+	if p_current_node >= 0 and not revealed.has(p_current_node):
+		revealed.append(p_current_node)
+	if p_graph.has(p_current_node):
+		for to_id: int in p_graph[p_current_node]:
+			if not revealed.has(to_id):
+				revealed.append(to_id)
+	for from_id: int in p_graph.keys():
+		if p_graph[from_id].has(p_current_node) and not revealed.has(from_id):
+			revealed.append(from_id)
+	return revealed
+
+
+## 节点是否被迷雾覆盖（legacy 近似——见 [method revealed_set]）。
+static func is_fogged(p_graph: Dictionary, p_visited: Array, p_current_node: int,
+		p_node_id: int) -> bool:
+	return not revealed_set(p_graph, p_visited, p_current_node).has(p_node_id)
+
+
+## 迷雾覆盖的节点位置列表（AC-3 采样用——迷雾节点计数）。[br]
+## [br]states 注入时以六态 FOGGED 为准（与 [NodeStateLogic] 判定一致）；否则 legacy 近似。[br]
+## [br][b]只列有坐标的节点[/b]：布局尚未跑过（[param p_positions] 为空）时不给位置，
+## 免得调用方拿到一堆 [constant Vector2.ZERO] 在原点堆成一坨。
+static func fogged_positions(p_graph: Dictionary, p_nodes: Dictionary,
+		p_positions: Dictionary, p_states: Dictionary, p_visited: Array,
+		p_current_node: int) -> Array:
+	var result: Array = []
+	if not p_states.is_empty():
+		for node_id: int in p_nodes.keys():
+			if int(p_states.get(node_id, NodeStateLogicScript.NodeState.FOGGED)) \
+					!= NodeStateLogicScript.NodeState.FOGGED:
+				continue
+			if p_positions.has(node_id):
+				result.append(p_positions[node_id])
+		return result
+	var revealed: Array = revealed_set(p_graph, p_visited, p_current_node)
+	for node_id: int in p_nodes.keys():
+		if revealed.has(node_id):
+			continue
+		if p_positions.has(node_id):
+			result.append(p_positions[node_id])
+	return result
+
+
+## 已揭示节点位置列表（迷雾挖孔位置）。[br]
+## [br]states 注入时挖孔 = 全部非迷雾节点；否则 legacy 已揭示集合（口径同
+## [method fogged_positions]，两者互补——同一份判定不会一半说亮一半说暗）。
+static func revealed_positions(p_graph: Dictionary, p_nodes: Dictionary,
+		p_positions: Dictionary, p_states: Dictionary, p_visited: Array,
+		p_current_node: int) -> Array:
+	var result: Array = []
+	if not p_states.is_empty():
+		for node_id: int in p_nodes.keys():
+			if int(p_states.get(node_id, NodeStateLogicScript.NodeState.FOGGED)) \
+					== NodeStateLogicScript.NodeState.FOGGED:
+				continue
+			if p_positions.has(node_id):
+				result.append(p_positions[node_id])
+		return result
+	var revealed: Array = revealed_set(p_graph, p_visited, p_current_node)
+	for node_id: int in revealed:
+		if p_positions.has(node_id):
+			result.append(p_positions[node_id])
+	return result
+
+
+## 节点是否已显现——逐层展开浮现（AC-1）：超过 [param p_reveal_max_layer] 的层
+## 未绘制（负值 = 全部显现）。[br]
+## [br][b]命中检测复用同一判定[/b]：未绘制的节点不该可点（可见性与可点性同源）。
+static func is_layer_revealed(p_nodes: Dictionary, p_reveal_max_layer: int,
+		p_node_id: int) -> bool:
+	if p_reveal_max_layer < 0:
+		return true
+	var layer: int = int(p_nodes.get(p_node_id, {}).get("layer", 0))
+	return layer <= p_reveal_max_layer

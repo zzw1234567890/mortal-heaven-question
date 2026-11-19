@@ -10,6 +10,10 @@ extends GutTest
 ## 风格先例：tests/integration/combat_ui/test_layout_skeleton.gd。
 
 const CardScene := "res://src/ui/combat/layout/character_status_card.gd"
+## 六层绘制模块——「这张卡」的实现面另一半（源码级断言要连着它一起看）。
+const CardPainter := "res://src/ui/combat/layout/character_card_painter.gd"
+## 文字子节点模块（三个 Label 的创建/摆放/内容——同属实现面）。
+const CardLabels := "res://src/ui/combat/layout/character_card_labels.gd"
 const Rules := preload("res://src/ui/combat/shared/combat_ui_rules.gd")
 const Icons := preload("res://src/ui/combat/shared/combat_icon_atlas.gd")
 
@@ -98,13 +102,23 @@ func test_card_has_no_process_polling() -> void:
 
 func test_card_consumes_shared_pure_functions_not_inline() -> void:
 	# Then: 消费共享纯函数（story 001/002 唯一落地处——源码无内联阈值实现）
-	var source: String = (load(CardScene) as GDScript).source_code
+	# 卡的实现面 = 状态入口（character_status_card）+ 六层绘制（painter）
+	# ——本文件的 300 行拆分把画笔搬到了旁边的模块，两者合起来才是「这张卡」。
+	var source: String = _card_surface_source()
 	assert_true(source.contains("Rules.hp_bar_color"),
 		"HP 颜色应经 CombatUiRules.hp_bar_color（禁止内联）")
 	assert_true(source.contains("Rules.formation_row_scale"),
 		"缩放应经 CombatUiRules.formation_row_scale（禁止内联）")
 	assert_true(source.contains("UiFont.font_size_responsive"),
 		"字号应经 CombatUiFont.font_size_responsive（story 001 共享）")
+
+
+## 卡的实现面源码（状态入口 + 绘制模块 + 文字子节点模块）。
+func _card_surface_source() -> String:
+	var out: String = (load(CardScene) as GDScript).source_code
+	out += (load(CardPainter) as GDScript).source_code
+	out += (load(CardLabels) as GDScript).source_code
+	return out
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

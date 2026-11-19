@@ -132,7 +132,9 @@ func build(result: int, turn: int, entries: Array) -> Dictionary:
 	}
 
 
-## 单侧汇总——活人数 / 剩余 HP 总和 / 未知条目数 / 逐条明细（按 character_id 升序）。
+## 单侧汇总——活人数 / 剩余 HP 总和 / 未知条目数 / 逐条明细（按 character_id 升序）。[br]
+## [br][b]明细带 display_name[/b]：名字由 [code]combat_roster_state.snapshot_all[/code]
+## 透传（建表时已定格）——本模块只抄录，不解析名字（Feature 层不反向依赖 UI 的解析器）。
 func _fold_side(entries: Array, side: int) -> Dictionary:
 	var roster: Array = []
 	var alive_count: int = 0
@@ -154,6 +156,7 @@ func _fold_side(entries: Array, side: int) -> Dictionary:
 			unknown_count += 1
 		roster.append({
 			"character_id": int(entry.get("character_id", -1)),
+			"display_name": str(entry.get("display_name", "")),
 			"current_hp": int(entry.get("current_hp", 0)),
 			"max_hp": int(entry.get("max_hp", 0)),
 			"is_alive": is_alive,

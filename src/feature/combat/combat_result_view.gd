@@ -19,6 +19,8 @@ extends RefCounted
 
 ## 奖励文案内核（与结算面板/回探索提示同一份口径）。
 const RewardLines := preload("res://src/feature/combat/combat_reward_lines.gd")
+## 名字兜底口径（[code]resolve_name[/code]——与战斗内建表/播报同源）。
+const NameRules := preload("res://src/feature/combat/combat_roster_seeding.gd")
 
 ## 结局枚举——镜像 [code]CombatSystem.CombatResult[/code]（0 无 / 1 胜 / 2 败 / 3 撤退）。
 const RESULT_NONE: int = 0
@@ -227,9 +229,16 @@ func battle_report_lines() -> PackedStringArray:
 	return lines
 
 
-## 逐人战报行——[code]角色 #ID: 12/20[/code]；数据不可信时标「状态未知」不编数字。
+## 逐人战报行——[code]林渊: 12/20[/code]；数据不可信时标「状态未知」不编数字。[br]
+## [br][b]名字优先、编号兜底[/b]：记录里带 [code]display_name[/code] 时用它（战斗侧
+## 开战时定格的真名）；缺名（旧存档载荷、模板查不到）时退回 [code]角色 #ID[/code]——
+## 玩家至少能对着编号数出是哪一栏，而不是看到一行空白。[br]
+## [br][b]兜底口径取自 [code]CombatRosterSeeding.fallback_name[/code][/b]：战斗内播报
+## 「敌人 #100000」用的是同一句，两处各写一遍迟早会分叉成一个说「角色」一个说「敌人」。
 func _roster_line(entry: Dictionary) -> String:
-	var name: String = "角色 #%d" % int(entry.get("character_id", -1))
+	var character_id: int = int(entry.get("character_id", -1))
+	var name: String = NameRules.resolve_name(
+			str(entry.get("display_name", "")), character_id)
 	if not bool(entry.get("known", false)):
 		return "%s: 状态未知" % name
 	var hp: String = "%d/%d" % [int(entry.get("current_hp", 0)),

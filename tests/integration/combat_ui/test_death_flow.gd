@@ -113,3 +113,45 @@ func test_unregister_card_cleans_transient_state() -> void:
 	# Then: 表清理（防悬空引用）
 	assert_false(coordinator._cards.has(101), "卡表应清理")
 	assert_false(coordinator._pending_deltas.has(101), "增量表应清理")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 缺口一：阵亡终态（空位框）也要带可辨识的「已阵亡」文字
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 阵亡动画结束后，接替的空位框上写有「已阵亡」——终态不是一块无来由的空白。
+func test_empty_slot_after_death_carries_defeat_stamp_text() -> void:
+	# Arrange
+	mock.character_died.emit(101, 0, [])
+	# Act —— 等动画跑完（0.5s）+ 接替
+	await _wait_sec(0.8)
+	# Assert
+	var frame: Control = container.get_child(0)
+	assert_eq(frame.get_script(), EmptyFrameScript, "前置：接替节点为 EmptySlotFrame")
+	assert_eq(frame.call(&"get_defeat_text"), "已阵亡",
+		"空位框应写明「已阵亡」，而不是只剩一圈虚线")
+
+
+## 未阵亡的位置不出现这个文字（对照组——文字来自阵亡事实，不是空位框自带装饰）。
+func test_empty_slot_without_death_has_no_stamp_text() -> void:
+	# Arrange —— 直接建一个空位框（模拟「这格本来就是空的」）
+	var frame: Control = EmptyFrameScript.new()
+	add_child_autofree(frame)
+	frame.size = Vector2(120.0, 168.0)
+	# Assert —— 默认无文字（对照上面那条：文字由阵亡流程写入）
+	assert_eq(frame.call(&"get_defeat_text"), "",
+		"未阵亡的空位不应带阵亡文字")
+
+
+## 显式清空后文字消失（空串 = 框回到「只是一格空位」的语义）。
+func test_empty_slot_stamp_text_can_be_cleared() -> void:
+	# Arrange
+	var frame: Control = EmptyFrameScript.new()
+	add_child_autofree(frame)
+	frame.size = Vector2(120.0, 168.0)
+	frame.call(&"set_defeat_text", "已阵亡")
+	assert_eq(frame.call(&"get_defeat_text"), "已阵亡", "前置：文字已填入")
+	# Act
+	frame.call(&"set_defeat_text", "")
+	# Assert
+	assert_eq(frame.call(&"get_defeat_text"), "", "清空后文字应消失")

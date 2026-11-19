@@ -13,14 +13,17 @@ extends RefCounted
 
 ## 状态表——敌方 ID 派生约定（与落库/建卡同源）。
 const RosterState := preload("res://src/feature/combat/combat_roster_state.gd")
+## 名字解析口径（兜底文案 / 名册条目与卡牌模板取名的唯一实现处——在 Feature 层，
+## 战报与播报共用同一句，见 [method Seeding.resolve_name]）。
+const Seeding := preload("res://src/feature/combat/combat_roster_seeding.gd")
 
 ## 行动类型（与 [code]combat_enemy_turn.gd[/code] 常量同值）。
 const ACTION_SKILL: StringName = &"skill"
 const ACTION_RETREAT: StringName = &"retreat"
 const ACTION_NONE: StringName = &"none"
 
-## 名称缺省文案（不让空名把一行战报变成「对『』造成…」）。
-const NAME_UNKNOWN: String = "未知目标"
+## 名称缺省文案（不让空名把一行战报变成「对『』造成…」）——转引 Feature 层口径。
+const NAME_UNKNOWN: String = Seeding.NAME_UNKNOWN
 
 ## 名称解析闭包——[code]func(character_id: int) -> String[/code]。
 ## 生产由 [method make_name_resolver] 生成；测试可直接给桩。
@@ -88,14 +91,15 @@ static func name_of(p_character_id: int, p_combat: Node,
 	return fallback_name(p_character_id)
 
 
-## 兜底名——按敌方 ID 段区分「敌人」与「角色」，保证玩家至少能看到编号。
+## 兜底名——按 ID 段区分「敌人」与「角色」（转引 [code]CombatRosterSeeding[/code]：
+## 战报的逐人行走的是同一句，两处各写一遍迟早分叉成一个说「角色」一个说「敌人」）。
 static func fallback_name(p_character_id: int) -> String:
-	if p_character_id >= RosterState.ENEMY_ID_BASE:
-		return "敌人 #%d" % p_character_id
-	return "角色 #%d" % p_character_id
+	return Seeding.fallback_name(p_character_id)
 
 
-## 敌方显示名——开战名册（与 END 判定/建卡同一份快照）按 ID 约定反查。
+## 敌方显示名——本方法只负责「从战斗系统拿本场名册并按 ID 约定反查」这一跳；
+## 条目取名（[code]display_name[/code] > 模板对象 > 模板 ID）归 Feature 层
+## [method CombatRosterSeeding.enemy_display_name]——战报与播报读的是同一句。
 static func _enemy_display_name(p_character_id: int, p_combat: Node) -> String:
 	if p_combat == null or not p_combat.has_method(&"get_battle_enemy_roster"):
 		return ""
@@ -107,33 +111,14 @@ static func _enemy_display_name(p_character_id: int, p_combat: Node) -> String:
 		var entry: Variant = roster[idx]
 		if RosterState.enemy_id_of(entry, idx) != p_character_id:
 			continue
-		var direct: String = str(_prop(entry, "display_name", ""))
-		if direct != "":
-			return direct
-		var template: Variant = _prop(entry, "template", null)
-		if template is Object:
-			var template_name: Variant = (template as Object).get("display_name")
-			if template_name != null and str(template_name) != "":
-				return str(template_name)
-		var template_id: String = str(_prop(entry, "template_id", ""))
-		return template_id
+		return Seeding.enemy_display_name(entry)
 	return ""
 
 
-## 我方显示名——卡牌模板（[code]CardTemplate.display_name[/code] 或旧字段 name）。
+## 我方显示名——卡牌模板（[code]display_name[/code] 或旧字段 name），
+## 取名实现转引 [method CombatRosterSeeding.card_display_name]。
 static func _card_display_name(p_character_id: int, p_card_system: Node) -> String:
-	if p_card_system == null \
-			or not p_card_system.has_method(&"get_template_by_instance_id"):
-		return ""
-	var template: Variant = p_card_system.call(&"get_template_by_instance_id",
-			p_character_id)
-	if template == null:
-		return ""
-	for key: String in ["display_name", "name"]:
-		var value: Variant = template.get(key)
-		if value != null and str(value) != "":
-			return str(value)
-	return ""
+	return Seeding.card_display_name(p_card_system, p_character_id)
 
 
 ## 调用名称闭包——闭包缺失/抛错/返回空时回退可读编号。
@@ -143,13 +128,3 @@ static func _call_name(p_resolver: Callable, p_character_id: int) -> String:
 		if resolved != null and str(resolved) != "":
 			return str(resolved)
 	return fallback_name(p_character_id)
-
-
-## 条目字段读取（Dictionary 与 Object 通吃）。
-static func _prop(p_entry: Variant, p_key: String, p_fallback: Variant) -> Variant:
-	if p_entry is Dictionary:
-		return (p_entry as Dictionary).get(p_key, p_fallback)
-	if p_entry is Object:
-		var raw: Variant = (p_entry as Object).get(p_key)
-		return raw if raw != null else p_fallback
-	return p_fallback

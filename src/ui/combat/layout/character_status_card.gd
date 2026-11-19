@@ -6,78 +6,36 @@ extends Control
 ##   L0 头像全幅背景 → L1 底部渐变遮罩（对比度保障）→ L2 左右 28px
 ##   功法/法宝竖排栏（各最多 3）→ L3 底部 40px HP 条+ATK → L4 buff 左下
 ##   （最多 5）+境界右下 → L5 待命/已行动左上。[br]
-## [br][b]合批[/b]（R-02 §3 分组方案）：图标全部走 [code]CombatIconAtlas[/code]
-## 单图集（[code]draw_texture_rect_region[/code] 同纹理合批）；HP 条
-## [code]draw_rect[/code] 纯色绘制（非纹理 ProgressBar——R-02 §2）；文字单
-## Label（名+数值合并）。[br]
+## [br][b]两块内容已拆出[/b]（本文件守 300 行软上限）：六层绘制归
+## [code]character_card_painter.gd[/code]，尺寸/配色/时长常量归
+## [code]character_card_style.gd[/code]。本文件剩下的是[b]状态入口[/b]——信号驱动的
+## 写入方法、Tween 编排、Label 子节点摆放。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：角色数据（HP/buff/绑定）所有权在
 ## 战斗/绑定系统——本组件只持渲染快照，[method apply_hp] 等由系统信号驱动。[br]
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——HP 过渡 0.3s 一次性 Tween
 ## （§2.1 豁免），数字 ≤100ms 终值直显（GDD 批量伤害免抖条款）。[br]
-## [br][b]前排/后排[/b]：缩放经 [code]Rules.formation_row_scale()[/code]；
-## 边框实线金/虚线蓝为独立属性（story AC-4——不内联进纯函数）。
 ##
 ## @experimental
 ## 来源: ADR-0031、design/ux/combat-ui.md §角色状态卡、
 ## production/qa/evidence/r02-batching-spec.md、combat-ui-layout Story 002。
 
-## 共享纯函数/图集模块（story 001/002 唯一落地处——禁止内联）。
+## 视觉规格常量（卡宽高 / 层尺寸 / 配色 / 时长——唯一来源）。
+const Style := preload("res://src/ui/combat/layout/character_card_style.gd")
+## 六层绘制（L0-L5——本卡只负责摆放与状态，画笔在那边）。
+const Painter := preload("res://src/ui/combat/layout/character_card_painter.gd")
+## 文字子节点（创建 / 摆放 / 内容同步——三个 Label，见该模块类文档）。
+const Labels := preload("res://src/ui/combat/layout/character_card_labels.gd")
+## 共享纯函数（前后排缩放——story 001 唯一落地处，禁止内联）。
 const Rules := preload("res://src/ui/combat/shared/combat_ui_rules.gd")
-const Icons := preload("res://src/ui/combat/shared/combat_icon_atlas.gd")
-const UiFont := preload("res://src/ui/combat/shared/combat_ui_font.gd")
-## 阵亡判定与视觉规格（纯函数——story 003 AC-4 的判定收在那边，本卡只画）。
+## 阵亡判定（纯函数——story 003 AC-4，本卡只派生不重判）。
 const DefeatMarker := preload("res://src/ui/combat/layout/combat_card_defeat_marker.gd")
-
-## === 卡牌尺寸常量（UX Layout Zones：120×168 前排基准）=======================
-
-const CARD_WIDTH: float = 120.0
-const CARD_HEIGHT: float = 168.0
-## L2 侧栏宽（px）。
-const SIDE_BAR_WIDTH: float = 28.0
-## L2 图标尺寸（20×20px，间距 4px——UX 规格表）。
-const ICON_SIZE: float = 20.0
-const ICON_GAP: float = 4.0
-## L2 图标每侧上限（UX：功法/法宝各最多 3）。
-const SIDE_ICON_LIMIT: int = 3
-## L3 底部条高（px）。
-const BOTTOM_BAR_HEIGHT: float = 40.0
-## L4 buff 图标上限（UX：最多 3-5——取 5 上限）。
-const BUFF_LIMIT: int = 5
-## L4/L5 角标尺寸（R-02 corner_badge 20×20）。
-const BADGE_SIZE: float = 20.0
-
-## === HP 过渡常量（GDD 公式 3 调优旋钮）=======================================
-
-## HP 条平滑过渡时长（0.3s 线性——GDD 调优表 0.2~0.5 默认 0.3）。
-const HP_TWEEN_SEC: float = 0.3
-
-## 沙漏标记淡出时长（GDD 动画表 L611 前半句——待命→已就绪 0.3s；
-## 文字通道推迟见 DEBT-CUI-003，角标部分归本 story）。
-const BADGE_FADE_SEC: float = 0.3
-
-## === 视觉常量（集中定义——R-02 数据驱动条款）=================================
-
-## 前排边框色（金色实线）。
-const FRONT_BORDER_COLOR: Color = Color(0.91, 0.76, 0.35)
-## 后排边框色（蓝色虚线）。
-const BACK_BORDER_COLOR: Color = Color(0.45, 0.62, 0.85)
-## 边框线宽。
-const BORDER_WIDTH: float = 2.0
-## 虚线段长/间隔（后排虚线边框）。
-const DASH_LENGTH: float = 6.0
-## L3 底部条不透明背板色。
-const BOTTOM_BAR_BG: Color = Color(0.06, 0.06, 0.09, 0.92)
-## HP 条底槽色。
-const HP_TRACK_COLOR: Color = Color(0.16, 0.16, 0.20, 0.9)
-## ATK 数字色（暖白——对比度 ≥4.5:1 on 遮罩）。
-const ATK_COLOR: Color = Color(0.96, 0.94, 0.88)
 
 ## === 渲染快照（零状态所有权——系统信号驱动写入）==============================
 
 ## 当前/最大 HP（渲染快照——所有权在战斗系统）。
 var current_hp: int = 0
 var max_hp: int = 0
-## 角色显示名（渲染快照——解析归 [code]EnemyActionText.name_of[/code]，
+## 角色显示名（渲染快照——解析归战斗侧的角色取数入口，
 ## 本卡只存只画：[method apply_name] 写入）。
 var display_name: String = ""
 ## ATK 数值快照。
@@ -93,9 +51,9 @@ var debuff_count: int = 0
 var realm: int = 0
 ## 玩家境界（比较基准——由场景层注入）。
 var player_realm: int = 0
-## 待命/已行动标记（L5 渲染归本 story；切换信号逻辑归 story 003）。
+## 待命/已行动标记（L5 渲染；切换信号逻辑归 story 003）。
 var is_standby: bool = false
-## 已行动遮罩标志（story 003 AC-2——true 时全卡幅半透明灰色遮罩）。
+## 已行动遮罩标志（story 003 AC-2——true 时全卡幅半透明灰色遮罩）。[br]
 ## [br][b]语义澄清[/b]（story 002 遗留）：[member is_standby]=false 本渲染
 ## 「已行动对勾」，但未覆盖 GDD「灰色遮罩」完整语义——本属性补齐：
 ## is_acted=true 同时驱动遮罩+对勾（[method set_acted_state]），默认 false
@@ -114,15 +72,19 @@ var is_front_row: bool = true
 ## 减少动态（进场时从设置读取——进场后静态，零轮询）。
 var reduce_motion: bool = false
 
-## HP 条显示宽度（Tween 插值目标——0..1 比例）。
+## HP 条显示宽度（Tween 插值目标——0..1 比例）。[br]
+## [br][b]绘制模块会读它[/b]（[code]character_card_painter.draw_hp_bar[/code]）：
+## 本卡是这份瞬态视觉状态的唯一持有者，画笔不该另存一份。
 var _hp_display_ratio: float = 1.0
 ## HP 过渡 Tween 句柄（重入 kill 重建——批量伤害直算终值条款）。
 var _hp_tween: Tween = null
 ## 沙漏淡出透明度（>0 时 L5 继续绘制沙漏——待命→已就绪 0.3s 淡出通道；
-## 瞬态视觉状态 §2.1 豁免）。
+## 瞬态视觉状态 §2.1 豁免）。绘制模块同读。
 var _badge_alpha: float = 0.0
 ## 沙漏淡出 Tween 句柄（重入 kill）。
 var _badge_tween: Tween = null
+## 文字子节点表（[code]{stat, name, defeat}[/code]——[CharacterCardLabels.create] 的产出）。
+var _labels: Dictionary = {}
 ## 名+数值合并 Label（R-02 §3 文字合并——单 Label 不拆多）。
 var _stat_label: Label = null
 ## 角色显示名 Label（L5 名牌——[method apply_name] 写入；敌方此前无名可分）。
@@ -132,54 +94,40 @@ var _defeat_label: Label = null
 ## 头像纹理（每角色唯一独立纹理——R-02 §3 头像分组；null 时色块占位）。
 var portrait: Texture2D = null
 
+## === 常量转发（外部文档与既有引用读的是卡上的名字）============================
 
-## _init 构建文字子节点（不依赖场景树时序）。
+const CARD_WIDTH: float = Style.CARD_WIDTH
+const CARD_HEIGHT: float = Style.CARD_HEIGHT
+const SIDE_BAR_WIDTH: float = Style.SIDE_BAR_WIDTH
+const ICON_SIZE: float = Style.ICON_SIZE
+const ICON_GAP: float = Style.ICON_GAP
+const SIDE_ICON_LIMIT: int = Style.SIDE_ICON_LIMIT
+const BOTTOM_BAR_HEIGHT: float = Style.BOTTOM_BAR_HEIGHT
+const BUFF_LIMIT: int = Style.BUFF_LIMIT
+const BADGE_SIZE: float = Style.BADGE_SIZE
+const HP_TWEEN_SEC: float = Style.HP_TWEEN_SEC
+const BADGE_FADE_SEC: float = Style.BADGE_FADE_SEC
+const FRONT_BORDER_COLOR: Color = Style.FRONT_BORDER_COLOR
+const BACK_BORDER_COLOR: Color = Style.BACK_BORDER_COLOR
+const BORDER_WIDTH: float = Style.BORDER_WIDTH
+const DASH_LENGTH: float = Style.DASH_LENGTH
+const BOTTOM_BAR_BG: Color = Style.BOTTOM_BAR_BG
+const HP_TRACK_COLOR: Color = Style.HP_TRACK_COLOR
+const ATK_COLOR: Color = Style.ATK_COLOR
+const ACTED_OVERLAY_COLOR: Color = Style.ACTED_OVERLAY_COLOR
+
+
+## _init 构建文字子节点（不依赖场景树时序——创建归 [CharacterCardLabels]）。
 func _init() -> void:
 	custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-	_stat_label = Label.new()
-	_stat_label.name = "StatLabel"
-	add_child(_stat_label)
-	_name_label = Label.new()
-	_name_label.name = "NameLabel"
-	add_child(_name_label)
-	_defeat_label = Label.new()
-	_defeat_label.name = "DefeatStamp"
-	_defeat_label.visible = false
-	add_child(_defeat_label)
+	_labels = Labels.create(self)
+	_stat_label = _labels["stat"]
+	_name_label = _labels["name"]
+	_defeat_label = _labels["defeat"]
 
 
 func _draw() -> void:
-	var card_size: Vector2 = size
-	if card_size.x <= 0.0 or card_size.y <= 0.0:
-		return
-	# L0 头像全幅背景（null → 深色占位块——stub 阶段头像未入库）
-	if portrait != null:
-		draw_texture_rect(portrait, Rect2(Vector2.ZERO, card_size), true)
-	else:
-		draw_rect(Rect2(Vector2.ZERO, card_size), Color(0.18, 0.20, 0.24))
-	# L1 底部渐变遮罩（透明 → 黑 60%——L3 文字可读性）
-	draw_texture_rect(Icons.get_mask(), Rect2(Vector2.ZERO, card_size), true)
-	# L2 左右功法/法宝竖排（同一图集批次）
-	_draw_side_icons(true)
-	_draw_side_icons(false)
-	# L3 底部条：不透明背板 + HP 条（draw_rect 纯色）+ ATK
-	var bar_rect: Rect2 = Rect2(0.0, card_size.y - BOTTOM_BAR_HEIGHT,
-		card_size.x, BOTTOM_BAR_HEIGHT)
-	draw_rect(bar_rect, BOTTOM_BAR_BG)
-	_draw_hp_bar(bar_rect)
-	# L4 左下 buff/debuff 角标 + 右下境界角标（仅高于玩家境界）
-	_draw_badges()
-	# L5 左上待命/已行动标记
-	_draw_standby_badge()
-	# 阵亡灰化（story 003 AC-4——压住头像与 HP 条，让「这格倒了」一眼可见；
-	# 画在文字子节点之下、边框之上）。规格与绘制同源，见 DefeatMarker；
-	# 底部条高度由本卡给出，免得那边也写一个 40。
-	DefeatMarker.draw_on(self, size, is_defeated, BOTTOM_BAR_HEIGHT)
-	# 已行动灰色遮罩（story 003 AC-2——顶层覆盖，L5 标记之上边框之下）
-	if is_acted:
-		draw_rect(Rect2(Vector2.ZERO, size), ACTED_OVERLAY_COLOR)
-	# 前后排边框（最后绘——顶层描边）
-	_draw_border()
+	Painter.draw_all(self)
 
 
 ## === 信号驱动更新入口（战斗系统信号 → 渲染快照）==============================
@@ -194,8 +142,7 @@ func apply_hp(p_current: int, p_max: int) -> void:
 	current_hp = maxi(p_current, 0)
 	max_hp = maxi(p_max, 0)
 	is_defeated = DefeatMarker.is_defeated(current_hp, max_hp)
-	var target_ratio: float = 1.0 if max_hp == 0 \
-			else clampf(float(current_hp) / float(max_hp), 0.0, 1.0)
+	var target_ratio: float = Painter.hp_ratio(self)
 	if reduce_motion:
 		_hp_display_ratio = target_ratio
 		_kill_hp_tween()
@@ -207,7 +154,7 @@ func apply_hp(p_current: int, p_max: int) -> void:
 	_refresh()
 
 
-## 设置角色显示名（L5 名牌——[code]EnemyActionText.name_of[/code] 口径解析后写入）。[br]
+## 设置角色显示名（L5 名牌——战斗侧取数入口解析后写入）。[br]
 ## [br][b]为什么名要在卡上[/b]：敌方此前只有头像没有名字，玩家分不清两只同色敌人
 ## 谁是谁；HP 条挂了名才能读懂「这条血是谁的」。名字是渲染快照（零状态所有权），
 ## 解析归调用方（[code]ActorStageRoster[/code] 注入的取数入口）。[br]
@@ -255,12 +202,7 @@ func set_front_row(p_front: bool) -> void:
 	_refresh()
 
 
-## === 已行动遮罩常量（story 003 AC-2——数值数据驱动）==========================
-
-## 已行动遮罩色（GDD §角色状态标记——「已行动角色：灰色遮罩」）。
-const ACTED_OVERLAY_COLOR: Color = Color(0.5, 0.5, 0.52, 0.5)
-
-## 设置待命标记（L5 渲染归本 story——切换信号逻辑归 story 003）。[br]
+## 设置待命标记（L5 渲染——切换信号逻辑归 story 003）。[br]
 ## 待命→已就绪：沙漏标记 0.3s 淡出（GDD 动画表 L611——语义位立即翻转，
 ## 视觉通道经 [member _badge_alpha] 渐隐；reduce_motion 瞬时清除）。
 func set_standby(p_standby: bool) -> void:
@@ -310,161 +252,13 @@ func _set_hp_display_ratio(value: float) -> void:
 	_refresh()
 
 
-## 标记重绘 + 同步合并 Label（文字合批——R-02 §3 单 Label 条款）。
+## 标记重绘 + 同步三个文字子节点（内容与摆放归 [CharacterCardLabels]——
+## 文字是[b]子节点[/b]，与 [code]_draw()[/code] 里的绘制是两条渲染通道）。[br]
+## [br][b]重绘与文字同步在同一个入口[/b]：任何状态变更方法都只调本方法，
+## 不会出现「条变了字没变」。
 func _refresh() -> void:
-	var screen_height: int = int(get_viewport_rect().size.y) \
-			if get_viewport() != null else 1080
-	var font_size: int = UiFont.font_size_responsive(14, screen_height)
-	_stat_label.text = "HP %d/%d  ATK %d" % [current_hp, max_hp, atk_value]
-	_stat_label.add_theme_font_size_override("font_size", font_size)
-	_stat_label.add_theme_color_override("font_color", ATK_COLOR)
-	_stat_label.position = Vector2(SIDE_BAR_WIDTH,
-		size.y - BOTTOM_BAR_HEIGHT + 22.0)
-	_stat_label.size = Vector2(size.x - SIDE_BAR_WIDTH * 2.0, 18.0)
-	_refresh_name_label(font_size)
-	_refresh_defeat_stamp(font_size)
+	Labels.sync(self, _labels)
 	queue_redraw()
-
-
-## 名牌同步（L5——顶部横条；名字为空时隐藏，不留一条空底色）。
-func _refresh_name_label(p_font_size: int) -> void:
-	if _name_label == null:
-		return
-	_name_label.visible = not display_name.is_empty()
-	_name_label.text = display_name
-	_name_label.add_theme_font_size_override("font_size", p_font_size)
-	_name_label.add_theme_color_override("font_color", ATK_COLOR)
-	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name_label.position = Vector2(SIDE_BAR_WIDTH, 26.0)
-	_name_label.size = Vector2(size.x - SIDE_BAR_WIDTH * 2.0, 18.0)
-
-
-## 阵亡戳记同步——文案与可见性都从纯函数规格取（判定只有一处）。[br]
-## [br][b]为什么戳记与灰化并存[/b]：灰化（[method _draw] 的 overlay）在缩到 50%
-## 时未必读得出，一条写着「已阵亡」的实色横条是灰度模式下也读得到的那一层信息。[br]
-## [br][b]卡被摘除时怎么办[/b]：阵亡动画结束后卡会换成空位框
-## （[code]CombatFeedbackCoordinator._finish_death[/code]），戳记只在动画那 0.5s
-## 与「已阵亡但仍留在场上」两条路径上出现——两条都比没有强。
-func _refresh_defeat_stamp(p_font_size: int) -> void:
-	if _defeat_label == null:
-		return
-	var spec: Dictionary = DefeatMarker.style(is_defeated)
-	var text: String = str(spec.get("text", ""))
-	_defeat_label.visible = not text.is_empty()
-	_defeat_label.text = text
-	if text.is_empty():
-		return
-	_defeat_label.add_theme_font_size_override("font_size", p_font_size)
-	_defeat_label.add_theme_color_override("font_color",
-		spec.get("stamp_text", DefeatMarker.STAMP_TEXT_COLOR))
-	_defeat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_defeat_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var h: float = float(spec.get("stamp_height", DefeatMarker.STAMP_HEIGHT))
-	_defeat_label.position = Vector2(0.0, size.y - BOTTOM_BAR_HEIGHT - h)
-	_defeat_label.size = Vector2(size.x, h)
-
-
-## HP 条绘制（R-02 §2——draw_rect 纯色三段：底槽/前景/边框省略——§5 实测
-## 边框 outline 可裁剪省 1 DC，本实现裁剪）。
-func _draw_hp_bar(bar_rect: Rect2) -> void:
-	var track: Rect2 = Rect2(
-		bar_rect.position.x + SIDE_BAR_WIDTH,
-		bar_rect.position.y + 6.0,
-		bar_rect.size.x - SIDE_BAR_WIDTH * 2.0, 8.0)
-	draw_rect(track, HP_TRACK_COLOR)
-	var fill_width: float = track.size.x * _hp_display_ratio
-	if fill_width > 0.0:
-		var fill: Rect2 = Rect2(track.position.x, track.position.y,
-			fill_width, track.size.y)
-		var ratio: float = 1.0 if max_hp == 0 \
-				else clampf(float(current_hp) / float(max_hp), 0.0, 1.0)
-		draw_rect(fill, Rules.hp_bar_color(ratio))
-
-
-## L2 侧栏图标绘制（同图集合批——左功法/右法宝竖排）。
-func _draw_side_icons(left_side: bool) -> void:
-	var count: int = gongfa_count if left_side else fabao_count
-	var icon_id: int = Icons.IconId.GONGFA if left_side \
-			else Icons.IconId.FABAO
-	var backing_region: Rect2 = Icons.get_region(
-		Icons.IconId.BACKING)
-	var icon_region: Rect2 = Icons.get_region(icon_id)
-	var atlas: Texture2D = Icons.get_atlas()
-	var x: float = 4.0 if left_side else size.x - SIDE_BAR_WIDTH + 4.0
-	# 侧栏半透明背板（整栏一条）
-	var backing: Rect2 = Rect2(x - 4.0, 4.0, SIDE_BAR_WIDTH,
-		float(count) * (ICON_SIZE + ICON_GAP) + 4.0)
-	draw_texture_rect_region(atlas, backing, backing_region)
-	for i: int in count:
-		var y: float = 8.0 + float(i) * (ICON_SIZE + ICON_GAP)
-		draw_texture_rect_region(atlas,
-			Rect2(x, y, ICON_SIZE, ICON_SIZE), icon_region)
-
-
-## L4 角标绘制：左下 buff/debuff + 右下境界（仅高于玩家境界）。
-func _draw_badges() -> void:
-	var atlas: Texture2D = Icons.get_atlas()
-	var buff_region: Rect2 = Icons.get_region(Icons.IconId.BUFF)
-	var debuff_region: Rect2 = Icons.get_region(Icons.IconId.DEBUFF)
-	# 左下：buff 在上 debuff 在下（合计 ≤5——上限钳制在 set_status_effects）
-	var y_base: float = size.y - BOTTOM_BAR_HEIGHT - BADGE_SIZE - 4.0
-	var x: float = SIDE_BAR_WIDTH + 2.0
-	var slot: int = 0
-	for i: int in buff_count:
-		draw_texture_rect_region(atlas,
-			Rect2(x, y_base - float(slot) * (BADGE_SIZE + 2.0),
-				BADGE_SIZE, BADGE_SIZE), buff_region)
-		slot += 1
-	for i: int in debuff_count:
-		draw_texture_rect_region(atlas,
-			Rect2(x, y_base - float(slot) * (BADGE_SIZE + 2.0),
-				BADGE_SIZE, BADGE_SIZE), debuff_region)
-		slot += 1
-	# 右下：境界角标（story AC-6——仅高于玩家境界时显示）
-	if realm > player_realm and realm > 0:
-		var realm_region: Rect2 = Icons.get_region(
-			Icons.IconId.BADGE_REALM)
-		draw_texture_rect_region(atlas,
-			Rect2(size.x - SIDE_BAR_WIDTH - BADGE_SIZE - 2.0,
-				size.y - BOTTOM_BAR_HEIGHT - BADGE_SIZE - 4.0,
-				BADGE_SIZE, BADGE_SIZE), realm_region)
-
-
-## L5 待命/已行动标记（左上——is_standby=true 待命沙漏 / false 已行动对勾；
-## 渲染归本 story，切换逻辑归 story 003）。
-func _draw_standby_badge() -> void:
-	var badge_id: int
-	var alpha: float = 1.0
-	if is_standby:
-		badge_id = Icons.IconId.BADGE_STANDBY
-	elif _badge_alpha > 0.0:
-		badge_id = Icons.IconId.BADGE_STANDBY  # 淡出中的沙漏（语义已就绪）
-		alpha = _badge_alpha
-	else:
-		badge_id = Icons.IconId.BADGE_ACTED
-	var region: Rect2 = Icons.get_region(badge_id)
-	draw_texture_rect_region(Icons.get_atlas(),
-		Rect2(SIDE_BAR_WIDTH + 2.0, 4.0, BADGE_SIZE, BADGE_SIZE),
-		region, Color(1.0, 1.0, 1.0, alpha))
-
-
-## 前后排边框（story AC-4：前排金色实线 / 后排蓝色虚线）。
-func _draw_border() -> void:
-	var border_rect: Rect2 = Rect2(Vector2.ZERO, size)
-	if is_front_row:
-		draw_rect(border_rect, FRONT_BORDER_COLOR, false, BORDER_WIDTH)
-	else:
-		# 虚线边框：四边分段 draw_dashed_line（同色 4 次绘制——直线合批友好）
-		var w: float = size.x
-		var h: float = size.y
-		draw_dashed_line(Vector2(0, 0), Vector2(w, 0), BACK_BORDER_COLOR,
-			BORDER_WIDTH, DASH_LENGTH, true)
-		draw_dashed_line(Vector2(w, 0), Vector2(w, h), BACK_BORDER_COLOR,
-			BORDER_WIDTH, DASH_LENGTH, true)
-		draw_dashed_line(Vector2(w, h), Vector2(0, h), BACK_BORDER_COLOR,
-			BORDER_WIDTH, DASH_LENGTH, true)
-		draw_dashed_line(Vector2(0, h), Vector2(0, 0), BACK_BORDER_COLOR,
-			BORDER_WIDTH, DASH_LENGTH, true)
 
 
 ## 沙漏淡出 Tween 插值回调。
@@ -472,11 +266,13 @@ func _set_badge_alpha(value: float) -> void:
 	_badge_alpha = value
 	queue_redraw()
 
+
 ## 沙漏淡出 Tween 重入清理。
 func _kill_badge_tween() -> void:
 	if _badge_tween != null and _badge_tween.is_valid():
 		_badge_tween.kill()
 	_badge_tween = null
+
 
 ## HP Tween 重入清理（批量伤害终值条款——kill 重建单次过渡）。
 func _kill_hp_tween() -> void:

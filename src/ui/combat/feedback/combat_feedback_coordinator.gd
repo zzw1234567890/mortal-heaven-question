@@ -14,18 +14,16 @@ extends Control
 ## [b]飘字 = 实际扣血[/b]：载荷 [code]damage[/code] 已是落库后的增量（攻击结算为减伤后的
 ## [code]final_damage[/code]），本编排器不还原原始伤害；[code]damage_reduced[/code] 为真
 ## 时给飘字「减」角标 + 琥珀色。[br]
-## [b]零状态所有权[/b]（ADR-0031 §2）：入队增量为瞬态视觉状态（§2.1 豁免——待合并的
-## UI 编排中间态）；游戏数据（HP/角色状态）所有权在战斗/上场系统——终值每结算帧从
-## 注入的快照 Callable 读取，不缓存。[br]
+## [b]零状态所有权[/b]（ADR-0031 §2）：入队增量为瞬态视觉状态（§2.1 豁免）；游戏数据
+## （HP/角色状态）所有权在战斗/上场系统——终值每结算帧从注入的快照 Callable 读取。[br]
 ## [b]零轮询[/b]：无 [code]_process()[/code]——信号驱动 + 帧边界 [code]call_deferred[/code]
-## （合并结算的单帧延迟）+ 一次性 Tween；[b]依赖注入[/b]：信号源经 [method setup] 注入
-## （参照 realm_bar.setup + _connect_once 防重先例），HP 终值经 [code]hp_reader_cb[/code]。[br]
-## [b]伤害入口优先级[/b]：信号源带 [code]character_damaged[/code] 时只订阅它（覆盖攻击结算
-## 与出牌两条来源）；同一次攻击两条信号都会发，同订会让飘字重影。缺省回退旧信号。
+## + 一次性 Tween；[b]依赖注入[/b]：信号源经 [method setup] 注入，HP 终值经 [code]hp_reader_cb[/code]。[br]
+## [b]伤害入口优先级[/b]：信号源带 [code]character_damaged[/code] 时只订阅它（覆盖攻击
+## 结算与出牌两条来源）；同一次攻击两条信号都会发，同订会让飘字重影。缺省回退旧信号。
 ##
 ## @experimental
-## 来源: ADR-0031、design/gdd/combat-ui-system.md §HP条与视觉反馈 AC/
-## §角色阵亡 AC/§动画表、combat-ui-layout Story 003（AC-1~AC-4）。
+## 来源: ADR-0031、design/gdd/combat-ui-system.md（HP条与视觉反馈 AC、角色阵亡 AC、
+## 动画表）、combat-ui-layout Story 003（AC-1~AC-4）。
 
 ## 飘字池（预创建——依赖注入可替换）。
 var floater_pool: FloaterPool = null
@@ -34,6 +32,9 @@ var reduce_motion: bool = false
 
 ## 阵亡动画时长（秒——GDD 动画表「角色阵亡 0.5s」）。
 const DEATH_DURATION_SEC: float = 0.5
+
+## 阵亡终态的空位接替（卡 → 带「已阵亡」戳记的空位虚线框，见该模块类文档）。
+const DeathHandoff := preload("res://src/ui/combat/feedback/combat_death_handoff.gd")
 
 ## 已转发的战斗结果（-1 = 未结束；AC-3 断言用）。
 var forwarded_result: int = -1
@@ -273,32 +274,24 @@ func _play_death(character_id: int) -> void:
 	_death_tweens[character_id] = tween
 
 
-## 阵亡动画完成——移除卡节点 + 原位显示空位虚线框。
+## 阵亡动画完成——移除卡节点 + 原位显示带戳记的空位虚线框。[br]
+## [br][b]接替动作委托 [code]CombatDeathHandoff[/code][/b]：搬运节点与填「已阵亡」
+## 文字是同一件事的两半（框上没有字的终态等于把信息丢掉），收在一处才拆不开。[br]
+## [br][b]三层清理的分工[/b]：本方法只摘卡表（[code]_cards[/code]）；
+## [code]_pending_deltas[/code] 留给 [method unregister_card]（战斗结束统一清扫），
+## 阵亡 Tween 表由 [method _kill_death_tween] 先行摘干净——三者不合并，避免
+## 「战斗结束清理」与「单个角色阵亡」两条路径互相误伤。
 func _finish_death(character_id: int) -> void:
 	_kill_death_tween(character_id)
 	var card: Control = _cards.get(character_id)
 	if card == null:
 		return
-	# 空位虚线框在卡位置接替（同尺寸同父——阵位语义）
-	var frame: Control = EmptySlotFrame.new()
-	frame.custom_minimum_size = card.size
-	frame.size = card.size
-	if card.get_parent() != null:
-		card.get_parent().add_child(frame)
-		card.get_parent().remove_child(card)
-		# 同父局部坐标接替（在 add_child 后设置——节点入树前 global 换算
-		# 不可靠；同父下局部坐标等价于卡原位）
-		frame.position = card.position
-	_unregister_card_only(character_id)
+	DeathHandoff.replace_with_empty_slot(card)
+	_cards.erase(character_id)
 	card.queue_free()
 
 
 ## === 内部 ====================================================================
-
-## 从卡表移除（保留 pending_deltas 清理给 unregister_card——内部变体）。
-func _unregister_card_only(character_id: int) -> void:
-	_cards.erase(character_id)
-
 
 func _kill_death_tween(character_id: int) -> void:
 	var tween: Tween = _death_tweens.get(character_id)
