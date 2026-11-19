@@ -40,6 +40,15 @@ func compute_next_phase(current: int) -> int:
 	return current + 1
 
 
+## 该阶段是否由玩家的操作驱动（出牌 / 攻击声明）——是则[b]不得自动推进[/b]。[br]
+## [br][method enter_phase] 天然体现了这条（只有 0/1/4/5/6 排下一格），但[b]读档落位不走
+## 阶段入口[/b]（重放副作用会把玩家已经历过的抽牌/结算再跑一遍），于是「落位后要不要排
+## 下一格」需要同一口径的第二处读点。排错的症状：在攻击声明阶段存的档，读回来该阶段被
+## 当场推走（[code]_attack_queue[/code] 刚清空 → 3→4 空真放行），一路滑到下一回合。
+static func is_player_driven(p_phase: int) -> bool:
+	return p_phase == PHASE_PLAY or p_phase == PHASE_ATTACK_DECLARATION
+
+
 ## 阶段转换验证矩阵（ADR-0008 §验证矩阵）。[br]
 ## [br]无条件推进：0→1, 1→2, 4→5, 5→6, 6→0。[br]
 ## [br]条件推进：2→3（player_confirmed_end || timer_exceeded || hand_empty && !can_afford_any），[br]
@@ -272,29 +281,28 @@ func _card_id_of(p_card: Variant) -> int:
 
 # === Autoload 查找（子模块内自用）=================================================
 
-func _get_status_effect_system() -> Node:
+## Autoload 动态查找——四个系统同一取数口径（测试环境缺 Autoload 时返回 null）。[br]
+## [br][b]为什么不各写一遍[/b]：四次查找的逻辑逐字相同，抄四份只会让「找不到时返回
+## 什么」这件事有四个可能不一致的答案；且本文件已贴近单文件软上限
+## （.claude/docs/coding-standards.md）。
+func _autoload(p_node_name: StringName) -> Node:
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
 		return null
-	return tree.root.get_node_or_null("/root/StatusEffectSystem")
+	return tree.root.get_node_or_null(NodePath(String(p_node_name)))
+
+
+func _get_status_effect_system() -> Node:
+	return _autoload(&"StatusEffectSystem")
 
 
 func _get_cost_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/CostSystem")
+	return _autoload(&"CostSystem")
 
 
 func _get_deployment_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/DeploymentSystem")
+	return _autoload(&"DeploymentSystem")
 
 
 func _get_ai_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/AISystem")
+	return _autoload(&"AISystem")

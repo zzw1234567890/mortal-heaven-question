@@ -722,9 +722,16 @@ func restore_battle_state(p_turn: int, p_phase: int, p_current_cost: int,
 ## 「关自动 → battle_start → restore_battle_state → 开自动」，中间那步必须有自动
 ## 推进关着，而这个顺序的编排归场景侧重建设置（[code]combat_scene_resume.gd[/code]）；
 ## 本方法只补上「开自动之后把下一格排上」这半句——[method set_auto_advance] 只改
-## 字段不排调度，缺了它，玩家读档回来会停在一个永不推进的阶段里。
+## 字段不排调度，缺了它，玩家读档回来会停在一个永不推进的阶段里。[br]
+## [br][b]玩家主动阶段不排下一格[/b]（[method CombatPhaseManager.is_player_driven]）：
+## 落位直接改 [code]_phase[/code]、不重放阶段入口，若照旧排一格，玩家在攻击声明阶段
+## 存的档会被当场推走（[code]_attack_queue[/code] 刚清空 → 3→4 空真放行），一路滑到
+## 下一回合的出牌阶段——「本回合还能出几张牌」于是与存档那一刻不等。停在玩家阶段等
+## 玩家自己点，读档前后可出牌数才是同一个数。
 func resume_auto_advance() -> void:
 	if not _is_active:
+		return
+	if _get_phase_manager().call(&"is_player_driven", _phase):
 		return
 	_schedule_auto_advance()
 
