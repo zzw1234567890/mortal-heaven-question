@@ -1,7 +1,8 @@
 extends GutTest
-## Sprint 18 场景补链回归：占位场景（卡组编辑/坊市/结算/战败/养成）。[br]
-## 事件面板已交付真实脚本（探索事件走 overlay 弹层）——event_panel.tscn 不再
-## 是占位场景，由文末专项测试锁定挂载（路径保留，SceneManager 自检不红）。
+## Sprint 18 场景补链回归：占位场景（坊市/结算/战败/养成）。[br]
+## 事件面板与[b]卡组编辑[/b]已交付真实脚本——两者的 .tscn 不再挂
+## [code]PlaceholderScene[/code]，由文末专项测试锁定挂载（路径保留，
+## SceneManager 自检不红）。
 ##
 ## [b]背景[/b]（gate-check 2026-11-08 §B1）：这些 SCENE_PATHS 注册路径此前无资产，
 ## 任何指向它们的转场都落到「目标场景缺失 → 回退 MAIN_MENU」。本文件验证：[br]
@@ -11,7 +12,7 @@ extends GutTest
 ## [b]「返回」的目的地分两类（2026-11-17）[/b]：战败屏回[b]主菜单[/b]（本局已结束
 ## ——design/ux/pause-menu.md §Events Fired「玩家点击「返回」→ 回到主菜单」、
 ## design/gdd/audio-system.md §9 把「战败→任意非主菜单状态」列为 N/A 转换），
-## 其余四屏（卡组编辑 / 坊市 / 胜利结算 / 养成）回[b]探索[/b]（继续玩下去）。
+## 其余三屏（坊市 / 胜利结算 / 养成）回[b]探索[/b]（继续玩下去）。
 ## 判据收在 [code]battle_record_exit.gd[/code]，本文件按屏逐条钉住它的产出。
 ##
 ## SceneManager 以桩替代——不触发真实转场。
@@ -30,9 +31,8 @@ class SceneManagerStub extends Node:
 
 
 ## 路径 → 期望 SceneID（仍为占位的场景 .tscn 的 screen_id 配置——
-## event_panel.tscn 已换真实脚本，不在此表）。
+## event_panel.tscn / deck_editing.tscn 已换真实脚本，不在此表）。
 const CASES: Dictionary = {
-	"res://src/ui/deck_editing/deck_editing.tscn": 2,
 	"res://src/feature/shop/shop_scene.tscn": 6,
 	"res://src/ui/result_screen/result_screen.tscn": 8,
 	"res://src/ui/defeat_screen/defeat_screen.tscn": 9,
@@ -45,7 +45,6 @@ const CASES: Dictionary = {
 ## 测试不会红。这里的字面值就是规格（design/ux/pause-menu.md §Events Fired、
 ## design/gdd/audio-system.md §9）。
 const EXITS: Dictionary = {
-	2: {"text": "返回探索", "to": 3, "type": 4},
 	6: {"text": "返回探索", "to": 3, "type": 4},
 	8: {"text": "返回探索", "to": 3, "type": 4},
 	9: {"text": "返回主菜单", "to": 0, "type": 2},
@@ -138,3 +137,22 @@ func test_event_panel_scene_mounts_real_screen_script() -> void:
 	assert_false("screen_id" in screen, "真实脚本不应再暴露占位 screen_id")
 	assert_true(screen.has_signal(&"option_chosen"),
 			"真实脚本应声明 option_chosen 信号")
+
+
+## 卡组编辑场景已换挂真实 DeckEditingScreen（本轮交付）——不再是占位场景。[br]
+## [br][b]为什么单测一条[/b]：[code]SceneManager.SCENE_PATHS[/code] 里那条路径此前
+## 指向占位骨架，玩家因此无处改卡组。这一个断言钉住「路径后面真的是编辑界面」——
+## 若哪天有人把 .tscn 换回占位（或脚本路径写错），本用例红。
+func test_deck_editing_scene_mounts_real_screen_script() -> void:
+	var packed: PackedScene = load("res://src/ui/deck_editing/deck_editing.tscn")
+	var screen: Control = packed.instantiate() as Control
+	add_child_autofree(screen)
+	assert_not_null(screen, "deck_editing.tscn 应可实例化")
+	assert_eq(screen.get_script().resource_path,
+			"res://src/ui/deck_editing/deck_editing_screen.gd",
+			"卡组编辑场景应挂真实 DeckEditingScreen 脚本")
+	assert_false("screen_id" in screen, "真实脚本不应再暴露占位 screen_id")
+	assert_true(screen.has_method(&"refresh"), "真实脚本应具备刷新入口")
+	# 两栏骨架应在挂载时就建好（不是运行时才懒加载）
+	assert_true(screen.has_method(&"collection_count") and screen.has_method(&"deck_count"),
+			"真实脚本应暴露两栏读数口")

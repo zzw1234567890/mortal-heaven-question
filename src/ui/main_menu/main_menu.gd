@@ -60,6 +60,11 @@ const TEXT_INVENTORY: String = "行囊与道友"
 ## 「读档」入口文案——与「继续游戏」（读最新档）并列的第三条路径：这一条让玩家
 ## 自己挑槽位。两条路径都能进游戏，差别只在这里（GDD §新游戏/继续游戏/读档）。
 const TEXT_LOAD: String = "读档"
+## 「卡组编辑」入口文案——独立场景（[code]SceneID.DECK_EDITING[/code]），
+## 与「行囊与道友」（场景内覆盖层）不同：那里改的是行囊，这里改的是出战卡组。[br]
+## [br][b]为什么放在这里而不是背包里[/b]：卡组编辑是一屏两栏的编辑界面，塞进页签会
+## 与背包的「一件物品一行」形态打架；GDD 也把它列在主菜单入口下。
+const TEXT_DECK_EDIT: String = "卡组编辑"
 ## 无存档时的中文提示（GDD 边界：无档时继续游戏置灰并给出说明）。[br]
 ## [br][b]为什么两个按钮各说一句[/b]：它们被禁用的原因不同——「继续游戏」要的是
 ## 「至少有一份档」，「读档」要的是「有一格非空槽位」；共用一句会让其中一边说谎。
@@ -110,6 +115,8 @@ const PillUseScript := preload("res://src/feature/inventory/inventory_pill_use.g
 const LoadSlotPanelScript := preload("res://src/ui/main_menu/load_slot_panel.gd")
 ## 读档 → 进探索这一跳的编排（含「成功但空载荷」的判别——见该模块类文档）。
 const LaunchScript := preload("res://src/ui/main_menu/main_menu_launch.gd")
+## 卡组编辑的来路意图（「保存并返回」该回哪——见那边类文档）。
+const DeckEditingEntryScript := preload("res://src/ui/deck_editing/deck_editing_entry.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
 
@@ -147,6 +154,7 @@ var keybind_store: KeybindStore = null
 @onready var continue_button: Button = $LayoutAnchor/ButtonBox/ContinueButton
 @onready var save_summary_label: Label = $LayoutAnchor/ButtonBox/SaveSummaryLabel
 @onready var settings_button: Button = $LayoutAnchor/ButtonBox/SettingsButton
+@onready var deck_edit_button: Button = $LayoutAnchor/ButtonBox/DeckEditButton
 @onready var quit_button: Button = $LayoutAnchor/ButtonBox/QuitButton
 @onready var inventory_button: Button = $LayoutAnchor/UtilityBox/InventoryButton
 @onready var load_button: Button = $LayoutAnchor/UtilityBox/LoadButton
@@ -254,6 +262,7 @@ func _apply_texts() -> void:
 	new_game_button.text = TEXT_NEW_GAME
 	continue_button.text = TEXT_CONTINUE
 	settings_button.text = TEXT_SETTINGS
+	deck_edit_button.text = TEXT_DECK_EDIT
 	quit_button.text = TEXT_QUIT
 	inventory_button.text = TEXT_INVENTORY
 	load_button.text = TEXT_LOAD
@@ -439,6 +448,25 @@ func _on_settings_pressed() -> void:
 ## 退出 → 关闭进程（AC-main-menu-006；UX 规范：直接退出无确认）。
 func _on_quit_pressed() -> void:
 	get_tree().quit()
+
+## 「卡组编辑」→ 进卡组编辑场景（[code]SceneID.DECK_EDITING[/code]）。[br]
+## [br][b]与「行囊与道友」相反：这一条是转场而不是覆盖层[/b]——整屏两栏编辑与主菜单
+## 的按钮列没有共存的余地（ADR-0031 §1：能一屏共存才用覆盖层）。[br]
+## [br][b]先记来路再请求转场[/b]：编辑屏挂载时已无从知道是谁开的它，[code]DeckEditingEntry[/code]
+## 记下这一枚场景 ID，「保存并返回」据此回到主菜单（而不是把玩家丢进探索）。[br]
+## [br][b]转场类型 MENU_TO_GAME[/b]：音频矩阵按它索引（主菜单 → 游戏的长淡入）。
+func _on_deck_edit_pressed() -> void:
+	var sm: Node = _get_scene_manager()
+	if sm == null or not sm.has_method(&"request_scene_change"):
+		push_error("MainMenu: SceneManager 不可用——卡组编辑导航中止")
+		return
+	var from_id: int = SceneManagerScript.SceneID.MAIN_MENU  # 守卫失败回退
+	if sm.has_method(&"get_current_scene_id"):
+		from_id = int(sm.call(&"get_current_scene_id"))
+	DeckEditingEntryScript.request_edit(from_id)
+	sm.call(&"request_scene_change", from_id,
+			SceneManagerScript.SceneID.DECK_EDITING,
+			SceneManagerScript.TransitionType.MENU_TO_GAME)
 
 ## 「行囊与道友」→ 打开背包 + 角色状态界面（两页签，共用一次开合）。[br]
 ## [br][b]与设置按钮同源形态[/b]：场景内覆盖层、复用式单例、首次点击实例化后

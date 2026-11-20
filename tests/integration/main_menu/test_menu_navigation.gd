@@ -212,9 +212,12 @@ func test_navigation_initial_focus_new_game_without_save() -> void:
 
 
 func test_navigation_focus_order_buttons_in_vbox() -> void:
-	## 焦点顺序: 新游戏→继续→设置→退出（VBox 树序天然满足——断言树序）。[br]
+	## 焦点顺序: 新游戏→继续→设置→[b]卡组编辑[/b]→退出（VBox 树序天然满足——
+	## 断言树序）。[br]
 	## 注：[code]Node.name[/code] 为 StringName——转 String 后比较（类型化数组
-	## 严格相等拒绝 StringName/String 混比）。
+	## 严格相等拒绝 StringName/String 混比）。[br]
+	## [br][b]为什么这一条也要跟着改[/b]：焦点链就是这一串树序，加了入口却不更新期望
+	## 等于放弃了这条回归网（键盘玩家走 Tab 的顺序恰好由它定义）。
 	# Arrange
 	var box: Node = menu.get_node("LayoutAnchor/ButtonBox")
 	# Act
@@ -224,7 +227,8 @@ func test_navigation_focus_order_buttons_in_vbox() -> void:
 			order.append(String(child.name))
 	# Assert
 	assert_eq(order, ["NewGameButton", "ContinueButton", "SettingsButton",
-			"QuitButton"], "按钮树序应为 新游戏→继续→设置→退出")
+			"DeckEditButton", "QuitButton"],
+			"按钮树序应为 新游戏→继续→设置→卡组编辑→退出")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
