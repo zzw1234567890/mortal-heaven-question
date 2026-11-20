@@ -26,6 +26,10 @@ const PLAY_PHASE: int = 2
 
 ## === 子节点引用 ==============================================================
 
+## 焦点环样式（松石青粗边——与商店 / 卡组编辑面板同一份来源，禁止另写一套）。
+const FocusStyle: GDScript = preload(
+		"res://src/ui/exploration/shop_panel_layout.gd")
+
 ## 按钮本体（Button）。
 var button: Button = null
 
@@ -39,7 +43,11 @@ func _init() -> void:
 	_build()
 
 
-## 构建按钮（_init 构建——不依赖场景树时序）。
+## 构建按钮（_init 构建——不依赖场景树时序）。[br]
+## [br][b]键盘/手柄可达[/b]（.claude/rules/ui-code.md 双输入）：[member Button] 的
+## 默认 [code]focus_mode[/code] 已是 [constant Control.FOCUS_ALL]，此处显式钉住
+## 并挂上焦点环——焦点在哪一眼看得见，不是「按了才知道」。链子的串法归
+## [code]combat_focus_chain.gd[/code]（本组件只保证「可被聚焦」）。
 func _build() -> void:
 	custom_minimum_size = Vector2(96, 40)
 	button = Button.new()
@@ -47,6 +55,8 @@ func _build() -> void:
 	button.text = LABEL_TEXT
 	button.add_theme_font_size_override("font_size", BUTTON_FONT_SIZE)
 	button.set_anchors_preset(Control.PRESET_FULL_RECT)
+	button.focus_mode = Control.FOCUS_ALL
+	FocusStyle.apply_focus_ring(button)
 	# 启用态常亮——无前置条件（Button 默认 enabled，无需显式设 disabled）
 	add_child(button)
 	_apply_visibility()

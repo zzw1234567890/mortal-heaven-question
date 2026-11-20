@@ -12,13 +12,12 @@ extends Control
 ##   - [method on_hand_changed] 手牌变更快照 + 重排动画（0.2s ease-out）[br]
 ##   - [method apply_selection] 选中态落定（抬起 + 加粗描边）[br]
 ##   - [method card_instance_id_at] 命中测试（交互层点击/拖拽取卡）[br]
-## [br][b]拆分（DEBT-CUI-007-2）[/b]：弧形排位与动画归 [code]hand_area_layout.gd[/code]，
-## 节点池与三态视觉（含命中测试）归 [code]hand_area_cards.gd[/code]；本文件只留
-## 「组装 + 快照 + 信号回调」。[br]
-## [br][b]快照契约[/b]：卡面快照经 [method apply_hand] 重建——生产由
-## [code]CombatHandSnapshot[/code]（战斗手牌 → 快照，带卡面目标词）驱动；
-## 可负担性经 [method apply_affordability] 批量刷新；选中态经
-## [method apply_selection]（交互层驱动）。[br]
+## [br][b]拆分（DEBT-CUI-007-2）[/b]：弧排与动画归 [code]hand_area_layout.gd[/code]，
+## 节点池与三态视觉归 [code]hand_area_cards.gd[/code]，键盘确认出口归
+## [code]hand_area_keyboard.gd[/code]；本文件只留「组装 + 快照 + 信号回调」。[br]
+## [br][b]快照契约[/b]：卡面快照经 [method apply_hand] 重建（生产由
+## [code]CombatHandSnapshot[/code] 驱动）；可负担性经 [method apply_affordability]
+## 批量刷新；选中态经 [method apply_selection]（交互层驱动）。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不访问卡牌系统，数据均为渲染快照；
 ## [member _selected_id] 是渲染快照，选中态真理来源是 [HandSelectionModel]。
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——纯信号驱动。
@@ -31,6 +30,8 @@ extends Control
 const LayoutScript := preload("res://src/ui/combat/layout/hand_area_layout.gd")
 ## 节点池与三态视觉模块（快照 → 卡节点 / 灰显 / 选中 / 命中）。
 const CardsScript := preload("res://src/ui/combat/layout/hand_area_cards.gd")
+## 键盘确认出口模块（卡的回车/空格 → 交互接线）。
+const KeyboardScript := preload("res://src/ui/combat/layout/hand_area_keyboard.gd")
 ## 选中态模型（只为取 [code]NO_CARD[/code] 哨兵——本区不持有模型实例）。
 const SelectionModel := preload("res://src/ui/combat/shared/hand_selection_model.gd")
 
@@ -66,12 +67,15 @@ var _overflow_tween: Tween = null
 var _layout: RefCounted = null
 ## 节点池与三态视觉模块。
 var _card_nodes: RefCounted = null
+## 键盘确认出口模块（卡的回车/空格 → 交互接线）。
+var _keyboard: RefCounted = null
 
 
 func _init() -> void:
 	_build()
 	_layout = LayoutScript.new(self)
 	_card_nodes = CardsScript.new(card_parent)
+	_keyboard = KeyboardScript.new()
 
 
 ## 构建子节点（卡片容器 + 提示 Label + 敌方卡背区）。
@@ -141,6 +145,7 @@ func apply_hand(cards: Array) -> void:
 	for entry: Dictionary in cards:
 		_cards.append(entry.duplicate(true))  # 深拷贝——不污染调用方原字典
 	_card_nodes.call(&"sync", _cards, _phase, _selected_id)
+	_connect_card_signals()
 	empty_hint.visible = _cards.is_empty()
 	_relayout()
 
@@ -179,6 +184,17 @@ func get_card_instance_ids() -> Array:
 	return _card_nodes.call(&"instance_ids", _cards)
 
 
+## 键盘确认的卡（[signal HandCard.activated] 的转发口——未接线时为空 Callable）。[br]
+## [br][b]为什么不在这里出牌[/b]：手牌区是渲染层（零状态所有权，ADR-0031 §2）——
+## 「这张卡能不能出、打谁」全归交互层的出牌流程；本区只把「哪张被确认了」交上去。
+## 逐卡收信那一半在 [HandAreaKeyboard]，接线方只认这一个口。
+var card_activated: Callable = Callable():
+	set(value):
+		card_activated = value
+		if _keyboard != null:
+			_keyboard.set(&"activated", value)
+
+
 ## 命中测试——全局坐标落在哪张手牌上（交互层取卡用；无命中 -1）。[br]
 ## [br][b]逆序（视觉上层优先）[/b]：手牌 >7 张会叠放，命中必须与视觉一致
 ## （手牌区自身 [code]mouseFilter = IGNORE[/code]，卡面亦为 IGNORE——点击由交互层
@@ -214,6 +230,13 @@ func has_overflow_hint_active() -> bool:
 	return overflow_hint.visible
 
 
+## 手牌卡节点（弧形顺序——键盘焦点链据此串环）。[br]
+## [br][b]为什么暴露节点而不是卡实例 ID[/b]：焦点链要设的是
+## [member Control.focus_next]（节点属性），节点缺失条目无处可设。
+func card_nodes() -> Array:
+	return _card_nodes.call(&"nodes_of", _cards)
+
+
 ## === 信号回调 ================================================================
 
 ## phase_changed → 阶段状态落定（灵能预览 / 灰显切换）。
@@ -221,9 +244,13 @@ func _on_phase_changed(_old_phase: int, new_phase: int, _turn: int) -> void:
 	apply_phase(new_phase)
 
 
-## hand_changed → 快照重建 + 重排动画（载荷为卡面快照数组——生产契约）。
+## hand_changed → 快照重建 + 重排动画（载荷为卡面快照数组——生产契约）。[br]
+## [br][b]重建后重接键盘出口[/b]：卡节点会被复用（[code]hand_area_cards.sync[/code]
+## 池化），信号连接跟着节点走，故每轮快照重建都补一次（重复连接由
+## [method Signal.is_connected] 挡掉）。
 func on_hand_changed(hand: Array) -> void:
 	apply_hand(hand)
+	_connect_card_signals()
 
 
 ## card_drawn → 抽牌入场动画（系统信号驱动；快照新增由 hand_changed 负责）。
@@ -248,6 +275,12 @@ func on_card_overflow(_card_id: int) -> void:
 
 
 ## === 内部 ====================================================================
+
+## 接上每张卡的键盘确认出口（重建后重接——卡节点会被复用，重复连接要挡）。[br]
+## 逐卡接线与去重都在 [HandAreaKeyboard]（本区只负责「什么时候接」）。
+func _connect_card_signals() -> void:
+	_keyboard.call(&"connect_cards", _cards)
+
 
 ## 弧形重排（0.2s ease-out 动画；reduce_motion 直跳终态——委托排位模块）。
 func _relayout() -> void:

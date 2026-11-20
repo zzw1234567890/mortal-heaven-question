@@ -16,6 +16,8 @@ extends RefCounted
 const HostScript: GDScript = preload("res://src/ui/combat/settlement/settlement_host.gd")
 ## 撤退规则纯函数（按钮渲染态判定与文案）。
 const RetreatRulesScript: GDScript = preload("res://src/ui/combat/shared/retreat_rules.gd")
+## 焦点环样式（松石青粗边——与商店 / 卡组编辑面板同一份来源）。
+const FocusStyle: GDScript = preload("res://src/ui/exploration/shop_panel_layout.gd")
 
 ## 撤退按钮文案（GDD §10「撤退按钮始终在战斗中可点击」）。
 const TEXT_RETREAT_BUTTON: String = "撤退"
@@ -45,7 +47,11 @@ func build(p_retreat_slot: Control) -> void:
 	_build_retreat_button(p_retreat_slot)
 
 
-## 撤退按钮本体（story 008——渲染态始终可点；点击流转由本模块接到宿主）。
+## 撤退按钮本体（story 008——渲染态始终可点；点击流转由本模块接到宿主）。[br]
+## [br][b]键盘/手柄可达[/b]（.claude/rules/ui-code.md 双输入）：显式钉住
+## [code]focus_mode[/code] 并挂焦点环；链子的串法归
+## [code]combat_focus_chain.gd[/code]（撤退是链上唯一不受阶段限制的控件——
+## 敌方行动期间也允许撤退，GDD §10）。
 func _build_retreat_button(p_retreat_slot: Control) -> void:
 	if p_retreat_slot == null:
 		return
@@ -54,6 +60,8 @@ func _build_retreat_button(p_retreat_slot: Control) -> void:
 	retreat_button.text = TEXT_RETREAT_BUTTON
 	retreat_button.custom_minimum_size = BUTTON_SIZE
 	retreat_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	retreat_button.focus_mode = Control.FOCUS_ALL
+	FocusStyle.apply_focus_ring(retreat_button)
 	# 渲染态常驻可点（GDD §10）——disabled 恒 false，锁栈仲裁归 interaction
 	retreat_button.disabled = not RetreatRulesScript.retreat_button_always_enabled()
 	p_retreat_slot.add_child(retreat_button)

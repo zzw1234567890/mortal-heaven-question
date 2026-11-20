@@ -27,6 +27,10 @@ const BUTTON_FONT_SIZE: int = 16
 ## 出牌阶段号（ADR-0008 [code]CombatPhase.PLAY[/code]——仅此阶段显示/可点）。
 const PLAY_PHASE: int = 2
 
+## 焦点环样式（松石青粗边——与商店 / 卡组编辑面板同一份来源，禁止另写一套）。
+const FocusStyle: GDScript = preload(
+		"res://src/ui/exploration/shop_panel_layout.gd")
+
 ## 按钮本体（持有者据此接点击）。
 var button: Button = null
 
@@ -38,7 +42,10 @@ func _init() -> void:
 	_build()
 
 
-## 构建按钮（_init 构建——不依赖场景树时序）。
+## 构建按钮（_init 构建——不依赖场景树时序）。[br]
+## [br][b]键盘/手柄可达[/b]（.claude/rules/ui-code.md 双输入）：显式钉住
+## [code]focus_mode[/code] 并挂焦点环——焦点可见，不是「按了才知道」。
+## 链子的串法归 [code]combat_focus_chain.gd[/code]。
 func _build() -> void:
 	custom_minimum_size = Vector2(88, 40)
 	button = Button.new()
@@ -46,6 +53,8 @@ func _build() -> void:
 	button.text = LABEL_TEXT
 	button.add_theme_font_size_override("font_size", BUTTON_FONT_SIZE)
 	button.set_anchors_preset(Control.PRESET_FULL_RECT)
+	button.focus_mode = Control.FOCUS_ALL
+	FocusStyle.apply_focus_ring(button)
 	# 启用态常亮——「能不能开」由持有者按阶段再次裁定（按钮可见即可点）
 	add_child(button)
 	_apply_visibility()

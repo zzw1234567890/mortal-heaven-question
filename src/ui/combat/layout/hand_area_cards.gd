@@ -50,7 +50,8 @@ func sync(p_cards: Array, p_phase: int, p_selected_id: int) -> void:
 			node.name = "Card%d" % i
 			_parent.add_child(node)
 			data["node"] = node
-		node.set_card_data(str(data.get("name", "")), int(data.get("cost", 0)),
+		node.set_card_data(int(data.get("card_instance_id", -1)),
+				str(data.get("name", "")), int(data.get("cost", 0)),
 				int(data.get("rarity", 1)), int(data.get("type", 0)))
 		node.set_affordable(bool(data.get("affordable", true)))
 		node.set_psychic(p_phase != PLAY_PHASE)
@@ -108,6 +109,18 @@ func card_id_at(p_cards: Array, p_global_pos: Vector2) -> int:
 		if node != null and node.get_global_rect().has_point(p_global_pos):
 			return int((p_cards[i] as Dictionary).get("card_instance_id", -1))
 	return -1
+
+
+## 手牌里的卡节点（弧形顺序——焦点链据此串环）。[br]
+## [br][b]为什么要节点而不是卡实例 ID[/b]：焦点链设的是 [member Control.focus_next]
+## （节点属性），拿不到节点的条目无处可设。
+func nodes_of(p_cards: Array) -> Array:
+	var nodes: Array = []
+	for entry: Variant in p_cards:
+		var node: HandCard = _node_of(entry)
+		if node != null:
+			nodes.append(node)
+	return nodes
 
 
 ## 快照条目 → 卡节点（缺失 / 已释放返回 null）。

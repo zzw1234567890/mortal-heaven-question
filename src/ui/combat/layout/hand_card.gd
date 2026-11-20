@@ -49,6 +49,13 @@ const GRAYED_MODULATE: Color = Color(0.55, 0.55, 0.55)
 ## 灵能预览 modulate（60% 饱和度近似——偏灰仍保留色相）。
 const PSYCHIC_MODULATE: Color = Color(0.80, 0.78, 0.74)
 
+## === 键盘焦点视觉（.claude/rules/ui-code.md 双输入）===========================
+
+## 焦点环色（松石青——同商店 / 卡组编辑面板的焦点环，全项目一致）。
+const FOCUS_RING_COLOR: Color = Color(0.35, 0.85, 0.8)
+## 焦点环线宽（px——比稀有度边框粗，一眼分得出「边框」与「焦点」）。
+const FOCUS_RING_WIDTH: float = 3.0
+
 ## === 选中态视觉（combat-ui-interaction 001——选中抬起）=========================
 
 ## 选中抬起偏移（px——卡牌上移，与相邻卡区分）。
@@ -79,8 +86,19 @@ const LOCK_FONT_SIZE: int = 14
 ## 边框线宽。
 const BORDER_WIDTH: float = 2.0
 
+## 键盘/手柄确认——聚焦后按 Enter/Space（[code]ui_accept[/code]）发射。[br]
+## [br][b]载荷是卡实例 ID[/b]：卡的渲染快照不认识战斗手牌，把「哪张被确认了」原样
+## 交回持有者（[HandArea] → 交互接线 → 出牌流程）——组件不自己出牌（零状态所有权，
+## ADR-0031 §2）。[br]
+## [b]与鼠标的分工[/b]：鼠标手势仍统一由 [code]CombatInputLayer[/code] 接手
+## （本卡 [code]mouse_filter = IGNORE[/code]）；键盘这条路径没有坐标，走不了命中
+## 测试，故由卡自己接。
+signal activated(card_instance_id: int)
+
 ## === 渲染快照（零状态所有权——HandArea 写入）==================================
 
+## 卡实例 ID（键盘确认时随 [signal activated] 原样带回——手牌区据此映射回战斗手牌）。
+var card_instance_id: int = -1
 ## 卡名。
 var card_name: String = ""
 ## 灵力消耗。
@@ -95,18 +113,31 @@ var is_affordable: bool = true
 var is_psychic: bool = false
 ## 是否被选中（combat-ui-interaction 001——抬起 + 加粗描边）。
 var is_selected: bool = false
+## 是否持有键盘焦点（[method _draw] 据此画焦点环——焦点可见性）。
+var is_focused: bool = false
 
 
 func _init() -> void:
 	custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 	size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+	# 双焦点（ADR-0004）：纯 Control 默认 FOCUS_NONE，必须显式开启才能 grab_focus；
+	# 卡的键盘确认（Enter/Space）经 [method _gui_input] 的 ui_accept。
+	# [b]保持 IGNORE[/b]：鼠标手势统一由 CombatInputLayer 接手（命中测试在
+	# HandAreaCards），卡自己不认领鼠标事件；实测 mouse_filter=IGNORE 不影响键盘派发。
+	focus_mode = Control.FOCUS_ALL
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 焦点进出都要重画（焦点环随焦点画 / 撤）——引擎只发通知，不自绘焦点。
+	focus_entered.connect(_on_focus_changed.bind(true))
+	focus_exited.connect(_on_focus_changed.bind(false))
 
 
 ## 设置卡牌数据（渲染快照——HandArea 信号驱动写入）。[br]
+## [param p_instance_id]: 卡实例 ID（键盘确认回传用；-1 = 未知）。[br]
 ## [param p_name]: 卡名。[param p_cost]: 灵力消耗。[param p_rarity]: 稀有度 1-5。
 ## [param p_type]: 卡牌类型 0-5。
-func set_card_data(p_name: String, p_cost: int, p_rarity: int, p_type: int) -> void:
+func set_card_data(p_instance_id: int, p_name: String, p_cost: int, p_rarity: int,
+		p_type: int) -> void:
+	card_instance_id = p_instance_id
 	card_name = p_name
 	cost = maxi(p_cost, 0)
 	rarity = clampi(p_rarity, 1, 5)
@@ -168,7 +199,28 @@ func get_cost_color() -> Color:
 	return COST_UNAFFORDABLE_COLOR if not is_affordable else COST_COLOR
 
 
+## 焦点持有态（测试断言用——焦点环可见性据此判定）。
+func has_keyboard_focus() -> bool:
+	return is_focused
+
+
 ## === 内部 ====================================================================
+
+## 键盘/手柄确认入口（[code]ui_accept[/code] = Enter / 小键盘 Enter / Space，
+## 三条绑定同时覆盖键盘与手柄）。[br]
+## [br][b]只吃确认键[/b]：Tab 与方向键归引擎的焦点导航（.claude/rules/ui-code.md
+## 「所有交互元素必须同时支持键盘/鼠标和手柄输入」的走位那一半），本卡不拦。
+func _gui_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_accept"):
+		activated.emit(card_instance_id)
+		accept_event()
+
+
+## 焦点进出——重画（焦点环的绘制时机由本卡自己把握）。
+func _on_focus_changed(p_focused: bool) -> void:
+	is_focused = p_focused
+	queue_redraw()
+
 
 ## 状态落定（modulate 三态 + 重绘）。
 func _apply() -> void:
@@ -215,3 +267,6 @@ func _draw() -> void:
 	if is_psychic:
 		draw_string(font, Vector2(CARD_WIDTH - 20.0, 16.0), "🔒",
 				HORIZONTAL_ALIGNMENT_LEFT, 18.0, LOCK_FONT_SIZE, LOCK_COLOR)
+	# 焦点环（键盘/手柄焦点可见——最后画，压在其余视觉之上）
+	if is_focused:
+		draw_rect(card_rect, FOCUS_RING_COLOR, false, FOCUS_RING_WIDTH)
