@@ -32,6 +32,13 @@ signal loot_confirmed(option_index: int)
 signal loot_skipped()
 ## 战败面板确认返回探索。
 signal defeat_confirmed()
+## 面板已关闭（[method close_panel] 的唯一出口）。[br]
+## [br][b]为什么单开这条[/b]：关闭的触发点有四个（确认 / 跳过 / 战败返回 / 汇总视图
+## 再确认），而四个业务信号各自只覆盖一部分路径——「关掉之后要做什么」若挂在业务
+## 信号上，就得在四处各写一遍。焦点还原（见 [code]CombatFocusMemory[/code]）正是
+## 「关掉之后」的事，故由本信号统一承载。[br]
+## [br][b]与业务信号同时发[/b]：先发业务信号（上层据此推进结算），再发本信号。
+signal closed()
 
 ## === 面板尺寸（px——1920×1080 基准，不覆盖全屏）=============================
 
@@ -234,6 +241,7 @@ func close_panel() -> void:
 	loot_delay_timer.stop()
 	kind = Rules.KIND_NONE
 	_fade.play_close(self, reduce_motion)
+	closed.emit()
 
 
 ## 当前面板是否打开。

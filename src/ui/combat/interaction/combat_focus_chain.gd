@@ -12,11 +12,8 @@ extends RefCounted
 ##   3. [b]禁用即停[/b]：链上被 [member BaseButton.disabled] 的控件把 Tab 前后与
 ##      四个方向邻居全部自指——焦点落到它便不再前移（实测引擎对 [code]disabled[/code]
 ##      的 [Button] [b]不做跳过[/b]，跳过必须由链自己保证）。[br]
-## [br][b]几何归 [CombatFocusRing][/b]：本类只管「谁上场、焦点落在哪」，
-## 邻居路径怎么算全在纯函数那一半。[br]
-## [br][b]为什么单独成类[/b]：[code]combat_scene_interaction.gd[/code] 已持出牌
-## 手势的接线，而「焦点在哪、下一步去哪」与「手势怎么变成出牌请求」是两件事；
-## 本类不持任何游戏状态（阶段现读），可由测试直接驱动。[br]
+## [br][b]几何归 [CombatFocusRing][/b]、[b]链外收拢归 [CombatFocusSweeper][/b]：
+## 本类只管「谁上场、焦点落在哪」。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：控件引用是渲染节点，阶段现读战斗系统；
 ## [b]零轮询[/b]：无 [code]_process()[/code]——全部由阶段信号与手牌重建显式驱动。
 ##
@@ -30,8 +27,15 @@ const PLAY_PHASE: int = 2
 
 ## 焦点环几何（纯函数——邻居路径的唯一算法）。
 const Ring := preload("res://src/ui/combat/interaction/combat_focus_ring.gd")
+## 链外控件收拢（Tab 走到链尾时的兜底——见类文档「链外收拢」）。
+const Sweeper := preload("res://src/ui/combat/interaction/combat_focus_sweeper.gd")
 ## 焦点环样式（松石青粗边——与商店 / 卡组编辑面板同一份，禁止另写一套）。
 const FocusStyle: GDScript = preload("res://src/ui/exploration/shop_panel_layout.gd")
+
+## 豁免收拢的覆盖层子树名（转发收拢器的单一定义——不在这里另抄一份）。[br]
+## [br][b]为什么本链不持覆盖层句柄[/b]：备战 / 结算 / 行囊面板分别挂在不同层上
+## （由各自的挂载模块建），焦点链只管战场四控件；豁免清单归收拢器（它才是执行方）。
+const OVERLAY_NAMES: Array[String] = Sweeper.OVERLAY_NAMES
 
 ## 战场门面（[code]CombatLayout[/code]——取手牌区 / 底栏 / 撤退按钮）。
 var _layout: Control = null
@@ -39,6 +43,8 @@ var _layout: Control = null
 var _combat: Node = null
 ## 外部启用开关（面板打开 / 输入冻结时为 false——整条链让位）。
 var _enabled: bool = true
+## 链外收拢器（[method bind] 建——持「改过谁」的还原账）。
+var _sweeper: RefCounted = null
 
 
 ## 注入门面与战斗系统并订阅（场景接线在交互层装配后调用一次）。[br]
@@ -46,6 +52,7 @@ var _enabled: bool = true
 func bind(p_layout: Control, p_combat: Node) -> void:
 	_layout = p_layout
 	_combat = p_combat
+	_sweeper = Sweeper.new()
 	if _combat != null and _combat.has_signal(&"phase_changed") \
 			and not _combat.phase_changed.is_connected(_on_phase_changed):
 		_combat.phase_changed.connect(_on_phase_changed)
@@ -79,11 +86,40 @@ func apply_phase(p_phase: int) -> void:
 	_set_modes(bar, play_ok)
 	_set_modes([retreat], _enabled)
 	Ring.wire(cards, bar, retreat, play_ok, _enabled)
+	sweep_outside(cards, bar, retreat)
 	if not play_ok:
 		_release_if_holding(cards, bar, retreat)
 		return
 	if focus_owner() == null:
 		focus_default()
+
+
+## 收拢链外可聚焦控件（Tab 走到链尾不再跳到战斗日志折叠按钮）。[br]
+## [br][b]为什么每次阶段落定都收一次[/b]：链外控件（顶栏 / 覆盖层）的出现时机
+## 不由本链决定——新面板挂上、旧节点显隐都会改变「谁可聚焦」，只在 [method bind]
+## 时收一次会在那些时刻漏掉。收拢是幂等的（[CombatFocusSweeper] 逐控件记账），
+## 重复调用不产生额外代价。[br]
+## [br][b]返回[/b]：本次收掉几个（0 = 链外本就干净）。
+func sweep_outside(p_cards: Array, p_bar: Array, p_retreat: Control) -> int:
+	if _sweeper == null or not _has_layout():
+		return 0
+	return int(_sweeper.call(&"sweep", _layout, _chain_nodes(p_cards, p_bar, p_retreat)))
+
+
+## 还原收拢改过的 [member Control.focus_mode]（退场用）。[br]
+## [br][b]为什么必须还原[/b]：本链改的是别人（顶栏 / 覆盖层）的属性；不还原的话
+## 下一次进战斗时那些控件仍是 [constant Control.FOCUS_NONE]，而它们本不该由本链管。
+func restore_outside() -> void:
+	if _sweeper != null:
+		_sweeper.call(&"restore")
+
+
+## 链外可聚焦控件清单（纯查询——测试断言「链外已收干净」用）。
+func outside_focusables() -> Array:
+	if _sweeper == null or not _has_layout():
+		return []
+	return _sweeper.call(&"outside_nodes", _layout,
+			_chain_nodes(_hand_cards(), _bar_buttons(), _retreat_button()))
 
 
 ## 手牌重建后重建环（卡节点换了一批，旧的 [NodePath] 会指向已释放的节点）。[br]
@@ -170,15 +206,29 @@ func _retreat_button() -> Control:
 
 ## 门面属性 → 节点（缺失 / 未装配为 null）。
 func _node_of(p_property: StringName) -> Variant:
-	if _layout == null or not is_instance_valid(_layout):
+	if not _has_layout():
 		return null
 	var raw: Variant = _layout.get(p_property)
 	return raw if raw is Object and is_instance_valid(raw) else null
 
 
+## 门面是否可用（退场后 [member _layout] 为 null——各处入口统一走这一条）。
+func _has_layout() -> bool:
+	return _layout != null and is_instance_valid(_layout)
+
+
+## 链上控件清单（收拢的 [code]keep[/code] 名单——按 Tab 顺序，与
+## [method focus_order] 同一来源，避免两处各拼一份）。
+func _chain_nodes(p_cards: Array, p_bar: Array, p_retreat: Control) -> Array:
+	var keep: Array = p_cards.duplicate()
+	keep.append_array(p_bar)
+	if p_retreat != null:
+		keep.append(p_retreat)
+	return keep
+
+
 ## 包装控件内的 [Button] 本体（包装自身是 [Control]，点击归内层按钮）。[br]
-## [br][b]直接取 [code]button[/code] 属性[/b]：包装是懒建的，没有稳定节点路径；
-## 属性名由两个包装组件（[EndTurnButton] / [CombatBagButton]）共同约定。
+## [br][b]直接取 [code]button[/code] 属性[/b]：包装是懒建的，没有稳定节点路径。
 func _inner_button(p_wrapper: Variant, p_property: StringName) -> Control:
 	var wrapper: Variant = (p_wrapper as Object).get(p_property)
 	if wrapper == null or not is_instance_valid(wrapper):
@@ -239,6 +289,8 @@ func clear_wiring() -> void:
 
 ## 退订（场景退场——信号源是常驻 Autoload）。
 func unbind() -> void:
+	restore_outside()
+	_sweeper = null
 	if _combat != null and is_instance_valid(_combat) \
 			and _combat.has_signal(&"phase_changed") \
 			and _combat.phase_changed.is_connected(_on_phase_changed):

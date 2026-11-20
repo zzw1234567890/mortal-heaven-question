@@ -84,10 +84,14 @@ static func clear(p_node: Control) -> void:
 	p_node.focus_neighbor_bottom = NodePath()
 
 
-## 是否已入树且有效。[b]非 Control 一律为 false[/b]——邻居设置只对控件有意义。
+## 是否已入树且有效。[b]非 Control 一律为 false[/b]——邻居设置只对控件有意义。[br]
+## [br][b]先验有效性再判类型[/b]：对已释放的对象做 [code]is[/code] 判断会直接报
+## [code]Left operand of 'is' is a previously freed instance[/code] 并中断调用方
+## （实测踩到：收拢退场时记账里留着已释放的手牌节点）。顺序不能颠倒。
 static func inside_tree(p_node: Variant) -> bool:
-	return p_node is Control and is_instance_valid(p_node) \
-			and (p_node as Control).is_inside_tree()
+	if not is_instance_valid(p_node):
+		return false
+	return p_node is Control and (p_node as Control).is_inside_tree()
 
 
 ## 是否被禁用（不可交互——[member BaseButton.disabled] 为真）。
@@ -95,11 +99,17 @@ static func is_stopped(p_node: Variant) -> bool:
 	return p_node is BaseButton and (p_node as BaseButton).disabled
 
 
-## 可否落焦点（树内 + 可见 + 未禁用）。
+## 可否落焦点（树内 + 可见 + 未禁用 + [member Control.focus_mode] 允许）。[br]
+## [br][b]为什么把 [code]focus_mode[/code] 也算进来[/b]：链会按阶段把控件设成
+## [constant Control.FOCUS_NONE]（离开出牌阶段 / 弹窗打开），此时
+## [method Control.grab_focus] 会被引擎拒绝并打印告警——「可落焦点」若不认这一条，
+## 默认焦点与焦点还原就会把一次注定失败的落点当成成功。
 static func focusable(p_node: Variant) -> bool:
 	if not inside_tree(p_node):
 		return false
-	return (p_node as Control).is_visible_in_tree() and not is_stopped(p_node)
+	var control: Control = p_node
+	return control.is_visible_in_tree() and not is_stopped(p_node) \
+			and control.focus_mode != Control.FOCUS_NONE
 
 
 ## 组内首个可用控件（无则 null）。

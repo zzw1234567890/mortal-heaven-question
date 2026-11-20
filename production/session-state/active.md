@@ -1251,3 +1251,29 @@ Task: 主菜单 → 身份 → 首图 → Boss → 通关 → 解锁 → 存读�
 - 全量：**4940 tests / 4940 passing / 3 orphans 存量**，零失败、零回归（4896 → 4940，净增 44 全过）
 - 已知边界（见下方「遗留」段）：`ExplorationSystem` 686 行仍超限（既有）；推荐态是瞬态不入存档，重进场景即消失（下次通关会重新点亮）；`MapSelectScreen` 恰 300 行、`map_select_screen.gd` 的 `pending_reentry_id` 查询是仅转发的一层
 - Next recommended: `ExplorationSystem` 拆分（686 行，超 300 软上限）；推荐高亮在「从暂停菜单回选图」等无通关动作的路径上是否也该给（现只由结算确认触发）
+
+## Session Extract — 战斗底栏键盘/手柄焦点链（2026-11-20）
+- 任务：补齐战斗底栏的键盘/手柄焦点路径（`.claude/rules/ui-code.md` 要求交互元素同时支持键鼠与手柄）；此前三个按钮只有鼠标可用
+- **审计到的事实**：底栏按钮 = `CombatBagButton.button`（行囊，在 `CombatBottomBar` 内）、`EndTurnButton.button`（结束出牌）、`CombatLayoutSettlementMount.retreat_button`（撤退，右上角按钮位）；父容器分别是 `BottomBar` / `RetreatButtonSlot`，两者都是 `MOUSE_FILTER_IGNORE`，只有内层 `Button` 收事件；三个按钮的 `focus_mode` 都是引擎默认（Button 为 `FOCUS_ALL`，但**没有任何 `focus_neighbor`**，Tab 走的是几何自推）；**全库无统一焦点管理器**——只有 `settlement_panel_view.wire_focus_chain` 一处自建成环先例；手牌卡 `hand_card.gd` 是纯 `Control`，默认 `FOCUS_NONE`
+- **三条实测约束（探针验证，写进了 `combat_focus_ring.gd` 类文档）**：① 留空 `NodePath` **不会**停住焦点——引擎退回几何自推，焦点会跳到链外的战斗日志折叠按钮，要停住必须**自指**；② 引擎对 `disabled` 的 `Button` **不做跳过**（`find_next_valid_focus` 照样选中它），跳过必须由链自己保证；③ 相对 `NodePath` 须同树，未入树时算出的路径不可用
+- 另两条：场景节点 `_input` **早于** Autoload 的 `_input`（实测），故 Esc 路由挂场景侧能先一步消费；`mouse_filter=IGNORE` 不影响键盘派发
+- **新增生产文件**：`combat_focus_chain.gd`（248 行，链「手牌[0..n] → 行囊 → 结束出牌 → 撤退」+ 阶段驱动可聚焦性 + 默认焦点）、`combat_focus_ring.gd`（160 行，邻居路径纯函数）、`combat_escape_router.gd`（147 行，Esc 逐层退）、`hand_area_keyboard.gd`（41 行，手牌卡键盘确认出口）
+- **默认焦点选「第一张手牌」而不是底栏按钮**：出牌阶段玩家第一件事是出牌，落手牌 = 进战斗就能按回车出牌；手牌空时才退到行囊（此时唯一能做的是结束回合）
+- **Esc 层级**：行囊自己管（它自己接 `_input`，重复接管会让关闭路径有两条）→ 撤退/渡劫弹窗（走按钮 `pressed`，不直调 `close_dialog`——直调不发信号，上层收不到「玩家放弃撤退」）→ 取消选中 → **都没有则放行**给暂停菜单（不打乱既有语义）
+- **改动**：`hand_card.gd`（焦点环画在 `_draw` 末尾 + `activated` 信号）、`hand_area.gd`（`card_activated` 改成转发属性，逐卡收信交给 `hand_area_keyboard`）、`hand_area_cards.gd`（抽出 `nodes_of`）、三个按钮补 `focus_mode` + 复用 `shop_panel_layout.apply_focus_ring`、`combat_scene_interaction.gd`（接线焦点链 + 键盘确认 + Esc 路由 + 阶段闸）
+- **测试**：新增 `test_combat_keyboard_focus_path.gd`（12 例）与 `test_combat_escape_layers.gd`（4 例），全部走真实 `combat_scene.tscn` + `Viewport.push_input` 投递真实按键（Tab / 方向键 / 回车 / 空格 / Esc），不走直调 `grab_focus`
+- **踩到并修正的坑**：刷新手牌会**换一批卡节点**（快照条目不带 `node`），停在阶段切换前抓到的引用上验的是已退场的旧节点（`test_enemy_turn_takes_focus_chain_offline` 因此先红）；`CombatLayout.settlement_host` 是属性不是方法，`call("settlement_host")` 报 `Nonexistent function`
+- 全量：**5420 tests / 5420 passing / 3 orphans 存量**，零失败、零回归（combat_ui 目录 403 → 419，净增 16 例全过）
+- 已知边界：手柄按键映射属 InputMap 层，本轮未覆盖（`ui_accept` / `ui_cancel` / `ui_left..down` 这些**默认动作**在手柄上本就成立，但项目自定义的手柄按键映射未见配置）；撤退按钮在敌方回合仍可聚焦（有意——GDD §10「撤退按钮始终在战斗中可点击」）；焦点链只管战场控件，战斗日志折叠按钮等链外控件仍走几何自推
+- Next recommended: 手柄按键映射（InputMap 层）核对；战斗内其它面板（结算战利品选择）的焦点链与战场链的交接
+
+## Session Extract — 三条尾巴收尾（2026-11-20 续）
+- 任务：收掉上一轮的三条尾巴——① 链外控件仍走几何自推；② 弹窗关闭后焦点不回原处；③ 手柄按键映射未核过
+- **尾巴一（链外收拢）**：新增 `combat_focus_sweeper.gd`（约 125 行）。实测链外唯一可见可聚焦者是顶部条 `CombatTopBar/CombatLog/CollapseLabel`（战斗日志折叠按钮），且它的 `pressed` 全库无人接线——Tab 跳过去按回车什么都不发生。处理方式：**收掉**（`focus_mode = FOCUS_NONE`）而不是纳入链——它是顶栏信息控件、不是回合动作，纳入会把「按了没反应」从链外搬到链上。豁免覆盖层子树（`DeployPanel` / `SettlementHost` / `CombatBagScreen`，它们自管焦点）；隐藏控件不动；`FOCUS_ACCESSIBILITY`（RichTextLabel 默认 = 3）放过。逐控件记账、`restore()` 可逆、幂等
+- **尾巴二（焦点记忆）**：新增 `combat_focus_memory.gd`（约 110 行），挂在**交互接线**上（`CombatSceneInteraction.focus_memory()`，整场战斗一份，兜底注册为 `focus_chain.focus_default`）。三条路径全覆盖：行囊面板（`CombatBagHost.open/close`）、撤退确认弹窗与渡劫警示（`retreat_dialog.dialog_closed` / `tribulation_warning.dialog_closed` → 宿主 `_restore_focus`）、战利品面板（新增 `settlement_panel.closed` 信号 → 同一出口）。Esc 关弹窗走按钮 `pressed`，同样经过这个出口
+- **关键陷阱（探针 `tools/probe_freed_ref.gd` 验证）**：已释放的对象引用与 `null` **比较相等**，`_remembered == null` 无法区分「没记过」与「记过但控件已释放」——故加了独立的 `_recorded: bool` 标志，否则「目标控件失效时回默认焦点」这条永远走不到
+- **第二个陷阱**：对已释放对象做 `is Control` 判断会报 `Left operand of 'is' is a previously freed instance` 并**中断调用**（`CombatFocusRing.inside_tree` / `CombatFocusSweeper.restore` 都踩到）——必须先 `is_instance_valid()` 再判类型，顺序不能颠倒
+- **尾巴三（InputMap）**：审计发现 `ui_accept` / `ui_cancel` 只有键盘绑定（方向键四个动作本就有 JOY_BUTTON + JOY_AXIS）。在 `project.godot` 的 `[input]` 补 `ui_accept` 的 `InputEventJoypadButton button_index=0`（A）与 `ui_cancel` 的 `button_index=1`（B），键盘绑定原样保留（回车/小键盘回车/空格、Esc）。未新增自定义动作名
+- **新增测试 42 例**：`test_combat_focus_sweeper.gd`（13 例，单元）、`test_combat_focus_memory.gd`（10 例，单元）、`test_combat_input_map_joypad.gd`（10 例，单元，断言六个动作各至少 1 个 JOY 事件且键盘绑定未丢）、`test_combat_focus_restore_paths.gd`（9 例，集成，真实场景 + 真实按键：链外已收干净、连按 10 次 Tab 不跳链外、撤退/战利品/战败三条路径的焦点还原、Esc 还原、没记过时不凭空塞焦点）
+- 全量：**5462 tests / 5462 passing / 3 orphans 存量**，零失败、零回归（5420 → 5462，净增 42 全过）
+- 已知边界：`combat_focus_chain.gd` 301 行、`settlement_host.gd` 371 行，均略超 300 软上限（既有文件本轮追加所致，未再拆分）；`settlement_host.set_focus_fallback` 已删除（兜底改由交互接线在建立记忆时注册）

@@ -50,11 +50,13 @@ func wire_all(p_deploy_confirmed: Callable, p_deploy_back: Callable,
 	wire_deployment(p_deploy_confirmed, p_deploy_back, p_retreat, p_defeat)
 	wire_feedback()
 	var interaction: RefCounted = wire_interaction()
-	return {
+	var wired: Dictionary = {
 		"result_bridge": wire_result_bridge(),
 		"interaction_wiring": interaction,
 		"bag_mount": wire_bag(interaction),
 	}
+	wire_focus_memory(interaction)
+	return wired
 
 
 ## 音频——注入 AudioManager 并请求进入战斗音频状态（AC-7；未注入时静默跳过）。
@@ -161,6 +163,23 @@ func wire_bag(p_interaction: RefCounted) -> RefCounted:
 	return BagScript.new().call(&"wire", _root, _combat(), p_interaction,
 			_autoload(&"GameStateManager"), _autoload(&"CardSystem"),
 			_autoload(&"CostSystem")) as RefCounted
+
+
+## 焦点记忆接线——把交互层里那一份（挂在焦点链上）交给结算宿主，二者共用。[br]
+## [br][b]为什么在行囊之后[/b]：行囊装配时就把它自己那一份接走了（见
+## [code]combat_scene_bag.gd[/code] 的 [code]wire[/code] 参数），这里只补结算宿主
+## 那一处。[br]
+## [br][b]缺交互层时静默跳过[/b]：headless 环境本就没有焦点链，面板照常工作，
+## 只是不还原焦点。
+func wire_focus_memory(p_interaction: RefCounted) -> void:
+	if p_interaction == null or not p_interaction.has_method(&"focus_memory"):
+		return
+	var memory: Variant = p_interaction.call(&"focus_memory")
+	if memory == null:
+		return
+	var host: Variant = _root.get("settlement_host")
+	if host != null and (host as Object).has_method(&"set_focus_memory"):
+		host.call(&"set_focus_memory", memory)
 
 
 ## === 容器取数转发 ===========================================================

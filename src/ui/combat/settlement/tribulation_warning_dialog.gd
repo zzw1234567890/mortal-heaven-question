@@ -26,6 +26,11 @@ const Fade := preload("res://src/ui/combat/settlement/settlement_fade.gd")
 signal battle_confirmed()
 ## 返回（关闭警示，停留备战界面）。
 signal battle_cancelled()
+## 弹窗已关闭（[method close_dialog] 的唯一出口——与业务信号区分开）。[br]
+## [br][b]为什么单开这条[/b]：确认与返回都会关掉它，而「关掉之后把键盘焦点还给
+## 打开前的控件」与玩家选了什么无关——挂在本信号上两条路径一次覆盖（同
+## [signal RetreatDialog.dialog_closed] 口径）。
+signal dialog_closed()
 
 ## === 尺寸（px——1920×1080 基准）=============================================
 
@@ -127,6 +132,7 @@ func close_dialog() -> void:
 		return
 	is_open = false
 	_play_close()
+	dialog_closed.emit()
 
 
 ## 弹窗是否打开。

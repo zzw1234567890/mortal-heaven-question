@@ -34,7 +34,7 @@ const MountScript := preload("res://src/feature/combat/combat_bag_mount.gd")
 ## 装配并挂载行囊。[br]
 ## [br][param p_layout] 战场根（[code]CombatLayout[/code]）。[br]
 ## [param p_combat] 战斗系统（读状态表与落库模块；null 时行囊整条链路降级为不可用）。[br]
-## [param p_interaction] 出牌交互接线（开面板时冻结出牌输入；null 时不冻结）。[br]
+## [param p_interaction] 出牌交互接线（开面板时冻结出牌输入、并取它持有的焦点记忆）。[br]
 ## [param p_gsm] 存档管理器（扣实物）。[br]
 ## [param p_card_system] 卡牌系统（查模板）。[br]
 ## [param p_cost] 费用系统（读灵力 / 扣灵力）。[br]
@@ -45,8 +45,18 @@ func wire(p_layout: Control, p_combat: Node, p_interaction: RefCounted,
 		return null
 	var use_layer: RefCounted = build_use_layer(p_combat, p_gsm, p_card_system, p_cost)
 	var mount: RefCounted = MountScript.new(p_layout)
-	mount.call(&"mount", _input_toggle(p_interaction), use_layer)
+	mount.call(&"mount", _input_toggle(p_interaction), use_layer,
+			_focus_memory_of(p_interaction))
 	return mount
+
+
+## 交互接线持有的焦点记忆（面板开合时还原焦点用）。[br]
+## [br][b]返回[/b]：记忆实例，或 null（交互层缺失 / 未实现该入口——那说明这一场
+## 战斗本来就没有键盘焦点可言，静默降级）。
+func _focus_memory_of(p_interaction: RefCounted) -> RefCounted:
+	if p_interaction == null or not p_interaction.has_method(&"focus_memory"):
+		return null
+	return p_interaction.call(&"focus_memory") as RefCounted
 
 
 ## 拼出结算层（[code]CombatBagUse[/code]）——三层依赖一次接齐。[br]

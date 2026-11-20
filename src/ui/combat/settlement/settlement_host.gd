@@ -71,6 +71,11 @@ var tribulation_warning: Control = null
 
 ## 已接线信号源的战斗系统（换源时先断开旧源——防一次战斗开两次面板）。
 var _bound_combat_system: Node = null
+## 键盘/手柄焦点记忆（弹窗打开前记下焦点，关闭后还给原处）。[br]
+## [br][b]由场景挂载侧注入一个共享实例[/b]（[method set_focus_memory]）：行囊面板
+## 挂在战场根上、不归本宿主，但它开合同样要还原焦点——两处分头记会把彼此的位置
+## 覆盖掉，故整场战斗只有一份记忆。
+var _focus_memory: RefCounted = null
 ## 是否已在本场确认过渡劫战前警示（防重复拦）。
 var _pre_battle_confirmed: bool = false
 ## 战败上下文（阵亡角色名与绑定卡张数——由场景挂载侧在战斗结束时注入，
@@ -118,6 +123,9 @@ func has_sources() -> bool:
 ## 的全文由 [code]CombatRewardLines[/code] 以汇总行呈现——两处读同一份载荷。
 func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 	var kind: StringName = Rules.panel_kind_for(result)
+	if kind != Rules.KIND_NONE:
+		# 开面板前记下焦点（关闭时还给原处——见 [method _restore_focus]）
+		_remember_focus()
 	if kind == Rules.KIND_VICTORY:
 		_current_rolled_rewards = rewards.duplicate(true)
 		var counts: Dictionary = Data.deck_counts(deck_system)
@@ -147,6 +155,7 @@ func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 ## 撤退按钮点击（右上角常驻按钮的点击入口——AC-9）。[br]
 ## [br]打开撤退确认弹窗；渡劫战走红框 80% 变体（AC-7）。
 func request_retreat() -> void:
+	_remember_focus()
 	retreat_dialog.open(is_tribulation, _dead_binding_card_count)
 
 
@@ -162,6 +171,7 @@ func on_retreat_requested() -> void:
 func show_pre_battle_warning() -> bool:
 	if not Retreat.should_show_pre_battle_warning(is_tribulation, _pre_battle_confirmed):
 		return false
+	_remember_focus()
 	tribulation_warning.open()
 	return true
 
@@ -172,6 +182,42 @@ func set_reduce_motion(value: bool) -> void:
 	for panel: Control in [settlement_panel, retreat_dialog, tribulation_warning]:
 		if panel != null:
 			panel.reduce_motion = value
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 内部：焦点记忆
+# ═══════════════════════════════════════════════════════════════════════════════
+
+## 开弹窗之前记下当前键盘/手柄焦点。[br]
+## [br][b]为什么记在宿主而不是弹窗里[/b]：弹窗自己不知道「打开它的是谁」——
+## 撤退弹窗有两个入口（右上角按钮 / 战斗系统的撤退请求），战利品面板由战斗结束
+## 信号打开；「打开前焦点在哪」只有宿主这一层看得到。[br]
+## [br][b]记忆缺失时静默跳过[/b]：headless 单测里宿主不入树，焦点本就无从谈起。
+func _remember_focus() -> void:
+	if _focus_memory != null:
+		_focus_memory.call(&"remember_current")
+
+
+## 弹窗关闭后把焦点还给打开前的控件（还不了则落链注册的兜底默认焦点）。[br]
+## [br][b]三条路径共用一个出口[/b]：战利品面板（含战败返回）、撤退确认、渡劫警示
+## 各自在关闭时发信号到这里——一处实现，不必在每块面板里各写一遍。[br]
+## [br][b]为什么必须还原[/b]：不还原的话，玩家取消一次撤退确认之后焦点会跳到
+## 默认焦点（第一张手牌），每开一次面板就丢一次位置——手柄玩家尤其明显。
+func _restore_focus() -> void:
+	if _focus_memory != null:
+		_focus_memory.call(&"restore")
+
+
+## 注入共享的焦点记忆（场景挂载侧在建完焦点链后调用一次）。[br]
+## [br][b]为什么由外部注入[/b]：整场战斗只有一份记忆（见 [member _focus_memory]），
+## 而它的兜底（默认焦点）由交互接线在建立时注册——两件东西的装配点都在场景挂载侧。
+func set_focus_memory(p_memory: RefCounted) -> void:
+	_focus_memory = p_memory
+
+
+## 焦点记忆实例（未注入为 null——测试探针）。
+func focus_memory() -> RefCounted:
+	return _focus_memory
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -189,6 +235,8 @@ func _build_panels() -> void:
 	settlement_panel.loot_confirmed.connect(_on_loot_confirmed)
 	settlement_panel.loot_skipped.connect(_on_loot_skipped)
 	settlement_panel.defeat_confirmed.connect(func() -> void: defeat_confirmed.emit())
+	# 关闭后还焦点（四条关闭路径共用这一个出口——见 [signal SettlementPanel.closed]）
+	settlement_panel.closed.connect(_restore_focus)
 
 	retreat_dialog = RetreatScript.new()
 	retreat_dialog.name = "RetreatDialog"
@@ -197,6 +245,7 @@ func _build_panels() -> void:
 	add_child(retreat_dialog)
 	retreat_dialog.retreat_confirmed.connect(func() -> void: retreat_confirmed.emit())
 	retreat_dialog.retreat_cancelled.connect(func() -> void: retreat_cancelled.emit())
+	retreat_dialog.dialog_closed.connect(_restore_focus)
 
 	tribulation_warning = WarningScript.new()
 	tribulation_warning.name = "TribulationWarning"
@@ -208,6 +257,7 @@ func _build_panels() -> void:
 		pre_battle_confirmed.emit())
 	tribulation_warning.battle_cancelled.connect(func() -> void:
 		pre_battle_cancelled.emit())
+	tribulation_warning.dialog_closed.connect(_restore_focus)
 
 	# 构建后统一继承当前 reduce_motion（setup/入树前设置的值不被子面板默认值吞掉）
 	set_reduce_motion(reduce_motion)

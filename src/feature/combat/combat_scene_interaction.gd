@@ -21,6 +21,8 @@ const FocusChainScript := preload("res://src/ui/combat/interaction/combat_focus_
 const PlayResultScript := preload("res://src/feature/combat/combat_play_result.gd")
 ## Esc「退一层」路由（弹窗 → 取消选中 → 放行给暂停菜单）。
 const EscapeRouterScript := preload("res://src/ui/combat/interaction/combat_escape_router.gd")
+## 键盘/手柄焦点记忆（弹窗开合时把焦点还给打开前的控件）。
+const FocusMemoryScript := preload("res://src/ui/combat/interaction/combat_focus_memory.gd")
 
 ## 出牌阶段号（结束出牌按钮只在此阶段生效）。
 const PLAY_PHASE: int = 2
@@ -29,6 +31,8 @@ const PLAY_PHASE: int = 2
 var hand_wiring: RefCounted = null
 ## 键盘/手柄焦点链实例（[method wire] 创建）。
 var focus_chain: RefCounted = null
+## 键盘/手柄焦点记忆（[method wire] 创建——整场战斗一份，见 [method focus_memory]）。
+var _focus_memory: RefCounted = null
 ## Esc 退层路由节点（[method wire] 挂到战场根上）。
 var escape_router: Node = null
 ## 战场门面（CombatLayout）。
@@ -70,6 +74,21 @@ func enable() -> void:
 		focus_chain.call(&"set_enabled", true)
 
 
+## 键盘/手柄焦点记忆（面板开合的还原位置——整场战斗一份，惰性创建）。[br]
+## [br][b]为什么挂在本模块而不是焦点链上[/b]：行囊面板与结算宿主都要用它，而这两处
+## 面板的装配点在场景挂载侧、不持链；记忆归交互接线（它同时持链与面板装配时机），
+## 「默认焦点是谁」仍由链回答——记忆只持一个 [Callable] 兜底。[br]
+## [br][b]兜底在建立时注册[/b]：链未装配时为无兜底的空记忆（还不了原处就如实返回
+## null，不假装成功）。
+func focus_memory() -> RefCounted:
+	if _focus_memory == null:
+		_focus_memory = FocusMemoryScript.new()
+		if focus_chain != null:
+			_focus_memory.call(&"set_fallback",
+					Callable(focus_chain, &"focus_default"))
+	return _focus_memory
+
+
 ## 放行 / 停用输入（模态面板打开时停用——防止点穿）。[br]
 ## [br][b]焦点链同步让位[/b]：面板盖住的按钮不该还落得到焦点，否则玩家按 Tab
 ## 会在看不见的链上乱走、按回车又什么都不发生。
@@ -91,6 +110,9 @@ func unbind() -> void:
 	if focus_chain != null:
 		focus_chain.call(&"unbind")
 	focus_chain = null
+	if _focus_memory != null:
+		_focus_memory.call(&"clear")
+	_focus_memory = null
 	if escape_router != null and is_instance_valid(escape_router):
 		escape_router.queue_free()
 	escape_router = null

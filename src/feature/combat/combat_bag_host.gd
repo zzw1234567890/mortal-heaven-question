@@ -37,6 +37,8 @@ var use_layer: RefCounted = null
 var _set_input: Callable = Callable()
 ## 按钮本体（退订时断开连接用）。
 var _button: Button = null
+## 键盘/手柄焦点记忆（注入——整场战斗一份，见 [method mount] 的 [param p_focus_memory]）。
+var _focus_memory: RefCounted = null
 
 
 ## 装配：把面板挂到 [param p_host]、接上底部条的入口按钮与出牌输入开关。[br]
@@ -44,11 +46,16 @@ var _button: Button = null
 ## [br][param p_bottombar] 底部条（读它的 [code]bag_button[/code]）。[br]
 ## [br][param p_set_input] 出牌输入开关；[br]
 ## [param p_use_layer] 结算层。[br]
-## [br][b]返回[/b]：是否装上了入口按钮（false = 底部条结构不符，面板仍可手动打开）。
+## [param p_focus_memory] 焦点记忆（可空——打开前记焦点、关闭后还原；见下）。[br]
+## [br][b]返回[/b]：是否装上了入口按钮（false = 底部条结构不符，面板仍可手动打开）。[br]
+## [br][b]为什么行囊也要焦点记忆[/b]：行囊是覆盖面板，一开就把焦点抢到面板里；
+## 关闭后不还回去，玩家的焦点会落到链的默认焦点（第一张手牌）而不是他打开行囊
+## 时的位置——每开一次面板丢一次位置。
 func mount(p_host: Control, p_bottombar: Variant, p_set_input: Callable,
-		p_use_layer: RefCounted) -> bool:
+		p_use_layer: RefCounted, p_focus_memory: RefCounted = null) -> bool:
 	use_layer = p_use_layer
 	_set_input = p_set_input
+	_focus_memory = p_focus_memory
 	panel = ScreenScript.new()
 	panel.set_entries_source(_entries_of(p_use_layer))
 	panel.connect(&"entry_use_requested", _on_entry_use_requested)
@@ -60,20 +67,25 @@ func mount(p_host: Control, p_bottombar: Variant, p_set_input: Callable,
 
 ## 打开面板（幂等：已打开时只刷新，不重复冻结）。[br]
 ## [br][b]打开期间冻结出牌输入[/b]：面板盖住了手牌区，不冻结就会出现「隔面板点穿出牌」
-## ——玩家点的是行囊里的一行，打出去的却是手牌。
+## ——玩家点的是行囊里的一行，打出去的却是手牌。[br]
+## [br][b]先记焦点再开[/b]：顺序反了记到的是面板自己的默认焦点（等于没记）。
 func open() -> void:
 	if panel == null:
 		return
+	_remember_focus()
 	panel.call(&"open")
 	_apply_input(false)
 
 
-## 关闭面板并解冻出牌输入（未打开时为空操作）。
+## 关闭面板并解冻出牌输入（未打开时为空操作）。[br]
+## [br][b]无条件还原焦点[/b]：未打开时 [method close] 本就是幂等的（解冻 + 还焦点），
+## 记忆为空时还原是空操作，不产生副作用。
 func close() -> void:
 	if panel == null:
 		return
 	panel.call(&"close")
 	_apply_input(true)
+	_restore_focus()
 
 
 ## 面板是否开着（按钮据此决定「再点一次是开还是关」）。
@@ -95,6 +107,7 @@ func unbind() -> void:
 	panel = null
 	use_layer = null
 	_set_input = Callable()
+	_focus_memory = null
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -148,6 +161,18 @@ func _on_entry_use_requested(p_entry: Dictionary, p_target_ids: Array) -> void:
 func _apply_input(p_enabled: bool) -> void:
 	if _set_input.is_valid():
 		_set_input.call(p_enabled)
+
+
+## 开面板前记下焦点（未注入焦点记忆时空操作——headless 单测不带交互层）。
+func _remember_focus() -> void:
+	if _focus_memory != null:
+		_focus_memory.call(&"remember_current")
+
+
+## 关面板后把焦点还给打开前的控件（未注入时空操作）。
+func _restore_focus() -> void:
+	if _focus_memory != null:
+		_focus_memory.call(&"restore")
 
 
 ## 结算层持有的条目来源（面板直接问它——不必经本模块转一道手）。

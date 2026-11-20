@@ -31,16 +31,20 @@ func _init(p_layout: Control = null) -> void:
 ## [br][param p_set_input] 出牌输入开关 [code]func(enabled: bool) -> void[/code]
 ## （生产传 [code]CombatSceneInteraction.set_enabled[/code]）。[br]
 ## [param p_use_layer] 结算层（[code]CombatBagUse[/code]）。[br]
+## [param p_focus_memory] 焦点记忆（可空——整场战斗一份，见
+## [code]combat_focus_memory.gd[/code]）。[br]
 ## [br][b]返回[/b]：是否装上了底部条入口按钮（false = 底部条结构不符——面板仍在，
 ## 只是没有可点的入口；宿主已 push_warning）。[br]
 ## [br][b]幂等[/b]：重复装配只复用同一个宿主（重复挂面板会让两层遮罩叠在一起）。
-func mount(p_set_input: Callable, p_use_layer: RefCounted) -> bool:
+func mount(p_set_input: Callable, p_use_layer: RefCounted,
+		p_focus_memory: RefCounted = null) -> bool:
 	if _layout == null:
 		return false
 	if host == null:
 		host = HostScript.new()
 	var bar: Variant = _layout.get(&"combat_bottombar")
-	return bool(host.call(&"mount", _layout, bar, p_set_input, p_use_layer))
+	return bool(host.call(&"mount", _layout, bar, p_set_input, p_use_layer,
+			p_focus_memory))
 
 
 ## 打开面板（幂等——已打开时只刷新，不重复冻结出牌输入）。
