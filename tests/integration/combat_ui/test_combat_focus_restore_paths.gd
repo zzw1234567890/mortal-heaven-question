@@ -57,21 +57,31 @@ func test_no_outside_focusable_control_in_play_phase() -> void:
 			"出牌阶段链外不该还有可聚焦控件（实测漏网者：%s）" % _describe(outside))
 
 
-## 战斗日志折叠按钮真的退出了焦点（不只是清单为空）。[br]
-## [br][b]为什么点名这一个[/b]：它是链外的具体那一个；逐控件断言避免「清单算法
-## 与收拢口径一起漂了」时两条用例同时变绿。
-func test_log_collapse_button_left_the_focus_order() -> void:
+## 战斗日志折叠按钮已进链：它是链上可聚焦的一站，不再靠几何自推被 Tab 撞上。[br]
+## [br][b]本轮语义变更[/b]：上一轮它的 [code]pressed[/code] 全库无人接线，于是被
+## [b]收出焦点[/b]（[code]FOCUS_NONE[/code]）——Tab 不再跳过去，但键盘 / 手柄玩家
+## 也再也开不了日志。本轮按钮接上了开合（[code]CombatLog.toggle[/code]），
+## 于是改判据：它进链（环首），可聚焦、按得动。[br]
+## [br][b]本用例替换的旧断言[/b]：旧断言是「[code]focus_mode == FOCUS_NONE[/code]」，
+## 钉的是「链外唯一漏网者已被收掉」这一前提；前提已被有意推翻，断言随新语义重写，
+## 强度不降——从「它不能聚焦」变成「它可聚焦、在链上、且按下真的开合」。
+func test_log_collapse_button_is_a_reachable_chain_stop() -> void:
 	# Arrange
 	var collapse: Control = _root().find_child("CollapseLabel", true, false) as Control
 	assert_not_null(collapse, "前置：战斗日志折叠按钮应存在（顶栏结构变了就更新本用例）")
 	# Act / Assert
-	assert_eq(collapse.focus_mode, Control.FOCUS_NONE,
-			"战斗日志折叠按钮应退出焦点（它是链外唯一会吸走 Tab 的控件）")
+	assert_eq(collapse.focus_mode, Control.FOCUS_ALL,
+			"战斗日志折叠按钮应可聚焦（它是本轮的日志入口）")
+	assert_true(_chain().call("focus_order").has(collapse.name),
+			"折叠按钮应是焦点链上的一站（链序：%s）" % str(_chain().call("focus_order")))
+	assert_false(_chain().call("outside_focusables").has(collapse),
+			"折叠按钮已在链上，不该同时出现在链外清单里")
 
 
-## 连按 10 次 Tab，焦点始终落在链上（手牌 / 行囊 / 结束出牌 / 撤退）。[br]
+## 连按 10 次 Tab，焦点始终落在链上（手牌 / 行囊 / 结束出牌 / 撤退 / 日志入口）。[br]
 ## [br][b]为什么按次数而不是按某一站[/b]：链尾的自指一旦失效，引擎会退回几何自推
-## ——症状是「第 4 次 Tab 之后才会飘」，只按三次永远测不到。
+## ——症状是「第 4 次 Tab 之后才会飘」，只按三次永远测不到。[br]
+## [br][b]链上为什么含日志入口[/b]：它本轮进了环（环首）——见上一条用例说明。
 func test_tab_cycles_inside_the_chain_only() -> void:
 	# Arrange——焦点落在第一张手牌（默认焦点），从这里开始绕环
 	var chain: Array = _chain_nodes()
@@ -256,13 +266,21 @@ func _chain() -> Variant:
 	return chain
 
 
-## 链上控件清单（Tab 只该在这些之间走）。
+## 链上控件清单（Tab 只该在这些之间走）。[br]
+## [br][b]含战斗日志入口[/b]：本轮它从「链外收拢」改成「进链」（环首）——
+## 见 [method test_log_collapse_button_is_a_reachable_chain_stop] 的说明。
 func _chain_nodes() -> Array:
 	var nodes: Array = _hand_cards()
 	nodes.append(_bag_button())
 	nodes.append(_end_turn_button())
 	nodes.append(_retreat_button())
+	nodes.append(_log_collapse_button())
 	return nodes
+
+
+## 战斗日志折叠按钮（链首站）。
+func _log_collapse_button() -> Control:
+	return _root().find_child("CollapseLabel", true, false) as Control
 
 
 ## 走生产入口打开胜利面板（宿主是 [signal CombatSystem.battle_ended] 的接收者）。[br]

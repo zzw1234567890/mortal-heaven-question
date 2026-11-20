@@ -26,10 +26,11 @@ extends RefCounted
 ## [param p_bar] 底栏动作按钮（行囊 → 结束出牌）。[br]
 ## [param p_retreat] 撤退按钮（可空）。[br]
 ## [param p_play_ok] 手牌与底栏是否上场（出牌阶段且已启用）。[br]
-## [param p_enabled] 整条链是否启用（撤退只在启用时入环）。
+## [param p_enabled] 整条链是否启用（撤退只在启用时入环）。[br]
+## [param p_extra] 追加站（战斗日志入口 / 展开时的日志面板滚动区；空数组与旧行为一致）。
 static func wire(p_cards: Array, p_bar: Array, p_retreat: Control,
-		p_play_ok: bool, p_enabled: bool) -> void:
-	var order: Array = ring_order(p_cards, p_bar, p_retreat, p_play_ok, p_enabled)
+		p_play_ok: bool, p_enabled: bool, p_extra: Array = []) -> void:
+	var order: Array = ring_order(p_cards, p_bar, p_retreat, p_play_ok, p_enabled, p_extra)
 	for i: int in range(order.size()):
 		var node: Control = order[i]
 		if not inside_tree(node) or is_stopped(node):
@@ -39,17 +40,26 @@ static func wire(p_cards: Array, p_bar: Array, p_retreat: Control,
 				order[(i - 1 + order.size()) % order.size()])
 		_set_sides(node, order[(i - 1 + order.size()) % order.size()],
 				order[(i + 1) % order.size()])
-	_verticals(p_cards, p_bar, p_retreat)
+	_verticals(p_cards, p_bar, p_retreat, p_extra)
 
 
-## 环的顺序：手牌（出牌阶段）→ 行囊 → 结束出牌 → 撤退（启用时）。[br]
+## 环的顺序：追加站（战斗日志入口）→ 手牌（出牌阶段）→ 行囊 → 结束出牌 →
+## 撤退（启用时）→ 回到追加站（成环）。[br]
 ## [br][b]撤退不受阶段限制[/b]：GDD §10「撤退按钮始终在战斗中可点击」，敌方行动
 ## 期间也是合法的撤退时机；其余控件只在自己的舞台上出现。[br]
 ## [br][b]可聚焦者才进环[/b]：阶段外的手牌与被隐藏的按钮不入环——不靠「引擎会跳过」
-## 兜底（链外控件一旦混进来，Tab 顺序就随隐藏状态漂移，玩家的肌肉记忆跟着失效）。
+## 兜底（链外控件一旦混进来，Tab 顺序就随隐藏状态漂移，玩家的肌肉记忆跟着失效）。[br]
+## [br][b]追加站排在环首而不是环尾[/b]：环尾三位（行囊 → 结束出牌 → 撤退）是
+## 上一轮定下并被用例钉死的「回合动作三连」，日志入口是信息控件、不属于那一串；
+## 排在环首意味着连按 Tab 走完动作三连之后才轮到读战报，同时不动那三位的相对次序。[br]
+## [br][b]追加站只在链启用时入环[/b]：模态面板打开时整条链让位（日志入口也在面板底下）。
 static func ring_order(p_cards: Array, p_bar: Array, p_retreat: Control,
-		p_play_ok: bool, p_enabled: bool) -> Array:
+		p_play_ok: bool, p_enabled: bool, p_extra: Array = []) -> Array:
 	var order: Array = []
+	if p_enabled:
+		for node: Variant in p_extra:
+			if inside_tree(node) and not order.has(node):
+				order.append(node)
 	if p_play_ok:
 		order.append_array(p_cards)
 		order.append_array(p_bar)
@@ -124,13 +134,16 @@ static func first_control(p_nodes: Array) -> Control:
 # 内部
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 竖向邻居（手牌 ↔ 底栏；撤退回到手牌末张）。[br]
+## 竖向邻居（手牌 ↔ 底栏；撤退回到手牌末张；追加站接到底栏首个动作）。[br]
 ## [br][b]为什么手牌的上下都指行囊[/b]：手牌区在屏幕下方、底栏贴着屏幕底缘，
 ## 「往下走」在玩家心里就是「去底部条」；行囊是底栏里最靠左的动作按钮，也是从
 ## 手牌区垂直落下去最近的一个。[br]
 ## [br][b]为什么行囊的上方是末张手牌而不是首张[/b]：玩家从行囊往上退，落到离它
-## 最近的那张（弧形排布里最右的末张）比落到整个手牌区最左边更符合空间直觉。
-static func _verticals(p_cards: Array, p_bar: Array, p_retreat: Control) -> void:
+## 最近的那张（弧形排布里最右的末张）比落到整个手牌区最左边更符合空间直觉。[br]
+## [br][b]追加站往下接底栏[/b]：日志入口在屏幕左上、底栏在屏幕底部——竖向通道
+## 与手牌一致（玩家从日志往下走，落到回合动作上）。
+static func _verticals(p_cards: Array, p_bar: Array, p_retreat: Control,
+		p_extra: Array = []) -> void:
 	var hub: Control = first_control(p_bar)
 	var anchor: Control = p_cards[p_cards.size() - 1] if not p_cards.is_empty() else null
 	for card: Variant in p_cards:
@@ -141,6 +154,9 @@ static func _verticals(p_cards: Array, p_bar: Array, p_retreat: Control) -> void
 			set_verticals(button, anchor, null)
 	if inside_tree(p_retreat) and not is_stopped(p_retreat):
 		set_verticals(p_retreat, null, anchor)
+	for node: Variant in p_extra:
+		if inside_tree(node) and not is_stopped(node):
+			set_verticals(node, null, hub)
 
 
 ## 上下邻居（[param p_up] / [param p_down] 为 null 时自指）。
