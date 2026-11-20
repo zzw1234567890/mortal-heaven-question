@@ -137,7 +137,7 @@ func test_start_without_card_snapshot_keeps_opening_hand() -> void:
 ## 战斗系统不支持接管时的降级：不崩、不开空手，战斗照常（老实现的兼容半边）。
 func test_start_without_pile_api_degrades_to_opening_hand() -> void:
 	# Arrange——换成没有 [method restore_piles] 的替身（半截接线的实现）
-	var legacy_combat: Node = PilelessCombatStub.new()
+	var legacy_combat: Node = Stubs.PilelessCombatStub.new()
 	add_child_autofree(legacy_combat)
 	IntentScript.request(payload())
 	resume.call(&"consume")
@@ -160,7 +160,7 @@ func test_start_restores_debuffs_into_state_table() -> void:
 	# Act
 	resume.call(&"start", combat, root, interaction, deps(), 1)
 	# Assert——层数 / 剩余回合 / 数值三项都按存档落位
-	var manager: RefCounted = (combat.roster as RosterStub).debuff
+	var manager: RefCounted = (combat.roster as Stubs.RosterStub).debuff
 	assert_eq(int(manager.call(&"get_stacks", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)), 1,
 			"存档里的一条降攻应还原成 1 层")
 	assert_eq(int(manager.call(&"get_duration", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)),
@@ -180,7 +180,7 @@ func test_start_applies_debuffs_after_battle_start() -> void:
 	# Act
 	resume.call(&"start", combat, root, interaction, deps(), 1)
 	# Assert
-	var manager: RefCounted = (combat.roster as RosterStub).debuff
+	var manager: RefCounted = (combat.roster as Stubs.RosterStub).debuff
 	assert_gt(int(manager.call(&"get_duration", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)), 0,
 			"debuff 必须在开战清表之后才灌回（早于开战会被清掉）")
 	assert_lt(combat.calls.find("battle_start"), combat.calls.find("restore"),
@@ -197,7 +197,7 @@ func test_start_without_debuff_snapshot_leaves_state_clean() -> void:
 	# Act
 	resume.call(&"start", combat, root, interaction, deps(), 1)
 	# Assert——表里没有凭空多出的 debuff
-	var manager: RefCounted = (combat.roster as RosterStub).debuff
+	var manager: RefCounted = (combat.roster as Stubs.RosterStub).debuff
 	assert_eq(int(manager.call(&"get_stacks", DEBUFF_TARGET, DebuffManagerScript.TYPE_ATK)), 0,
 			"老档读回来不应挂着任何 debuff（空段 = 当时没有）")
 
