@@ -6,6 +6,10 @@ extends Panel
 ## [member entry]，按地图状态渲染三类卡片视觉（已通关可重入 / 未通关
 ## 境界达标 / 未解锁锁定），点击经 [signal card_activated] 上报主界面
 ## （主界面决定进入/重入/忽略——卡片自身零决策）。[br]
+## [br][b]卡面纵向排布[/b]（玩家反馈「地图选择里看不到地图 / 图标压字」后的重排）：
+## 顶部插图预览块 → 名称 → 解锁小标（仅锁定卡）→ 难度（⭐ + 文字）→ 状态 →
+## 条件行 → 费用行 → 重复说明 → 推荐标记。插图与图标行的搭法在 [MapCardArt]
+## （资产侧的事与卡面文案分开——本脚本已贴 300 行软上限）。[br]
 ## [br][b]双焦点[/b]（ADR-0031 §3 + ADR-0004）：[member focus_mode] 显式设为
 ## [constant FOCUS_ALL]（纯 Control 默认 FOCUS_NONE，必须显式开启才能
 ## grab_focus——godot-specialist 高风险修正，S16-1 同源）；焦点环（松石青 2px）
@@ -21,8 +25,15 @@ extends Panel
 ## 点击卡片信号——[param entry] 被点击卡片的完整地图载荷条目。
 signal card_activated(entry: Dictionary)
 
+## 插图预览块与图标行（见 [MapCardArt]）。
+const ArtScript := preload("res://src/ui/exploration/map_card_art.gd")
+
 ## 难度⭐字符串映射——难度等级 1-4 → ⭐数量（GDD §1「1~4颗⭐」）。
 const DIFFICULTY_STARS: Array[String] = ["⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐"]
+## 难度词（GDD §1「低/中/高/极高」）——与 ⭐ 数并排显示。[br]
+## [br][b]为什么数字与词都留[/b]：星星是数量、词是量级，一起写玩家才不用自己数
+## （图标与文字拆成两个节点后，间距由 [constant MapCardArt.ICON_GAP] 钉死）。
+const DIFFICULTY_WORDS: Array[String] = ["低", "中", "高", "极高"]
 
 ## 锁定卡半透明遮罩 alpha——锁定态灰显不变量（入场动画目标值同源）。
 const LOCKED_ALPHA: float = 0.45
@@ -38,6 +49,10 @@ const TEXT_REALM_PREFIX: String = "需"
 const TEXT_REALM_SUFFIX: String = "境界"
 ## 通关次数格式——第 2 次起显示（首通走 [constant TEXT_FIRST_CLEAR] 的 ⭐ 标记）。
 const TEXT_CLEAR_COUNT: String = "已通关·第%d次"
+## 解锁小标文案（图标行文字——图标是 [constant LOCK_ICON]）。
+const TEXT_LOCKED: String = "未解锁"
+## 解锁小标图标——从名称行里挪出来的单独一行（见 [method _build]）。
+const LOCK_ICON: String = "🔒"
 ## 通关后推荐下一张——卡面上的箭头前缀（[method set_recommended] 写入）。
 const TEXT_RECOMMEND: String = "▶ 推荐下一张"
 ## 已通关卡的重入说明——点名「能重复玩，但只有基础奖励」（GDD exploration-ui-system.md
@@ -49,9 +64,20 @@ const RECOMMEND_BORDER_WIDTH: int = 3
 ## 基础常态边框色（未推荐时恢复——[method set_recommended] 的另一半）。
 const NORMAL_BORDER_COLOR: Color = Color(0.24, 0.24, 0.28, 1.0)
 const NORMAL_BORDER_WIDTH: int = 1
+## 解锁小标颜色（取烟灰中档——小标不抢正文视线）。
+const LOCK_BADGE_COLOR: Color = Color(0.72, 0.76, 0.84, 1.0)
 
-## 卡片最小尺寸（横向由网格列宽定，纵向是给内容留的底）。
-const CARD_MIN_SIZE: Vector2 = Vector2(300, 232)
+## 卡片最小尺寸。[br]
+## [br][b]高度为什么是 420[/b]：顶部预览块占 45%（189px，见
+## [constant CARD_PREVIEW_RATIO]），余下 203px 与加入预览前的文字预算
+## （204px）持平——文字行数与字号一个字没改，卡片只是长出了预览那一截。
+## 这个高度也正是 GDD §1 的 B7 裁决值「每卡片 ~360×420px」。[br]
+## [br][b]宽度仍取 300（未随 GDD 的 360）[/b]：网格是 4 列，1280 下限分辨率
+## 下内容区只有 1088px（4×360+3×20 = 1500 会横向溢出，而滚动容器关着横向滚动
+## ——最右一列会被裁掉）。宽度不在本次反馈的范围内，不顺手改。
+const CARD_MIN_SIZE: Vector2 = Vector2(300, 420)
+## 顶部插图预览块占卡片高度的比例（其余留给卡面文字）。
+const CARD_PREVIEW_RATIO: float = 0.45
 ## 卡面内容盒四周留白（与 [method _build] 里 box 的四个 offset 同源）。
 const CARD_PAD_H: float = 32.0
 const CARD_PAD_V: float = 28.0
@@ -61,14 +87,18 @@ const FONT_SIZE_NAME: int = 26
 const FONT_SIZE_REPEAT: int = 14
 ## 推荐标记字号。
 const FONT_SIZE_RECOMMEND: int = 16
+## 难度行字号（图标与文字同号）。
+const FONT_SIZE_DIFFICULTY: int = 16
+## 解锁小标字号（小标——比正文小一档）。
+const FONT_SIZE_LOCK: int = 14
 
 ## 当前卡片的地图载荷条目（只读视图数据，主界面刷新时重建）。
 var entry: Dictionary = {}
 
-## 名称标签（动态追加 🔒/状态标记）。
+## 名称标签（不再拼接 🔒——解锁小标自占一行）。
 var _name_label: Label
-## 难度标签（⭐）。
-var _difficulty_label: Label
+## 难度行（⭐ 图标 + 难度词，见 [MapCardArt.build_icon_row]）。
+var _difficulty_row: HBoxContainer
 ## 状态标签（未通关/已通关/首次通关）。
 var _status_label: Label
 ## 费用/不可重入标签。
@@ -83,9 +113,9 @@ var _recommend_label: Label
 
 ## 初始化卡片视觉——[param map_entry] 为 [code]get_map_list()[/code] 载荷
 ## 单条目（契约字段见 story-002 stub 载荷契约）。[br]
-## [br]卡片尺寸 ~360×420px（B7 裁决）；[code]size_flags_vertical[/code] 设为
-## SHRINK_CENTER 防止被 HBox 纵向拉伸（code-review 建议——否则卡片实际高度
-## 被 ScrollContainer 内容高度撑到 524 而非 420）。
+## [br][code]size_flags_vertical[/code] 设为 EXPAND_FILL、最小尺寸由
+## [constant CARD_MIN_SIZE] 钉死：卡片高度不随内容长（卡面是 [Panel] 不是容器，
+## 内容多一行就会从卡片底下溢出去）。
 func setup(map_entry: Dictionary) -> void:
 	entry = map_entry
 	custom_minimum_size = CARD_MIN_SIZE
@@ -95,6 +125,18 @@ func setup(map_entry: Dictionary) -> void:
 	# 双焦点：纯 Control 默认 FOCUS_NONE，显式开启才能 grab_focus。
 	focus_mode = Control.FOCUS_ALL
 	_build()
+
+
+## 卡片的地图 ID（插图查表与测试用——条目缺字段时空串）。
+func map_id() -> StringName:
+	return StringName(str(entry.get(&"map_id", "")))
+
+
+## 顶部插图预览块的高度（px）——卡片高度 × [constant CARD_PREVIEW_RATIO]。[br]
+## [br][b]为什么由卡片高度算而不是写死像素[/b]：「预览占 45%」是这份排版的约束，
+## 卡片高度一改（如将来适配更矮的窗口），预览跟着走；写死 189 会在那一刻失约。
+func preview_height() -> float:
+	return CARD_MIN_SIZE.y * CARD_PREVIEW_RATIO
 
 
 ## 把一行文本限制在单行 + 超长省略——卡片每行的统一收尾（见 [method _build] 的
@@ -116,18 +158,25 @@ func is_unlocked_card() -> bool:
 	return bool(entry.get(&"is_unlocked", true))
 
 
-## 构建卡片内部结构——名称 + ⭐难度 + 状态 + 费用 + 悬停 tooltip。[br]
-## [br][b]所有行都只占一行且带省略号兜底[/b]（[code]clip_text[/code] +
+## 构建卡片内部结构——见类文档「卡面纵向排布」。[br]
+## [br][b]所有文字行都只占一行且带省略号兜底[/b]（[code]clip_text[/code] +
 ## [code]OVERRUN_TRIM_ELLIPSIS[/code]）：卡片是 [Panel] 而不是容器，卡面高度由
 ## [constant CARD_MIN_SIZE] 固定，内容多出一行就会从卡片底下溢出去。换行
 ## （autowrap）在这里是有害的——它把「一行放不下」变成「多占一行高度」，正好顶穿
 ## 卡片。当前数据下最长的一行是锁定条件「需大乘期 · 需通关归墟·古魔战场」
-## （226px，盒宽 383px），省略号只在万一出现超长文案时兜底。
+## （226px，盒宽 268px），省略号只在万一出现超长文案时兜底。[br]
+## [br][b]图标不挂进文字标签[/b]：🔒 此前拼在名称后面、⭐ 拼在难度文字里，
+## 玩家反馈「图标与文字压在一起」——两者之间量不出间距，长名字还会把图标挤掉。
+## 现在图标与文字是两个节点（[MapCardArt.build_icon_row]，间距 =
+## [constant MapCardArt.ICON_GAP]）。
 func _build() -> void:
+	# 顶部插图预览块（全宽出血——铺满卡片上沿，见 MapCardArt.build_preview）。
+	add_child(ArtScript.build_preview(map_id(), preview_height()))
+
 	var box: VBoxContainer = VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
 	box.offset_left = CARD_PAD_H / 2.0
-	box.offset_top = CARD_PAD_V / 2.0
+	box.offset_top = preview_height() + CARD_PAD_V / 2.0
 	box.offset_right = -CARD_PAD_H / 2.0
 	box.offset_bottom = -CARD_PAD_V / 2.0
 	add_child(box)
@@ -138,20 +187,19 @@ func _build() -> void:
 	_trim_single_line(_name_label)
 	box.add_child(_name_label)
 
-	_difficulty_label = Label.new()
-	_difficulty_label.text = _difficulty_text()
-	_trim_single_line(_difficulty_label)
-	box.add_child(_difficulty_label)
+	# 解锁小标（仅锁定卡）——名字下方单独一行的左对齐小标（图标 + 文字两节点）。
+	var lock_row: HBoxContainer = ArtScript.build_icon_row(&"LockRow", LOCK_ICON,
+			TEXT_LOCKED, LOCK_BADGE_COLOR, FONT_SIZE_LOCK)
+	box.add_child(lock_row)
+
+	_difficulty_row = ArtScript.build_icon_row(&"DifficultyRow", _difficulty_text(),
+			_difficulty_word(), Color(0, 0, 0, 0), FONT_SIZE_DIFFICULTY)
+	box.add_child(_difficulty_row)
 
 	_status_label = Label.new()
 	_status_label.text = _status_text()
 	_trim_single_line(_status_label)
 	box.add_child(_status_label)
-
-	_cost_label = Label.new()
-	_cost_label.text = _cost_text()
-	_trim_single_line(_cost_label)
-	box.add_child(_cost_label)
 
 	# 解锁条件行——未解锁时明确写出缺什么（GDD exploration-ui-system.md §1
 	# 「未解锁 → 灰色锁标记，不可点击，标明所需境界」；剧情前置同理）。
@@ -160,6 +208,11 @@ func _build() -> void:
 	_lock_label.text = locked_hint_text()
 	_trim_single_line(_lock_label)
 	box.add_child(_lock_label)
+
+	_cost_label = Label.new()
+	_cost_label.text = _cost_text()
+	_trim_single_line(_cost_label)
+	box.add_child(_cost_label)
 
 	# 重复挑战说明——已通关卡写清「再打一次拿什么」（见 [constant TEXT_REPEAT_REWARD]）。
 	_repeat_label = Label.new()
@@ -179,12 +232,12 @@ func _build() -> void:
 	# 常态边框（显式给一份——推荐态的边框覆盖它，[method set_recommended] 要能换回来）。
 	apply_border(NORMAL_BORDER_COLOR, NORMAL_BORDER_WIDTH)
 
-	# 视觉状态：锁定卡半透明遮罩 + 🔒 标记；tooltip 显示解锁条件/不可重入。
+	# 视觉状态：锁定卡半透明遮罩 + 解锁小标；tooltip 显示解锁条件/不可重入。
 	if is_unlocked_card():
 		modulate = Color(1.0, 1.0, 1.0, 1.0)
 	else:
 		modulate = Color(1.0, 1.0, 1.0, LOCKED_ALPHA)
-		_name_label.text += " 🔒"
+	lock_row.visible = not is_unlocked_card()
 	tooltip_text = _tooltip_text()
 
 	gui_input.connect(_on_gui_input)
@@ -237,11 +290,24 @@ func _difficulty_text() -> String:
 	return "—"
 
 
+## 难度词文本——与 [method _difficulty_text] 同一档位口径，越界回退空串
+## （「—」已经在星星那一格说了，再来一个「—」是重复）。
+func _difficulty_word() -> String:
+	var difficulty: int = int(entry.get(&"difficulty", 0))
+	if difficulty >= 1 and difficulty <= DIFFICULTY_WORDS.size():
+		return DIFFICULTY_WORDS[difficulty - 1]
+	return ""
+
+
 ## 状态文本——未通关 / ⭐首次通关 / 已通关·第N次 / 已通关。[br]
 ## [br][b]首通与刷图分开[/b]：判据是通关次数（1 = 首通、≥2 = 刷过），而不是
 ## 「是否已通关」——只报「已通关」的话，玩家看不出这张图自己是初通还是回来刷的，
 ## 首通彩头那一次也没有任何留痕（GDD exploration-ui-system.md §1
 ## 「初次通关的地图有⭐标记」）。[br]
+## [br][b]⚠ 状态行不拆图标[/b]：整句「⭐首次通关」保持为一个 Label。拆成
+## 「⭐」+「首次通关」两个节点会让这一行的读法从「一句话」变成「图标加后缀」，
+## 而既有用例（[code]test_map_card_status.gd[/code]）按整句文本锁定该行口径；
+## 本次拆图标只针对「贴在名字后面的 🔒」与「拼在难度文字里的 ⭐」两处。[br]
 ## [br][b]次数缺失回退「已通关」[/b]：条目不带 [code]clear_count[/code] 时不知道通过
 ## 几次，[b]不能报「⭐首次通关」也不能报「第 0 次」[/b]——前者是编造一个「你是首通」
 ## 的claim，后者读不通。退回原来那三个字即可（列表载荷会把老档折算为 1 次，

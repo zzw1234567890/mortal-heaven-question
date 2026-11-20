@@ -1,10 +1,22 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://src/ui/hud/exploration_info_area.gd" id="1_script"]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_info_panel"]
+bg_color = Color(0.078, 0.086, 0.11, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.38, 0.44, 0.56, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
 [sub_resource type="LabelSettings" id="LabelSettings_info"]
 font_size = 20
-font_color = Color(0.10196078514957428, 0.10196078514957428, 0.10196078514957428, 1)
+font_color = Color(0.9, 0.92, 0.96, 1)
 
 [node name="ExplorationInfoArea" type="Control"]
 custom_minimum_size = Vector2(200, 90)
@@ -19,7 +31,7 @@ grow_vertical = 0
 mouse_filter = 2
 script = ExtResource("1_script")
 
-[node name="PanelBackground" type="ColorRect" parent="."]
+[node name="PanelBackground" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -27,7 +39,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.960784, 0.941176, 0.890196, 0.85)
+theme_override_styles/panel = SubResource("StyleBoxFlat_info_panel")
 
 [node name="MapLabel" type="Label" parent="."]
 layout_mode = 1

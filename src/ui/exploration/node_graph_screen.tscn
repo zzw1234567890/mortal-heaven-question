@@ -31,14 +31,23 @@ offset_bottom = 48.0
 grow_horizontal = 2
 mouse_filter = 2
 
+[node name="ExitButton" type="Button" parent="TopBar"]
+layout_mode = 1
+offset_left = 24.0
+offset_top = 8.0
+offset_right = 148.0
+offset_bottom = 40.0
+custom_minimum_size = Vector2(124, 32)
+text = "退出探索"
+
 [node name="APLabel" type="Label" parent="TopBar"]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -160.0
+offset_left = -184.0
 offset_top = 12.0
-offset_right = -16.0
+offset_right = -24.0
 offset_bottom = 36.0
 grow_horizontal = 0
 clip_text = true
@@ -46,22 +55,13 @@ text_overrun_behavior = 3
 horizontal_alignment = 2
 text = "AP: 0"
 
-[node name="ExitButton" type="Button" parent="TopBar"]
-layout_mode = 1
-offset_left = 16.0
-offset_top = 8.0
-offset_right = 128.0
-offset_bottom = 40.0
-custom_minimum_size = Vector2(112, 32)
-text = "退出探索"
-
 [node name="StatusLabel" type="Label" parent="TopBar"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 144.0
+offset_left = 256.0
 offset_top = 12.0
-offset_right = -176.0
+offset_right = -196.0
 offset_bottom = 36.0
 grow_horizontal = 2
 clip_text = true

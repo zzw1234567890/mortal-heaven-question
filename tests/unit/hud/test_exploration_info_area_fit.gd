@@ -7,7 +7,8 @@ extends GutTest
 ## [br][b]覆盖[/b]：[br]
 ##   1. 面板宽度按段条 + 计数算得（满格时够宽，低境界回落到最小宽度）；[br]
 ##   2. 段条与计数不压叠、都在面板内（前一版把它们放在同一行且各自写死宽度）；[br]
-##   3. 段条文本在任一境界档下都不宽过自己的 rect（不裁字）。[br]
+##   3. 段条文本在任一境界档下都不宽过自己的 rect（不裁字）；[br]
+##   4. 面板底色为深色、字色为浅色且亮度差够（玩家反馈「右下角一块白底很怪」）。[br]
 ## [br][b]为什么是控件级[/b]：这三条判据落在 [code]ExplorationInfoArea._apply_ap[/code]
 ## 与 tscn 的锚点/偏移上，脱开控件就没有「拿到多少 / 内容要多少」可言；信息组是
 ## 纯展示组件（[code]new()[/code] 即可建，不需要场景与 Autoload）。[br]
@@ -137,3 +138,78 @@ func test_segment_and_count_labels_trim_instead_of_widening() -> void:
 		var label: Label = info.get_node(NodePath(String(name)))
 		assert_true(label.clip_text,
 				"%s 应开启 clip_text——否则长文本会把面板顶破（结构性防御）" % name)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. 面板底色与字色（玩家反馈「右下角一块白底很怪」）
+# ═══════════════════════════════════════════════════════════════════════════════
+# 本组补的缺口：面板此前坐米白半透明底（#F5F0E3 @0.85），而全局 UI 都是深色暗调
+# ——玩家看到「一块白底很怪」；同一份 LabelSettings 的字色是墨黑，正好与全局相反。
+
+## 面板背景的底色（Node 已由 ColorRect 改为带 StyleBoxFlat 的 Panel——从样式盒读）。
+func _panel_bg() -> Color:
+	var panel: Panel = info.get_node(^"PanelBackground") as Panel
+	var style: StyleBox = panel.get_theme_stylebox(&"panel")
+	return (style as StyleBoxFlat).bg_color
+
+
+## 感知亮度（Rec. 709 加权——比「三通道均值」更贴近人眼对明暗的判断）。
+func _luminance(p_color: Color) -> float:
+	return 0.2126 * p_color.r + 0.7152 * p_color.g + 0.0722 * p_color.b
+
+
+func test_panel_background_is_dark_not_near_white() -> void:
+	# Act
+	var bg: Color = _panel_bg()
+	# Assert——三通道均压到 0.3 以下（米白 #F5F0E3 的三通道都在 0.88 以上）
+	assert_lt(bg.r, 0.3, "面板底色 R 通道应为深色，实际 %.3f（底 %s）" % [bg.r, bg])
+	assert_lt(bg.g, 0.3, "面板底色 G 通道应为深色，实际 %.3f（底 %s）" % [bg.g, bg])
+	assert_lt(bg.b, 0.3, "面板底色 B 通道应为深色，实际 %.3f（底 %s）" % [bg.b, bg])
+
+
+func test_panel_background_is_mostly_opaque() -> void:
+	# Assert——半透明可以（要透出下层场景），但不能薄到读不清字
+	assert_gte(_panel_bg().a, 0.75, "面板底色应基本不透明（实际 alpha %.2f）" % _panel_bg().a)
+
+
+func test_text_luminance_contrasts_with_panel_background() -> void:
+	# Arrange——量两个[b]不会被运行时改色[/b]的标签（MapLabel / LayerLabel）。
+	# ApSegmentLabel / ApCountLabel 的颜色每次刷新都被 AP_COLORS 覆写
+	# （ExploreInfoArea._set_label_color），它们的可读性由下一例单独判。
+	var bg: Color = _panel_bg()
+	# Assert——字色与底色亮度差 > 0.5（深底浅字，玩家读得清）
+	for name: StringName in [&"MapLabel", &"LayerLabel"]:
+		var label: Label = info.get_node(NodePath(String(name)))
+		var fg: Color = label.label_settings.font_color
+		assert_gt(absf(_luminance(fg) - _luminance(bg)), 0.5,
+				"%s 字色 %s（亮度 %.2f）与底 %s（亮度 %.2f）的亮度差应 > 0.5"
+				% [name, fg, _luminance(fg), bg, _luminance(bg)])
+
+
+## AP 语义色在深底上的下限（感知亮度差）。[br]
+## [br][b]为什么不跟正文一样卡 0.5[/b]：朱砂红 / 琉璃金是[b]有彩色[/b]，
+## 感知亮度（Rec.709 加权）的天花板本就低——纯红 #FF0000 的感知亮度只有 0.21，
+## 任何红色的 0.5 亮度差在深底上都不可能达到（要凑到只能把红兑成粉，
+## 那就不是朱砂红了）。语义色改用「明显亮于底色」的下限，并另在旁边用
+## 「色相可区分」保证三态互不混淆（见下一例）。
+const AP_COLOR_LUMA_FLOOR: float = 0.25
+
+
+func test_ap_semantic_colors_are_readable_on_dark_panel() -> void:
+	# Arrange
+	var bg: Color = _panel_bg()
+	# Assert——三档语义色都明显亮于底色（深底上不会糊成一片）
+	for state: String in ["normal", "warning", "critical"]:
+		var color: Color = InfoScript.AP_COLORS[state]
+		assert_gt(_luminance(color) - _luminance(bg), AP_COLOR_LUMA_FLOOR,
+				"%s 档字色 %s（亮度 %.2f）应明显亮于底色 %s（亮度 %.2f）"
+				% [state, color, _luminance(color), bg, _luminance(bg)])
+
+
+func test_ap_normal_color_differs_from_warning_color() -> void:
+	# Assert——正常态不再是墨黑（深底上会直接消失），且三档两两不同色
+	var normal: Color = InfoScript.AP_COLORS["normal"]
+	assert_gt(_luminance(normal), 0.5, "正常态字色应为浅色，实际 %s" % normal)
+	assert_ne(normal, InfoScript.AP_COLORS["warning"], "正常态与警告态不应同色")
+	assert_ne(InfoScript.AP_COLORS["warning"], InfoScript.AP_COLORS["critical"],
+			"警告态与紧急态不应同色")

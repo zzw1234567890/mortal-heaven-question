@@ -24,6 +24,10 @@ extends Control
 ## 即时，信号驱动非轮询）。[br]
 ## [br][b]可见性边界[/b]：本组件不处理场景可见性——ContentLayer 整体显隐归
 ## hud.gd 可见性矩阵（Story 001；战斗隐藏由矩阵覆盖，AC 第 5 条无需新逻辑）。[br]
+## [br][b]面板底色为深色半透明[/b]（反馈修订）：全局 UI 都是深色暗调，本组件此前
+## 坐米白半透明面板（#F5F0E3 @0.85），玩家看到「右下角一块白底很怪」。现改为
+## 深底 + 1px 暗蓝描边，文字转浅色（[constant AP_COLORS] 的 normal 同步改浅——
+## 深底上墨黑字会消失）。[br]
 ## [br][b]mouse_filter[/b]：纯显示无交互——根与子节点全 IGNORE 透传
 ## （LingshiDeckBar G8 裁决先例）。
 ##
@@ -33,12 +37,14 @@ extends Control
 ## === Visual 常量（数据驱动）===================================================
 
 ## AP 颜色映射（判定标识 → 美术圣经 §4.1 主色调色板）：
-## normal=墨黑 #1A1A1A（信息组坐米白半透明面板——面板背景见
-## ExplorationInfoArea.tscn PanelBackground，故 normal 用墨黑而非纸白；
-## 语义色须压暗以在米白底上保对比：warning=琉璃金 #C8A84E（警示）/
+## 信息组坐[b]深色半透明面板[/b]（PanelBackground 的 StyleBoxFlat，
+## bg_color ≈ #14161C @0.88，见 ExplorationInfoArea.tscn），故 normal 用具名浅色
+## 而非墨黑——原先面板是米白半透明，normal 取墨黑 #1A1A1A，玩家反馈「右下角一块
+## 白底很怪」（全局 UI 都是深色暗调），面板转深后墨黑字会直接消失在底色里。[br]
+## 语义色仍取美术圣经的琉璃金 / 朱砂红：warning=琉璃金 #C8A84E（警示）/
 ## critical=朱砂红 #B3424A（紧急——「生命在流逝」警报编码复用先例）。
 const AP_COLORS: Dictionary = {
-	"normal": Color("#1A1A1A"),
+	"normal": Color(0.90, 0.92, 0.96, 1.0),
 	"warning": Color("#C8A84E"),
 	"critical": Color("#B3424A"),
 }
