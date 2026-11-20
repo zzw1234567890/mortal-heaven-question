@@ -82,21 +82,59 @@ func test_row_has_focus_ring_stylebox() -> void:
 
 
 func test_state_styleboxes_do_not_cover_the_face() -> void:
-	## 自绘卡底必须看得见——引擎默认的不透明灰底会把它糊死。[br]
-	## [br][b]常态盒是无底色的 [StyleBoxEmpty][/b]（连 [member StyleBox.bg_color]
-	## 都没有，所以不读它的颜色）；悬停/按下是半透明白的叠加层，透明度必须低到
-	## 卡面仍读得清。
-	for key: StringName in [&"normal", &"hover", &"pressed"]:
+	## [b]卡底必须由样式盒提供，不能自绘[/b]：实测 4.6.3 下脚本 [method CanvasItem._draw]
+	## 的产物落在 [Button] 自身的样式盒与文字[b]之上[/b]——自绘一整块不透明卡底等于给
+	## 每行的字盖一张不透明的纸（数据全对、屏幕上没字，本组件真的这么错过一轮）。[br]
+	## [br]所以这里钉的是「卡底在样式盒里、文字在样式盒之上」：常态盒自己有卡底色
+	## （[constant RowScript.CARD_BG]），悬停 / 按下在卡底上混白，禁用压暗；
+	## 自绘里没有满行不透明矩形（那条语句在源码里不存在）。
+	for key: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
 		var box: StyleBox = row.get_theme_stylebox(key)
 		assert_not_null(box, "%s 状态应挂样式盒" % key)
-		if box is StyleBoxEmpty:
-			continue
-		assert_lt((box as StyleBoxFlat).bg_color.a, 0.5,
-				"%s 样式盒底色必须半透明以下（否则盖住卡面）" % key)
-	assert_true(row.get_theme_stylebox(&"normal") is StyleBoxEmpty,
-			"常态盒应为无底色空盒（卡底由自绘提供）")
+		assert_true(box is StyleBoxFlat, "%s 状态应为带底色的 StyleBoxFlat" % key)
+	assert_eq((row.get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color, RowScript.CARD_BG,
+			"常态盒底色应为卡底（卡面观感来自它，而不是自绘）")
+	assert_ne((row.get_theme_stylebox(&"hover") as StyleBoxFlat).bg_color, RowScript.CARD_BG,
+			"悬停态底色应与常态不同（悬停要看得出来）")
+	assert_ne((row.get_theme_stylebox(&"pressed") as StyleBoxFlat).bg_color,
+			(row.get_theme_stylebox(&"hover") as StyleBoxFlat).bg_color,
+			"按下态底色应与悬停不同")
+	assert_lt((row.get_theme_stylebox(&"disabled") as StyleBoxFlat).bg_color.get_luminance(),
+			RowScript.CARD_BG.get_luminance(), "禁用态卡底应比常态暗")
 	assert_eq(row.get_theme_stylebox(&"normal").content_margin_left, RowScript.TEXT_INSET,
 			"文本左边距应让开左侧稀有度色条")
+
+
+func test_self_drawn_strokes_stay_clear_of_the_text() -> void:
+	## [b]回归[/b]：自绘只许画「够不着文字」的两笔——左侧稀有度色条与行边缘的细描边。[br]
+	## [br]见 [method test_state_styleboxes_do_not_cover_the_face] 的说明：脚本
+	## [method CanvasItem._draw] 的产物在 [Button] 的文字[b]之上[/b]，所以自绘里
+	## 任何盖到文本区的东西都会把字吃掉。可断言的判据是几何：色条宽度与描边线宽都
+	## 小于文本左边距（留白区），因此必然落在文字左侧。[br]
+	## [br][b]为什么不断言「源码里没有那一笔」[/b]：GDScript 对象读不到自己的源码
+	## （[code]source_code[/code] 不是成员，写它会解析失败并被 GUT 静默跳过整个文件）
+	## ——几何判据同样是客观的，而且不依赖源码文本。
+	assert_lt(RowScript.BAR_WIDTH, RowScript.TEXT_INSET,
+			"色条宽度应小于文本左边距（色条落在留白里，不压字）")
+	assert_gt(RowScript.BAR_WIDTH, 0.0, "色条宽度应大于 0（稀有度要有可见通道）")
+	assert_lt(RowScript.BORDER_WIDTH, RowScript.TEXT_INSET,
+			"描边线宽应小于文本左边距")
+	assert_gt(RowScript.CARD_BG.a, 0.99,
+			"卡底必须不透明——它现在由样式盒提供；自绘画一块不透明的它会盖住文字")
+
+
+func test_font_is_light_and_disabled_font_is_dimmed() -> void:
+	## 浅字压深底：四态文本色都是浅色（浅色主题的默认深字在卡底上看不见）；
+	## 禁用态压暗一档但仍是浅色系——「点不动」不等于「读不出」。
+	assert_eq(row.get_theme_color(&"font_color"), RowScript.TEXT_COLOR, "常态文本色应为浅色")
+	for key: StringName in [&"font_hover_color", &"font_pressed_color", &"font_focus_color"]:
+		assert_eq(row.get_theme_color(key), RowScript.TEXT_COLOR, "%s 应与常态同色" % key)
+	var disabled: Color = row.get_theme_color(&"font_disabled_color")
+	assert_eq(disabled, RowScript.TEXT_DISABLED_COLOR, "禁用态文本色应取专用的一档")
+	assert_lt(disabled.get_luminance(), RowScript.TEXT_COLOR.get_luminance(),
+			"禁用态文本应比常态暗")
+	assert_gt(disabled.get_luminance(), RowScript.CARD_BG.get_luminance(),
+			"禁用态文本仍应亮于卡底（读得出）")
 
 
 func test_row_height_is_a_card_not_a_text_line() -> void:

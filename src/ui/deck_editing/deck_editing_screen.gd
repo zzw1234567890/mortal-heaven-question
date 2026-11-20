@@ -18,6 +18,12 @@ extends Control
 ## [br][b]保存即出口[/b]：「保存并返回」写一次盘然后回到打开它的地方
 ## （[code]DeckEditingEntry[/code] 记的来路）。落盘沿用自动存档口径
 ## （[code]SaveLoadSystem.auto_save[/code]——项目里唯一的无人值守写盘点）。[br]
+## [br][b]模板是异步来的[/b]：卡牌模板由 [code]CardSystem._ready[/code] 用
+## [code]load_threaded_request[/code] 分批装载（每帧 10 个），而本界面 [code]_ready[/code]
+## 只刷一次。装载完成前右栏会按 [code]DeckViewRows[/code] 的「取不到模板就不出行」少几张
+## ——所以本界面接上 [code]templates_loaded[/code]，在装载收尾时自己再刷一次
+## （见 [method _connect_templates_loaded]）。少了这条接线，那几行会永远缺着，
+## 而统计行照样写着「卡组 6/20」。[br]
 ## [br][b]事件层级 = _input[/b]：与商店 / 背包 / 卡组查看面板同源理由——焦点落在
 ## [Button] 上时引擎的内置焦点导航会在 GUI 阶段先吃掉方向键；[code]_input[/code] 排在
 ## GUI 派发之前，是唯一能拦住的层。出口仍沿用 [code]PlaceholderScene[/code] 的
@@ -35,9 +41,10 @@ const NavScript := preload("res://src/ui/deck_editing/deck_editing_navigator.gd"
 const ViewScript := preload("res://src/ui/deck_editing/deck_editing_view.gd")
 const ActionsScript := preload("res://src/ui/deck_editing/deck_editing_actions.gd")
 const EntryScript := preload("res://src/ui/deck_editing/deck_editing_entry.gd")
+## 模板就绪守望（异步装载完成后自己再刷一次——见那边类文档）。
+const WatchScript := preload("res://src/ui/deck_editing/deck_editing_template_watch.gd")
 ## 依赖解析（注入优先、否则 Autoload——与 [code]deck_view_sources.gd[/code] 同口径）。
 const SourcesScript := preload("res://src/ui/hud/deck_view_sources.gd")
-
 const TEXT_TITLE: String = "📜 卡组编辑"
 
 ## 依赖注入（null 时按 /root 找 Autoload——同 [code]InventoryModel[/code] 的回退口径）。
@@ -46,6 +53,10 @@ var card_system: Node = null
 var gsm: Node = null
 var save_load: Node = null
 var scene_manager: Node = null
+
+## 已接上「模板装载完成」信号的守望（换了一个卡牌系统则改接新的那一个——
+## 见 [method DeckEditingTemplateWatch.watch]）。
+var _watch: RefCounted = null
 
 ## 两栏的渲染与读数（本界面不自己持控件路径——见类文档）。
 var _view: RefCounted = null
@@ -72,6 +83,15 @@ func _ready() -> void:
 	refresh()
 
 
+## 离屏时拆掉模板守望（信号持有的是守望对象，不拆会在界面释放后仍被卡牌系统引用）。[br]
+## [br][b]卡牌系统是 Autoload、活得比界面久[/b]：装载完成时它照样会发信号——
+## 不拆的话守望对象就白拿着一个指向已释放界面的 [Callable]。
+func _exit_tree() -> void:
+	if _watch != null:
+		_watch.call(&"release")
+		_watch = null
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 对外
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -84,6 +104,7 @@ func _ready() -> void:
 ## [br][b]卡组与上限都现取[/b]：缓存会让手上这份与系统里那份分叉（刚加进去的那张不在
 ## 手上，判定就会算错张数）。
 func refresh() -> void:
+	_connect_templates_loaded()
 	_view.rebuild(SourcesScript.resolve(gsm, &"GameStateManager"),
 			SourcesScript.resolve(card_system, &"CardSystem"),
 			_deck_ids(), _deck_limit(), _on_collection_row_pressed, _on_deck_row_pressed)
@@ -112,6 +133,19 @@ func collection_texts() -> Array:
 ## 右栏全部行的文本。
 func deck_texts() -> Array:
 	return _view.texts_of(NavScript.COLUMN_DECK)
+
+
+## 某一栏的全部行控件（渲染实证的取数口）。[br]
+## [br][b]为什么要有它[/b]：[method collection_texts] / [method payload_at] 回答的是
+## 「行里写了什么」与「这一行是哪张卡」，都答不了「这一行玩家看不看得见」——
+## 那要看控件自己的 [member Control.is_visible_in_tree] 与高度。
+func rows_of(p_column: int) -> Array:
+	return _view.rows_of(p_column)
+
+
+## 某一栏第 [param p_index] 行的控件（越界为 null）。
+func row_at(p_column: int, p_index: int) -> Node:
+	return _view.row_at(p_column, p_index)
 
 
 ## 统计行文案（「卡组 N/上限」）。
@@ -210,6 +244,18 @@ func _build_layout() -> void:
 	_view = ViewScript.new(parts)
 	var save_button: Button = parts.get("save_button")
 	save_button.pressed.connect(_on_save_exit_pressed)
+
+
+## 接上卡牌系统的「模板装载完成」信号——装载完成后自己再刷一次两栏。[br]
+## [br][b]为什么必须有这条接线[/b]：见类文档「模板是异步来的」——没有它，
+## 在装载完成前进来的一次刷新就是最终结果，缺的行永远缺着。[br]
+## [br][b]为什么挂在这里而不是 [code]_ready[/code][/b]：依赖是注入的，注入发生在进树前
+## ——[code]_ready[/code] 那一刻 [member card_system] 未必已经赋好；刷新是「界面开始
+## 读数据」的统一时机，接在这一处才不会漏掉后注入的场景。
+func _connect_templates_loaded() -> void:
+	if _watch == null:
+		_watch = WatchScript.new()
+	_watch.call(&"watch", SourcesScript.resolve(card_system, &"CardSystem"), refresh)
 
 
 ## 行数组（游标的取数口——每次现取不缓存：刷新会换一批控件）。
