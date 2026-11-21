@@ -24,8 +24,8 @@ const ClickDriverScript := preload("res://tests/integration/combat_ui/full_battl
 ## 结算屏脚本（[code]_on_return_pressed[/code] 是胜利收尾的生产入口）。
 const ResultScreenScript := preload("res://src/ui/result_screen/result_screen.gd")
 
-## 胜利结果码（[code]CombatSystem.CombatResult.VICTORY[/code]）。
-const RESULT_VICTORY: int = 1
+## 胜利结果码——引真实枚举本身（不再硬写 1）。
+const RESULT_VICTORY: int = CS_SCRIPT.CombatResult.VICTORY
 ## 伤害牌模板 ID（初始卡组里只有它打得动敌人——其余是护盾/增益/位移）。
 const BASIC_ATTACK: StringName = &"basic_attack"
 ## 单场最多推进的回合数（防挂死）。

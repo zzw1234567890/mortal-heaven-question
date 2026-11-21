@@ -7,11 +7,10 @@ extends "res://tests/integration/tribulation/tribulation_reward_fixture.gd"
 ##      [code]reward_lines_label[/code]，没有奖励时不建该行；[br]
 ##   3. 载荷：报告随 [code]battle_ended[/code] 下发，结算屏（[code]CombatResultView[/code]）
 ##      读得到；失败时载荷里没有这一段。[br]
-## [br][b]面板用例为什么用真枚举的 VICTORY(1)[/b]：面板路由走
+## [br][b]面板用例为什么也用 VICTORY(1)[/b]：面板路由走
 ## [code]SettlementRules.panel_kind_for[/code]，它按真实 [code]CombatResult[/code]
-## 判kind —— 传 0（[code]NONE[/code]）什么面板都不开，断言必然读到空串
-## （既有实现里 [code]tribulation_combat.gd[/code] 的 0 是渡劫侧的私有约定，
-## 见基类 [constant COMBAT_VICTORY_AS_IMPLEMENTED] 的说明）。[br]
+## 判 kind——两个入口（渡劫战斗委托与结算宿主）现在取的是同一个枚举值，
+## 不再有「渡劫侧私有约定」那一层。[br]
 ## [br]来源: design/gdd/tribulation-system.md §6、ADR-0031 §2（Logic 内核）、
 ## ADR-0021 §_on_battle_ended。
 
@@ -71,7 +70,7 @@ func test_settlement_panel_shows_tribulation_reward_line() -> void:
 	var rewards: Dictionary = {"lingshi": 12, "cultivation": 4,
 			PoolScript.KEY_PAYLOAD: report}
 	# Act——真枚举的 VICTORY（见文件头说明）
-	host.call("on_battle_ended", COMBAT_VICTORY_REAL, rewards)
+	host.call("on_battle_ended", COMBAT_VICTORY, rewards)
 	var text: String = str(host.settlement_panel.reward_lines_label.text)
 	# Assert
 	assert_string_contains(text, "获得：", "结算面板应写出「获得」行：%s" % text)
@@ -84,7 +83,7 @@ func test_settlement_panel_omits_reward_line_when_absent() -> void:
 	var host: Node = HostScript.new()
 	add_child_autofree(host)
 	# Act
-	host.call("on_battle_ended", COMBAT_VICTORY_REAL, {"lingshi": 12, "cultivation": 4})
+	host.call("on_battle_ended", COMBAT_VICTORY, {"lingshi": 12, "cultivation": 4})
 	# Assert
 	var text: String = str(host.settlement_panel.reward_lines_label.text)
 	assert_false(text.contains("获得："), "没有渡劫奖励时不得凭空出现「获得」行：%s" % text)
@@ -109,7 +108,7 @@ func test_battle_ended_payload_carries_reward_report() -> void:
 	_enter_combat()
 	var rewards: Dictionary = {}
 	# Act——渡劫战斗委托的结算入口（真实路径：battle_ended 载荷就地补键）
-	ts.call("_on_battle_ended", COMBAT_VICTORY_AS_IMPLEMENTED, rewards)
+	ts.call("_on_battle_ended", COMBAT_VICTORY, rewards)
 	# Assert
 	assert_true(rewards.has(PoolScript.KEY_PAYLOAD), "载荷应带渡劫奖励报告")
 	var report: Dictionary = rewards[PoolScript.KEY_PAYLOAD]
@@ -121,8 +120,8 @@ func test_battle_ended_payload_has_no_report_on_failure() -> void:
 	# Arrange
 	_enter_combat()
 	var rewards: Dictionary = {}
-	# Act——失败（渡劫侧实现里 1 = 失败，见基类常量说明）
-	ts.call("_on_battle_ended", COMBAT_DEFEAT_AS_IMPLEMENTED, rewards)
+	# Act——失败（真实枚举的 DEFEAT——渡劫战里撤退不可用，故只验这一支）
+	ts.call("_on_battle_ended", COMBAT_DEFEAT, rewards)
 	# Assert——失败不发卡，也不该有奖励段（结算屏「不建那一行」的根据）
 	assert_false(rewards.has(PoolScript.KEY_PAYLOAD), "失败不发卡，也不该有奖励段")
 
@@ -131,9 +130,9 @@ func test_battle_ended_victory_payload_lines_readable_for_result_screen() -> voi
 	# Arrange——结算屏读的是 CombatResultView（跨场景只读快照）
 	_enter_combat()
 	var rewards: Dictionary = {"lingshi": 3}
-	ts.call("_on_battle_ended", COMBAT_VICTORY_AS_IMPLEMENTED, rewards)
+	ts.call("_on_battle_ended", COMBAT_VICTORY, rewards)
 	# Act
-	var view: RefCounted = ViewScript.from_battle_ended(COMBAT_VICTORY_REAL, rewards)
+	var view: RefCounted = ViewScript.from_battle_ended(COMBAT_VICTORY, rewards)
 	var lines: Array = view.call("reward_lines")
 	# Assert
 	assert_true(lines.has("灵石 +3"), "普通奖励行照旧：%s" % str(lines))
@@ -146,7 +145,7 @@ func test_battle_ended_victory_payload_lines_readable_for_result_screen() -> voi
 
 func test_result_screen_has_no_tribulation_line_for_normal_battle() -> void:
 	# Arrange——普通战斗载荷（无渡劫段）
-	var view: RefCounted = ViewScript.from_battle_ended(COMBAT_VICTORY_REAL, {"lingshi": 3})
+	var view: RefCounted = ViewScript.from_battle_ended(COMBAT_VICTORY, {"lingshi": 3})
 	# Act
 	var lines: Array = view.call("reward_lines")
 	# Assert

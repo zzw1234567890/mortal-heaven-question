@@ -12,6 +12,8 @@ extends GutTest
 
 const BridgeScript := preload("res://src/ui/combat/shared/combat_result_bridge.gd")
 const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
+## 结局取值引真实枚举（[code]battle_ended[/code] 与战绩 [code]result[/code] 键同源）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
 
 const RESULT_SCREEN: String = "res://src/ui/result_screen/result_screen.tscn"
 const DEFEAT_SCREEN: String = "res://src/ui/defeat_screen/defeat_screen.tscn"
@@ -54,9 +56,9 @@ func after_each() -> void:
 ## 一份带战报字段的战绩载荷（[code]CombatBattleRecord.build[/code] 的等价形态）。
 func _rewards_with_report(damage: int, kills: int) -> Dictionary:
 	return {
-		"result": 1,
+		"result": CombatScript.CombatResult.VICTORY,
 		"record": {
-			"result": 1,
+			"result": CombatScript.CombatResult.VICTORY,
 			"outcome": "victory",
 			"turn_count": 6,
 			"effect_entries": 9,
@@ -98,7 +100,7 @@ func _report_text(screen: Control) -> String:
 func test_settlement_screen_shows_battle_report_block() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards_with_report(41, 2))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards_with_report(41, 2))
 	# Act
 	var screen: Control = _mount(RESULT_SCREEN)
 	# Assert —— 区块标题
@@ -121,7 +123,7 @@ func test_settlement_screen_shows_battle_report_block() -> void:
 func test_defeat_screen_also_shows_battle_report() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards_with_report(23, 1))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards_with_report(23, 1))
 	# Act
 	var screen: Control = _mount(DEFEAT_SCREEN)
 	# Assert
@@ -134,7 +136,7 @@ func test_defeat_screen_also_shows_battle_report() -> void:
 func test_battle_report_is_before_return_button() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards_with_report(10, 1))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards_with_report(10, 1))
 	# Act
 	var screen: Control = _mount(RESULT_SCREEN)
 	# Assert
@@ -163,10 +165,10 @@ func test_no_record_builds_no_report_block() -> void:
 func test_legacy_record_without_report_fields_degrades_to_zero() -> void:
 	# Arrange —— 只有老字段的 record
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, {
-		"result": 1,
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, {
+		"result": CombatScript.CombatResult.VICTORY,
 		"record": {
-			"result": 1, "outcome": "victory", "turn_count": 2,
+			"result": CombatScript.CombatResult.VICTORY, "outcome": "victory", "turn_count": 2,
 			"effect_entries": 1,
 			"player": {"count": 1, "alive_count": 1, "remaining_hp": 5,
 					"unknown_count": 0, "roster": []},
@@ -187,10 +189,10 @@ func test_legacy_record_without_report_fields_degrades_to_zero() -> void:
 func test_unknown_roster_entry_is_labeled_not_fabricated() -> void:
 	# Arrange —— roster 一条 known=false
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, {
-		"result": 1,
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, {
+		"result": CombatScript.CombatResult.VICTORY,
 		"record": {
-			"result": 1, "outcome": "victory", "turn_count": 3,
+			"result": CombatScript.CombatResult.VICTORY, "outcome": "victory", "turn_count": 3,
 			"effect_entries": 2,
 			"player": {"count": 1, "alive_count": 0, "remaining_hp": 0,
 					"unknown_count": 1, "roster": [
@@ -215,10 +217,10 @@ func test_unknown_roster_entry_is_labeled_not_fabricated() -> void:
 func test_defeated_roster_entry_is_marked() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(2, {
-		"result": 2,
+	combat.battle_ended.emit(CombatScript.CombatResult.DEFEAT, {
+		"result": CombatScript.CombatResult.DEFEAT,
 		"record": {
-			"result": 2, "outcome": "defeat", "turn_count": 4,
+			"result": CombatScript.CombatResult.DEFEAT, "outcome": "defeat", "turn_count": 4,
 			"effect_entries": 3,
 			"player": {"count": 1, "alive_count": 0, "remaining_hp": 0,
 					"unknown_count": 0, "roster": [

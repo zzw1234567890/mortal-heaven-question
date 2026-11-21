@@ -13,6 +13,8 @@ const CardScript: GDScript = preload("res://src/ui/combat/layout/character_statu
 const CoordinatorScript: GDScript = preload("res://src/ui/combat/feedback/combat_feedback_coordinator.gd")
 const PoolScript: GDScript = preload("res://src/ui/combat/feedback/floater_pool.gd")
 const MockSignals: GDScript = preload("res://tests/integration/combat_ui/mocks/mock_combat_signals.gd")
+## 战斗结果枚举的出处（[code]battle_ended[/code] 载荷的取值）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
 const CountingCard: GDScript = preload("res://tests/integration/combat_ui/mocks/counting_card.gd")
 
 ## battle_result_forwarded 信号计数（AC-3 断言）。
@@ -239,11 +241,12 @@ func test_total_wipe_skips_death_animations_and_forwards_immediately() -> void:
 			forwarded_signals.append([result, rewards])
 	)
 	# Act —— 全灭：battle_ended 立即到达（最后一个角色 HP 归零的同时）
-	mock.battle_ended.emit(1, {"lingshi": 10})
+	mock.battle_ended.emit(CombatScript.CombatResult.VICTORY, {"lingshi": 10})
 	# Then: 结算信号立即触发（同帧——无等待）
 	assert_eq(forwarded_signals.size(), 1,
 		"battle_ended 应立即转发结算信号（不逐个播阵亡动画）")
-	assert_eq(forwarded_signals[0][0], 1, "结果应为原始 result=1（VICTORY）")
+	assert_eq(forwarded_signals[0][0], CombatScript.CombatResult.VICTORY,
+		"结果应为原始结果（VICTORY）——UI 不裁定")
 	# Then: 无阵亡动画启动
 	assert_eq(coordinator._death_tweens.size(), 0, "不应启动任何阵亡动画")
 
@@ -260,14 +263,15 @@ func test_total_wipe_cancels_pending_deltas_and_running_death_anim() -> void:
 		func(result: int, rewards: Dictionary) -> void:
 			forwarded_signals.append([result])
 	)
-	mock.battle_ended.emit(2, {})
+	mock.battle_ended.emit(CombatScript.CombatResult.DEFEAT, {})
 	# Then: 短路清理——待处理清空 + 进行中动画杀死
 	assert_true(coordinator._pending_deltas.is_empty(),
 		"全灭应清空待结算增量")
 	assert_false(coordinator._death_tweens.has(101),
 		"全灭应取消进行中的阵亡动画")
 	assert_eq(forwarded_signals.size(), 1, "结算信号应转发一次")
-	assert_eq(forwarded_signals[0][0], 2, "DEFEAT 原样转发（不裁定）")
+	assert_eq(forwarded_signals[0][0], CombatScript.CombatResult.DEFEAT,
+		"DEFEAT 原样转发（不裁定）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

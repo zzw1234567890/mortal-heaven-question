@@ -11,11 +11,18 @@ extends RefCounted
 ## [br]来源: GDD combat-system.md §9 战斗结束规则、ADR-0008 §Phase 6、
 ## gate-check 2026-11-08 §B1（END 阶段检查原为桩）。
 
-## 战斗结果（镜像 CombatSystem.CombatResult——子模块不反向依赖父节点枚举，
-## 数值单一来源由父节点枚举对齐，同 combat_phase_manager 的 PHASE_* 镜像先例）。
-const RESULT_NONE: int = 0
-const RESULT_VICTORY: int = 1
-const RESULT_DEFEAT: int = 2
+## 战斗结果——[b]直接引[/b] [enum CombatSystem.CombatResult]。[br]
+## [br][b]为什么不再是镜像字面量[/b]：本模块曾自持一份 [code]NONE=0 / VICTORY=1 /
+## DEFEAT=2[/code] 的镜像，理由是「子模块不反向依赖父节点枚举」。但同一份数字抄两处
+## 就会漂移——渡劫侧正是栽在这种「字面量与枚举分叉」上（[code]tribulation_combat.gd[/code]
+## 曾用 [code]0[/code] 判胜，打赢被判成输）。判据只有一个出处才不会再分叉。[br]
+## [br][b]preload 不成环[/b]：父节点对本模块的引用是 [code]combat_battle_wiring.gd[/code]
+## 的 preload，而父节点自身不被 preload 链回头引用（同 [code]combat_battle_record.gd[/code]
+## 引用父枚举的先例）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
+const RESULT_NONE: int = CombatScript.CombatResult.NONE
+const RESULT_VICTORY: int = CombatScript.CombatResult.VICTORY
+const RESULT_DEFEAT: int = CombatScript.CombatResult.DEFEAT
 
 ## 空位哨兵（DeploymentSystem 空位 character_id = -1）。
 const EMPTY_CHARACTER_ID: int = -1

@@ -14,7 +14,8 @@ extends "res://tests/integration/combat_ui/full_battle_fixture.gd"
 
 const DriverScript := preload(
 		"res://tests/integration/combat_ui/real_input_click_driver.gd")
-const RETREAT_RESULT: int = 3
+## 撤退结局——引真实枚举本身（[constant CS_SCRIPT] 来自父夹具）。
+const RETREAT_RESULT: int = CS_SCRIPT.CombatResult.RETREAT
 
 ## 暂停菜单场景（第 5 组用例挂它——HUD 的生产挂载点是 [code]hud.gd[/code]，
 ## 本文件只取菜单这一层，避免把整个 HUD 拉进战斗用例）。

@@ -254,12 +254,12 @@ var _battle_player_roster: Array = []
 ## [br]防止「DeploymentSystem 从未被布置」被读成「己方全灭」。
 var _field_engaged: bool = false
 
-## Phase 6 END 判定出的战斗结果（0 = 未结束）。[br]
+## Phase 6 END 判定出的战斗结果（[constant CombatResult.NONE] = 未结束）。[br]
 ## [br][b]为何延后执行[/b]：判定发生在 _enter_phase(END) 内部，此时 advance_phase
 ## 的阶段簿记（_phase / GSM 镜像 / phase_changed 信号）尚未完成——若立即
 ## battle_end() 会把已结束的战斗再写一次阶段。改为「END 入口判定 + advance_phase
 ## 簿记后收尾」，保证 7 阶段序列完整走完再退出（ADR-0008 §Phase 6）。
-var _pending_battle_result: int = 0
+var _pending_battle_result: int = CombatResult.NONE
 
 ## 本场开战 config 快照——回合经济规则的输入（先手/后手由
 ## [code]is_first_player[/code] 决定抽牌数与首回合费用）。[br]
@@ -301,7 +301,7 @@ func set_battle_active(active: bool, turn: int = 1) -> void:
 	_is_active = active
 	# END 判定结果只在单场战斗内有意义——桩式开关一并清掉（防上一场的结局
 	# 被下一场 advance_phase 的收尾逻辑捡起来误执行）
-	_pending_battle_result = 0
+	_pending_battle_result = CombatResult.NONE
 	if active:
 		# 本场我方名册同样只在单场内有意义——桩式开关没有名册可快照，清空后
 		# 抽牌退回保底张数（否则会读进上一场/别的用例留下的阵容，抽牌数漂移）
@@ -403,7 +403,7 @@ func battle_start(config: Dictionary) -> void:
 	_player_confirmed_attack_skip = false
 	_phase_timer_exceeded = false
 	_attack_queue.clear()
-	_pending_battle_result = 0
+	_pending_battle_result = CombatResult.NONE
 
 	# Sprint 18：记录本场名册快照（END 阶段胜负判定的输入之一）
 	_capture_battle_rosters(config)
@@ -463,7 +463,7 @@ func battle_end(result: int) -> void:
 	# AC-011：入口防御清理
 	_attack_queue.clear()
 	_is_active = false
-	_pending_battle_result = 0
+	_pending_battle_result = CombatResult.NONE
 	_clear_animation_lock()
 
 	# Sprint 18：费用系统清理（未开始/已清理时自身为幂等 no-op）
@@ -1077,7 +1077,7 @@ func advance_phase() -> bool:
 	# （Sprint 18：已判定结束的战斗不开启下一回合——回合数停在结束的那一回合）
 	var turn_changed: bool = false
 	if next == CombatPhase.PREPARATION and old_phase == CombatPhase.END \
-			and _pending_battle_result == 0:
+			and _pending_battle_result == CombatResult.NONE:
 		_turn += 1
 		_gsm_increment_battle_turn()
 		turn_changed = true

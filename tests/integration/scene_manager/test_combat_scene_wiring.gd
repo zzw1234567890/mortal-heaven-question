@@ -291,6 +291,8 @@ func test_tribulation_scene_marks_is_tribulation() -> void:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
+## 结局取值引真实枚举（桩战斗系统发的 [code]battle_ended[/code] 载荷）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
 
 ## 战斗结束 → 结算对象发布（结算/战败场景据此取数）。
 func test_battle_ended_publishes_result_view() -> void:
@@ -298,11 +300,13 @@ func test_battle_ended_publishes_result_view() -> void:
 	assert_not_null(scene.get("result_bridge"), "战斗场景应装配结算接线")
 	ViewScript.clear()
 	# Act
-	combat.battle_ended.emit(1, {"result": 1, "record": {
-		"outcome": "victory", "turn_count": 2, "effect_entries": 4,
-		"player": {"count": 1, "alive_count": 1, "remaining_hp": 6},
-		"enemy": {"count": 1, "alive_count": 0, "remaining_hp": 0},
-	}})
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, {
+		"result": CombatScript.CombatResult.VICTORY, "record": {
+			"outcome": "victory", "turn_count": 2, "effect_entries": 4,
+			"player": {"count": 1, "alive_count": 1, "remaining_hp": 6},
+			"enemy": {"count": 1, "alive_count": 0, "remaining_hp": 0},
+		},
+	})
 	# Assert
 	var view: RefCounted = ViewScript.last()
 	assert_not_null(view, "battle_ended 应发布结算对象")
@@ -319,7 +323,8 @@ func test_result_bridge_bound_to_injected_combat_system() -> void:
 	var bridge: RefCounted = scene.get("result_bridge")
 	assert_not_null(bridge, "战斗场景应装配结算接线")
 	# Act——桩战斗系统发信号
-	combat.battle_ended.emit(1, {"result": 1})
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY,
+			{"result": CombatScript.CombatResult.VICTORY})
 	# Assert——发布方就是本容器持有的接线
 	assert_eq(ViewScript.last(), bridge.get("published"), "发布应经本容器的接线实例")
 	ViewScript.clear()

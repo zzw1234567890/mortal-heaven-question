@@ -38,12 +38,14 @@ const OUTCOME_VICTORY: String = "victory"
 const OUTCOME_DEFEAT: String = "defeat"
 const OUTCOME_RETREAT: String = "retreat"
 
-## 结局枚举值 → token（镜像 CombatSystem.CombatResult：0 无 / 1 胜 / 2 败 / 3 撤退）。
+## 结局枚举值 → token（键为 [enum CombatSystem.CombatResult] 本身——
+## 枚举值是战斗域的公共契约，不再在战绩侧重写一份数字）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
 const OUTCOME_BY_RESULT: Dictionary = {
-	0: OUTCOME_NONE,
-	1: OUTCOME_VICTORY,
-	2: OUTCOME_DEFEAT,
-	3: OUTCOME_RETREAT,
+	CombatScript.CombatResult.NONE: OUTCOME_NONE,
+	CombatScript.CombatResult.VICTORY: OUTCOME_VICTORY,
+	CombatScript.CombatResult.DEFEAT: OUTCOME_DEFEAT,
+	CombatScript.CombatResult.RETREAT: OUTCOME_RETREAT,
 }
 
 ## 本场「进入执行端的效果条目数」。

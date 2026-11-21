@@ -33,24 +33,18 @@ const DARK_D: StringName = &"test_trib_dark_d"
 ## 炼气期的修为上限（境界表 §1——本夹具的基准状态）。
 const BASE_MAX: int = 1000
 
-## [code]TribulationCombat.on_battle_ended[/code] [b]当前实现[/b]里代表「胜利」的取值。[br]
-## [br][b]与真实枚举不一致，这是既有缺陷[/b]：枚举真理来源是
-## [code]src/feature/combat_system.gd[/code] §CombatResult ——
-## [code]VICTORY = 1[/code] / [code]DEFEAT = 2[/code] / [code]RETREAT = 3[/code]，
-## 而 [code]tribulation_combat.gd[/code] 用 [code]if result == 0[/code] 判胜。[br]
-## [br][b]本轮不动它[/b]：修它会让两份既有用例变红
-## （[code]tests/unit/tribulation_system/test_pill_and_settlement.gd[/code]、
-## [code]tests/integration/exploration_ui/test_node_tribulation_entry.gd[/code]——
-## 两份都按 [code]0 = 胜利[/code] 写的），而本轮纪律禁止改既有用例。
-## 故用例按[b]实现现状[/b]取值；缺陷修掉时只需把这一个常量改成
-## [code]CombatSystem.CombatResult.VICTORY[/code]。[br]
-## [br]缺陷详情见本轮汇报的「剩余遗留」第 1 条。
-const COMBAT_VICTORY_AS_IMPLEMENTED: int = 0
-## 同 [constant COMBAT_VICTORY_AS_IMPLEMENTED]——实现里的「失败」取值（真实应为 2）。
-const COMBAT_DEFEAT_AS_IMPLEMENTED: int = 1
-## 真实枚举的胜利值——[b]结算面板路由按真枚举判定[/b]（[code]SettlementRules.panel_kind_for[/code]），
-## 故面板类用例必须用这个值而不是 [constant COMBAT_VICTORY_AS_IMPLEMENTED]。
-const COMBAT_VICTORY_REAL: int = 1
+## [code]battle_ended[/code] 结果取值——[b]直接引真实枚举[/b]。[br]
+## [br][b]这里原先记着一处缺陷[/b]：[code]tribulation_combat.gd[/code] 曾用
+## [code]if result == 0[/code] 判胜，而枚举真理来源
+## [code]src/feature/combat_system.gd[/code] §CombatResult 是
+## [code]VICTORY = 1 / DEFEAT = 2 / RETREAT = 3[/code]——打赢也走失败结算
+## （境界不升、修为被扣、金卡不发）。缺陷已修（判据改为引用枚举本身），
+## 本常量随之改成同一个出处：[b]用例与生产判据同源，再也无法分叉[/b]。[br]
+## [br]回归守卫见 [code]test_tribulation_result_wiring.gd[/code]。
+const CombatScript := preload("res://src/feature/combat_system.gd")
+const COMBAT_VICTORY: int = CombatScript.CombatResult.VICTORY
+const COMBAT_DEFEAT: int = CombatScript.CombatResult.DEFEAT
+const COMBAT_RETREAT: int = CombatScript.CombatResult.RETREAT
 
 var ts: Node = null
 var gsm: Node = null

@@ -120,7 +120,7 @@ func clear_cost_for_battle() -> void:
 ## [br][b]只记录不执行[/b]：结果写入父节点 [code]_pending_battle_result[/code]，
 ## 由 [method CombatSystem.advance_phase] 在阶段簿记与信号完成后收尾。
 func check_battle_end() -> bool:
-	if int(_parent.get("_pending_battle_result")) != 0:
+	if int(_parent.get("_pending_battle_result")) != EndCheck.RESULT_NONE:
 		return true
 	if not bool(_parent.get("_is_active")):
 		return false
@@ -132,7 +132,7 @@ func check_battle_end() -> bool:
 			_parent.get("_battle_enemy_roster"), field,
 			_parent.get("_battle_player_roster"), bool(_parent.get("_field_engaged")))
 	_parent.set("_pending_battle_result", result)
-	return result != 0
+	return result != EndCheck.RESULT_NONE
 
 
 ## 读取 DeploymentSystem 阵位快照——不可用时返回空数组（= 无阵位信息）。
@@ -164,9 +164,9 @@ func update_field_engaged(field: Array) -> void:
 ## 无待定结果时为空操作。
 func finish_pending_battle_end() -> void:
 	var result: int = int(_parent.get("_pending_battle_result"))
-	if result == 0:
+	if result == EndCheck.RESULT_NONE:
 		return
-	_parent.set("_pending_battle_result", 0)
+	_parent.set("_pending_battle_result", EndCheck.RESULT_NONE)
 	_parent.call("battle_end", result)
 
 

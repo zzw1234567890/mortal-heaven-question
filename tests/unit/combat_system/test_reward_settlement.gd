@@ -8,6 +8,9 @@ extends GutTest
 ##   - 验证 is_kill 从 target_hp 派生
 ##   - 验证 grant_reward_selection 发放逻辑
 
+## 结局取值引真实枚举（[code]_settle_result[/code] 的入参就是它）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
+
 var cs: Node = null
 
 
@@ -35,10 +38,10 @@ func after_each() -> void:
 
 func test_settle_result_victory_contains_reward_keys() -> void:
 	# Act
-	var rewards: Dictionary = cs.call("_settle_result", 1)  # CombatResult.VICTORY=1
+	var rewards: Dictionary = cs.call("_settle_result", CombatScript.CombatResult.VICTORY)
 
 	# Assert
-	assert_eq(rewards["result"], 1, "result=VICTORY")
+	assert_eq(rewards["result"], CombatScript.CombatResult.VICTORY, "result=VICTORY")
 	assert_true(rewards.has("lingshi"), "应包含 lingshi 键")
 	assert_true(rewards.has("cultivation"), "应包含 cultivation 键")
 	assert_true(rewards.has("cards"), "应包含 cards 键")
@@ -49,12 +52,12 @@ func test_settle_result_victory_contains_reward_keys() -> void:
 # ============================================================================
 
 func test_settle_result_defeat_returns_retain_ratio() -> void:
-	var rewards_d: Dictionary = cs.call("_settle_result", 2)  # DEFEAT=2
-	assert_eq(rewards_d["result"], 2, "result=DEFEAT")
+	var rewards_d: Dictionary = cs.call("_settle_result", CombatScript.CombatResult.DEFEAT)
+	assert_eq(rewards_d["result"], CombatScript.CombatResult.DEFEAT, "result=DEFEAT")
 	assert_eq(rewards_d["retain_ratio"], 0.5, "DEFEAT retain_ratio=0.5")
 
-	var rewards_r: Dictionary = cs.call("_settle_result", 3)  # RETREAT=3
-	assert_eq(rewards_r["result"], 3, "result=RETREAT")
+	var rewards_r: Dictionary = cs.call("_settle_result", CombatScript.CombatResult.RETREAT)
+	assert_eq(rewards_r["result"], CombatScript.CombatResult.RETREAT, "result=RETREAT")
 	assert_eq(rewards_r["retain_ratio"], 0.5, "RETREAT retain_ratio=0.5")
 
 
@@ -76,7 +79,7 @@ func test_rewards_come_from_battle_config() -> void:
 	assert_eq(drops.size(), 1, "卡牌掉落取配置列表")
 	assert_eq(drops[0]["card_id"], "basic_attack", "掉落条目透传")
 	# 清场（下一用例不继承本场配置）
-	cs.call("battle_end", 2)
+	cs.call("battle_end", CombatScript.CombatResult.DEFEAT)
 
 
 ## 配置缺失时按 0 / 空处理——不臆造奖励。
@@ -91,7 +94,7 @@ func test_rewards_clamp_negative_config() -> void:
 	cs.call("battle_start", {"rewards": {"lingshi": -5, "cultivation": -1}})
 	assert_eq(cs.call("_calculate_lingshi_reward"), 0, "负灵石钳到 0")
 	assert_eq(cs.call("_calculate_cultivation_reward"), 0, "负修为钳到 0")
-	cs.call("battle_end", 2)
+	cs.call("battle_end", CombatScript.CombatResult.DEFEAT)
 
 
 # ============================================================================
@@ -108,7 +111,7 @@ func test_grant_selection_writes_lingshi() -> void:
 
 	# Act——先开战掷骰，再发放
 	cs.call("battle_start", {"rewards": {"lingshi": 100, "cultivation": 0, "cards": []}})
-	cs.call("_settle_result", 1)  # VICTORY，只掷骰不发放
+	cs.call("_settle_result", CombatScript.CombatResult.VICTORY)  # 胜利，只掷骰不发放
 	var result: Dictionary = cs.call("grant_reward_selection", -1)  # 跳过卡牌
 
 	# Assert
@@ -135,7 +138,7 @@ func test_grant_selection_writes_cultivation() -> void:
 
 	# Act
 	cs.call("battle_start", {"rewards": {"lingshi": 0, "cultivation": 50, "cards": []}})
-	cs.call("_settle_result", 1)
+	cs.call("_settle_result", CombatScript.CombatResult.VICTORY)
 	var result: Dictionary = cs.call("grant_reward_selection", -1)
 
 	# Assert
@@ -151,7 +154,7 @@ func test_grant_selection_writes_cultivation() -> void:
 func test_grant_selection_no_crash_when_systems_missing() -> void:
 	# Act——先掷骰，再发放（index=-1 跳过卡牌）
 	cs.call("battle_start", {"rewards": {"lingshi": 0, "cultivation": 0, "cards": []}})
-	cs.call("_settle_result", 1)
+	cs.call("_settle_result", CombatScript.CombatResult.VICTORY)
 	var result: Dictionary = cs.call("grant_reward_selection", -1)
 
 	# Assert——不崩溃即通过
@@ -218,7 +221,7 @@ func test_no_regression() -> void:
 func test_grant_selection_idempotent() -> void:
 	# Arrange
 	cs.call("battle_start", {"rewards": {"lingshi": 10, "cultivation": 0, "cards": []}})
-	cs.call("_settle_result", 1)
+	cs.call("_settle_result", CombatScript.CombatResult.VICTORY)
 	# Act——第一次发放
 	var result1: Dictionary = cs.call("grant_reward_selection", -1)
 	# 第二次发放

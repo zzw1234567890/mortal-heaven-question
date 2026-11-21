@@ -175,23 +175,23 @@ func test_ac003_battle_started_payload_is_config() -> void:
 
 func test_ac004_battle_ended_emitted() -> void:
 	var sig := _capture_battle_ended()
-	cs.call("battle_end", 1)  # VICTORY=1
+	cs.call("battle_end", CS_SCRIPT.CombatResult.VICTORY)
 	assert_true(sig["received"], "battle_ended 已发射")
 	assert_eq(sig["count"], 1, "发射 1 次")
 
 
 func test_ac004_battle_ended_payload_result_and_rewards() -> void:
 	var sig := _capture_battle_ended()
-	cs.call("battle_end", 1)  # VICTORY=1
-	assert_eq(sig["result"], 1, "result=VICTORY(1)")
+	cs.call("battle_end", CS_SCRIPT.CombatResult.VICTORY)
+	assert_eq(sig["result"], CS_SCRIPT.CombatResult.VICTORY, "result=VICTORY")
 	assert_true(sig["rewards"] is Dictionary, "rewards 是 Dictionary")
 
 
 func test_ac004_battle_ended_for_defeat() -> void:
 	var sig := _capture_battle_ended()
-	cs.call("battle_end", 2)  # DEFEAT=2
+	cs.call("battle_end", CS_SCRIPT.CombatResult.DEFEAT)
 	assert_true(sig["received"], "battle_ended 已发射")
-	assert_eq(sig["result"], 2, "result=DEFEAT(2)")
+	assert_eq(sig["result"], CS_SCRIPT.CombatResult.DEFEAT, "result=DEFEAT")
 
 
 # ============================================================================
@@ -433,12 +433,12 @@ func test_multiple_battle_cycles_signal_consistency() -> void:
 	cs.call("set_scene_change", false)
 	cs.call("battle_start", {"enemy_deck_id": 1})
 	assert_eq(started_sig["count"], 1, "周期 1 battle_started 发射 1 次")
-	cs.call("battle_end", 1)  # VICTORY
+	cs.call("battle_end", CS_SCRIPT.CombatResult.VICTORY)
 	assert_eq(ended_sig["count"], 1, "周期 1 battle_ended 发射 1 次")
 	# 周期 2
 	cs.call("battle_start", {"enemy_deck_id": 2})
 	assert_eq(started_sig["count"], 2, "周期 2 battle_started 发射 1 次")
-	cs.call("battle_end", 2)  # DEFEAT
+	cs.call("battle_end", CS_SCRIPT.CombatResult.DEFEAT)
 	assert_eq(ended_sig["count"], 2, "周期 2 battle_ended 发射 1 次")
 
 
@@ -507,5 +507,5 @@ func test_full_signal_lifecycle_integration() -> void:
 	assert_true(phase_changed_sig["count"] >= 2, "phase_changed 至少 2 次")
 
 	# battle_end
-	cs.call("battle_end", 1)  # VICTORY
+	cs.call("battle_end", CS_SCRIPT.CombatResult.VICTORY)
 	assert_true(battle_ended_sig["received"], "battle_ended 发射")

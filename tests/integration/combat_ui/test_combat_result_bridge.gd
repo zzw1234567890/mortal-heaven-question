@@ -14,6 +14,8 @@ extends GutTest
 
 const BridgeScript := preload("res://src/ui/combat/shared/combat_result_bridge.gd")
 const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
+## 战斗结果枚举的出处（信号载荷与战绩 [code]result[/code] 键的取值）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
 
 const RESULT_SCREEN: String = "res://src/ui/result_screen/result_screen.tscn"
 const DEFEAT_SCREEN: String = "res://src/ui/defeat_screen/defeat_screen.tscn"
@@ -92,7 +94,7 @@ func test_battle_ended_publishes_result_view() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
 	# Act
-	combat.battle_ended.emit(1, _rewards("victory", 1, 7, 0))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards("victory", 1, 7, 0))
 	# Assert
 	var view: RefCounted = ViewScript.last()
 	assert_not_null(view, "battle_ended 应发布结算对象")
@@ -106,7 +108,7 @@ func test_payload_without_record_degrades() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
 	# Act
-	combat.battle_ended.emit(2, {"result": 2})
+	combat.battle_ended.emit(CombatScript.CombatResult.DEFEAT, {"result": 2})
 	# Assert
 	var view: RefCounted = ViewScript.last()
 	assert_not_null(view, "仍应发布一份结算对象")
@@ -118,11 +120,11 @@ func test_payload_without_record_degrades() -> void:
 func test_unbind_stops_publishing() -> void:
 	# Arrange——先发布一次，再退订
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards("victory", 1, 5, 0))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards("victory", 1, 5, 0))
 	var first: RefCounted = ViewScript.last()
 	# Act——退订后再发一次
 	bridge.call(&"unbind")
-	combat.battle_ended.emit(2, _rewards("defeat", 2, 0, 3))
+	combat.battle_ended.emit(CombatScript.CombatResult.DEFEAT, _rewards("defeat", 2, 0, 3))
 	# Assert——缓存仍是第一份（第二份没有被发布）
 	assert_eq(ViewScript.last(), first, "退订后不应再发布")
 
@@ -130,14 +132,14 @@ func test_unbind_stops_publishing() -> void:
 func test_rebind_swaps_source() -> void:
 	# Arrange——接到 A 并发布一次
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards("victory", 1, 9, 0))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards("victory", 1, 9, 0))
 	# Act——换到另一个源
 	var other: CombatStub = CombatStub.new()
 	add_child_autofree(other)
 	bridge.call(&"bind", other)
-	combat.battle_ended.emit(2, _rewards("defeat", 2, 0, 1))  # 旧源不应再生效
+	combat.battle_ended.emit(CombatScript.CombatResult.DEFEAT, _rewards("defeat", 2, 0, 1))  # 旧源不应再生效
 	var after_old: RefCounted = ViewScript.last()
-	other.battle_ended.emit(1, _rewards("victory", 1, 4, 0))  # 新源生效
+	other.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards("victory", 1, 4, 0))  # 新源生效
 	# Assert
 	assert_eq(int(after_old.call(&"player_remaining_hp")), 9, "旧源已被断开")
 	assert_eq(int(ViewScript.last().call(&"player_remaining_hp")), 4, "新源应接管发布")
@@ -150,7 +152,7 @@ func test_rebind_swaps_source() -> void:
 func test_result_screen_shows_victory_record() -> void:
 	# Arrange——先发布胜利战绩，再转场进场景
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards("victory", 1, 12, 0, 4, 8))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards("victory", 1, 12, 0, 4, 8))
 	# Act
 	var screen: Control = _mount(RESULT_SCREEN)
 	# Assert
@@ -166,7 +168,7 @@ func test_result_screen_shows_victory_record() -> void:
 func test_defeat_screen_shows_defeat_record() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(2, _rewards("defeat", 2, 0, 16, 2, 3))
+	combat.battle_ended.emit(CombatScript.CombatResult.DEFEAT, _rewards("defeat", 2, 0, 16, 2, 3))
 	# Act
 	var screen: Control = _mount(DEFEAT_SCREEN)
 	# Assert
@@ -195,7 +197,7 @@ func test_screen_without_record_keeps_placeholder_contract() -> void:
 func test_screen_keeps_navigation_with_record() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards("victory", 1, 5, 0))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards("victory", 1, 5, 0))
 	sm.current_id = 8
 	var screen: Control = _mount(RESULT_SCREEN)
 	var button: Button = screen.get("return_button") as Button
@@ -213,7 +215,7 @@ func test_screen_keeps_navigation_with_record() -> void:
 func test_brief_is_before_return_button() -> void:
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, _rewards("victory", 1, 5, 0))
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, _rewards("victory", 1, 5, 0))
 	var screen: Control = _mount(RESULT_SCREEN)
 	# Assert
 	var brief: Label = screen.get("brief_label") as Label
@@ -231,7 +233,7 @@ func test_defeat_screen_returns_to_main_menu() -> void:
 	## §9 把「战败→任意非主菜单状态」列为 N/A 转换）。接入战绩不影响这条出口。
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(2, _rewards("defeat", 2, 0, 8))
+	combat.battle_ended.emit(CombatScript.CombatResult.DEFEAT, _rewards("defeat", 2, 0, 8))
 	sm.current_id = 9
 	var screen: Control = _mount(DEFEAT_SCREEN)
 	var button: Button = screen.get("return_button") as Button
@@ -249,7 +251,7 @@ func test_retreat_screen_returns_to_main_menu() -> void:
 	## ——投降链的终点就是这里，出口错了整条链等于白接。
 	# Arrange
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(3, _rewards("retreat", 3, 6, 5))
+	combat.battle_ended.emit(CombatScript.CombatResult.RETREAT, _rewards("retreat", 3, 6, 5))
 	sm.current_id = 9
 	var screen: Control = _mount(DEFEAT_SCREEN)
 	var button: Button = screen.get("return_button") as Button

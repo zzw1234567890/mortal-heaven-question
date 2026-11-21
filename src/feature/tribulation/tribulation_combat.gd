@@ -19,6 +19,16 @@ const _TYPE_CROSS_REALM: int = 1
 ## 金卡报告载荷键的出处（不在此写字符串字面量）。
 const RewardPoolScript := preload("res://src/feature/tribulation/tribulation_reward_pool.gd")
 
+## [enum CombatSystem.CombatResult] 的出处——胜负判据的唯一真理来源。[br]
+## [br][b]为什么不镜像枚举值[/b]：本模块此前按「胜利=0」判胜，而
+## [code]combat_system.gd[/code] 的枚举是 [code]VICTORY = 1 / DEFEAT = 2 /
+## RETREAT = 3[/code]——[code]battle_ended[/code] 发的正是真实值，于是
+## [b]打赢也走失败结算[/b]（境界不升、修为被扣、金卡不发），且渡劫永不进境。
+## 判据改为直接引用枚举本身，字面量再也无法与枚举分叉。[br]
+## [br][b]preload 不成环[/b]：[code]combat_system.gd[/code] 及其子模块不反向
+## preload 渡劫侧（同 [code]settlement_rules.gd[/code] 引用本枚举的先例）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
+
 ## 父节点引用——TribulationSystem Autoload 实例。
 var _parent: Node = null
 
@@ -104,8 +114,10 @@ func on_battle_ended(result: int, rewards: Dictionary) -> void:
 	var state: int = int(gsm.player.get("tribulation_state", _STATE_NOT_READY))
 	if state != _STATE_IN_COMBAT:
 		return  # 非渡劫战 / 本场已结算过——忽略
-	# CombatResult.VICTORY=0, DEFEAT=1, RETREAT=2（渡劫战中撤退不可用——仅 DEFEAT）
-	if result == 0:  # CombatResult.VICTORY
+	# 胜负判据引 [enum CombatSystem.CombatResult] 本身（VICTORY=1 / DEFEAT=2 /
+	# RETREAT=3）——[code]battle_ended[/code] 发的就是这个枚举的真实取值。
+	# 渡劫战中撤退不可用，故非 VICTORY 一律走失败（DEFEAT 与 RETREAT 同路）。
+	if result == CombatScript.CombatResult.VICTORY:
 		var report: Dictionary = _parent.call("_handle_tribulation_success")
 		_attach_reward_report(rewards, report)
 	else:  # DEFEAT or RETREAT

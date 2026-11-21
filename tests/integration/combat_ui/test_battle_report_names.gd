@@ -15,6 +15,8 @@ extends GutTest
 
 const BridgeScript := preload("res://src/ui/combat/shared/combat_result_bridge.gd")
 const ViewScript := preload("res://src/feature/combat/combat_result_view.gd")
+## 结局取值引真实枚举（[code]battle_ended[/code] 与战绩 [code]result[/code] 键同源）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
 const RecordScript := preload("res://src/feature/combat/combat_battle_record.gd")
 const RosterStateScript := preload("res://src/feature/combat/combat_roster_state.gd")
 const Seeding := preload("res://src/feature/combat/combat_roster_seeding.gd")
@@ -114,7 +116,8 @@ func test_battle_report_shows_real_names_of_player_roster() -> void:
 		CHAR_LIN: "林渊", CHAR_SU: "苏剑鸣",
 	})
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, {"result": 1, "record": record})
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY,
+			{"result": CombatScript.CombatResult.VICTORY, "record": record})
 	# Act
 	var screen: Control = _mount(RESULT_SCREEN)
 	# Assert
@@ -134,7 +137,8 @@ func test_battle_report_name_is_paired_with_its_own_hp() -> void:
 		CHAR_LIN: "林渊", CHAR_SU: "苏剑鸣",
 	})
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, {"result": 1, "record": record})
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY,
+			{"result": CombatScript.CombatResult.VICTORY, "record": record})
 	# Act
 	var screen: Control = _mount(RESULT_SCREEN)
 	# Assert —— 快照里两条都满血（无注入 stats → 模板 base_hp 为 0 → 0/0）
@@ -155,7 +159,8 @@ func test_missing_name_falls_back_to_character_id_label() -> void:
 	# Arrange —— 模板字典空着（查不到任何名字）
 	var record: Dictionary = _record_via_roster({})
 	bridge.call(&"bind", combat)
-	combat.battle_ended.emit(1, {"result": 1, "record": record})
+	combat.battle_ended.emit(CombatScript.CombatResult.VICTORY,
+			{"result": CombatScript.CombatResult.VICTORY, "record": record})
 	# Act
 	var screen: Control = _mount(RESULT_SCREEN)
 	# Assert

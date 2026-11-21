@@ -24,11 +24,13 @@ const TribRewardLines := preload("res://src/feature/tribulation/tribulation_rewa
 ## 名字兜底口径（[code]resolve_name[/code]——与战斗内建表/播报同源）。
 const NameRules := preload("res://src/feature/combat/combat_roster_seeding.gd")
 
-## 结局枚举——镜像 [code]CombatSystem.CombatResult[/code]（0 无 / 1 胜 / 2 败 / 3 撤退）。
-const RESULT_NONE: int = 0
-const RESULT_VICTORY: int = 1
-const RESULT_DEFEAT: int = 2
-const RESULT_RETREAT: int = 3
+## 结局枚举——[b]直接引[/b] [enum CombatSystem.CombatResult]（本文件曾镜像一份
+## 0/1/2/3 的字面量；同一份数字抄两处必然漂移，故改为单一出处）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
+const RESULT_NONE: int = CombatScript.CombatResult.NONE
+const RESULT_VICTORY: int = CombatScript.CombatResult.VICTORY
+const RESULT_DEFEAT: int = CombatScript.CombatResult.DEFEAT
+const RESULT_RETREAT: int = CombatScript.CombatResult.RETREAT
 
 ## 结局 token → 中文标题（占位场景与后续界面共用；本地化 epic 后改为 key）。
 const OUTCOME_TITLES: Dictionary = {

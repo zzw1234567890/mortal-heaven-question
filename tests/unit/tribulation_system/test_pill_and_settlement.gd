@@ -10,6 +10,8 @@ extends GutTest
 ## Story 来源：production/epics/tribulation-system/story-003-pill-and-settlement.md
 
 const TS_SCRIPT := preload("res://src/feature/tribulation_system.gd")
+## 胜负判据的真理来源（[code]battle_ended[/code] 发的就是这个枚举的取值）。
+const CS_SCRIPT := preload("res://src/feature/combat_system.gd")
 
 var ts: Node = null
 var gsm: Node = null
@@ -277,14 +279,14 @@ func test_ac007_protection_unlocked_above_3() -> void:
 
 func test_ac008_victory_calls_success() -> void:
 	_setup_in_combat()
-	ts.call("_on_battle_ended", 0, {})  # VICTORY
+	ts.call("_on_battle_ended", CS_SCRIPT.CombatResult.VICTORY, {})
 	await _flush()
 	assert_true(_signals_received.has("succeeded"), "VICTORY 触发 _handle_success")
 
 
 func test_ac008_defeat_calls_failure() -> void:
 	_setup_in_combat()
-	ts.call("_on_battle_ended", 1, {})  # DEFEAT
+	ts.call("_on_battle_ended", CS_SCRIPT.CombatResult.DEFEAT, {})
 	await _flush()
 	assert_true(_signals_received.has("failed"), "DEFEAT 触发 _handle_failure")
 

@@ -28,9 +28,15 @@ const TableScript := preload("res://src/feature/exploration/exploration_breakthr
 
 ## 渡劫台节点 ID（layer 4 idx 0——与节点图 stub 的渡劫台同号）。
 const TRIB_NODE: int = 401
-## [code]CombatResult[/code] 取值（源: [code]combat_system.gd[/code] 枚举——胜 0 / 败 1）。
-const COMBAT_VICTORY: int = 0
-const COMBAT_DEFEAT: int = 1
+## [code]CombatResult[/code] 取值——[b]引真实枚举[/b]（源:
+## [code]src/feature/combat_system.gd[/code] 的 [code]CombatResult[/code]）。[br]
+## [br][b]原先这里是硬写的 0/1[/b]：注解还写着「胜 0 / 败 1」——那正是
+## [code]tribulation_combat.gd[/code] 旧缺陷（用字面量 0 判胜）的翻版，
+## 曲线（真实枚举是 VICTORY=1 / DEFEAT=2）。缺陷已修，本组常量随之改为
+## 引用枚举：用例与生产判据同源，分叉不了。
+const CombatScript := preload("res://src/feature/combat_system.gd")
+const COMBAT_VICTORY: int = CombatScript.CombatResult.VICTORY
+const COMBAT_DEFEAT: int = CombatScript.CombatResult.DEFEAT
 
 
 ## 导航桩——记录转场请求，不真跳场景（[member accept] = false 时模拟并发守卫拒绝）。

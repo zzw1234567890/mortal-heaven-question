@@ -9,8 +9,10 @@
 ## 「结束出牌」按钮无处理者。[br]
 ## [br]本文件独占角色段：卡实例 ID 由 CardSystem 分配，不手写。
 
-const VictoryResult: int = 1
-const DefeatResult: int = 2
+## 结局取值引真实枚举（[constant CS_SCRIPT] 来自父夹具
+## [code]full_battle_fixture.gd[/code]——子类不重复声明）。
+const VictoryResult: int = CS_SCRIPT.CombatResult.VICTORY
+const DefeatResult: int = CS_SCRIPT.CombatResult.DEFEAT
 
 
 func before_all() -> void:

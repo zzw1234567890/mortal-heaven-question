@@ -10,6 +10,8 @@ extends GutTest
 
 const Topbar := preload("res://src/ui/combat/layout/combat_topbar.gd")
 const MockSignals := preload("res://tests/integration/combat_ui/mocks/mock_topbar_signals.gd")
+## 战斗结果枚举的出处（[code]battle_ended[/code] 载荷的取值）。
+const CombatScript := preload("res://src/feature/combat_system.gd")
 
 var topbar: CombatTopbar = null
 var _mock_combat: Node = null
@@ -159,6 +161,6 @@ func test_topbar_battle_ended_clears_log() -> void:
 	topbar.combat_log.append_entry("[1·抽牌] 林渊 → 抽牌 → 手牌 → 2张")
 	assert_eq(topbar.combat_log.get_entries().size(), 1, "前置：有 1 条日志")
 	# When: battle_ended 信号（经 topbar 路由）
-	_mock_combat.battle_ended.emit(1, {})
+	_mock_combat.battle_ended.emit(CombatScript.CombatResult.VICTORY, {})
 	# Then: 日志清空
 	assert_eq(topbar.combat_log.get_entries().size(), 0, "战斗结束后日志应清空")

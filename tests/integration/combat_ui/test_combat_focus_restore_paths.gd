@@ -14,10 +14,10 @@ extends "res://tests/integration/combat_ui/full_battle_fixture.gd"
 
 ## 环境推进用到的阶段号（与 [code]CombatPhase[/code] 同源）。
 const PHASE_PLAY: int = 2
-## 战斗结果（与 [code]CombatSystem.CombatResult[/code] 同源）。
-const VICTORY: int = 1
-## 战败结果（同源）。
-const DEFEAT: int = 2
+## 战斗结果——引真实枚举本身（[constant CS_SCRIPT] 来自父夹具）。
+const VICTORY: int = CS_SCRIPT.CombatResult.VICTORY
+## 战败结果——同上。
+const DEFEAT: int = CS_SCRIPT.CombatResult.DEFEAT
 
 
 func before_all() -> void:
