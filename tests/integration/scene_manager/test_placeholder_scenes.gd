@@ -1,6 +1,6 @@
 extends GutTest
-## Sprint 18 场景补链回归：占位场景（坊市/结算/战败/养成）。[br]
-## 事件面板与[b]卡组编辑[/b]已交付真实脚本——两者的 .tscn 不再挂
+## Sprint 18 场景补链回归：占位场景（结算/战败/养成）。[br]
+## 事件面板、[b]卡组编辑[/b]与[b]坊市[/b]已交付真实脚本——三者的 .tscn 不再挂
 ## [code]PlaceholderScene[/code]，由文末专项测试锁定挂载（路径保留，
 ## SceneManager 自检不红）。
 ##
@@ -12,8 +12,15 @@ extends GutTest
 ## [b]「返回」的目的地分两类（2026-11-17）[/b]：战败屏回[b]主菜单[/b]（本局已结束
 ## ——design/ux/pause-menu.md §Events Fired「玩家点击「返回」→ 回到主菜单」、
 ## design/gdd/audio-system.md §9 把「战败→任意非主菜单状态」列为 N/A 转换），
-## 其余三屏（坊市 / 胜利结算 / 养成）回[b]探索[/b]（继续玩下去）。
+## 其余两屏（胜利结算 / 养成）回[b]探索[/b]（继续玩下去）。
 ## 判据收在 [code]battle_record_exit.gd[/code]，本文件按屏逐条钉住它的产出。
+##
+## [b]坊市已不在本表（2026-11-21）[/b]：[code]shop_scene.tscn[/code] 换挂真实
+## [code]ShopScreen[/code]，不再是占位场景——它没有 [code]screen_id[/code] /
+## [code]return_button[/code] 这些占位契约的字段，本文件的循环断言对它不再成立，
+## 故从 [constant CASES] / [constant EXITS] 移出，由文末专项测试锁定挂载。
+## 它的「离开」固定回[b]主菜单[/b]（该屏只从主菜单进入），与占位期的
+## 「一律回探索」不同——这也是它必须移出 [constant EXITS] 的第二个理由。
 ##
 ## SceneManager 以桩替代——不触发真实转场。
 
@@ -31,9 +38,8 @@ class SceneManagerStub extends Node:
 
 
 ## 路径 → 期望 SceneID（仍为占位的场景 .tscn 的 screen_id 配置——
-## event_panel.tscn / deck_editing.tscn 已换真实脚本，不在此表）。
+## event_panel.tscn / deck_editing.tscn / shop_scene.tscn 已换真实脚本，不在此表）。
 const CASES: Dictionary = {
-	"res://src/feature/shop/shop_scene.tscn": 6,
 	"res://src/ui/result_screen/result_screen.tscn": 8,
 	"res://src/ui/defeat_screen/defeat_screen.tscn": 9,
 	"res://src/feature/cultivation/cultivation_scene.tscn": 10,
@@ -45,7 +51,6 @@ const CASES: Dictionary = {
 ## 测试不会红。这里的字面值就是规格（design/ux/pause-menu.md §Events Fired、
 ## design/gdd/audio-system.md §9）。
 const EXITS: Dictionary = {
-	6: {"text": "返回探索", "to": 3, "type": 4},
 	8: {"text": "返回探索", "to": 3, "type": 4},
 	9: {"text": "返回主菜单", "to": 0, "type": 2},
 	10: {"text": "返回探索", "to": 3, "type": 4},
@@ -156,3 +161,24 @@ func test_deck_editing_scene_mounts_real_screen_script() -> void:
 	# 两栏骨架应在挂载时就建好（不是运行时才懒加载）
 	assert_true(screen.has_method(&"collection_count") and screen.has_method(&"deck_count"),
 			"真实脚本应暴露两栏读数口")
+
+
+## 坊市场景已换挂真实 ShopScreen（本轮交付）——不再是占位场景。[br]
+## [br][b]为什么单测一条[/b]：[code]SceneManager.SCENE_PATHS[/code] 里那条路径此前
+## 指向占位骨架（「坊市交易功能正在打造中」），玩家从主菜单进去只能看到一句开发
+## 排期术语。这一个断言钉住「路径后面真的是坊市界面」——若哪天有人把 .tscn 换回
+## 占位（或脚本路径写错），本用例红。[br]
+## [br][b]为什么只查「有没有货架口」而不查行数[/b]：行数取决于卡牌模板是否装载完成
+## （异步），在此处断言会随装载时机抖动；「摆得出行」这件事由
+## [code]tests/integration/shop/test_shop_scene.gd[/code] 在模板就位后断言。
+func test_shop_scene_mounts_real_screen_script() -> void:
+	var packed: PackedScene = load("res://src/feature/shop/shop_scene.tscn")
+	var screen: Control = packed.instantiate() as Control
+	add_child_autofree(screen)
+	assert_not_null(screen, "shop_scene.tscn 应可实例化")
+	assert_eq(screen.get_script().resource_path,
+			"res://src/ui/shop/shop_screen.gd",
+			"坊市场景应挂真实 ShopScreen 脚本")
+	assert_false("screen_id" in screen, "真实脚本不应再暴露占位 screen_id")
+	assert_true(screen.has_method(&"item_count") and screen.has_method(&"refresh"),
+			"真实脚本应暴露货架读数口与刷新入口")
