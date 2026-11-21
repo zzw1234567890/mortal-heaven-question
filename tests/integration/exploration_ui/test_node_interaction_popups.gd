@@ -319,6 +319,11 @@ func test_tribulation_popup_warns_eighty_percent_in_cinnabar() -> void:
 
 
 func test_tribulation_confirm_requests_tribulation_transition() -> void:
+	# 渡劫台可挑战的前提是修为已满（与 AC-7 同一个前提，只是那一条验的是反面）。
+	# 不入这一手，状态机会拒绝触发——而「拒绝时不得转场」正是本轮修好的行为
+	# （此前这条转场是不看状态的，所以才会有「从地图进渡劫空打一场」的断链）。
+	var player_before: Dictionary = (GameStateManager.player as Dictionary).duplicate(true)
+	GameStateManager.player["cultivation"] = int(GameStateManager.player.max_cultivation)
 	_inject_snapshot({401: {"type": 9, "tribulation_ready": true}})
 	host.on_node_interaction(401, &"tribulation")
 	var requests: Array = []
@@ -330,6 +335,7 @@ func test_tribulation_confirm_requests_tribulation_transition() -> void:
 			"目标场景应为 TRIBULATION")
 	assert_eq(deps.scene_changes[0]["type"],
 			SceneManagerScript.TransitionType.TRIBULATION, "转场类型应为 TRIBULATION")
+	GameStateManager.player = player_before
 
 
 func test_tribulation_unready_shows_no_popup() -> void:

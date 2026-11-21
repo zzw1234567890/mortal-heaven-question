@@ -17,6 +17,9 @@ extends RefCounted
 
 ## 配置读取面（境界名 / 所需修为 / 最高境界数——唯一来源）。
 const TableScript := preload("res://src/feature/exploration/exploration_breakthrough_table.gd")
+## 渡劫入口共用件——渡劫那几句回执的[b]唯一出处[/b]（探索节点图与修炼室同调它，
+## 同一个失败原因在两处措辞必然漂移，故本模块只转发不另写一份）。
+const LaunchScript := preload("res://src/feature/tribulation/tribulation_launch.gd")
 
 ## 每次打坐的修为增量（GDD §5 修为获取——本屏的固定档）。[br]
 ## [br][b]数值放这里而不是屏幕类[/b]：按钮文案与「实际加多少」必须是同一个数
@@ -45,8 +48,10 @@ const TEXT_MEDITATE_DONE: String = "打坐完毕：修为 +%d。"
 ## 一行是「别再攒了」、一行是「别再突破了」，玩家点哪一行看到哪一句。
 const TEXT_MEDITATE_AT_MAX: String = "已达最高境界，修为无处可用。"
 const TEXT_BREAKTHROUGH_DONE: String = "突破成功：%s → %s，修为上限随即提升。"
-## 渡劫触发回执（即将转场——说明去哪里、要做什么）。
-const TEXT_TRIBULATION_STARTED: String = "已触发渡劫——前往天劫之下，胜则进境。"
+## 渡劫触发回执（即将转场——说明去哪里、要做什么）。[br]
+## [br][b]来源在共用件[/b]（[code]tribulation_launch.gd[/code]）：探索节点图也走
+## 那同一条路，玩家在两个入口看到的必须字字相同。
+const TEXT_TRIBULATION_STARTED: String = LaunchScript.TEXT_STARTED
 ## 渡劫归来回执（成功 / 失败）——渡劫战的结算在战斗侧，本屏只把结果讲给玩家听。
 const TEXT_TRIBULATION_SUCCEEDED: String = "渡劫成功：%s → %s，修为上限随即提升。"
 const TEXT_TRIBULATION_FAILED: String = "渡劫失败：修为损失 %d，境界未变。"
@@ -56,13 +61,13 @@ const TEXT_CAN_BREAK: String = "修为已满——可以突破了。"
 ## 是因为「点下去会发生什么」不同：一个直接进境，一个要先打一场）。
 const TEXT_CAN_TRIBULATE: String = "修为已满，需渡劫方能进境。"
 ## 渡劫流程已在进行中（准备 / 渡劫战中）——不得重复触发（ADR-0021 §check_tribulation_ready）。
-const TEXT_TRIBULATION_BUSY: String = "渡劫流程进行中，先了结这一场。"
+const TEXT_TRIBULATION_BUSY: String = LaunchScript.TEXT_BUSY
 ## 渡劫系统缺失——可读的降级文案（不让玩家点了没反应）。
-const TEXT_TRIBULATION_UNAVAILABLE: String = "渡劫系统不可用，此处暂时无法渡劫。"
+const TEXT_TRIBULATION_UNAVAILABLE: String = LaunchScript.TEXT_TRIBULATION_UNAVAILABLE
 ## 渡劫去向的场景不可用（SceneManager 缺失）。
-const TEXT_NO_SCENE_MANAGER_TRIBULATION: String = "场景管理器不可用，暂时无法前往渡劫。"
+const TEXT_NO_SCENE_MANAGER_TRIBULATION: String = LaunchScript.TEXT_NO_SCENE_MANAGER
 ## 转场请求被拒（SceneManager 正在转场中——并发守卫）。渡劫状态已退回，可再试。
-const TEXT_TRIBULATION_DEPART_FAILED: String = "转场被拒——渡劫已取消，稍后再试。"
+const TEXT_TRIBULATION_DEPART_FAILED: String = LaunchScript.TEXT_DEPART_FAILED
 ## 操作提示行。
 const TEXT_HINT: String = "↑ ↓ 选行动，回车执行，Esc 返回主菜单。"
 ## 系统缺失时的可读降级文案。

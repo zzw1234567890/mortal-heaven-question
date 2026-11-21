@@ -20,6 +20,8 @@ const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
 const RealmSystemScript := preload("res://src/core/realm_system.gd")
 ## 交互规则（渡劫判定与常量同源）。
 const Rules := preload("res://src/ui/exploration/node_interaction_rules.gd")
+## 渡劫入口共用件——顺序与收尾的唯一出处（修炼室同调它）。
+const LaunchScript := preload("res://src/feature/tribulation/tribulation_launch.gd")
 
 
 ## 灵泉——调用探索系统 API（效果执行归 Feature 层），返回系统给出的回复量。
@@ -73,3 +75,31 @@ func tribulation_ready(p_snapshot: Dictionary, p_node_id: int) -> bool:
 	var nodes: Dictionary = p_snapshot.get("nodes", {})
 	var detail: Dictionary = nodes.get(p_node_id, {})
 	return Rules.tribulation_ready(detail)
+
+
+## 渡劫入口（顺序 + 失败收尾 + 回执全在共用件里——两个入口同调它）。[br]
+## [br][b]为什么这里不自己组织调用顺序[/b]：渡劫的正确顺序是「先触发状态机、再转场」，
+## 而探索节点图此前正是少做了前半步——只转场，渡劫场景进战时状态还在
+## [code]NOT_READY[/code]，[code]start_tribulation_combat[/code] 校验不过而降级成普通
+## 战斗，[code]on_battle_ended[/code] 又因状态不是 [code]IN_COMBAT[/code] 直接 return，
+## [b]打赢也不进境[/b]。顺序收在 [code]tribulation_launch.gd[/code] 一处，节点图与
+## 修炼室便不可能再各写一套（见该类文档）。[br]
+## [br][param p_from_scene] 源场景兜底值（真实 SceneManager 在时以实况为准）。[br]
+## [br][b]返回[/b]：共用件的结果字典 [code]{ok, outcome, text}[/code]——调用方按
+## [code]ok[/code] 决定发「已请求」还是「被拒」。[br]
+func launch_tribulation(p_tribulation_system: Node, p_scene_manager: Node,
+		p_host: Node, p_from_scene: int, p_cross_realm: bool = false) -> Dictionary:
+	return LaunchScript.launch(resolve_tribulation(p_tribulation_system, p_host),
+			p_scene_manager, p_from_scene, p_cross_realm)
+
+
+## 渡劫系统（注入优先，否则 [code]/root[/code] 兜底查找——同 [method max_deploy]
+## 对 RealmSystem 的口径）。[br]
+## [br][b]为什么允许兜底[/b]：渡劫系统是 Autoload，探索屏幕不必为它多传一个参数；
+## 注入口留着是给测试换替身用的（生产路径走现读，UI 不缓存系统引用）。
+func resolve_tribulation(p_tribulation_system: Node, p_host: Node = null) -> Node:
+	if p_tribulation_system != null and is_instance_valid(p_tribulation_system):
+		return p_tribulation_system
+	if p_host != null:
+		return p_host.get_node_or_null(NodePath("/root/TribulationSystem"))
+	return null

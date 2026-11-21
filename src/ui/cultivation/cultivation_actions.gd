@@ -40,6 +40,8 @@ const GateScript := preload("res://src/ui/cultivation/cultivation_tribulation_ga
 const SourcesScript := preload("res://src/ui/hud/deck_view_sources.gd")
 ## 渡劫状态枚举真理来源（默认态用——不写魔数 0）。
 const TribulationScript := preload("res://src/feature/tribulation_system.gd")
+## 渡劫入口共用件（顺序 + 收尾 + 回执——探索节点图那条入口同调它）。
+const LaunchScript := preload("res://src/feature/tribulation/tribulation_launch.gd")
 ## SceneManager 脚本常量——SceneID / TransitionType 枚举真理来源。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
 
@@ -183,39 +185,23 @@ func refusal(p_row: int = 1) -> String:
 ## [br][b]顺序不可颠倒[/b]：先 [code]trigger_tribulation[/code] 把状态机推进
 ## [code]PREPARING[/code]，再转场——渡劫场景进战时 [code]start_tribulation_combat[/code]
 ## 会校验这个状态，反过来做就会降级成一场普通战斗（赢了也不进境）。[br]
-## [br][b]触发被状态机拒绝时不谎报成功[/b]：回读一次状态，没进 [code]PREPARING[/code]
-## 就把「流程进行中」那句交回去，而不是发一个「已前往渡劫」的假回执。[br]
+## [br][b]顺序与收尾都委托 [code]TribulationLaunch.launch[/code][/b]：探索节点图那条
+## 入口（渡劫台）要的是同一段逻辑——写在两处就必然有一天只改对一处（节点图原先正是
+## 只转场、从不触发，玩家从地图进渡劫是空打一场）。故本方法只负责「取依赖、把结果句
+## 交回屏幕」，不再自己组织调用序列。[br]
+## [br][b]触发被状态机拒绝时不谎报成功[/b]：共用件会回读一次状态，没进
+## [code]PREPARING[/code] 就把「流程进行中」那句交回去。[br]
 ## [br][b]转场不可用 / 被拒时把状态退回去[/b]：已进 [code]PREPARING[/code] 却去不了渡劫
-## 场景，会把玩家永久卡在「渡劫流程进行中」——故两路都用 [code]cancel_tribulation[/code]
-## 收尾（[code]request_scene_change[/code] 的返回值同样要看：并发守卫会直接拒掉）。[br]
-## [br][b]类型固定 NORMAL[/b]：越阶渡劫是地图上的即时动作（GDD §6），不进渡劫台；
-## 本屏是正常渡劫的入口。[br]
-## [br]来源: GDD tribulation-system.md §1 地图渡劫点 + §2 准备阶段、
+## 场景，会把玩家永久卡在「渡劫流程进行中」——共用件在两路都用
+## [code]cancel_tribulation[/code] 收尾。[br]
+## [br][b]类型固定 NORMAL[/b]：越阶渡劫是玩家在渡劫台上主动选的选项（GDD §6），
+## 本屏是正常渡劫的入口；越阶落到界面上时把玩家的选择透传给共用件即可。[br]
+## [br]来源: GDD tribulation-system.md §1 地图渡劫点 + §2 准备阶段 + §6 越阶渡劫、
 ## ADR-0021 §trigger_tribulation / §cancel_tribulation。
 func start_tribulation() -> String:
-	var ts: Node = tribulation_system()
-	if ts == null or not ts.has_method(&"trigger_tribulation"):
-		return RulesScript.TEXT_TRIBULATION_UNAVAILABLE
-	ts.call(&"trigger_tribulation", TribulationScript.TribulationType.NORMAL)
-	if int(_tribulation_status().get("state", TribulationScript.TribulationState.NOT_READY)) \
-			!= TribulationScript.TribulationState.PREPARING:
-		return RulesScript.TEXT_TRIBULATION_BUSY
-	var sm: Node = scene_manager()
-	if sm == null or not sm.has_method(&"request_scene_change"):
-		_cancel_quietly(ts)
-		return RulesScript.TEXT_NO_SCENE_MANAGER_TRIBULATION
-	var from_id: int = SceneManagerScript.SceneID.CULTIVATION
-	if sm.has_method(&"get_current_scene_id"):
-		from_id = int(sm.call(&"get_current_scene_id"))
-	var accepted: bool = bool(sm.call(&"request_scene_change", from_id,
-			SceneManagerScript.SceneID.TRIBULATION,
-			SceneManagerScript.TransitionType.TRIBULATION))
-	if not accepted:
-		# 转场被并发守卫拒绝——已进 PREPARING 却去不了，必须退回去，
-		# 否则玩家被永久卡在「渡劫流程进行中」（同转场缺失那一路的收尾）。
-		_cancel_quietly(ts)
-		return RulesScript.TEXT_TRIBULATION_DEPART_FAILED
-	return RulesScript.tribulation_started_line()
+	var result: Dictionary = LaunchScript.launch(tribulation_system(), scene_manager(),
+			SceneManagerScript.SceneID.CULTIVATION)
+	return str(result.get("text", RulesScript.TEXT_TRIBULATION_UNAVAILABLE))
 
 
 ## 请 [code]RealmSystem.realm_up[/code] 动手（不走渡劫的境界——见类文档）。[br]
@@ -259,12 +245,6 @@ func _tribulation_status() -> Dictionary:
 		return {}
 	var raw: Variant = ts.call(&"get_tribulation_status")
 	return raw if raw is Dictionary else {}
-
-
-## 退回准备阶段（转场失败时收尾——失败不影响回执，故不向外报错）。
-func _cancel_quietly(p_ts: Node) -> void:
-	if p_ts != null and p_ts.has_method(&"cancel_tribulation"):
-		p_ts.call(&"cancel_tribulation")
 
 
 ## 判定层实例（无状态、纯函数——每次新建即可，不持有跨调用状态）。[br]

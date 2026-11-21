@@ -43,6 +43,9 @@ signal spring_used(node_id: int, restored: int)
 signal rest_used(node_id: int, healed: int)
 ## 请求进入渡劫（AC-6——SceneManager TRIBULATION 已受理或已发出请求）。
 signal tribulation_requested(node_id: int)
+## 渡劫入口的结果（共用件的结果令牌与中文句——上层据此提示「流程进行中」/「转场被拒」；
+## 结果令牌见 [code]TribulationLaunch.OUTCOME_*[/code]）。
+signal tribulation_launch_resolved(outcome: StringName, text: String)
 ## 弹窗开关（观测/analytics；[param kind] 为弹窗种类）。
 signal popup_opened(node_id: int, kind: StringName)
 signal popup_closed(node_id: int, kind: StringName)
@@ -57,6 +60,9 @@ var viewport: Control = null
 var exploration_system: Node = null
 var scene_manager: Node = null
 var realm_system: Node = null
+## 渡劫系统（渡劫台确认时转交给共用件；null = 按 [code]/root/TribulationSystem[/code]
+## Autoload 现读——测试可注入替身，生产不缓存系统引用）。
+var tribulation_system: Node = null
 ## 当前境界（推荐角色数的上限来源；≤0 时回退 1）与减少动态偏好。
 var realm_id: int = 1
 var reduce_motion: bool = false
@@ -90,14 +96,18 @@ func _ready() -> void:
 	_stage_ref().call(&"build_mask")
 
 
-## 注入依赖（宿主挂载时调用；可重复调用——幂等）。
+## 注入依赖（宿主挂载时调用；可重复调用——幂等）。[br]
+## [br][param p_tribulation_system] 渡劫系统（渡劫台确认时转给共用件；null 时按
+## [code]/root/TribulationSystem[/code] 现读——见 [member tribulation_system]）。
 func setup(p_renderer: Control, p_viewport: Control, p_system: Node,
-		p_scene_manager: Node = null, p_realm_system: Node = null) -> void:
+		p_scene_manager: Node = null, p_realm_system: Node = null,
+		p_tribulation_system: Node = null) -> void:
 	renderer = p_renderer
 	viewport = p_viewport
 	exploration_system = p_system
 	scene_manager = p_scene_manager
 	realm_system = p_realm_system
+	tribulation_system = p_tribulation_system
 	_stage_ref()  # 依赖刚变——舞台按新 renderer/viewport 重新绑定
 
 
@@ -243,11 +253,25 @@ func _on_confirmed() -> void:
 			rest_used.emit(node_id, _services().call(&"rest_party",
 					exploration_system, node_id))
 		Rules.KIND_TRIBULATION:
-			tribulation_requested.emit(node_id)
-			_services().call(&"request_scene_change", scene_manager,
-					SceneManagerScript.SceneID.TRIBULATION,
-					SceneManagerScript.TransitionType.TRIBULATION)
+			_on_tribulation_confirmed(node_id)
 	close_popup()
+
+
+## 渡劫确认——走共用入口 [NodePopupServices.launch_tribulation]（顺序、失败收尾与回执
+## 全在 [code]tribulation_launch.gd[/code]，与修炼室那一路同一份）。[br]
+## [br][b]这里此前是断的[/b]：本分支只发转场请求、从不调
+## [code]trigger_tribulation[/code]——渡劫场景进战时状态还在 [code]NOT_READY[/code]，
+## 被降级成普通战斗，结算又因状态不是 [code]IN_COMBAT[/code] 直接 return：
+## [b]打赢也不进境、打输也不扣修为[/b]。信号先发、成没成由
+## [signal tribulation_launch_resolved] 回报（提示行接线归 HUD story）。[br]
+## 来源: GDD tribulation-system.md §1/§2 + §6、ADR-0021 §trigger_tribulation、AC-6。
+func _on_tribulation_confirmed(node_id: int) -> void:
+	tribulation_requested.emit(node_id)
+	var result: Dictionary = _services().call(&"launch_tribulation",
+			tribulation_system, scene_manager, self,
+			SceneManagerScript.SceneID.EXPLORATION)
+	tribulation_launch_resolved.emit(StringName(str(result.get("outcome", &""))),
+			str(result.get("text", "")))
 
 
 ## 发布探索→战斗的开战上下文（构建与发布委托 [code]combat_launch_request.gd[/code]）。[br]
