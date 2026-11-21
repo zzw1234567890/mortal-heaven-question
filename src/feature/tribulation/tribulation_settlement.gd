@@ -11,6 +11,10 @@ extends RefCounted
 const _STATE_SUCCESS: int = 4
 const _STATE_FAILED: int = 5
 const _STATE_NOT_READY: int = 0
+const _STATE_IN_COMBAT: int = 3
+
+## 金卡奖励发放单点（GDD §6——普通 1 张 / 越阶 2 张，从金档池随机取）。
+const RewardPoolScript := preload("res://src/feature/tribulation/tribulation_reward_pool.gd")
 
 ## TribulationType 枚举值。
 const _TYPE_NORMAL: int = 0
@@ -25,27 +29,41 @@ const CONSECUTIVE_FAILURE_THRESHOLD: int = 3
 ## 父节点引用——TribulationSystem Autoload 实例。
 var _parent: Node = null
 
+## 金卡奖励发放件——惰性初始化（[method _reward_pool]）。
+var _reward_pool_instance: RefCounted = null
+
 
 ## 构造——传入父节点引用。
 func _init(parent: Node = null) -> void:
 	_parent = parent
 
 
-## 渡劫成功结算——调用 realm_up + 重置失败计数 + 发射信号。[br]
+## 渡劫成功结算——调用 realm_up + 发金卡 + 重置失败计数 + 发射信号。[br]
 ## [br][b]流程[/b]（ADR-0021 §_handle_tribulation_success）:[br]
 ##   1. 记录 old_realm[br]
 ##   2. 调用 RealmSystem.realm_up(old_realm)[br]
 ##   3. GSM._set_consecutive_tribulation_failures(0)[br]
-##   4. _set_state(SUCCESS)[br]
-##   5. 发射 tribulation_succeeded 信号[br]
-##   6. _set_state(NOT_READY)[br]
-## [br][b]金卡奖励[/b]: TODO——CardSystem 未接线，后续 Sprint 补充。[br]
-## [br]来源: ADR-0021 §_handle_tribulation_success + GDD §4。
-func handle_success() -> void:
+##   4. 发金卡奖励（普通 1 张 / 越阶 2 张——GDD §6）[br]
+##   5. _set_state(SUCCESS)[br]
+##   6. 发射 tribulation_succeeded 信号[br]
+##   7. _set_state(NOT_READY)[br]
+## [br][b]幂等[/b]：入口先判「本场是否真的在打」——[code]tribulation_state[/code] 不是
+## [code]IN_COMBAT[/code] 就直接返回（判据与 [code]TribulationCombat.on_battle_ended[/code]
+## 完全同一处，不另造一套序号）。同一场渡劫被结算两次（场景重入 / 重复 [code]battle_end[/code]）
+## 时第二次进不来：境界不会连升两级、金卡不会连发两遍、失败计数也不会被再清一次。[br]
+## [br][b]返回[/b]：本场金卡发放报告 [code]{cards, cards_failed}[/code]（两键恒在）——
+## 由 [code]TribulationCombat.on_battle_ended[/code] 写进 [code]battle_ended[/code] 载荷，
+## 结算屏据此写出「获得：×××（金）」。未获发（池空 / 收藏被拒）时
+## [code]cards_failed[/code] 带中文原因，结算屏照实说明「未发放」。[br]
+## [br]来源: ADR-0021 §_handle_tribulation_success + GDD §4/§6。
+func handle_success() -> Dictionary:
 	var gsm: Node = _parent.call("_get_gsm")
 	if gsm == null:
-		return
+		return _empty_report()
+	if not _is_settling(gsm, "handle_success"):
+		return _empty_report()
 	var old_realm: int = int(gsm.player.realm)
+	var is_cross: bool = _parent.get("_trib_type") == _TYPE_CROSS_REALM
 	# 1. 调用 RealmSystem.realm_up——编排境界升级全流程
 	var realm_sys: Node = _parent.call("_get_realm_system")
 	if realm_sys != null and realm_sys.has_method("realm_up"):
@@ -57,16 +75,19 @@ func handle_success() -> void:
 	_recompute_max_cultivation(new_realm)
 	# 3. 重置连续失败计数器
 	gsm._set_consecutive_tribulation_failures(0)
-	# 4. 金卡奖励——TODO: CardSystem 未接线
+	# 4. 金卡奖励——GDD §6：普通 1 张、越阶额外 +1 张，从新境界卡池的金档取
+	var report: Dictionary = _reward_pool().grant(
+			_card_system(), gsm, is_cross)
 	# 5. 进入 SUCCESS 状态
 	_parent.call("_set_state", _STATE_SUCCESS)
-	var is_cross: bool = _parent.get("_trib_type") == _TYPE_CROSS_REALM
-	# 6. 发射渡劫成功信号
+	# 6. 发射渡劫成功信号（载荷沿用已接受的三参签名——金卡报告走 battle_ended 载荷，
+	#    不在此扩参：扩参会同时改变既有订阅者的回调签名）
 	_parent.call("_emit_safe", &"tribulation_succeeded", [old_realm, new_realm, is_cross])
 	# 7. 回到 NOT_READY
 	_parent.call("_set_state", _STATE_NOT_READY)
 	_parent.set("_trib_type", _TYPE_NORMAL)
 	_parent.get("_active_pills").clear()
+	return report
 
 
 ## 请 [code]CultivationSystem[/code] 按新境界重算修为上限（并顺带结算溢出池）。[br]
@@ -98,6 +119,46 @@ func _cultivation_system() -> Node:
 	return tree.root.get_node_or_null("/root/CultivationSystem")
 
 
+## 获取 CardSystem 引用——经父节点取（父节点支持注入覆盖，测试可换夹具注册表）。[br]
+## [br][b]取不到返回 null 而不是报错[/b]：金卡池取不到要走「未发放」降级，不是崩溃点。
+func _card_system() -> Node:
+	if _parent == null or not _parent.has_method("_get_card_system"):
+		return null
+	return _parent.call("_get_card_system")
+
+
+## 金卡奖励发放件（惰性初始化——不发奖的路径不构造它）。
+func _reward_pool() -> RefCounted:
+	if _reward_pool_instance == null:
+		_reward_pool_instance = RewardPoolScript.new()
+	return _reward_pool_instance
+
+
+## 本场是否真的在「打渡劫」——幂等守卫（见 [method handle_success] 的「幂等」）。[br]
+## [br][b]为什么直接读状态而不自己记序号[/b]：状态机本身已经是「本场在不在打」的
+## 唯一事实——[code]IN_COMBAT[/code] 进出由 [code]start_tribulation_combat[/code] 与
+## 结算的收尾一步配对。自记序号会多出一份可以与状态机不一致的簿记，而
+## [code]TribulationCombat.on_battle_ended[/code] 已经在用同一个判据，
+## 两处判据同源才不可能分叉。[br]
+## [br][b]不在渡劫中一律不收尾[/b]：普通战斗撞上来的 [code]battle_ended[/code]、
+## 重复结算、以及玩家从节点图直接进渡劫场景的降级路径，全都落到这里返回。
+func _is_settling(gsm: Node, p_caller: String) -> bool:
+	var state: int = int(gsm.player.get("tribulation_state", _STATE_NOT_READY))
+	if state == _STATE_IN_COMBAT:
+		return true
+	push_warning("TribulationSystem.%s: 当前状态非 IN_COMBAT（%d）——本场渡劫不结算"
+			% [p_caller, state])
+	return false
+
+
+## 空发放报告（两键恒在——消费方无需判 null）。
+func _empty_report() -> Dictionary:
+	return {
+		RewardPoolScript.KEY_CARDS: [],
+		RewardPoolScript.KEY_FAILED: [],
+	}
+
+
 ## 渡劫失败结算——修为扣除 + 失败计数 + 发射信号 + 保护检查。[br]
 ## [br][b]流程[/b]（ADR-0021 §_handle_tribulation_failure + GDD §5）:[br]
 ##   1. 计算 penalty = floor(max_cult × FAILURE_PENALTY_RATIO)[br]
@@ -107,10 +168,14 @@ func _cultivation_system() -> Node:
 ##   5. 发射 tribulation_failed 信号[br]
 ##   6. 连续 ≥3 次发射 tribulation_protection_unlocked[br]
 ##   7. _set_state(NOT_READY)[br]
+## [br][b]幂等[/b]：与 [method handle_success] 同一条守卫（[method _is_settling]）
+## ——同一场结算两次不会扣两遍修为、也不会把失败计数加两次。[br]
 ## [br]来源: ADR-0021 §_handle_tribulation_failure + GDD §5 + §公式 1。
 func handle_failure() -> void:
 	var gsm: Node = _parent.call("_get_gsm")
 	if gsm == null:
+		return
+	if not _is_settling(gsm, "handle_failure"):
 		return
 	var max_cult: int = int(gsm.player.max_cultivation)
 	var current: int = int(gsm.player.cultivation)

@@ -16,6 +16,9 @@ const _STATE_IN_COMBAT: int = 3
 const _TYPE_NORMAL: int = 0
 const _TYPE_CROSS_REALM: int = 1
 
+## 金卡报告载荷键的出处（不在此写字符串字面量）。
+const RewardPoolScript := preload("res://src/feature/tribulation/tribulation_reward_pool.gd")
+
 ## 父节点引用——TribulationSystem Autoload 实例。
 var _parent: Node = null
 
@@ -76,19 +79,45 @@ func build_tribulation_config() -> Dictionary:
 
 ## 监听 CombatSystem.battle_ended——渡劫专属结算入口。[br]
 ## [br][param result] 战斗结果（CombatResult.VICTORY/DEFEAT/RETREAT）。[br]
-## [br][param rewards] 奖励字典。[br]
-## [br][b]流程[/b]: 检查 tribulation_state == IN_COMBAT → VICTORY 调用 _handle_success / DEFEAT 调用 _handle_failure。[br]
+## [br][param rewards] 奖励字典（[b]本方法会往里写渡劫金卡报告[/b]——见下）。[br]
+## [b]流程[/b]: 检查 tribulation_state == IN_COMBAT → VICTORY 调用 _handle_success / DEFEAT 调用 _handle_failure。[br]
 ## [br][b]非渡劫战[/b]: tribulation_state != IN_COMBAT 时忽略（普通战斗不响应）。[br]
-## [br]来源: ADR-0021 §_on_battle_ended + GDD §4-5。
-func on_battle_ended(result: int, _rewards: Dictionary) -> void:
+## [br][b]同一条判据兼作幂等守卫[/b]：结算是「本场在不在打」这一事实的消费方——
+## [code]TribulationSettlement.handle_success[/code] 最后一步把状态推回
+## [code]NOT_READY[/code]，故同一场被结算两次时第二次直接走这里的 return：
+## 境界不会连升两级、金卡不会连发两遍、修为不会连扣两次。[b]不另造序号[/b]
+## （[code]CombatSystem._battle_serial[/code] 那套是战斗域自己的掷骰守卫，
+## 渡劫这层用状态机本身的事实即可）。[br]
+## [br][b]为什么把金卡报告写回 [code]rewards[/code] 而不是另发信号[/b]：
+## [code]battle_ended[/code] 的载荷就是本场战果的唯一载体——结算面板
+## （[code]SettlementHost[/code]）与结算屏（[code]CombatResultView[/code]）都从它取数。
+## 另发一条信号会让这两处各多一次订阅与断线，还引入「谁先到」的时序问题。[br]
+## [br][b]写入时机依赖连接顺序[/b]：[code]TribulationSystem[/code] 在 Autoload
+## [code]_ready[/code] 里订阅（[code]tribulation_system.gd[/code] §_ready），早于任何
+## 战斗场景装配的订阅者（如 [code]combat_result_bridge.gd[/code]）——故本方法在
+## 折叠载荷之前就把键写好了。这一条是契约，改动订阅时机需同步复核。[br]
+## [br]来源: ADR-0021 §_on_battle_ended + GDD §4-5/§6。
+func on_battle_ended(result: int, rewards: Dictionary) -> void:
 	var gsm: Node = _parent.call("_get_gsm")
 	if gsm == null:
 		return
 	var state: int = int(gsm.player.get("tribulation_state", _STATE_NOT_READY))
 	if state != _STATE_IN_COMBAT:
-		return  # 非渡劫战——忽略
+		return  # 非渡劫战 / 本场已结算过——忽略
 	# CombatResult.VICTORY=0, DEFEAT=1, RETREAT=2（渡劫战中撤退不可用——仅 DEFEAT）
 	if result == 0:  # CombatResult.VICTORY
-		_parent.call("_handle_tribulation_success")
+		var report: Dictionary = _parent.call("_handle_tribulation_success")
+		_attach_reward_report(rewards, report)
 	else:  # DEFEAT or RETREAT
 		_parent.call("_handle_tribulation_failure")
+
+
+## 把金卡发放报告写进 [code]battle_ended[/code] 载荷（键名取自
+## [code]tribulation_reward_pool.gd[/code]——唯一出处，消费方都引它）。[br]
+## [br][b]失败不发卡也不写键[/b]：没有奖励就没有这一段，结算界面自然「不建那一行」。[br]
+## [br][b]载荷为空时静默跳过[/b]：没有可写的载荷就没有这一段（载荷被换掉 / 调用方只
+## 传字面量空字典的路径不该在这里崩）。
+func _attach_reward_report(rewards: Dictionary, report: Dictionary) -> void:
+	if rewards == null or report == null or report.is_empty():
+		return
+	rewards[RewardPoolScript.KEY_PAYLOAD] = report.duplicate(true)

@@ -85,6 +85,12 @@ var _combat_override: Node = null
 ## 可注入 RealmSystem 引用——测试时设置，绕过 Autoload 查找。
 var _realm_override: Node = null
 
+## 可注入 CardSystem 引用——测试时设置，绕过 Autoload 查找（同 _realm_override 模式）。[br]
+## [br][b]为什么需要[/b]：金卡奖励要从模板注册表里挑「金档」模板，而真实 Autoload 的
+## 模板是[b]异步[/b]加载的（[code]load_threaded_request[/code]）——测试注入一个已灌入
+## 夹具模板的实例即可确定性地验「发的是不是金档」。
+var _card_override: Node = null
+
 ## 结算子模块——惰性初始化（Sprint 9 Story 7 拆分）。
 var _settlement: RefCounted = null
 
@@ -344,9 +350,12 @@ func use_tribulation_pill(pill_data: Dictionary) -> bool:
 
 # === 成功/失败结算（Story 5-12——委托给 tribulation_settlement.gd 子模块）===
 
-## 渡劫成功结算——委托给子模块（Sprint 9 Story 7 拆分）。
-func _handle_tribulation_success() -> void:
-	_get_settlement().handle_success()
+## 渡劫成功结算——委托给子模块（Sprint 9 Story 7 拆分）。[br]
+## [br][b]返回[/b]：本场金卡发放报告 [code]{cards, cards_failed}[/code]（见
+## [method TribulationSettlement.handle_success]）——[code]TribulationCombat[/code]
+## 把它写进 [code]battle_ended[/code] 载荷，结算屏据此写出「获得：×××（金）」。
+func _handle_tribulation_success() -> Dictionary:
+	return _get_settlement().handle_success()
 
 
 ## 渡劫失败结算——委托给子模块。
@@ -395,3 +404,14 @@ func _get_realm_system() -> Node:
 	if tree == null:
 		return null
 	return tree.root.get_node_or_null("/root/RealmSystem")
+
+
+## 获取 CardSystem 引用——优先使用注入的覆盖引用，否则通过 SceneTree Autoload 查找。[br]
+## [br][b]返回[/b]: CardSystem 节点或 [code]null[/code]（未注册时——金卡走「未发放」降级）。
+func _get_card_system() -> Node:
+	if _card_override != null and is_instance_valid(_card_override):
+		return _card_override
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("/root/CardSystem")

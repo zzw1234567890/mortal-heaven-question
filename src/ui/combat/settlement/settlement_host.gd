@@ -25,6 +25,8 @@ const RetreatScript := preload("res://src/ui/combat/settlement/retreat_dialog.gd
 const WarningScript := preload("res://src/ui/combat/settlement/tribulation_warning_dialog.gd")
 ## 奖励文案内核——与结算场景/回探索提示共用同一份口径。
 const RewardLines := preload("res://src/feature/combat/combat_reward_lines.gd")
+## 渡劫金卡文案内核——渡劫结算报告 → 「获得：×××（金）」的中文行（GDD §6）。
+const TribRewardLines := preload("res://src/feature/tribulation/tribulation_reward_lines.gd")
 ## 数据快照与载荷构建工具（拆分自宿主——行数预算）。
 const Data := preload("res://src/ui/combat/settlement/settlement_host_data.gd")
 
@@ -139,13 +141,16 @@ func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 				lines.append("灵石 +%d" % lingshi)
 			if cultivation > 0:
 				lines.append("修为 +%d" % cultivation)
+			lines.append_array(tribulation_reward_lines(rewards))
 			settlement_panel.show_victory(options, int(counts["count"]),
 					int(counts["limit"]), lines)
 			# 直接切换到汇总视图
 			settlement_panel.show_grant_summary(lines)
 		else:
+			var lines: Array = RewardLines.reward_lines(rewards)
+			lines.append_array(tribulation_reward_lines(rewards))
 			settlement_panel.show_victory(options, int(counts["count"]),
-					int(counts["limit"]), RewardLines.reward_lines(rewards))
+					int(counts["limit"]), lines)
 	elif kind == Rules.KIND_DEFEAT:
 		settlement_panel.show_defeat(Data.defeat_summary(rewards, _dead_names,
 				_dead_binding_card_count))
@@ -365,8 +370,21 @@ func _show_grant_summary(result: Dictionary) -> void:
 		# 跳过卡牌时添加放弃文案
 		if cards.is_empty() and not _current_rolled_rewards.get("cards", []).is_empty():
 			lines.append("未选择即放弃，卡牌不进收藏")
+		lines.append_array(tribulation_reward_lines(_current_rolled_rewards))
 	# 无任何奖励时显示提示
 	if lines.is_empty():
 		lines.append("本次战斗无奖励")
 	# 隐藏战利品网格，只显示汇总
 	settlement_panel.show_grant_summary(lines)
+
+
+## 渡劫金卡奖励行——载荷里没有 [code]tribulation_rewards[/code] 时返回空数组。[br]
+## [br][b]为什么在宿主里再包一层[/b]：载荷键名是渡劫侧的口径（
+## [code]tribulation_reward_pool.gd[/code] 的 [code]KEY_PAYLOAD[/code]），宿主不该
+## 自己写一遍字符串；这一层只负责「取键 → 交给文案内核」。[br]
+## [br][b]普通战斗天然为空[/b]：键只在渡劫战结算时写入（见
+## [code]TribulationCombat.on_battle_ended[/code]），故这一段对普通战斗不产生任何行。
+func tribulation_reward_lines(p_rewards: Dictionary) -> Array:
+	if not p_rewards.has(TribRewardLines.PoolScript.KEY_PAYLOAD):
+		return []
+	return TribRewardLines.card_lines(p_rewards.get(TribRewardLines.PoolScript.KEY_PAYLOAD))

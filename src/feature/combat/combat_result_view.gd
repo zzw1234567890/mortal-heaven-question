@@ -19,6 +19,8 @@ extends RefCounted
 
 ## 奖励文案内核（与结算面板/回探索提示同一份口径）。
 const RewardLines := preload("res://src/feature/combat/combat_reward_lines.gd")
+## 渡劫金卡文案内核——渡劫战才有的那段「获得：×××（金）」（GDD §6）。
+const TribRewardLines := preload("res://src/feature/tribulation/tribulation_reward_lines.gd")
 ## 名字兜底口径（[code]resolve_name[/code]——与战斗内建表/播报同源）。
 const NameRules := preload("res://src/feature/combat/combat_roster_seeding.gd")
 
@@ -269,9 +271,20 @@ func summary_lines() -> PackedStringArray:
 
 ## 本场奖励文案行（[code]CombatRewardLines.reward_lines()[/code] 口径——空 = 无奖励）。[br]
 ## [br][b]为什么放在这里而不是场景里[/b]：胜利/战败两个场景、结算面板、回探索提示
-## 各有一条读取路径，口径只留一处（同 [method summary_lines] 的集中理由）。
+## 各有一条读取路径，口径只留一处（同 [method summary_lines] 的集中理由）。[br]
+## [br][b]渡劫金卡接在末尾[/b]：渡劫战的载荷多一段 [code]tribulation_rewards[/code]
+## （GDD §6 的固定金卡），普通战斗没有这一段、行数组逐字节不变。
 func reward_lines() -> Array:
-	return RewardLines.reward_lines(rewards)
+	var lines: Array = RewardLines.reward_lines(rewards)
+	lines.append_array(tribulation_reward_lines())
+	return lines
+
+
+## 渡劫金卡奖励行（[code]TribulationRewardLines[/code] 口径——非渡劫战为空数组）。
+func tribulation_reward_lines() -> Array:
+	if not rewards.has(TribRewardLines.PoolScript.KEY_PAYLOAD):
+		return []
+	return TribRewardLines.card_lines(rewards.get(TribRewardLines.PoolScript.KEY_PAYLOAD))
 
 
 ## 本场奖励的单行摘要（回探索提示用；空 = 无需提示）。
