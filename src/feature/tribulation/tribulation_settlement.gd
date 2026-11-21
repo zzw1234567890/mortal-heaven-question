@@ -52,19 +52,50 @@ func handle_success() -> void:
 		realm_sys.realm_up(old_realm)
 	else:
 		push_warning("TribulationSystem: RealmSystem 不可用，realm_up 未调用")
-	# 2. 重置连续失败计数器
-	gsm._set_consecutive_tribulation_failures(0)
-	# 3. 金卡奖励——TODO: CardSystem 未接线
-	# 4. 进入 SUCCESS 状态
-	_parent.call("_set_state", _STATE_SUCCESS)
 	var new_realm: int = int(gsm.player.realm)
+	# 2. 修为上限重算 + 溢出结算（见 _recompute_max_cultivation 的「为什么要显式调」）
+	_recompute_max_cultivation(new_realm)
+	# 3. 重置连续失败计数器
+	gsm._set_consecutive_tribulation_failures(0)
+	# 4. 金卡奖励——TODO: CardSystem 未接线
+	# 5. 进入 SUCCESS 状态
+	_parent.call("_set_state", _STATE_SUCCESS)
 	var is_cross: bool = _parent.get("_trib_type") == _TYPE_CROSS_REALM
-	# 5. 发射渡劫成功信号
+	# 6. 发射渡劫成功信号
 	_parent.call("_emit_safe", &"tribulation_succeeded", [old_realm, new_realm, is_cross])
-	# 6. 回到 NOT_READY
+	# 7. 回到 NOT_READY
 	_parent.call("_set_state", _STATE_NOT_READY)
 	_parent.set("_trib_type", _TYPE_NORMAL)
 	_parent.get("_active_pills").clear()
+
+
+## 请 [code]CultivationSystem[/code] 按新境界重算修为上限（并顺带结算溢出池）。[br]
+## [br][b]为什么渡劫这边要显式调一次[/b]：按设计，上限重算走
+## [code]realm_changed[/code]（Cat 1）→ [code]CultivationSystem.on_realm_changed[/code]
+## （GDD §6/§7）。但 GSM 的域信号只在「本帧恰好一条变更」时发射，多条时[b]只发
+## [code]batch_updated[/code][/b]——而渡劫结算是典型的同帧多写入（境界 + 渡劫状态 +
+## 连续失败计数），[code]realm_changed[/code] 根本到不了 [code]CultivationSystem[/code]：
+## 修为上限会停在上一个境界（溢出池也不会结算）。[br]
+## [br][b]幂等[/b]：[code]update_max_cultivation[/code] 值没变就不写、溢出不足一个
+## 转化单位也不写——信号真到了的那条路再算一次同样无害。[br]
+## [br][b]取不到就算了[/b]：系统缺失时 push_warning 并返回（境界已经升上去了，
+## 不能因为重算不到就把结算判失败）。[br]
+## [br]来源: GDD cultivation-system.md §6/§7、ADR-0010 §realm_up 编排器、
+## GSM 帧末缓冲既有契约（[code]gsm_signal_router.gd[/code] §_flush_pending_changes）。
+func _recompute_max_cultivation(p_new_realm: int) -> void:
+	var cs: Node = _cultivation_system()
+	if cs == null or not cs.has_method("update_max_cultivation"):
+		push_warning("TribulationSystem: CultivationSystem 不可用，修为上限未重算")
+		return
+	cs.call("update_max_cultivation", p_new_realm)
+
+
+## 获取 CultivationSystem 引用——通过 SceneTree Autoload。
+func _cultivation_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("/root/CultivationSystem")
 
 
 ## 渡劫失败结算——修为扣除 + 失败计数 + 发射信号 + 保护检查。[br]

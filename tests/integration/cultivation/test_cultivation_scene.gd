@@ -26,6 +26,8 @@ extends GutTest
 
 const ScreenScene: PackedScene = preload("res://src/feature/cultivation/cultivation_scene.tscn")
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
+## 渡劫判定层（本文件借它取真境界表 + 键名——不自己抄一份配置）。
+const GateScript := preload("res://src/ui/cultivation/cultivation_tribulation_gate.gd")
 ## 配置读取面（期望的境界名 / 所需修为从这里取——测试不自己硬编码等级名）。
 const TableScript := preload("res://src/feature/exploration/exploration_breakthrough_table.gd")
 
@@ -95,14 +97,32 @@ func _reset_player() -> void:
 
 ## 挂载修炼室场景（注入导航桩；[param p_cultivation] 非空时替换修行系统）。[br]
 ## [br][b]注入必须在进树前[/b]：[code]_ready[/code] 那一刻就会 [code]refresh()[/code]，
-## 之后再赋字段这次刷新已经错过了。
-func _mount(p_cultivation: Variant = null) -> Control:
+## 之后再赋字段这次刷新已经错过了。[br]
+## [br][b]为什么本文件要传一张「无需渡劫」的境界表[/b]：按渡劫 GDD，低于最高境界的
+## 每次大境界提升都要先渡劫（修为满 → 打一场天劫战 → 才进境），此时第二行动作叫
+## 「渡劫」、点下去是转场而不是 [code]realm_up[/code]。本文件验的是[b]直接突破那条
+## 路本身[/b]（点下去境界真的升、上限真的跟着重算），故注入一张把炼气期标成
+## 「无需渡劫」的同构表——那条路在真配置里正是留给剧情专属境界的（GDD
+## tribulation-system.md §7「唯一例外」）。两条路的界面行为由
+## [code]test_cultivation_tribulation_entry.gd[/code] 分别钉住。
+func _mount(p_cultivation: Variant = null, p_table: Variant = null) -> Control:
 	var instance: Control = ScreenScene.instantiate() as Control
 	instance.set("scene_manager", sm)
 	if p_cultivation != null:
 		instance.set("cultivation_system", p_cultivation)
+	instance.set("tribulation_table", p_table if p_table != null \
+			else _table_without_tribulation_at_realm_one())
 	add_child_autofree(instance)
 	return instance
+
+
+## 一张「炼气期不需要渡劫」的境界表副本（其余行全部走真配置——见 [method _mount]）。[br]
+## [br][b]为什么复制而不是改真表[/b]：[code]RealmSystem.realm_table[/code] 是全局单例
+## 数据，改了会漏进别的用例。
+func _table_without_tribulation_at_realm_one() -> Dictionary:
+	var table: Dictionary = GateScript.RealmScript.realm_table.duplicate(true)
+	(table[1] as Dictionary)[GateScript.KEY_REQUIRES_TRIBULATION] = false
+	return table
 
 
 func _cultivation() -> int:
@@ -278,7 +298,8 @@ func test_cultivation_scene_breakthrough_without_enough_changes_nothing() -> voi
 func test_cultivation_scene_disabled_row_click_shows_reason() -> void:
 	# Arrange——修为 0，突破行禁用
 	screen = _mount()
-	var breakthrough: Button = screen.get("_breakthrough_button")
+	var breakthrough: Button = screen.row_button(1)
+	assert_true(breakthrough != null, "前置：应能取到第二动作行的控件")
 	assert_true(breakthrough.disabled, "前置：修为未满时突破行应禁用")
 	# Act——把真实鼠标按下事件投给那一行
 	breakthrough.gui_input.emit(_click())
@@ -291,7 +312,7 @@ func test_cultivation_scene_disabled_row_click_shows_reason() -> void:
 func test_cultivation_scene_hover_does_not_show_reason() -> void:
 	# Arrange
 	screen = _mount()
-	var breakthrough: Button = screen.get("_breakthrough_button")
+	var breakthrough: Button = screen.row_button(1)
 	var before: String = str(screen.message_text())
 	# Act——抬起事件（非按下）
 	var released := InputEventMouseButton.new()

@@ -30,6 +30,8 @@ const TEXT_TITLE: String = "🧘 修炼室"
 ## 「打坐」按钮文案（含增量——玩家进屏就知道按一下能给多少）。
 const TEXT_MEDITATE: String = "打坐（+%d 修为）"
 const TEXT_BREAKTHROUGH: String = "突破"
+## 「渡劫」按钮文案（需要渡劫的境界用这一句——语义不同，文案必须跟着不同）。
+const TEXT_TRIBULATION: String = "渡劫"
 const TEXT_BALANCE: String = "灵石：%d"
 const TEXT_REALM: String = "当前境界：%s"
 const TEXT_PROGRESS: String = "修为 %d / %d"
@@ -37,9 +39,30 @@ const TEXT_PROGRESS: String = "修为 %d / %d"
 const TEXT_UNKNOWN: String = "—"
 ## 打坐完成、突破成功的回执。
 const TEXT_MEDITATE_DONE: String = "打坐完毕：修为 +%d。"
+## 已达最高境界时「打坐」行的原因——没有下一境界可去，攒修为无处兑现
+## （溢出属性丹的发放挂在突破上，见 GDD cultivation-system.md §7）。[br]
+## [br]与 [code]ExplorationBreakthroughTable.TEXT_AT_MAX[/code]（「无需突破」）刻意分开：
+## 一行是「别再攒了」、一行是「别再突破了」，玩家点哪一行看到哪一句。
+const TEXT_MEDITATE_AT_MAX: String = "已达最高境界，修为无处可用。"
 const TEXT_BREAKTHROUGH_DONE: String = "突破成功：%s → %s，修为上限随即提升。"
+## 渡劫触发回执（即将转场——说明去哪里、要做什么）。
+const TEXT_TRIBULATION_STARTED: String = "已触发渡劫——前往天劫之下，胜则进境。"
+## 渡劫归来回执（成功 / 失败）——渡劫战的结算在战斗侧，本屏只把结果讲给玩家听。
+const TEXT_TRIBULATION_SUCCEEDED: String = "渡劫成功：%s → %s，修为上限随即提升。"
+const TEXT_TRIBULATION_FAILED: String = "渡劫失败：修为损失 %d，境界未变。"
 ## 状态行：修为满且未到顶。
 const TEXT_CAN_BREAK: String = "修为已满——可以突破了。"
+## 状态行：修为满、该走渡劫的境界（[code]TEXT_CAN_BREAK[/code] 的渡劫版——两句话分开
+## 是因为「点下去会发生什么」不同：一个直接进境，一个要先打一场）。
+const TEXT_CAN_TRIBULATE: String = "修为已满，需渡劫方能进境。"
+## 渡劫流程已在进行中（准备 / 渡劫战中）——不得重复触发（ADR-0021 §check_tribulation_ready）。
+const TEXT_TRIBULATION_BUSY: String = "渡劫流程进行中，先了结这一场。"
+## 渡劫系统缺失——可读的降级文案（不让玩家点了没反应）。
+const TEXT_TRIBULATION_UNAVAILABLE: String = "渡劫系统不可用，此处暂时无法渡劫。"
+## 渡劫去向的场景不可用（SceneManager 缺失）。
+const TEXT_NO_SCENE_MANAGER_TRIBULATION: String = "场景管理器不可用，暂时无法前往渡劫。"
+## 转场请求被拒（SceneManager 正在转场中——并发守卫）。渡劫状态已退回，可再试。
+const TEXT_TRIBULATION_DEPART_FAILED: String = "转场被拒——渡劫已取消，稍后再试。"
 ## 操作提示行。
 const TEXT_HINT: String = "↑ ↓ 选行动，回车执行，Esc 返回主菜单。"
 ## 系统缺失时的可读降级文案。
@@ -126,3 +149,21 @@ static func meditate_done_line(p_amount: int) -> String:
 static func breakthrough_done_line(p_realm: int) -> String:
 	return TEXT_BREAKTHROUGH_DONE % [TableScript.realm_name(p_realm),
 			TableScript.realm_name(p_realm + 1)]
+
+
+## 渡劫触发回执（转场之前写给玩家看的那一句）。
+static func tribulation_started_line() -> String:
+	return TEXT_TRIBULATION_STARTED
+
+
+## 渡劫成功回执（旧境界名 / 新境界名——名字取自配置表，数字不写死）。[br]
+## [br][b]与 [method breakthrough_done_line] 同为「跃迁」句式但句子不同[/b]：玩家回来时
+## 需要能分清这次是打赢了天劫、还是走的直接突破那条路。
+static func tribulation_succeeded_line(p_old_realm: int, p_new_realm: int) -> String:
+	return TEXT_TRIBULATION_SUCCEEDED % [TableScript.realm_name(p_old_realm),
+			TableScript.realm_name(p_new_realm)]
+
+
+## 渡劫失败回执（修为损失量由结算给出——本模块不自己算，同「上限不写死」的理由）。
+static func tribulation_failed_line(p_penalty: int) -> String:
+	return TEXT_TRIBULATION_FAILED % p_penalty
