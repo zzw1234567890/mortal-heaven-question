@@ -30,11 +30,27 @@ const FORMATION_WIDTH_RATIO: float = 168.0 / 1920.0
 ## 组件间距（8/1920）。
 const GAP_RATIO: float = 8.0 / 1920.0
 
+## === 结局行文案内核 ==========================================================
+
+## 结局行文案内核（[code]result + 渡劫标识 → 一行中文[/code]）。
+const OutcomeLines: GDScript = preload(
+		"res://src/ui/combat/shared/combat_outcome_lines.gd")
+
 ## === 子组件引用 ==============================================================
 
 var phase_indicator: PhaseIndicator = null
 var formation_zone: FormationZone = null
 var combat_log: CombatLog = null
+
+## === 本场标识 ================================================================
+
+## 本场是否渡劫战——开战时从 [code]battle_started[/code] 的配置里定格
+## （[code]is_tribulation[/code] 键由 [code]TribulationCombat.build_tribulation_config[/code]
+## 写入，本组件不自造判据）。[br]
+## [br][b]为什么在开战时取而不是结束时问[/b]：结束那一刻战斗系统已把本场配置
+## 用完了（并且顶部条并不持有战斗源对象）——开战载荷是这条信息唯一必然在场的时刻。[br]
+## [br][b]缺省 false[/b]：老调用方 / 桩载荷不发该键时按普通战斗处理。
+var _is_tribulation: bool = false
 
 ## === 注入回调 ================================================================
 
@@ -116,14 +132,24 @@ func _on_phase_changed(old_phase: int, new_phase: int, turn: int) -> void:
 	combat_log.apply_phase(new_phase)
 
 
-## battle_started → 初始阶段落定（阶段 0「准备」+ 回合 1——消除「—/第 0 回合」初始态）。
-func _on_battle_started(_config: Dictionary) -> void:
+## battle_started → 初始阶段落定（阶段 0「准备」+ 回合 1——消除「—/第 0 回合」初始态）
+## + 定格本场渡劫标识（结局行文案要用——见 [member _is_tribulation]）。
+func _on_battle_started(config: Dictionary) -> void:
 	phase_indicator.set_initial_phase(0, 1)
+	_is_tribulation = bool(config.get(&"is_tribulation", false))
 
 
-## battle_ended → 日志清空（AC-2 战后清理条款）。
-func _on_battle_ended(_result: int, _rewards: Dictionary) -> void:
+## battle_ended → 日志清空（AC-2 战后清理条款）+ 补一条结局行。[br]
+## [br][b]为什么先清后写[/b]：这场的过程播报对玩家已经没有后续价值，但「谁赢了、
+## 是不是渡劫」正是他此刻要的答案——清空与写结局是同一次收尾的两半。[br]
+## [br][b]不另造渲染[/b]：走 [method CombatLog.append_entry]，与敌人行动播报
+## （[code]EnemyActionBroadcast[/code]）同一入口、同一个渲染快照。[br]
+## [br][b]文案内核[/b]：[class CombatOutcomeLines]（纯映射，可脱离场景逐档断言）。
+func _on_battle_ended(result: int, _rewards: Dictionary) -> void:
+	if combat_log == null:
+		return
 	combat_log.clear()
+	combat_log.append_entry(OutcomeLines.outcome_entry(result, _is_tribulation))
 
 
 ## === 布局 ====================================================================

@@ -36,8 +36,15 @@ const DEATH_DURATION_SEC: float = 0.5
 ## 阵亡终态的空位接替（卡 → 带「已阵亡」戳记的空位虚线框，见该模块类文档）。
 const DeathHandoff := preload("res://src/ui/combat/feedback/combat_death_handoff.gd")
 
-## 已转发的战斗结果（-1 = 未结束；AC-3 断言用）。
-var forwarded_result: int = -1
+## 本场是否已转发结算结果（AC-3 全灭短路的布雷位）。[br]
+## [br][b]为什么是布尔而不是结果码[/b]：这里要记的是「本场转没转过」这一位事实，
+## 结果取值由 [signal battle_result_forwarded] 的载荷承载。此前用
+## [code]forwarded_result: int = -1[/code] 兼任两者——而 [code]-1[/code] 并不在
+## [enum CombatSystem.CombatResult] 里（[code]NONE=0 / VICTORY=1 / DEFEAT=2 /
+## RETREAT=3[/code]），读代码的人会以为它是某个结果值。[br]
+## [br][b]不复位[/b]：一个编排器实例只服务一场战斗（场景挂载侧每场新建），
+## 与改造前的行为逐位一致。
+var _result_forwarded: bool = false
 
 ## === 瞬态视觉状态（§2.1 豁免）=================================================
 
@@ -238,7 +245,7 @@ func _on_battle_ended(result: int, rewards: Dictionary) -> void:
 		if dying_card != null:
 			dying_card.modulate.a = 1.0  # L-2——中途杀动画恢复不透明（防半透明悬挂）
 		_kill_death_tween(character_id)
-	forwarded_result = result
+	_result_forwarded = true
 	battle_result_forwarded.emit(result, rewards)
 
 
@@ -256,7 +263,7 @@ func _on_character_died(character_id: int, side: int,
 ## 阵亡动画执行（两条路径汇合：pending_death 结算帧 / character_died 信号）。[br]
 ## 幂等：已在播或已移除的卡不重播。
 func _play_death(character_id: int) -> void:
-	if forwarded_result != -1:
+	if _result_forwarded:
 		return  # 全灭短路后不再播动画（M-1——结算面板已接管）
 	var card: Control = _cards.get(character_id)
 	if card == null:
