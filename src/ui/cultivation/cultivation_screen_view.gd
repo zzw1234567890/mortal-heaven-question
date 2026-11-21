@@ -29,6 +29,8 @@ var _fill: ColorRect = null
 var _message: Label = null
 var _meditate: Button = null
 var _breakthrough: Button = null
+## 越阶渡劫勾选框（GDD §6 主动选项——默认不勾，能不能勾由判定层给）。
+var _cross_toggle: CheckButton = null
 
 
 ## 接线——取控件树产物（[code]CultivationSceneLayout.build[/code] 的返回值）。[br]
@@ -47,10 +49,17 @@ func _init(p_parts: Dictionary) -> void:
 	_message = p_parts.get("message_label") as Label
 	_meditate = p_parts.get("meditate_button") as Button
 	_breakthrough = p_parts.get("breakthrough_button") as Button
+	_cross_toggle = p_parts.get("cross_realm_toggle") as CheckButton
 	if _meditate != null:
 		_meditate.text = RulesScript.meditate_line()
 	if _breakthrough != null:
 		_breakthrough.text = RulesScript.TEXT_BREAKTHROUGH
+	if _cross_toggle != null:
+		# 初值「关」——GDD §6 越阶非默认（勾选态由玩家决定，界面不代他选）。
+		_cross_toggle.text = RulesScript.cross_realm_line(false)
+		# 勾选态一动手就把文案换成对应那一句（两处写「开/关」必然漂移）。
+		_cross_toggle.toggled.connect(func(p_pressed: bool) -> void:
+			_cross_toggle.text = RulesScript.cross_realm_line(p_pressed))
 	show_message(RulesScript.TEXT_HINT)
 
 
@@ -75,6 +84,26 @@ func present(p_status: Dictionary, p_ling_shi: int) -> void:
 	_meditate.disabled = not bool(p_status.get("meditate_enabled", true))
 	_breakthrough.text = str(p_status.get("button_text", RulesScript.TEXT_BREAKTHROUGH))
 	_breakthrough.disabled = not bool(p_status.get("enabled", false))
+	_present_cross_realm(p_status)
+
+
+## 越阶渡劫勾选框的可见性 / 可用性 / 文案。[br]
+## [br][b]三态各有各的呈现[/b]：规则允许（该境界需渡劫且 +1 存在）→ 可勾可取消；
+## 规则不允许 → 藏起来（到顶前一级、不走渡劫的境界里这一行毫无意义，留着只是噪音）；
+## 玩家已经勾上但此刻规则不允许（境界变了）→ 取消勾选，避免把「上一次的选择」
+## 带进一个它不成立的场合。[br]
+## [br][b]为什么在刷新时收回勾选[/b]：勾选态属于玩家的[b]当下选择[/b]，不是持久偏好——
+## 越阶渡劫成功会升境（+1 可能不再可选），那时留着勾就是在替玩家选了下一次的越阶。
+func _present_cross_realm(p_status: Dictionary) -> void:
+	if _cross_toggle == null:
+		return
+	var available: bool = bool(p_status.get("cross_realm_available", false))
+	_cross_toggle.visible = available
+	if not available:
+		_cross_toggle.button_pressed = false
+		_cross_toggle.text = RulesScript.TEXT_CROSS_REALM_UNAVAILABLE
+		return
+	_cross_toggle.text = RulesScript.cross_realm_line(_cross_toggle.button_pressed)
 
 
 ## 系统缺失时的降级形态（可读的中文原因 + 唯一可用的出口，不臆造数值）。
@@ -87,6 +116,9 @@ func present_unavailable(p_ling_shi: int) -> void:
 	_meditate.disabled = true
 	_breakthrough.text = RulesScript.TEXT_BREAKTHROUGH
 	_breakthrough.disabled = true
+	if _cross_toggle != null:
+		_cross_toggle.visible = false
+		_cross_toggle.button_pressed = false
 	show_message(RulesScript.TEXT_UNAVAILABLE)
 
 
@@ -137,3 +169,32 @@ func breakthrough_button() -> Button: return _breakthrough
 ## 路走的是 [signal Control.gui_input]，只有拿到控件本身才验得了）。
 func row_button(p_index: int) -> Button:
 	return _meditate if p_index == 0 else _breakthrough
+
+
+# === 越阶渡劫勾选框 =============================================================
+
+## 勾选框本身（屏幕接线与测试投递真实点击用——不发任何信号，只把控件交出去）。
+func cross_realm_toggle() -> CheckButton: return _cross_toggle
+
+
+## 当前是否勾了越阶（控件缺席时为 false——不臆造玩家的选择）。
+func cross_realm_checked() -> bool:
+	return _cross_toggle != null and _cross_toggle.button_pressed
+
+
+## 勾选框此刻是否露出（规则不允许时藏起来——见 [method _present_cross_realm]）。
+func cross_realm_visible() -> bool:
+	return _cross_toggle != null and _cross_toggle.visible
+
+
+## 勾选框此刻的文案（控件缺席时为空串）。
+func cross_realm_text() -> String:
+	return _cross_toggle.text if _cross_toggle != null else ""
+
+
+## 翻转勾选（测试口——走 [member BaseButton.button_pressed] 而不是改控件内部状态：
+## 这个属性的 setter 会发 [signal BaseButton.toggled]，文案换句正挂在那条信号上，
+## 绕开属性验到的是一条生产里不存在的路径）。
+func toggle_cross_realm() -> void:
+	if _cross_toggle != null:
+		_cross_toggle.button_pressed = not _cross_toggle.button_pressed

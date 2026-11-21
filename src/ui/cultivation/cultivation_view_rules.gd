@@ -64,12 +64,27 @@ const TEXT_CAN_TRIBULATE: String = "修为已满，需渡劫方能进境。"
 const TEXT_TRIBULATION_BUSY: String = LaunchScript.TEXT_BUSY
 ## 渡劫系统缺失——可读的降级文案（不让玩家点了没反应）。
 const TEXT_TRIBULATION_UNAVAILABLE: String = LaunchScript.TEXT_TRIBULATION_UNAVAILABLE
+## 本境界的渡劫规则[b]没配[/b]——数据缺口，与「修为不足」是两件事。[br]
+## [br][b]为什么要单独一句[/b]：把它当成修为不足，玩家会一直打坐等一扇永远不会开的门；
+## 这句话是给维护者看的（玩家侧也说得通：此处暂不可突破）。规则表见
+## [code]tribulation_realm_rules.gd[/code]——补上那一行即可恢复。
+const TEXT_TRIBULATION_UNCONFIGURED: String = "此境界的渡劫规则未配置，暂不可突破。"
+## 越阶渡劫开关的文案（GDD §6「越阶渡劫」——主动选项，非默认）。[br]
+## [br][b]勾选与未勾选各一句[/b]：这是玩家要在按下「渡劫」之前做的决定，文案必须
+## 把「打哪个 Boss」讲清楚（普通 = 本境界雷灵，越阶 = 高一级雷灵）。
+const TEXT_CROSS_REALM_OFF: String = "越阶渡劫：关（挑战本境界天劫）"
+const TEXT_CROSS_REALM_ON: String = "越阶渡劫：开（挑战高一级天劫·额外金卡）"
+## 越阶开关不可用时的原因（到顶前一级无处可越 / 本境界不走渡劫）。
+const TEXT_CROSS_REALM_UNAVAILABLE: String = "越阶渡劫：此处不可用"
 ## 渡劫去向的场景不可用（SceneManager 缺失）。
 const TEXT_NO_SCENE_MANAGER_TRIBULATION: String = LaunchScript.TEXT_NO_SCENE_MANAGER
 ## 转场请求被拒（SceneManager 正在转场中——并发守卫）。渡劫状态已退回，可再试。
 const TEXT_TRIBULATION_DEPART_FAILED: String = LaunchScript.TEXT_DEPART_FAILED
-## 操作提示行。
-const TEXT_HINT: String = "↑ ↓ 选行动，回车执行，Esc 返回主菜单。"
+## 操作提示行。[br]
+## [br][b]为什么要提 Tab[/b]：越阶渡劫勾选框住在中段信息块里（不在动作行容器内），
+## 上下键的游标走不到它——不写出来玩家只能靠试。Tab 是引擎内置的焦点导航，
+## 与鼠标点击同一条生效路径（见 [code]cultivation_scene_input.gd[/code]）。
+const TEXT_HINT: String = "↑ ↓ 选行动，Tab 切到渡劫选项，回车执行，Esc 返回主菜单。"
 ## 系统缺失时的可读降级文案。
 const TEXT_UNAVAILABLE: String = "修行系统不可用——此处暂时无法打坐。"
 const TEXT_UPGRADE_UNAVAILABLE: String = "境界系统不可用，突破未生效。"
@@ -172,3 +187,12 @@ static func tribulation_succeeded_line(p_old_realm: int, p_new_realm: int) -> St
 ## 渡劫失败回执（修为损失量由结算给出——本模块不自己算，同「上限不写死」的理由）。
 static func tribulation_failed_line(p_penalty: int) -> String:
 	return TEXT_TRIBULATION_FAILED % p_penalty
+
+
+## 越阶渡劫开关的文案（[param p_selected] = 玩家当前是否勾上）。[br]
+## [br][b]为什么由规则层给这一句[/b]：开关的开关状态与它写出来的字必须是同一个事实的
+## 两种呈现——界面自己拼「开 / 关」就又多了一处会漂移的措辞（同按钮文案的口径）。[br]
+## [br][b]默认不选中[/b]（GDD §6「玩家主动选择『越阶渡劫』选项（非默认）」）：调方传
+## false 得到的就是「关」那一句，界面无需另设初值。
+static func cross_realm_line(p_selected: bool) -> String:
+	return TEXT_CROSS_REALM_ON if p_selected else TEXT_CROSS_REALM_OFF

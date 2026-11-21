@@ -28,6 +28,8 @@ const ScreenScene: PackedScene = preload("res://src/feature/cultivation/cultivat
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
 const GateScript := preload("res://src/ui/cultivation/cultivation_tribulation_gate.gd")
 const RulesScript := preload("res://src/ui/cultivation/cultivation_view_rules.gd")
+## 渡劫规则表（「炼气期不需要渡劫」那张覆盖表的底本——规则单点）。
+const RealmRulesScript := preload("res://src/feature/tribulation/tribulation_realm_rules.gd")
 ## 配置读取面（期望的境界名从这里取——测试不自己硬编码等级名）。
 const TableScript := preload("res://src/feature/exploration/exploration_breakthrough_table.gd")
 ## 渡劫系统枚举与常量真理来源（状态值 / 结算比例都不写死）。
@@ -116,11 +118,11 @@ func _mount(p_table: Variant = null) -> Control:
 	return instance
 
 
-## 一张「炼气期不需要渡劫」的境界表副本（其余行全部走真配置——见类文档）。[br]
-## [br][b]为什么复制而不是改真表[/b]：[code]RealmSystem.realm_table[/code] 是全局单例
-## 数据，改了会漏进别的用例。
+## 一张「炼气期不需要渡劫」的规则表副本（其余行全部走真配置——见类文档）。[br]
+## [br][b]为什么复制而不是改真表[/b]：[code]TribulationRealmRules.TABLE[/code] 是全局
+## 单例数据，改了会漏进别的用例。
 func _table_without_tribulation_at_realm_one() -> Dictionary:
-	var table: Dictionary = GateScript.RealmScript.realm_table.duplicate(true)
+	var table: Dictionary = RealmRulesScript.TABLE.duplicate(true)
 	(table[1] as Dictionary)[GateScript.KEY_REQUIRES_TRIBULATION] = false
 	return table
 

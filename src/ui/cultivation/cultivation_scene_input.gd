@@ -57,10 +57,15 @@ func bind(p_parts: Dictionary, p_on_activate: Callable, p_on_cancel: Callable,
 
 ## 处理一条输入事件。[br]
 ## [br][b]返回[/b]：是否应当消费（屏幕据此标记事件已处理，不再向下传播）。[br]
-## [br][b]「离开」按钮保有焦点时不吃确认键[/b]：此时 Enter 应触发那个按钮本身
-## （玩家用 Tab/鼠标把焦点放过去，意图明确），游标确认让位（同坊市口径）。
+## [br][b]焦点在动作行之外时不吃确认键[/b]：本屏还有两个可聚焦控件住在动作行容器
+## 之外——「离开」按钮与越阶渡劫勾选框。[code]_input[/code] 排在 GUI 派发[b]之前[/b]，
+## 一旦在这里消费掉，事件就到不了那个控件：勾选框按回车会变成「确认当前动作行」
+## （玩家想勾越阶，结果直接触发了渡劫），「离开」按钮同理。故此时让位，交给引擎
+## 的 GUI 派发。[br]
+## [br][b]为什么按「焦点在哪」判而不是按控件类型判[/b]：将来再往容器外放控件不用
+## 回来改这一处；判据是「焦点有没有落在游标管得着的那批行上」。
 func handle_event(p_event: InputEvent) -> bool:
-	if _leave_has_focus() and p_event.is_action_pressed(&"ui_accept"):
+	if _focus_outside_rows() and p_event.is_action_pressed(&"ui_accept"):
 		return false
 	return bool(_navigator.call(&"handle_event", p_event))
 
@@ -135,7 +140,30 @@ func _row_at(p_index: int) -> Button:
 	return rows[p_index] as Button
 
 
-## 「离开」按钮是否持有键盘焦点（未挂载时为 false——不臆造）。
-func _leave_has_focus() -> bool:
-	return _leave_button != null and is_instance_valid(_leave_button) \
-			and _leave_button.has_focus()
+## 焦点是否落在游标管不着的控件上（见 [method handle_event]）。[br]
+## [br][b]为什么看实况而不是记「离开有没有焦点」[/b]：容器外的可聚焦控件不止一个
+## （离开按钮 + 越阶渡劫勾选框），每加一个都要补一条判据、且补漏了不会有任何报错
+## ——只有玩家按回车时才发现「勾选框勾不上」。反过来问「焦点在不在我管的那批行上」
+## 则天然覆盖将来新增的容器外控件。[br]
+## [br][b]无焦点时返回 false[/b]：没有焦点就没有「让位」的对象，游标照常工作。
+func _focus_outside_rows() -> bool:
+	var viewport: Viewport = _viewport()
+	if viewport == null:
+		return false
+	var owner: Control = viewport.gui_get_focus_owner()
+	if owner == null:
+		return false
+	for row: Node in _rows():
+		if row == owner:
+			return false
+	return true
+
+
+## 本模块所属视口（未挂载时为 null——控件还没进树时没有视口可问）。[br]
+## [br][b]为什么从 [member _item_box] 取而不是让屏幕传[/b]：本模块只被 [method bind]
+## 喂过一个容器引用，屏幕那侧不必为「问一次焦点归属」再多传一个对象（同「只取
+## item_box 与 leave_button」的取数口径）。
+func _viewport() -> Viewport:
+	if _item_box == null or not is_instance_valid(_item_box):
+		return null
+	return _item_box.get_viewport()

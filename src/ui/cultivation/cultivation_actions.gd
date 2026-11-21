@@ -86,6 +86,7 @@ func status() -> Dictionary:
 		"status_text": str(decision.get("status_text", "")),
 		"meditate_enabled": bool(decision.get("meditate_enabled", true)),
 		"meditate_reason": str(decision.get("meditate_reason", "")),
+		"cross_realm_available": bool(decision.get("cross_realm_available", false)),
 	}
 
 
@@ -128,9 +129,11 @@ func meditate() -> String:
 
 
 ## 第二动作行——按判定层的 [code]kind[/code] 分派（渡劫 / 直接突破，见类文档）。[br]
+## [br][param p_cross_realm] 玩家是否勾了「越阶渡劫」（GDD §6 主动选项）。
+## [b]默认 false[/b]——不勾就是普通渡劫，与共用件的默认同一口径。[br]
 ## [br][b]返回[/b]：面向玩家的中文回执——渡劫写明即将前往，直接突破写明境界跃迁，
 ## 被拒写明原因。
-func breakthrough() -> String:
+func breakthrough(p_cross_realm: bool = false) -> String:
 	var req: Dictionary = request()
 	if req.is_empty():
 		return RulesScript.TEXT_UNAVAILABLE
@@ -141,7 +144,7 @@ func breakthrough() -> String:
 	if not bool(decision.get("enabled", false)):
 		return str(decision.get("status_text", RulesScript.refusal_line(realm, current)))
 	if StringName(decision.get("kind", GateScript.KIND_NONE)) == GateScript.KIND_TRIBULATION:
-		return start_tribulation()
+		return start_tribulation(p_cross_realm)
 	return _raise_realm(realm)
 
 
@@ -194,13 +197,16 @@ func refusal(p_row: int = 1) -> String:
 ## [br][b]转场不可用 / 被拒时把状态退回去[/b]：已进 [code]PREPARING[/code] 却去不了渡劫
 ## 场景，会把玩家永久卡在「渡劫流程进行中」——共用件在两路都用
 ## [code]cancel_tribulation[/code] 收尾。[br]
-## [br][b]类型固定 NORMAL[/b]：越阶渡劫是玩家在渡劫台上主动选的选项（GDD §6），
-## 本屏是正常渡劫的入口；越阶落到界面上时把玩家的选择透传给共用件即可。[br]
+## [br][b]越阶由玩家的勾选决定[/b]（GDD §6 主动选项）：[param p_cross_realm] 由屏幕从
+## 勾选框读来原样透传，[b]本模块不自己判能不能越阶[/b]——那条规则在
+## [code]CultivationTribulationGate.cross_realm_available[/code]（判定层单点），
+## 界面按它决定要不要露出那个勾选框。状态机对越界（跳 2 级）有自己的一道校验，
+## 真被拒时共用件的回读会给出「流程进行中」的中文回执，不会静默失败。[br]
 ## [br]来源: GDD tribulation-system.md §1 地图渡劫点 + §2 准备阶段 + §6 越阶渡劫、
 ## ADR-0021 §trigger_tribulation / §cancel_tribulation。
-func start_tribulation() -> String:
+func start_tribulation(p_cross_realm: bool = false) -> String:
 	var result: Dictionary = LaunchScript.launch(tribulation_system(), scene_manager(),
-			SceneManagerScript.SceneID.CULTIVATION)
+			SceneManagerScript.SceneID.CULTIVATION, p_cross_realm)
 	return str(result.get("text", RulesScript.TEXT_TRIBULATION_UNAVAILABLE))
 
 

@@ -26,8 +26,10 @@ extends GutTest
 
 const ScreenScene: PackedScene = preload("res://src/feature/cultivation/cultivation_scene.tscn")
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
-## 渡劫判定层（本文件借它取真境界表 + 键名——不自己抄一份配置）。
+## 渡劫判定层（本文件借它取键名与规则表——不自己抄一份配置）。
 const GateScript := preload("res://src/ui/cultivation/cultivation_tribulation_gate.gd")
+## 渡劫规则表（「炼气期不需要渡劫」那张覆盖表的底本——规则单点）。
+const RealmRulesScript := preload("res://src/feature/tribulation/tribulation_realm_rules.gd")
 ## 配置读取面（期望的境界名 / 所需修为从这里取——测试不自己硬编码等级名）。
 const TableScript := preload("res://src/feature/exploration/exploration_breakthrough_table.gd")
 
@@ -116,11 +118,14 @@ func _mount(p_cultivation: Variant = null, p_table: Variant = null) -> Control:
 	return instance
 
 
-## 一张「炼气期不需要渡劫」的境界表副本（其余行全部走真配置——见 [method _mount]）。[br]
-## [br][b]为什么复制而不是改真表[/b]：[code]RealmSystem.realm_table[/code] 是全局单例
-## 数据，改了会漏进别的用例。
+## 一张「炼气期不需要渡劫」的规则表副本（其余行全部走真配置——见 [method _mount]）。[br]
+## [br][b]为什么复制而不是改真表[/b]：[code]TribulationRealmRules.TABLE[/code] 是全局
+## 单例数据，改了会漏进别的用例。[br]
+## [br][b]底本取自规则表而不是境界表[/b]：渡劫规则已独立成册（键名同形但表不同，
+## 见 [code]tribulation_realm_rules.gd[/code]）——取错表构造出来的覆盖对象
+## 形状对不上，判定层读不到会走「未配置」那条路，用例会以看不懂的方式红。
 func _table_without_tribulation_at_realm_one() -> Dictionary:
-	var table: Dictionary = GateScript.RealmScript.realm_table.duplicate(true)
+	var table: Dictionary = RealmRulesScript.TABLE.duplicate(true)
 	(table[1] as Dictionary)[GateScript.KEY_REQUIRES_TRIBULATION] = false
 	return table
 

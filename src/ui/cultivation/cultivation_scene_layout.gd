@@ -44,8 +44,8 @@ const BLOCK_SEPARATION: int = 8
 ## [param p_on_meditate] 「打坐」回调 [code]func() -> void[/code]。[br]
 ## [param p_on_breakthrough] 「突破」回调 [code]func() -> void[/code]。[br]
 ## [br][b]返回[/b]：[code]{title_label, balance_label, realm_label, status_label,
-## progress_label, progress_fill, item_box, message_label, meditate_button,
-## breakthrough_button, leave_button, background}[/code]。[br]
+## progress_label, progress_fill, cross_realm_toggle, item_box, message_label,
+## meditate_button, breakthrough_button, leave_button, background}[/code]。[br]
 ## [br][b]「离开」按钮的意图出口[/b]：骨架已把它的 [signal Button.pressed] 转发到
 ## 屏幕的 [signal CultivationScreen.leave_requested]，本模块不持有任何回调——
 ## 屏幕接那一个信号（再接一次按钮会让同一次点击发两次转场请求）。[br]
@@ -66,6 +66,7 @@ static func build(p_screen: Control, p_title: String,
 	parts["status_label"] = block["status_label"]
 	parts["progress_label"] = block["progress_label"]
 	parts["progress_fill"] = block["progress_fill"]
+	parts["cross_realm_toggle"] = block["cross_realm_toggle"]
 	parts["meditate_button"] = buttons["meditate_button"]
 	parts["breakthrough_button"] = buttons["breakthrough_button"]
 	return parts
@@ -96,8 +97,17 @@ static func _add_background(p_screen: Control) -> ColorRect:
 	return bg
 
 
-## 中段三块信息：当前境界 / 修为进度条 / 突破状态。[br]
-## [br][b]数值全由文字承载[/b]，条只作第二通道（色盲可读）。
+## 中段三块信息：当前境界 / 修为进度条 / 突破状态 + [b]越阶渡劫选项[/b]。[br]
+## [br][b]数值全由文字承载[/b]，条只作第二通道（色盲可读）。[br]
+## [br][b]为什么越阶选项在中段而不在动作行里[/b]：它不是「按下去就发生一件事」的动作，
+## 而是[b]对接下来那一击的修饰[/b]（GDD §6「玩家主动选择『越阶渡劫』选项（非默认）」）
+## ——与「调整上场角色 / 使用渡劫丹」同属准备阶段的选项（GDD §2）。放进动作行会变成
+## 「第三个动作」，也让动作行的条数不再等于「能做的事有几件」。故它住在状态块里，
+## 紧挨着「需渡劫方能进境」那句状态行。[br]
+## [br][b]控件用 [CheckButton][/b]：它自带勾选态的可视标记（双通道——文字里也写着
+## 「开 / 关」，不只靠勾），且鼠标与键盘（回车 / 空格）都能切换，无需自绘。[br]
+## [br][b]文案留空[/b]：句子由 [code]CultivationViewRules[/code] 单点给出（本模块不持有
+## 面向玩家的词条，同两个动作行）。
 static func _make_status_block() -> Dictionary:
 	var root := VBoxContainer.new()
 	root.name = "StatusBlock"
@@ -108,13 +118,33 @@ static func _make_status_block() -> Dictionary:
 	root.add_child(progress["root"])
 	var status_label: Label = _make_label()
 	root.add_child(status_label)
+	var cross_toggle: CheckButton = _make_cross_realm_toggle()
+	root.add_child(cross_toggle)
 	return {
 		"root": root,
 		"realm_label": realm_label,
 		"status_label": status_label,
 		"progress_label": progress["label"],
 		"progress_fill": progress["fill"],
+		"cross_realm_toggle": cross_toggle,
 	}
+
+
+## 越阶渡劫勾选框（见 [method _make_status_block] 的说明）。[br]
+## [br][b]默认不勾[/b]：GDD §6 明写越阶「非默认」——默认勾上等于把每个没留神的玩家
+## 都推去挑战高一级的天劫。[br]
+## [br][b]默认隐藏[/b]：能不能越阶是该境界的规则（到顶前一级不行、不走渡劫的境界不行），
+## 由屏幕每次刷新时按判定层的 [code]cross_realm_available[/code] 定——
+## 这里给 false 只是「还没读到状态之前不承诺有这条规则」。
+static func _make_cross_realm_toggle() -> CheckButton:
+	var toggle := CheckButton.new()
+	toggle.name = "CrossRealmToggle"
+	toggle.button_pressed = false
+	toggle.visible = false
+	toggle.focus_mode = Control.FOCUS_ALL
+	toggle.add_theme_font_size_override("font_size", ShopLayoutScript.FONT_SIZE_BODY)
+	ShopLayoutScript.apply_focus_ring(toggle)
+	return toggle
 
 
 ## 进度行：轨道 + 填充 + 叠在轨道上的文字。[br]

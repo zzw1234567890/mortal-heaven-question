@@ -144,6 +144,26 @@ func action_kind() -> StringName:
 	return StringName(_actions_.call(&"kind"))
 
 
+## 当前是否勾了「越阶渡劫」（GDD §6 主动选项——透传给渡劫入口共用件）。
+func is_cross_realm_checked() -> bool:
+	return bool(_view.call(&"cross_realm_checked"))
+
+
+## 「越阶渡劫」勾选框此刻是否露出（该境界不可越阶时藏起来）。
+func is_cross_realm_visible() -> bool:
+	return bool(_view.call(&"cross_realm_visible"))
+
+
+## 「越阶渡劫」勾选框此刻的文案（测试据它断言「开 / 关」两种说法）。
+func cross_realm_text() -> String:
+	return str(_view.call(&"cross_realm_text"))
+
+
+## 测试用：切换「越阶渡劫」勾选框（不依赖真实输入事件）。
+func toggle_cross_realm() -> void:
+	_view.call(&"toggle_cross_realm")
+
+
 ## 第二动作行是否可点（修为未满 / 已达最高境界 / 渡劫不可用时为 false）。
 func is_breakthrough_enabled() -> bool:
 	return bool(_view.call(&"is_breakthrough_enabled"))
@@ -239,7 +259,7 @@ func _on_meditate_pressed() -> void:
 ## [br][b]渡劫触发后本屏即将被转场释放[/b]：渡劫那一路的最终画面由回流接线在回来时重刷
 ## （见 [code]CultivationScreenBinding[/code]）。
 func _on_breakthrough_pressed() -> void:
-	var message: String = str(_actions_.call(&"breakthrough"))
+	var message: String = str(_actions_.call(&"breakthrough", is_cross_realm_checked()))
 	refresh()
 	show_message(message)
 
