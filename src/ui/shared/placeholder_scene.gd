@@ -70,22 +70,20 @@ static func return_button_text(p_screen_id: int) -> String:
 ## SceneID → 标题（键为 SceneManager.SceneID 字面值——const Dictionary 不可引用
 ## 脚本常量，镜像口径同 hud.gd SCENE_VISIBILITY / state_transition_matrix.gd）。
 ## 事件面板（7）已不在表中——Sprint 18 起事件走探索层 overlay
-## （event_panel.tscn 挂真实 EventPanelScreen 脚本）。
+## （event_panel.tscn 挂真实 EventPanelScreen 脚本）；坊市（6）与修炼室（10）同样
+## 已换挂真实界面（[code]ShopScreen[/code] / [code]CultivationScreen[/code]），
+## 它们不再是占位场景，条目留着只会变成一份指向不存在的占位契约的旧账。
 const TITLES: Dictionary = {
 	2: "卡组编辑",    # SceneID.DECK_EDITING
-	6: "坊市",        # SceneID.SHOP
 	8: "战斗结算",    # SceneID.RESULT_SCREEN
 	9: "战败",        # SceneID.DEFEAT_SCREEN
-	10: "修为养成",   # SceneID.CULTIVATION
 }
 
 ## SceneID → 归属说明（玩家可见的下一跳提示——不含开发排期术语）。
 const HINTS: Dictionary = {
 	2: "卡组编辑功能正在打造中，当前对局使用初始卡组。",
-	6: "坊市交易功能正在打造中，请先继续探索。",
 	8: "战斗胜利！奖励已计入修为与灵石，节点已标记为已清。",
 	9: "战斗失败/撤退。节点未标记为已清，请重整旗鼓后再试。",
-	10: "修为养成功能正在打造中，请先继续探索。",
 }
 
 ## 目标场景 ID（[code]SceneManager.SceneID[/code]——由 .tscn 逐个配置）。

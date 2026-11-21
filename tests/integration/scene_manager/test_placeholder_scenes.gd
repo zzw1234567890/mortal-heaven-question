@@ -22,6 +22,11 @@ extends GutTest
 ## 它的「离开」固定回[b]主菜单[/b]（该屏只从主菜单进入），与占位期的
 ## 「一律回探索」不同——这也是它必须移出 [constant EXITS] 的第二个理由。
 ##
+## [b]修炼室同理移出（2026-11-22）[/b]：[code]cultivation_scene.tscn[/code] 换挂真实
+## [code]CultivationScreen[/code]（打坐涨修为 + 突破升境界）。同一条理由——它不是
+## 占位屏，没有 [code]screen_id[/code] / [code]return_button[/code]，且「离开」固定
+## 回[b]主菜单[/b]而非探索。由文末专项测试锁定挂载。
+##
 ## SceneManager 以桩替代——不触发真实转场。
 
 ## 桩场景管理器——记录导航请求。
@@ -38,11 +43,11 @@ class SceneManagerStub extends Node:
 
 
 ## 路径 → 期望 SceneID（仍为占位的场景 .tscn 的 screen_id 配置——
-## event_panel.tscn / deck_editing.tscn / shop_scene.tscn 已换真实脚本，不在此表）。
+## event_panel.tscn / deck_editing.tscn / shop_scene.tscn / cultivation_scene.tscn
+## 已换真实脚本，不在此表）。
 const CASES: Dictionary = {
 	"res://src/ui/result_screen/result_screen.tscn": 8,
 	"res://src/ui/defeat_screen/defeat_screen.tscn": 9,
-	"res://src/feature/cultivation/cultivation_scene.tscn": 10,
 }
 
 ## SceneID → 本屏「返回」的期望（文案 / 目标 SceneID / 转场类型）。
@@ -53,7 +58,6 @@ const CASES: Dictionary = {
 const EXITS: Dictionary = {
 	8: {"text": "返回探索", "to": 3, "type": 4},
 	9: {"text": "返回主菜单", "to": 0, "type": 2},
-	10: {"text": "返回探索", "to": 3, "type": 4},
 }
 
 var sm: SceneManagerStub = null
@@ -182,3 +186,25 @@ func test_shop_scene_mounts_real_screen_script() -> void:
 	assert_false("screen_id" in screen, "真实脚本不应再暴露占位 screen_id")
 	assert_true(screen.has_method(&"item_count") and screen.has_method(&"refresh"),
 			"真实脚本应暴露货架读数口与刷新入口")
+
+
+## 修炼室场景已换挂真实 CultivationScreen（本轮交付）——不再是占位场景。[br]
+## [br][b]为什么单测一条[/b]：[code]SceneManager.SCENE_PATHS[/code] 里那条路径此前
+## 指向占位骨架（「修为养成功能正在打造中」），玩家从主菜单点进去只有一个返回按钮
+## ——而打坐与突破两条链路在 Feature 层早已就位。这一个断言钉住「路径后面真的是
+## 修炼界面」；若哪天有人把 .tscn 换回占位（或脚本路径写错），本用例红。[br]
+## [br][b]为什么只查「有没有动作口」而不断言具体数值[/b]：数值取自 GSM
+## 当前状态（修为/境界），在此处断言会随存档抖动；「打坐真的加修为、突破真的升境界」
+## 由 [code]tests/integration/cultivation/test_cultivation_scene.gd[/code] 断言。
+func test_cultivation_scene_mounts_real_screen_script() -> void:
+	var packed: PackedScene = load("res://src/feature/cultivation/cultivation_scene.tscn")
+	var screen: Control = packed.instantiate() as Control
+	add_child_autofree(screen)
+	assert_not_null(screen, "cultivation_scene.tscn 应可实例化")
+	assert_eq(screen.get_script().resource_path,
+			"res://src/ui/cultivation/cultivation_screen.gd",
+			"修炼室场景应挂真实 CultivationScreen 脚本")
+	assert_false("screen_id" in screen, "真实脚本不应再暴露占位 screen_id")
+	assert_true(screen.has_method(&"refresh") and screen.has_method(&"press_meditate")
+			and screen.has_method(&"press_breakthrough"),
+			"真实脚本应暴露刷新入口与两个动作口")
