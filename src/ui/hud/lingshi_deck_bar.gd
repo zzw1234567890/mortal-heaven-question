@@ -1,10 +1,14 @@
 class_name LingshiDeckBar
 extends Control
-## LingshiDeckBar —— 灵石+卡组计数组件（右上，hud Story 003）。
+## LingshiDeckBar —— 灵石+卡组计数组件（右上，hud Story 003）。[br]
 ##
 ## [b]结构[/b]：灵石行 Label（🪙 占位图标 + k 格式数额）+ 灵石浮动 delta Label
 ## （(+xx/-xx) 跳动动画）+ 卡组行 Label（📜 占位图标 + count/cap）+ 超限标记
 ## Label（「超限！」，仅超限时显示）。[br]
+## [br][b]职责[/b]：本文件是门面——生命周期、GSM 信号订阅与幂等刷新编排、卡组三态。
+## 显示词表（颜色/时长/图标/路径）在 [LingshiDeckBarStyle]，三类动画（滚动/浮动/
+## 闪烁）在 [LingshiDeckBarAnim]；两者均以同名常量与同名方法在此转发，
+## 既有引用点（[code]bar.animate[/code] / [code]bar._overlimit_tween[/code] 等）口径不变。[br]
 ## [br][b]Logic 内核[/b]：全部格式化/阈值判定走 [LingshiFormatter] 纯函数
 ## （ADR-0031——UI 节点只消费判定结果，禁止内联阈值 if-else）。[br]
 ## [br][b]信号订阅[/b]（G1 裁决 2026-09-10 双订阅）：[code]resource_changed[/code]
@@ -27,41 +31,24 @@ extends Control
 ## [br]来源: ADR-0031、design/gdd/hud-system.md §3、design/ux/hud.md「元素 2/3」、
 ## hud Story 003（2026-09-10 QL-STORY-READY G1-G4 裁决）。
 
-## === Visual 常量（数据驱动）===================================================
+## 显示词表与动画模块（门面持有二者，转发外部引用的常量与动画入口）。
+const Style := preload("res://src/ui/hud/lingshi_deck_bar_style.gd")
+const Anim := preload("res://src/ui/hud/lingshi_deck_bar_anim.gd")
 
-## 卡组计数颜色映射（判定标识 → 美术圣经 §4.1 主色调色板）：
-## normal=墨色（默认 Label 色）/ yellow=琉璃金 #C8A84E（达上限警示）/
-## red=朱砂红 #B3424A（超限警报——美术圣经「生命在流逝」编码复用为警报色）。
-const COUNT_COLORS: Dictionary = {
-	"normal": Color("#1A1A1A"),
-	"yellow": Color("#C8A84E"),
-	"red": Color("#B3424A"),
-}
-## 「超限！」标记色——朱砂红 #B3424A（与 COUNT_COLORS.red 同源，
-## OverlimitLabel 的 LabelSettings 直写专用——B-1 修复）。
-const COLOR_OVERLIMIT: Color = Color("#B3424A")
-## 灵石负值 delta 文本色——朱砂红 #B3424A（支出警示，与 COUNT_COLORS.red
-## 同源；正值保持计数器墨色——2026-09-12 TD-013 验证裁决：仅 ± 前缀区分
-## 辨识度不足，负值复用警报色增强方向感知）。
-const COLOR_DELTA_NEGATIVE: Color = Color("#B3424A")
+## === 显示常量（唯一出处在 [LingshiDeckBarStyle]——此处同名转发）===============
 
-## 灵石数字滚动时长——0.3s（GDD hud-system.md §调优参数表「灵石数字跳动 0.3s」）。
-const LINGSHI_ROLL_DURATION: float = 0.3
-## 灵石 (+xx/-xx) 浮动标签浮动时长（含淡出——向下浮 18px）。
-const DELTA_FLOAT_DURATION: float = 0.8
-## 卡组超限红色闪烁全周期——0.8s（realm_bar FALLEN_FLICKER_PERIOD 风格先例）。
-const OVERLIMIT_FLICKER_PERIOD: float = 0.8
-
-## 订阅过滤常量——GSM 路径前缀（G1 裁决订阅集）。
-const PATH_LING_SHI: String = "player.resources.ling_shi"
-const PATH_DECK: String = "deck.current_deck"
-## 灵石资源类型标识（resource_changed 信号第一参数——gsm_signal_router
-## 从路径第三段切出）。灵石图标占位字符（真图标归美术资产管线——图集）。
-const RES_TYPE_LING_SHI: StringName = &"ling_shi"
-const ICON_LINGSHI: String = "🪙"
-const ICON_DECK: String = "📜"
-## (+xx/-xx) 前缀符号。
-const SIGN_PLUS: String = "+"
+const COUNT_COLORS: Dictionary = Style.COUNT_COLORS
+const COLOR_OVERLIMIT: Color = Style.COLOR_OVERLIMIT
+const COLOR_DELTA_NEGATIVE: Color = Style.COLOR_DELTA_NEGATIVE
+const LINGSHI_ROLL_DURATION: float = Style.LINGSHI_ROLL_DURATION
+const DELTA_FLOAT_DURATION: float = Style.DELTA_FLOAT_DURATION
+const OVERLIMIT_FLICKER_PERIOD: float = Style.OVERLIMIT_FLICKER_PERIOD
+const PATH_LING_SHI: String = Style.PATH_LING_SHI
+const PATH_DECK: String = Style.PATH_DECK
+const RES_TYPE_LING_SHI: StringName = Style.RES_TYPE_LING_SHI
+const ICON_LINGSHI: String = Style.ICON_LINGSHI
+const ICON_DECK: String = Style.ICON_DECK
+const SIGN_PLUS: String = Style.SIGN_PLUS
 
 ## === 依赖注入 ==================================================================
 
@@ -77,7 +64,7 @@ var _deck_system: Node = null
 ## 动画开关——[b]测试注入点[/b]（story AC-3 规格「自动化断言显示文本，不含动画」：
 ## 测试置 false 后刷新直接落位终值，绕过 0.3s 滚动 Tween 的帧内插值覆写）。
 ## 覆盖全部三类动画：滚动（_apply_lingshi）/ delta 浮动（_show_delta）/
-## 超限闪烁（_start_overlimit_flicker——reduce-motion 静态降级）。
+## 超限闪烁（LingshiDeckBarAnim.start_overlimit_flicker——reduce-motion 静态降级）。
 ## 亦为未来 reduce-motion 用户设置预留接线点（TD-008 同源技债——设置系统
 ## 入库后由此开关接入跳过/弱化）。
 var animate: bool = true
@@ -90,22 +77,8 @@ var _last_lingshi: int = -1
 var _last_deck_key: String = ""
 ## 上次超限闪烁激活状态——仅翻转时启停 Tween，避免每信号重建循环动画。
 var _last_overlimit: bool = false
-## 灵石数字滚动 Tween 句柄（新值到来时 kill 重建）。
-var _roll_tween: Tween = null
-## 灵石 delta 浮动 Tween 句柄（含浮动 Label 本体的显隐编排）。
-var _delta_tween: Tween = null
-## 卡组超限闪烁 Tween 句柄。
-var _overlimit_tween: Tween = null
-## 灵石滚动动画当前插值值（Tween method 绑定的可变捕获——
-## _exit_tree 后 Tween 回调不再触达节点）。
-var _roll_display: int = 0
-## delta 浮动标签归位基准 Y——_ready 缓存的初始位置（B-3 修复：每次浮动
-## 从归位基准起算向下浮，动画结束复位，杜绝 18px 漂移累积）。
-var _delta_home_y: float = 0.0
-
-## delta 标签 LabelSettings 是否已 duplicate 为独立实例（B-1 同源——
-## 首次直写前 duplicate，防跨场景实例共享污染）。
-var _delta_settings_owned: bool = false
+## 动画编排件（_ready 建；持有三个 Tween 句柄与插值中间值）。
+var _anim: RefCounted = null
 
 ## === 节点引用 ==================================================================
 
@@ -114,14 +87,17 @@ var _delta_settings_owned: bool = false
 @onready var deck_label: Label = $DeckLabel
 @onready var overlimit_label: Label = $OverlimitLabel
 
+## 超限闪烁 Tween 句柄（转发自动画件——既有引用点读此成员）。
+var _overlimit_tween: Tween:
+	get:
+		return null if _anim == null else _anim.call(&"overlimit_tween")
+
 ## === 生命周期 ==================================================================
 
 func _ready() -> void:
 	# 纯显示组件（G8 裁决透传先例）：根与子节点全 IGNORE，不拦截下层点击。
 	# tscn 中已设各 Label mouse_filter=2——此处钉根节点防场景外实例化漏配。
 	mouse_filter = MOUSE_FILTER_IGNORE
-	# B-3 修复：缓存 delta 标签归位基准——每次浮动从基准起算，结束复位。
-	_delta_home_y = lingshi_delta_label.position.y
 	# B-1 修复：DeckLabel/OverlimitLabel 与 LingshiLabel 共享 tscn SubResource
 	# LabelSettings——label_settings 非 null 时优先于一切 theme 属性，
 	# add_theme_color_override 永不生效（三态颜色死代码）。为两个 Label 各
@@ -133,15 +109,12 @@ func _ready() -> void:
 		# 「超限！」朱砂红——原 tscn 节点级 font_color 会被共享 LabelSettings
 		# 覆盖（同 B-1），duplicate 后直写。
 		overlimit_label.label_settings.font_color = COLOR_OVERLIMIT
+	_anim = Anim.new(self, lingshi_label, lingshi_delta_label, deck_label)
 	setup()
 
 func _exit_tree() -> void:
-	_stop_overlimit_flicker()
-	for t: Tween in [_roll_tween, _delta_tween]:
-		if t != null and t.is_valid():
-			t.kill()
-	_roll_tween = null
-	_delta_tween = null
+	if _anim != null:
+		_anim.call(&"kill_all")
 
 ## 初始化信号订阅与首刷。[br]
 ## [param gsm]: 依赖注入的 GSM（测试 mock）；null 时回退 Autoload。[br]
@@ -206,102 +179,31 @@ func _refresh(delta: int = 0) -> void:
 ## 单变更时 GSM 先发 [code]resource_changed[/code] 再发 [code]batch_updated[/code]
 ## 双信号，第二个处理器若因 delta!=0 绕过守卫会 kill 重启滚动动画）。[br]
 ## 首刷（_last_lingshi < 0）或 delta==0 时直接落位不播动画（参照 realm_bar
-## _tween_fill 的 is_first 处理）。
+## _tween_fill 的 is_first 处理）。动画本体归 [LingshiDeckBarAnim]。
 func _apply_lingshi(lingshi: int, delta: int) -> void:
 	var is_first: bool = _last_lingshi < 0
 	if lingshi == _last_lingshi:
 		return  # 幂等：双发射重复触发时无操作
 	var old_val: int = _last_lingshi if _last_lingshi >= 0 else lingshi
 	_last_lingshi = lingshi
-	if is_first or delta == 0 or not is_inside_tree():
-		lingshi_label.text = ICON_LINGSHI + " " + LingshiFormatter.format_lingshi(lingshi)
+	if _anim == null or is_first or delta == 0 or not is_inside_tree():
+		if _anim != null:
+			_anim.call(&"set_text_immediate", lingshi)
 		return
-	# 变更动画路径：滚动 Tween 从旧显示值插值到新值（AC-007）。
-	# 不重置 label.text 到 old_val——label 已显示旧值，重置会使同帧读取者
-	# （集成测试断言）读到回退值；Tween 首个回调（progress≈0）很快到来。
 	if not animate:
 		# 测试注入/reduce-motion：跳过滚动动画直接落位终值（AC-3 规格
-		# 「断言显示文本，不含动画」的可测性前提）。
-		lingshi_label.text = ICON_LINGSHI + " " + LingshiFormatter.format_lingshi(lingshi)
+		# 「断言显示文本，不含动画」的可测性前提）；delta 浮动由动画件
+		# 自行按 animate 开关决定是否播。
+		_anim.call(&"set_text_immediate", lingshi)
 		if delta != 0:
-			_show_delta(delta)
+			_anim.call(&"show_delta", delta)
 		return
-	# S-2 修复：中断起点用屏上实际插值值 _roll_display（连续变更时上一滚动
-	# 尚未播完，_last_lingshi 是前一目标而非屏上值——从目标起算会瞬跳）。
-	# 无进行中 Tween 时（首次动画/上次已播完）用 old_val——上次播完时
-	# _on_roll_tick(1.0) 已令 _roll_display == old_val，二者一致。
-	var start_val: int = old_val
-	if _roll_tween != null and _roll_tween.is_valid():
-		start_val = _roll_display
-	_roll_display = start_val
-	if _roll_tween != null and _roll_tween.is_valid():
-		_roll_tween.kill()
-	_roll_tween = create_tween()
-	_roll_tween.tween_method(_on_roll_tick.bind(start_val, lingshi),
-			0.0, 1.0, LINGSHI_ROLL_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	# 终值立即落位：Tween 完成时由 _on_roll_tick(1.0) 覆盖为同一文本——
-	# 滚动动画仅是视觉插值层，数据正确性不依赖动画时序。
-	lingshi_label.text = ICON_LINGSHI + " " + LingshiFormatter.format_lingshi(lingshi)
-	# S-1 修复：终值落位后再手动落一帧起点值——若在终值赋值前调用会被直接
-	# 覆写（死代码）。终值先写保证异常路径下数据终态正确，起点值紧随其后
-	# 供渲染层显示（同帧内无渲染点，顺序无视觉差异；animate=true 路径无
-	# 同步文本断言——集成测试走 animate=false 分支）。
-	_on_roll_tick(0.0, start_val, lingshi)
-	if delta != 0:
-		_show_delta(delta)
+	_anim.call(&"roll_to", lingshi, old_val, delta)
 
-## Tween 滚动插值回调——按进度重格式化显示值。
-func _on_roll_tick(progress: float, from_val: int, to_val: int) -> void:
-	_roll_display = int(round(lerpf(float(from_val), float(to_val), progress)))
-	lingshi_label.text = ICON_LINGSHI + " " + LingshiFormatter.format_lingshi(_roll_display)
-
-## 灵石 (+xx/-xx) 浮动标签：向下浮 0.8s 并淡出（2026-09-10 用户裁决：
-## 顶行向上浮 18px 会顶出 HUD 顶边距 12px——改为向下浮；方向区分仅靠
-## +/- 前缀；AC-004 手动验证项）。
+## 灵石 (+xx/-xx) 浮动标签（转发自动画件——保留方法名供既有引用点直调）。
 func _show_delta(delta: int) -> void:
-	if not animate:
-		# H-2 修复：animate 开关全覆盖（滚动/浮动/闪烁三类）——测试注入
-		# reduce-motion 下跳过浮动（主文本落位已在 _apply_lingshi 处理）。
-		return
-	# B-2 修复：tscn 默认 visible=false，必须显式置可见（此前只设 text 与
-	# modulate.a，浮动标签永不显示）。
-	lingshi_delta_label.visible = true
-	lingshi_delta_label.text = ("%+d" % delta) if delta > 0 else str(delta)
-	# 负值红色——支出警示（COLOR_DELTA_NEGATIVE；正值复位墨色——
-	# 共享 LabelSettings 上一轮负值直写残留）。B-1 同源：LingshiDeltaLabel
-	# 与计数器共享 tscn SubResource，须 duplicate 独立实例后直写（首次），
-	# 后续轮次已是独立实例直写即可。
-	if lingshi_delta_label.label_settings != null:
-		if not _delta_settings_owned:
-			lingshi_delta_label.label_settings = \
-					lingshi_delta_label.label_settings.duplicate()
-			_delta_settings_owned = true
-		lingshi_delta_label.label_settings.font_color = \
-				COLOR_DELTA_NEGATIVE if delta < 0 else Color("#1A1A1A")
-	else:
-		lingshi_delta_label.add_theme_color_override("font_color",
-				COLOR_DELTA_NEGATIVE if delta < 0 else Color("#1A1A1A"))
-	lingshi_delta_label.modulate.a = 1.0
-	# B-3 修复：先复位到归位基准再起浮——连续变更时上一浮动可能尚未播完，
-	# 从漂移位置起算会累积偏移。
-	lingshi_delta_label.position.y = _delta_home_y
-	if _delta_tween != null and _delta_tween.is_valid():
-		_delta_tween.kill()
-	_delta_tween = create_tween()
-	_delta_tween.set_parallel(true)
-	_delta_tween.tween_property(lingshi_delta_label, "modulate:a", 0.0,
-			DELTA_FLOAT_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	# B-3：目标 = 归位基准 + 18px（向下浮——2026-09-10 用户裁决）。
-	_delta_tween.tween_property(lingshi_delta_label, "position:y",
-			_delta_home_y + 18.0,
-			DELTA_FLOAT_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_delta_tween.chain().tween_callback(_reset_delta_label)
-
-func _reset_delta_label() -> void:
-	lingshi_delta_label.modulate.a = 0.0
-	# B-2/B-3 修复：淡出后归位——隐藏 + 复位到归位基准 Y。
-	lingshi_delta_label.visible = false
-	lingshi_delta_label.position.y = _delta_home_y
+	if _anim != null:
+		_anim.call(&"show_delta", delta)
 
 ## 应用卡组显示：计数文本 + 三态颜色 + 超限闪烁/标记（AC-005/006）。
 func _apply_deck(deck_state: Dictionary) -> void:
@@ -309,7 +211,7 @@ func _apply_deck(deck_state: Dictionary) -> void:
 	var cap: int = int(deck_state.get("limit", 0))
 	var state: Dictionary = LingshiFormatter.get_deck_count_state(count, cap)
 
-	deck_label.text = ICON_DECK + " " + state[&"label"]
+	deck_label.text = ICON_DECK + Style.ICON_SEPARATOR + state[&"label"]
 	# B-1 修复：直写独立 LabelSettings.font_color——deck_label 与灵石行共享
 	# SubResource 时 add_theme_color_override 永不生效（label_settings 优先）。
 	# 判空守卫：全库仅 tscn 实例化（集成测试 BAR_SCENE + HUD.tscn——
@@ -330,39 +232,9 @@ func _apply_deck(deck_state: Dictionary) -> void:
 	var overlimit: bool = state[&"overlimit"]
 	if overlimit != _last_overlimit:
 		_last_overlimit = overlimit
-		_stop_overlimit_flicker()
+		_anim.call(&"stop_overlimit_flicker")
 		if overlimit:
-			_start_overlimit_flicker()
-
-## === 动画（Tween——输入驱动的纯视觉变换，零轮询豁免）===========================
-
-## 卡组超限红色闪烁：0.8s 周期循环（透明度闪烁）。持续到玩家处理超限弃牌
-## （deck-editing-ui epic）——本组件不负责停止条件以外的清理。
-## [b]reduce-motion 技债注记[/b]（TD-008 同源）：动画未读用户减少动态偏好——
-## 设置系统入库后应接入跳过/弱化，见 production tech-debt TD-008。
-func _start_overlimit_flicker() -> void:
-	if not is_inside_tree():
-		return
-	if not animate:
-		# H-2 修复：animate 开关全覆盖——reduce-motion 静态降级：不建循环
-		# Tween，超限态以半透明静态红呈现（TD-008 接线点声明兑现）。
-		deck_label.modulate.a = 0.6
-		return
-	deck_label.modulate.a = 1.0
-	_overlimit_tween = create_tween().set_loops()
-	_overlimit_tween.tween_property(deck_label, "modulate:a", 0.35,
-			OVERLIMIT_FLICKER_PERIOD * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	_overlimit_tween.tween_property(deck_label, "modulate:a", 1.0,
-			OVERLIMIT_FLICKER_PERIOD * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-
-func _stop_overlimit_flicker() -> void:
-	if _overlimit_tween != null and _overlimit_tween.is_valid():
-		_overlimit_tween.kill()
-	_overlimit_tween = null
-	# H-1 修复：不触碰 _last_overlimit——翻转状态仅由 _apply_deck 管理
-	# （先例 realm_bar.gd _stop_pulse L212-216 不触碰翻转检测状态）。
-	# 此前重置为 false 使超限期间每次刷新误判翻转、kill/重建闪烁 Tween。
-	deck_label.modulate.a = 1.0
+			_anim.call(&"start_overlimit_flicker")
 
 ## === 内部辅助 ==================================================================
 
@@ -371,13 +243,13 @@ func _stop_overlimit_flicker() -> void:
 func _get_gsm() -> Node:
 	if _gsm != null:
 		return _gsm
-	return get_node_or_null("/root/GameStateManager")
+	return get_node_or_null("/root/" + String(Style.AUTOLOAD_GSM))
 
 ## 获取 DeckEditingSystem——注入对象优先，否则回退 Autoload。
 func _get_deck_system() -> Node:
 	if _deck_system != null:
 		return _deck_system
-	return get_node_or_null("/root/DeckEditingSystem")
+	return get_node_or_null("/root/" + String(Style.AUTOLOAD_DECK))
 
 ## 读取卡组摘要（total/limit）——UI 数据源接口（ADR-0023）。
 ## 系统不可用时返回全 0（get_deck_count_state 的 cap<=0 防御分支兜底——
