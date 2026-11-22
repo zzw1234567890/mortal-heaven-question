@@ -36,8 +36,9 @@ layout_mode = 1
 anchors_preset = 0
 offset_right = 480.0
 offset_bottom = 72.0
-text = "仙途问道"
+theme_override_colors/font_color = Color(0.941176, 0.921569, 0.878431, 1)
 theme_override_font_sizes/font_size = 48
+text = "仙途问道"
 
 [node name="ButtonBox" type="VBoxContainer" parent="LayoutAnchor"]
 layout_mode = 1
@@ -50,38 +51,64 @@ theme_override_constants/separation = 16
 [node name="NewGameButton" type="Button" parent="LayoutAnchor/ButtonBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 48)
-text = "新游戏"
+theme_override_colors/font_color = Color(0.784314, 0.768627, 0.737255, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_hover_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_disabled_color = Color(0.407843, 0.392157, 0.360784, 1)
 theme_override_font_sizes/font_size = 18
+text = "新游戏"
 
 [node name="ContinueButton" type="Button" parent="LayoutAnchor/ButtonBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 48)
-text = "继续游戏"
+theme_override_colors/font_color = Color(0.784314, 0.768627, 0.737255, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_hover_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_disabled_color = Color(0.407843, 0.392157, 0.360784, 1)
 theme_override_font_sizes/font_size = 18
+text = "继续游戏"
 
 [node name="SaveSummaryLabel" type="Label" parent="LayoutAnchor/ButtonBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 20)
+theme_override_colors/font_color = Color(0.596078, 0.580392, 0.54902, 1)
 theme_override_font_sizes/font_size = 13
 text = ""
 
 [node name="SettingsButton" type="Button" parent="LayoutAnchor/ButtonBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 48)
-text = "设置"
+theme_override_colors/font_color = Color(0.784314, 0.768627, 0.737255, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_hover_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_disabled_color = Color(0.407843, 0.392157, 0.360784, 1)
 theme_override_font_sizes/font_size = 18
+text = "设置"
 
 [node name="DeckEditButton" type="Button" parent="LayoutAnchor/ButtonBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 48)
-text = "卡组编辑"
+theme_override_colors/font_color = Color(0.784314, 0.768627, 0.737255, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_hover_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_disabled_color = Color(0.407843, 0.392157, 0.360784, 1)
 theme_override_font_sizes/font_size = 18
+text = "卡组编辑"
 
 [node name="QuitButton" type="Button" parent="LayoutAnchor/ButtonBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 48)
-text = "退出"
+theme_override_colors/font_color = Color(0.784314, 0.768627, 0.737255, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_hover_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_disabled_color = Color(0.407843, 0.392157, 0.360784, 1)
 theme_override_font_sizes/font_size = 18
+text = "退出"
 
 [node name="UtilityBox" type="HBoxContainer" parent="LayoutAnchor"]
 layout_mode = 1
@@ -93,15 +120,25 @@ theme_override_constants/separation = 12
 
 [node name="InventoryButton" type="Button" parent="LayoutAnchor/UtilityBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(314, 48)
-text = "行囊与道友"
+custom_minimum_size = Vector2(320, 48)
+theme_override_colors/font_color = Color(0.784314, 0.768627, 0.737255, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_hover_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_disabled_color = Color(0.407843, 0.392157, 0.360784, 1)
 theme_override_font_sizes/font_size = 18
+text = "行囊与道友"
 
 [node name="LoadButton" type="Button" parent="LayoutAnchor/UtilityBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(314, 48)
-text = "读档"
+custom_minimum_size = Vector2(320, 48)
+theme_override_colors/font_color = Color(0.784314, 0.768627, 0.737255, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_hover_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.921569, 0.878431, 1)
+theme_override_colors/font_disabled_color = Color(0.407843, 0.392157, 0.360784, 1)
 theme_override_font_sizes/font_size = 18
+text = "读档"
 
 [node name="NoSaveHintLabel" type="Label" parent="LayoutAnchor"]
 layout_mode = 1
@@ -109,6 +146,7 @@ anchors_preset = 0
 offset_top = 552.0
 offset_right = 640.0
 offset_bottom = 576.0
+theme_override_colors/font_color = Color(0.596078, 0.580392, 0.54902, 1)
 theme_override_font_sizes/font_size = 13
 text = ""
 
@@ -122,6 +160,7 @@ offset_top = -36.0
 offset_right = 224.0
 offset_bottom = -12.0
 grow_vertical = 0
+theme_override_colors/font_color = Color(0.596078, 0.580392, 0.54902, 1)
 theme_override_font_sizes/font_size = 13
 text = "v?"
 
