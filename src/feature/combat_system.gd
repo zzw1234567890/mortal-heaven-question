@@ -251,6 +251,12 @@ var _roster_ops: RefCounted = null
 ## 三堆牌子模块（抽牌 / 洗牌 / 弃牌 / 开局发牌 / 读档恢复——本轮拆出）。
 var _piles: RefCounted = null
 
+## 战斗生命周期编排模块（开战 / 终战 / 撤退 / 续战复位——本轮拆出）。
+var _lifecycle: RefCounted = null
+
+## 战斗对外副作用模块（快照 / 输入锁 / 转场 / GSM 镜像——本轮拆出）。
+var _side_effects: RefCounted = null
+
 ## 攻击队列减伤覆盖子模块（DEBT-CBT-018-8 残留——Attack 阶段写入防御方减伤来源）。
 var _attack_coverage: RefCounted = null
 
@@ -372,130 +378,29 @@ func set_scene_manager(p_manager: Node) -> void:
 
 
 # === 战斗生命周期（Story 002）====================================================
+# 编排与顺序契约在 combat_battle_lifecycle.gd（开战 / 终战 / 撤退 / 续战复位）；
+# 父节点只保留同名薄转发——[code]battle_start[/code] / [code]battle_end[/code] /
+# [code]retreat[/code] / [code]confirm_retreat[/code] / [code]resume_auto_advance[/code]
+# 是场景容器（[code]combat_scene_battle_setup.gd[/code] /
+# [code]combat_scene_resume.gd[/code] / [code]combat_scene_exits.gd[/code]）、
+# 子模块回调（[code]combat_battle_wiring.gd[/code]）与大量既有用例按名字调用的入口，
+# 名字、签名与内部顺序一律不动。
 
 ## 战斗开始——初始化 battle.* 域 + 费用系统 + 备战阶段 + 快照 + 输入锁 + 开始回合。[br]
 ## [br][param config] 战斗配置 [code]{character_ids, enemy_roster, is_tribulation}[/code]。
-## [br]流程（ADR-0008 §生命周期）：[br]
-##   1. 重复调用守卫——已有活跃战斗时 push_warning + return[br]
-##   2. GSM._set_battle_active(true) 创建 battle 域[br]
-##   3. 初始化内部状态（_phase=PREPARATION, _turn=1, _is_active=true）[br]
-##   4. 记录本场敌我名册快照（END 阶段胜负判定用）[br]
-##   5. [b]CostSystem.init_for_battle(境界费用上限)[/b]——费用系统激活[br]
-##   6. SaveLoad.create_battle_snapshot(GSM.serialize()) 创建快照[br]
-##   7. InputManager.push_lock(ANIMATION) 推入输入锁[br]
-##   8. _emit_safe("battle_started", [config]) 发射 Cat 2b 信号[br]
-##   9. _enter_phase(PREPARATION) 启动第一回合
+## [br]流程（ADR-0008 §生命周期）、9 步顺序与「重复调用守卫」的判据见
+## [method CombatBattleLifecycle.battle_start]。
 func battle_start(config: Dictionary) -> void:
-	# AC-001：重复调用守卫
-	if _is_active:
-		push_warning("CombatSystem.battle_start: 已有活跃战斗，拒绝重复调用")
-		return
-
-	# AC-002：通过 GSM 第二层方法创建 battle 域
-	_gsm_set_battle_active(true)
-
-	# AC-001：初始化内部状态
-	_is_active = true
-	_phase = CombatPhase.PREPARATION
-	_turn = 1
-	_player_confirmed_end = false
-	_player_confirmed_attack_skip = false
-	_phase_timer_exceeded = false
-	_attack_queue.clear()
-	_pending_battle_result = CombatResult.NONE
-
-	# Sprint 18：记录本场名册快照（END 阶段胜负判定的输入之一）
-	_capture_battle_rosters(config)
-
-	# Sprint 18（结算回流）：本场战绩计数归零
-	_get_battle_record().call(&"reset")
-
-	# 回合经济规则输入快照（先手/后手——开战定格，见成员文档）
-	_battle_config = config.duplicate(true)
-	# 本场身份 + 奖励 RNG（序号递增即「换场」，同场的重复结算据此识别）
-	_battle_serial += 1
-	_seed_reward_rng()
-
-	# Sprint 18 / DEBT-CBT-018-1：种子敌我 HP 状态 + 订阅自身 character_died（阵亡清位）
-	_seed_roster_state(config)
-	_connect_death_cleanup()
-
-	# Sprint 18：费用系统激活——境界费用上限由 RealmSystem 现读，战斗中锁定
-	_init_cost_for_battle()
-
-	# AC-004：创建战斗快照
-	_create_battle_snapshot()
-
-	# GDD §2 开局手牌（先手 4 / 后手 5）——「先手第 1 回合不抽牌」的前提。
-	# 牌堆尚未就绪（调用方未 init_deck）时发 0 张，不报错：本场的抽牌阶段
-	# 会照常走牌堆为空的分支（GDD §边缘情况「抽空牌库」）。[br]
-	# [b]读档续战走的是同一条[/b]：那一路的发牌结果会被随后的
-	# [method restore_piles] 原样换掉（顺序上接管在最后）；存档里没有牌面快照时
-	# （v3 老档）发出来的这几张正是玩家读到的手牌——老档因此不必另开一条路。
-	deal_opening_hand()
-
-	# AC-005 / DEBT-CBT-018-11：动画锁不再整场持有——改由阶段 4/5 的
-	# 进/出配对推弹（见 _sync_animation_lock）。开战瞬间不在阶段 4/5，
-	# 故此处不推锁。
-
-	# AC-003：发射 battle_started 信号（Cat 2b）
-	_emit_safe(&"battle_started", [config.duplicate(true)])
-
-	# AC-006：开始第一个回合——进入 PREPARATION 阶段
-	_enter_phase(CombatPhase.PREPARATION)
+	_get_lifecycle().battle_start(config)
 
 
 ## 战斗结束——防御清理 + 奖励/损失结算 + 清理 battle 域 + 场景切换。[br]
 ## [br][param result] 战斗结果（CombatResult.VICTORY/DEFEAT/RETREAT）。[br]
-## [br]流程（ADR-0008 §生命周期）：[br]
-##   1. 入口防御清理（_attack_queue.clear + _is_active=false）[br]
-##   2. 按结果结算奖励/损失[br]
-##   3. GSM._set_battle_active(false) 清理 battle 域[br]
-##   4. _emit_safe("battle_ended", [result, rewards]) 发射 Cat 2b 信号[br]
-##   5. GSM._set_battle_active(false) 清理 battle 域[br]
-##   6. SceneManager.request_scene_change 切换场景[br]
-## [br][b]Sprint 18 结算回流[/b]：结束瞬间定格本场战绩（胜负 / 回合数 / 双方剩余 HP /
-## 触发条目数）并入 [code]rewards["record"][/code]，同时把我方残血回写
-## [code]player.character_hp[/code]（[code]combat_hp_carryover.gd[/code]）。[br]
-## 两者都必须在 [code]_get_roster_state().clear()[/code] [b]之前[/b]取数。
+## [br][b]顺序不可更改[/b]（[code]battle_ended[/code] 必须在清 battle 域之前发射；
+## 战绩定格与 HP 回写必须在 HP 状态表清空之前取数）——见
+## [method CombatBattleLifecycle.battle_end]。
 func battle_end(result: int) -> void:
-	# AC-011：入口防御清理
-	_attack_queue.clear()
-	_is_active = false
-	_pending_battle_result = CombatResult.NONE
-	_clear_animation_lock()
-
-	# Sprint 18：费用系统清理（未开始/已清理时自身为幂等 no-op）
-	_clear_cost_for_battle()
-
-	# Sprint 18（结算回流）：先定格本场战绩 + 回写我方残血，再清空 HP 状态表——
-	# 两者都以状态表为唯一取数来源，清表后读到的只会是空数组。
-	var record: Dictionary = _build_battle_record(result)
-
-	# Sprint 18 / DEBT-CBT-018-1：本场 HP 状态表退场（下一场重新种子）
-	_get_roster_state().call(&"clear")
-
-	# 结算奖励/损失
-	var rewards: Dictionary = _settle_result(result)
-	# 战绩随载荷下发（键为新增，旧消费者忽略即可）——battle_ended 的展示端据此渲染
-	rewards["record"] = record
-
-	# AC-014：VICTORY 清理快照
-	if result == CombatResult.VICTORY:
-		_clear_battle_snapshot()
-
-	# AC-013：发射 battle_ended 信号（在清理 battle 域之前发射——ADR-0008 §信号分类表）
-	# rewards Dictionary 已在 _settle_result 中构建，但消费者可能需要读取 battle 域最终状态
-	_emit_safe(&"battle_ended", [result, rewards])
-
-	# AC-012：清理 battle 域（在 battle_ended 信号发射之后）
-	_gsm_set_battle_active(false)
-
-	# 「回到这场战斗」的快照随战斗结束作废——否则读档会回到一盘已经打完的棋
-	_gsm_set_battle_resume({})
-
-	# AC-015：切换场景
-	_request_scene_change(result)
+	_get_lifecycle().battle_end(result)
 
 
 ## 撤退——确认后调用 battle_end(RETREAT)。[br]
@@ -503,17 +408,13 @@ func battle_end(result: int) -> void:
 ## [br][b]有活跃战斗[/b]：发射确认提示信号（AC-017），UI 展示弹窗，[br]
 ## 玩家确认后调用 battle_end(RETREAT)。
 func retreat() -> void:
-	# AC-016：无活跃战斗时直接返回
-	if not _is_active:
-		return
-	# AC-017：发射确认提示信号（Cat 2b）——UI 展示弹窗
-	_emit_safe(&"retreat_requested", [])
+	_get_lifecycle().retreat()
 
 
 ## 玩家确认撤退——UI 弹窗确认后调用。[br]
 ## [br]调用 battle_end(RETREAT) 执行 50% 保留结算。
 func confirm_retreat() -> void:
-	battle_end(CombatResult.RETREAT)
+	_get_lifecycle().confirm_retreat()
 
 
 # === 战斗结束判定（Sprint 18——Phase 6 END 真实现）===============================
@@ -656,22 +557,12 @@ func restore_battle_state(p_turn: int, p_phase: int, p_current_cost: int,
 
 
 ## 恢复自动推进——读档落位完成后由调用方调用（把落位期间压住的调度放出来）。[br]
-## [br][b]为什么是由调用方显式恢复而不是本方法内部开关[/b]：落位顺序是
-## 「关自动 → battle_start → restore_battle_state → 开自动」，中间那步必须有自动
-## 推进关着，而这个顺序的编排归场景侧重建设置（[code]combat_scene_resume.gd[/code]）；
-## 本方法只补上「开自动之后把下一格排上」这半句——[method set_auto_advance] 只改
-## 字段不排调度，缺了它，玩家读档回来会停在一个永不推进的阶段里。[br]
-## [br][b]玩家主动阶段不排下一格[/b]（[method CombatPhaseManager.is_player_driven]）：
-## 落位直接改 [code]_phase[/code]、不重放阶段入口，若照旧排一格，玩家在攻击声明阶段
-## 存的档会被当场推走（[code]_attack_queue[/code] 刚清空 → 3→4 空真放行），一路滑到
-## 下一回合的出牌阶段——「本回合还能出几张牌」于是与存档那一刻不等。停在玩家阶段等
-## 玩家自己点，读档前后可出牌数才是同一个数。
+## [br][b]开自动 ≠ 排下一格[/b]：[method set_auto_advance] 只改字段不排调度，
+## 缺了这一步玩家读档回来会停在永不推进的阶段里；[b]玩家主动阶段不排[/b]，
+## 否则攻击声明阶段存的档会被当场推走。判据见
+## [method CombatBattleLifecycle.resume_auto_advance]。
 func resume_auto_advance() -> void:
-	if not _is_active:
-		return
-	if _get_phase_manager().call(&"is_player_driven", _phase):
-		return
-	_schedule_auto_advance()
+	_get_lifecycle().resume_auto_advance()
 
 
 ## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。转发 [CombatRewards]。[br]
@@ -755,73 +646,39 @@ func _apply_victory_rewards(rewards: Dictionary) -> void:
 	_get_rewards().apply_victory_rewards(rewards)
 
 
-## 创建战斗快照——SaveLoad.create_battle_snapshot(GSM.serialize())（AC-004）。[br]
-## [br][b]桩实现[/b]——SaveLoad 不可用时静默跳过（记录错误不阻塞战斗启动）。
+## 创建战斗快照——SaveLoad.create_battle_snapshot(GSM.serialize())（AC-004）。委托副作用件。
 func _create_battle_snapshot() -> void:
-	var save_load = _get_save_load()
-	if save_load == null or not save_load.has_method("create_battle_snapshot"):
-		return
-	var gsm = _get_gsm()
-	if gsm == null:
-		push_warning("CombatSystem: GSM 不可用，跳过战斗快照")
-		return
-	save_load.create_battle_snapshot(gsm.serialize())
+	_get_side_effects().create_battle_snapshot()
 
 
-## 清理战斗快照——SaveLoad.clear_battle_snapshot()（AC-014）。
+## 清理战斗快照——SaveLoad.clear_battle_snapshot()（AC-014）。委托副作用件。
 func _clear_battle_snapshot() -> void:
-	var save_load = _get_save_load()
-	if save_load != null and save_load.has_method("clear_battle_snapshot"):
-		save_load.clear_battle_snapshot()
+	_get_side_effects().clear_battle_snapshot()
 
 
-## 推入 ANIMATION 输入锁（AC-005）。
-## [br][b]只在阶段 4/5 持有[/b]（DEBT-CBT-018-11 收窄）：GDD 只要求攻击结算与
-## 敌方行动这两个「玩家只看不动」的阶段拦截玩法输入；整场持锁会让出牌阶段
-## （2）永远收不到点击，输入层不得不为它开一条豁免口子。[br]
-## [br][b]与 [method _clear_animation_lock] 严格配对[/b]：每次推入都在
-## [method _sync_animation_lock] 里以「当前是否在阶段 4/5」为唯一判据，
-## 重复推入由 InputManager 的 source 去重兜底（不会叠加）。
+## 推入 ANIMATION 输入锁（AC-005）。委托副作用件。[br]
+## [br][b]只在阶段 4/5 持有[/b]（DEBT-CBT-018-11 收窄）：整场持锁会让出牌阶段
+## 永远收不到点击；推入与清除按「当前是否在阶段 4/5」幂等配对。
 func _push_animation_lock() -> void:
-	var im = _get_input_manager()
-	if im != null and im.has_method("push_lock"):
-		# LockType.ANIMATION = 1
-		im.push_lock(1, &"combat_system")
+	_get_side_effects().push_animation_lock()
 
 
-## 清理 CombatSystem 推入的输入锁（AC-011）。
-## [br][b]也用 [code]clear_locks[/code] 而非 pop[/b]：本方法同时服务「离开阶段 4/5」
-## 与「战斗结束」两个场景，后者要求无论当前阶段如何都清干净
-## （残留锁会让下一场战斗开局的输入被吞）。
+## 清理 CombatSystem 推入的输入锁（AC-011）。委托副作用件。[br]
+## [br]用 [code]clear_locks[/code] 而非 pop：同时服务「离开阶段 4/5」与「战斗结束」，
+## 后者要求无论当前阶段如何都清干净。
 func _clear_animation_lock() -> void:
-	var im = _get_input_manager()
-	if im != null and im.has_method("clear_locks"):
-		im.clear_locks(&"combat_system")
+	_get_side_effects().clear_animation_lock()
 
 
-## 阶段驱动的锁同步——进入阶段 4/5 推锁，其余阶段不持有。[br]
-## [br][b]为什么以「当前阶段」而非「翻越了边界」判定[/b]：状态机可能因校验失败
-## 原地不动，边界法会积累漂移；按当前阶段幂等地推/清，任何路径走到这里
-## 都会收敛到正确状态（推入与清除各自幂等）。[br]
+## 阶段驱动的锁同步——进入阶段 4/5 推锁，其余阶段不持有。委托副作用件。[br]
 ## [br][param p_phase] 刚进入的阶段（[method advance_phase] 在簿记后调用）。
 func _sync_animation_lock(p_phase: int) -> void:
-	if p_phase == CombatPhase.ATTACK_RESOLUTION or p_phase == CombatPhase.ENEMY_TURN:
-		_push_animation_lock()
-	else:
-		_clear_animation_lock()
+	_get_side_effects().sync_animation_lock(p_phase)
 
 
-## 请求场景切换（AC-015）。
+## 请求场景切换（AC-015）。委托副作用件。
 func _request_scene_change(result: int) -> void:
-	if not _scene_change_enabled:
-		return
-	var sm = _get_scene_manager()
-	if sm == null or not sm.has_method("request_scene_change"):
-		return
-	# VICTORY → RESULT_SCREEN(8), DEFEAT/RETREAT → DEFEAT_SCREEN(9)
-	var target_scene: int = 8 if result == CombatResult.VICTORY else 9
-	# TransitionType.COMBAT_TO_EXPLORE = 4
-	sm.request_scene_change(4, target_scene, 4)
+	_get_side_effects().request_scene_change(result)
 
 
 ## 查找 SaveLoadSystem Autoload（薄转发——实现在 combat_autoload_access.gd）。
@@ -835,9 +692,9 @@ func _get_input_manager() -> Node:
 
 
 ## 查找 SceneManager——注入覆盖优先（测试桩），否则 /root/SceneManager Autoload。[br]
-## [br][b]为什么这一支不走查找器[/b]：[code]_scene_manager_override[/code] 是门面的
-## 状态字段（字段留在门面——ADR-0008 §状态单一所有者），查找器不持状态，
-## 故「覆盖优先」这一层判据只能留在门面。覆盖为空时仍走同一份查找实现。
+## [br][b]为什么这一支不走纯查找[/b]：[code]_scene_manager_override[/code] 是门面的
+## 状态字段（ADR-0008 §状态单一所有者），查找器不持状态，故「覆盖优先」这一层判据
+## 只能留在门面。覆盖为空时仍走同一份查找实现。
 func _get_scene_manager() -> Node:
 	if _scene_manager_override != null:
 		return _scene_manager_override
@@ -1439,6 +1296,20 @@ func _get_piles() -> RefCounted:
 	return _piles
 
 
+## 获取战斗生命周期模块实例（开战 / 终战 / 撤退 / 续战复位——本轮拆出）。
+func _get_lifecycle() -> RefCounted:
+	if _lifecycle == null:
+		_lifecycle = preload("res://src/feature/combat/combat_battle_lifecycle.gd").new(self)
+	return _lifecycle
+
+
+## 获取战斗副作用模块实例（快照 / 输入锁 / 转场 / GSM 镜像——本轮拆出）。
+func _get_side_effects() -> RefCounted:
+	if _side_effects == null:
+		_side_effects = preload("res://src/feature/combat/combat_battle_side_effects.gd").new(self)
+	return _side_effects
+
+
 # === 只读/落库子模块的公开取数口（战斗域之外的表现层装配用）=====================
 
 ## 敌我角色运行时状态表（HP / 存活 / 属性增益）。[br]
@@ -1476,48 +1347,38 @@ func is_battle_active() -> bool:
 
 
 # === GSM 第二层镜像 + Cat 2b 信号路由 =============================================
+# 四个 [_gsm_set_battle_*] / [_gsm_increment_battle_turn] 镜像口与
+# [code]_sync_animation_lock[/code] 同属副作用面，实现在 combat_battle_side_effects.gd；
+# 父节点保留原名是因为 [code]combat_roster_ops.gd[/code] 等处按名字回调它们。
 
-## 通过 SceneTree 查找 GSM 并调用第二层方法镜像 phase 变更。[br]
-## [br][b]失败回退[/b]：GSM 未注册时静默跳过——状态机逻辑不依赖 GSM 镜像，[br]
-## GSM 仅负责 Cat 1 信号传播给外部订阅者（CombatUI 等）。
+## 通过 GSM 第二层方法镜像 phase 变更。委托副作用件。
 func _gsm_set_battle_phase(phase: int) -> void:
-	var gsm = _get_gsm()
-	if gsm != null and gsm.has_method("_set_battle_phase"):
-		gsm._set_battle_phase(phase)
+	_get_side_effects().gsm_set_battle_phase(phase)
 
 
-## 通过 GSM 第二层方法递增回合数。
+## 通过 GSM 第二层方法递增回合数。委托副作用件。
 func _gsm_increment_battle_turn() -> void:
-	var gsm = _get_gsm()
-	if gsm != null and gsm.has_method("_increment_battle_turn"):
-		gsm._increment_battle_turn()
+	_get_side_effects().gsm_increment_battle_turn()
 
 
-## 通过 GSM 第二层方法落位回合数——读档续战专用（[method restore_battle_state]）。[br]
+## 通过 GSM 第二层方法落位回合数——读档续战专用。委托副作用件。[br]
 ## [br][b]为什么不用 [method _gsm_increment_battle_turn][/b]：那一支是「+1」，
 ## 而存档里的回合是绝对值（可能比 GSM 镜像的现值大好几轮，也可能一样）；
 ## 逐次 +1 既慢又会把中间那些轮次当成真的发生过。
 func _gsm_set_battle_turn(turn: int) -> void:
-	var gsm = _get_gsm()
-	if gsm != null and gsm.has_method("_set_battle_turn"):
-		gsm._set_battle_turn(turn)
+	_get_side_effects().gsm_set_battle_turn(turn)
 
 
-## 通过 GSM 第二层方法设置战斗活跃状态。
+## 通过 GSM 第二层方法设置战斗活跃状态。委托副作用件。
 func _gsm_set_battle_active(active: bool) -> void:
-	var gsm = _get_gsm()
-	if gsm != null and gsm.has_method("_set_battle_active"):
-		gsm._set_battle_active(active)
+	_get_side_effects().gsm_set_battle_active(active)
 
 
-## 通过 GSM 第二层方法写入 / 清空「进行中战斗」的存档快照。[br]
-## [br][b]存档侧的写入点不在这里[/b]：抓快照要现读布阵与费用（本类之外的持有方），
-## 那是 [code]combat_resume_capture.gd[/code] 的职责；本方法只负责「战斗结束时清空」
-## 这条对称出口（不清的话读档会回到一盘已经打完的棋）。
+## 通过 GSM 第二层方法写入 / 清空「进行中战斗」的存档快照。委托副作用件。[br]
+## [br]存档侧的[b]写入[/b]点不在战斗系统（[code]combat_resume_capture.gd[/code] 现读布阵
+## 与费用后组装），本口只负责「战斗结束时清空」这条对称出口。
 func _gsm_set_battle_resume(resume: Dictionary) -> void:
-	var gsm = _get_gsm()
-	if gsm != null and gsm.has_method("_set_battle_resume"):
-		gsm._set_battle_resume(resume)
+	_get_side_effects().gsm_set_battle_resume(resume)
 
 
 ## Cat 2b 信号安全发射——经 GSM._emit_signal_safe 路由（ADR-0007 信号链深度追踪）。[br]
