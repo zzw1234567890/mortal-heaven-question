@@ -52,6 +52,9 @@ const DebuffManagerScript: GDScript = preload("res://src/feature/combat/combat_d
 ## 指向自身的条目标记——只有它才把效果落在施法者身上。
 const TARGET_SELF: String = "self"
 
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 ## 父节点引用——CombatSystem 实例（取战斗状态表与落库子模块）。
 var _parent: Node = null
 
@@ -292,7 +295,4 @@ func _roster() -> RefCounted:
 
 ## 以 SceneTree.root 查找 Autoload——测试环境缺该 Autoload 时返回 null（不抛错）。
 func _autoload(node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(node_name)))
+	return AutoloadAccess.find(node_name)

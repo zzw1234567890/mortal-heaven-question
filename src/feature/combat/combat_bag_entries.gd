@@ -38,6 +38,9 @@ const RosterStateScript := preload("res://src/feature/combat/combat_roster_state
 const CATEGORY_ID_PILL: StringName = &"pill"
 const CATEGORY_ID_ARTIFACT: StringName = &"artifact"
 
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 ## 依赖注入（测试用桩；null 时按 Autoload / 本地 new 降级——各方法自带空守卫）。
 var inventory_model: RefCounted = null
 var card_system: Node = null
@@ -262,7 +265,4 @@ func _resolve_cost() -> Node:
 
 ## Autoload 动态查找（无 SceneTree / 未注册时返回 null，不抛错）。
 static func _autoload(p_node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(p_node_name)))
+	return AutoloadAccess.find(p_node_name)

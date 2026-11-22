@@ -12,6 +12,10 @@ extends RefCounted
 ## 来源: ADR-0031 §1/§2、combat-ui-layout Story 001-008、Sprint 18 结算回流。
 
 ## 结算回流接线（battle_ended → CombatResultView）。
+
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 const ResultBridgeScript := preload("res://src/ui/combat/shared/combat_result_bridge.gd")
 ## 出牌交互接线（输入层 + 手牌供给）。
 const InteractionScript := preload("res://src/feature/combat/combat_scene_interaction.gd")
@@ -199,7 +203,4 @@ func _reduce_motion() -> bool:
 
 ## Autoload 动态查找（测试环境缺 Autoload 时返回 null——同容器先例）。
 func _autoload(p_node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(p_node_name)))
+	return AutoloadAccess.find(p_node_name)

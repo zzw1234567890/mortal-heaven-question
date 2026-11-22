@@ -27,6 +27,9 @@ const HpCarryoverScript := preload("res://src/feature/combat/combat_hp_carryover
 ## 阵营常量（镜像 [signal CombatSystem.character_died] 的 side 参数：0 己方 / 1 敌方）。
 const SIDE_PLAYER: int = 0
 
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 ## 父节点引用——CombatSystem Autoload 实例。
 var _parent: Node = null
 
@@ -228,12 +231,11 @@ func _get_damage_settlement() -> RefCounted:
 
 # === Autoload 查找（子模块内自用）================================================
 
-## 以 SceneTree.root 查找 Autoload——测试环境缺该 Autoload 时返回 null（不抛错）。
+## 以 SceneTree.root 查找 Autoload——测试环境缺该 Autoload 时返回 null（不抛错）。[br]
+## [br]实现已收拢到 [code]combat_autoload_access.gd[/code]（本方法是该实现的转发口，
+## 保留原名以免动调用点）。
 func _autoload(node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(node_name)))
+	return AutoloadAccess.find(node_name)
 
 
 func _get_deployment_system() -> Node:

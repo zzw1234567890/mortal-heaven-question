@@ -22,6 +22,9 @@ const EndCheck := preload("res://src/feature/combat/combat_end_check.gd")
 ## 数值与 realm_table[1].cost_per_turn（炼气期 2 费）一致；生产路径永远走 RealmSystem 现读。
 const DEFAULT_COST_PER_TURN: int = 2
 
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 ## 父节点引用——CombatSystem 实例。
 var _parent: Node = null
 
@@ -190,7 +193,4 @@ func _get_ai_system() -> Node:
 
 ## 以 SceneTree.root 查找 Autoload——测试环境缺该 Autoload 时返回 null（不抛错）。
 func _autoload(node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(node_name)))
+	return AutoloadAccess.find(node_name)

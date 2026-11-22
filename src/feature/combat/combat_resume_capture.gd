@@ -14,6 +14,10 @@ extends RefCounted
 ## 本轮「战斗中存档 → 读档回到战斗」。
 
 ## 载荷模块（形状与解析的唯一真理来源）。
+
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 const PayloadScript := preload("res://src/feature/combat/battle_resume_payload.gd")
 ## 跨场景上下文的来源读取（origin node id / combat type）。
 const ContextScript := preload("res://src/feature/combat/combat_launch_context.gd")
@@ -239,10 +243,7 @@ func _cost() -> Node:
 
 ## Autoload 动态查找（测试环境缺 Autoload 时返回 null——同容器先例）。
 func _autoload(p_node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(p_node_name)))
+	return AutoloadAccess.find(p_node_name)
 
 
 ## 战斗系统上的整数取数（缺席 / 无该方法时回退）。

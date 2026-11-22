@@ -1,4 +1,7 @@
 extends RefCounted
+
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
 ## CombatAttackCoverage —— Attack 阶段的防御方百分比减伤覆盖（DEBT-CBT-018-8 残留闭环）。[br]
 ## [br][b]职责[/b]：遍历攻击队列，把每条攻击的[b]防御方[/b]（[code]target_id[/code]）
 ## 身上生效的百分比减伤汇总写入条目键 [code]damage_reduction_pcts[/code]，
@@ -54,7 +57,4 @@ func _collect_reduction(character_id: int) -> Array:
 
 ## 以 SceneTree.root 查找 Autoload——测试环境缺该 Autoload 时返回 null（不抛错）。
 func _autoload(node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(node_name)))
+	return AutoloadAccess.find(node_name)

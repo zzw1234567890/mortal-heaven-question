@@ -28,6 +28,9 @@ const RESULT_VICTORY: int = 1
 ## 战斗奖励的掷骰与发放（灵石区间 / 卡牌概率——全场唯一实现）。
 const RewardRoller := preload("res://src/feature/combat/combat_reward_roller.gd")
 
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 ## 父节点引用——CombatSystem Autoload 实例。
 var _parent: Node = null
 
@@ -301,13 +304,10 @@ func apply_victory_rewards(rewards: Dictionary) -> void:
 # === Autoload 查找（子模块内自用）================================================
 
 ## 以 SceneTree.root 查找 Autoload——测试环境缺该 Autoload 时返回 null（不抛错）。[br]
-## [br][b]口径同 [code]combat_autoload_access.gd[/code][/b]：那边的静态查找器尚未被本模块
-## 采用，是为了让 P1 只搬实现面、不动查找方式；后续阶段统一时改这一处即可。
+## [br]实现已收拢到 [code]combat_autoload_access.gd[/code]（本方法是该实现的转发口，
+## 保留原名以免动调用点）。
 func _autoload(node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(node_name)))
+	return AutoloadAccess.find(node_name)
 
 
 func _get_gsm() -> Node:

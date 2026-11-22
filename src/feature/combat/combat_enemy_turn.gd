@@ -25,6 +25,10 @@ extends RefCounted
 ## production/epics/combat-ui-interaction/story-002-turn-cycle.md。
 
 ## 战场状态表（AI 快照的 HP/ATK/防御取数来源——与落库侧同源）。
+
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 const RosterStateScript := preload("res://src/feature/combat/combat_roster_state.gd")
 ## 固定值防御结算纯函数（max(0, 伤害 − DEF)）。
 const DefenseRules := preload("res://src/feature/combat/combat_defense_rules.gd")
@@ -309,7 +313,4 @@ static func _position_of(p_action: Variant) -> int:
 
 ## 以 SceneTree.root 查找 Autoload——测试环境缺该 Autoload 时返回 null（不抛错）。
 func _autoload(p_node_name: StringName) -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath(String(p_node_name)))
+	return AutoloadAccess.find(p_node_name)

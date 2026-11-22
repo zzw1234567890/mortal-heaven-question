@@ -118,6 +118,9 @@ const TurnEconomy := preload("res://src/feature/combat/combat_turn_economy.gd")
 ## 战斗奖励的掷骰与发放（灵石区间 / 卡牌概率——全场唯一实现）。
 const RewardRoller := preload("res://src/feature/combat/combat_reward_roller.gd")
 
+## Autoload 查找器——本类 12 个 [code]_get_X()[/code] 全部转发到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 
 # === 内部状态 ====================================================================
 
@@ -821,30 +824,24 @@ func _request_scene_change(result: int) -> void:
 	sm.request_scene_change(4, target_scene, 4)
 
 
-## 查找 SaveLoadSystem Autoload。
+## 查找 SaveLoadSystem Autoload（薄转发——实现在 combat_autoload_access.gd）。
 func _get_save_load() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/SaveLoadSystem")
+	return AutoloadAccess.find(AutoloadAccess.SAVE_LOAD_SYSTEM)
 
 
-## 查找 InputManager Autoload。
+## 查找 InputManager Autoload（薄转发——实现在 combat_autoload_access.gd）。
 func _get_input_manager() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/InputManager")
+	return AutoloadAccess.find(AutoloadAccess.INPUT_MANAGER)
 
 
-## 查找 SceneManager——注入覆盖优先，否则 /root/SceneManager Autoload。
+## 查找 SceneManager——注入覆盖优先（测试桩），否则 /root/SceneManager Autoload。[br]
+## [br][b]为什么这一支不走查找器[/b]：[code]_scene_manager_override[/code] 是门面的
+## 状态字段（字段留在门面——ADR-0008 §状态单一所有者），查找器不持状态，
+## 故「覆盖优先」这一层判据只能留在门面。覆盖为空时仍走同一份查找实现。
 func _get_scene_manager() -> Node:
 	if _scene_manager_override != null:
 		return _scene_manager_override
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/SceneManager")
+	return AutoloadAccess.find(AutoloadAccess.SCENE_MANAGER)
 
 
 # === 阶段管理 ====================================================================
@@ -1285,76 +1282,56 @@ func _get_realm_penalty(attacker_realm: int, defender_realm: int) -> float:
 	return _get_damage_calculator()._get_realm_penalty(attacker_realm, defender_realm)
 
 
+# === Autoload 查找（薄转发——实现在 combat_autoload_access.gd）====================
+
 ## 查找 CostSystem Autoload。
 func _get_cost_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/CostSystem")
+	return AutoloadAccess.find(AutoloadAccess.COST_SYSTEM)
 
 
 ## 查找 RealmSystem Autoload。
 func _get_realm_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/RealmSystem")
+	return AutoloadAccess.find(AutoloadAccess.REALM_SYSTEM)
 
 
 ## 查找 CardEffectEngine Autoload。
 func _get_card_effect_engine() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/CardEffectEngine")
+	return AutoloadAccess.find(AutoloadAccess.CARD_EFFECT_ENGINE)
 
 
 ## 查找 CardSystem Autoload。
 func _get_card_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/CardSystem")
+	return AutoloadAccess.find(AutoloadAccess.CARD_SYSTEM)
 
 
 ## 查找 StatusEffectSystem Autoload。
 func _get_status_effect_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/StatusEffectSystem")
+	return AutoloadAccess.find(AutoloadAccess.STATUS_EFFECT_SYSTEM)
 
 
 ## 查找 DeploymentSystem Autoload。
 func _get_deployment_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/DeploymentSystem")
+	return AutoloadAccess.find(AutoloadAccess.DEPLOYMENT_SYSTEM)
 
 
 ## 查找 AISystem Autoload。
 func _get_ai_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/AISystem")
+	return AutoloadAccess.find(AutoloadAccess.AI_SYSTEM)
 
 
 ## 查找 ResourceSystem Autoload。
 func _get_resource_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/ResourceSystem")
+	return AutoloadAccess.find(AutoloadAccess.RESOURCE_SYSTEM)
 
 
 ## 查找 CultivationSystem Autoload。
 func _get_cultivation_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/CultivationSystem")
+	return AutoloadAccess.find(AutoloadAccess.CULTIVATION_SYSTEM)
+
+
+## 查找 GameStateManager Autoload——返回 null 时调用方静默跳过。
+func _get_gsm() -> Node:
+	return AutoloadAccess.find(AutoloadAccess.GAME_STATE_MANAGER)
 
 
 ## 从角色条目提取 character_id——兼容 Dictionary / 对象。
@@ -1541,14 +1518,6 @@ func _gsm_set_battle_resume(resume: Dictionary) -> void:
 	var gsm = _get_gsm()
 	if gsm != null and gsm.has_method("_set_battle_resume"):
 		gsm._set_battle_resume(resume)
-
-
-## 查找 GameStateManager Autoload——返回 null 时调用方静默跳过。
-func _get_gsm() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/GameStateManager")
 
 
 ## Cat 2b 信号安全发射——经 GSM._emit_signal_safe 路由（ADR-0007 信号链深度追踪）。[br]

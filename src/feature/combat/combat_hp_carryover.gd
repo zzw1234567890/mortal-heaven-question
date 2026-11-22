@@ -37,6 +37,9 @@ extends RefCounted
 ## 阵营常量——镜像 [code]combat_roster_state.gd[/code]（0 己方 / 1 敌方）。
 const SIDE_PLAYER: int = 0
 
+## Autoload 查找器——本模块内的查找已收拢到它（唯一实现）。
+const AutoloadAccess := preload("res://src/feature/combat/combat_autoload_access.gd")
+
 ## GSM [code]player[/code] 域内的存储键。
 const STORAGE_KEY: String = "character_hp"
 
@@ -181,9 +184,6 @@ func _field_id(entry: Variant) -> int:
 	return -1
 
 
-## GSM Autoload——不可用返回 null（父节点引用仅用于表明归属，查找走 SceneTree）。
+## GSM Autoload——不可用返回 null（父节点引用仅用于表明归属，查找走统一查找器）。
 func _gsm() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null(NodePath("/root/GameStateManager"))
+	return AutoloadAccess.find(AutoloadAccess.GAME_STATE_MANAGER)
