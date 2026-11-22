@@ -8,11 +8,20 @@ extends Control
 ## （→ 撤退确认弹窗）、渡劫战前的战前警示（→ warning 弹窗）。判定与文案全部
 ## 委托 [SettlementRules] / [RetreatRules]（Logic 内核，BLOCKING 单测）。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不缓存战斗/卡组/角色状态——卡组张数
-## 每次按注入依赖现读（[method _deck_counts]），面板内容按信号载荷重建。[br]
+## 每次按注入依赖现读（[code]SettlementHostData[/code]），面板内容按信号载荷重建。[br]
 ## [br][b]零轮询[/b]（ADR-0031 §3）：无 [code]_process()[/code]——信号与输入驱动。[br]
 ## [br][b]不自动关闭[/b]（AC-10）：三面板只由玩家点击关闭；本宿主不设自动关闭路径。[br]
 ## [br][b]持久写入归 interaction epic[/b]（Out of Scope）：本宿主只把面板的
 ## 确认/跳过/返回转发成同名信号，不调 loot 应用 / retreat 执行 API。[br]
+## [br][b]各件各有其家[/b]：面板的建与信号回流归 [SettlementHostPanels]、奖励中文行与
+## 掷骰缓存归 [SettlementGrantLines]、战斗系统信号接线归 [SettlementHostSignals]、
+## 面板开合的焦点记忆归 [SettlementFocusRestore]、纯数据整形归
+## [SettlementHostData]。本类只管「信号进来 → 该谁开面板 → 该发什么信号出去」。[br]
+## [br][b]为什么面板句柄仍写在本类属性上[/b]：它们是场景挂载侧与测试的既有读窗口
+## （[code]host.settlement_panel[/code] / [code]retreat_dialog[/code] /
+## [code]tribulation_warning[/code]）——建造方是面板件，所有权仍在本类这一处。[br]
+## [br][b]为什么 [_lines] 在字段处就建好[/b]：它不碰场景树、构造即可用——未入树就被
+## 直调的路径（headless 用例、手动调试脚本）因此不会撞上 null。
 ##
 ## @experimental
 ## 来源: ADR-0031、design/gdd/combat-ui-system.md §9/§10、
@@ -20,15 +29,17 @@ extends Control
 
 const Rules := preload("res://src/ui/combat/shared/settlement_rules.gd")
 const Retreat := preload("res://src/ui/combat/shared/retreat_rules.gd")
-const PanelScript := preload("res://src/ui/combat/settlement/settlement_panel.gd")
-const RetreatScript := preload("res://src/ui/combat/settlement/retreat_dialog.gd")
-const WarningScript := preload("res://src/ui/combat/settlement/tribulation_warning_dialog.gd")
-## 奖励文案内核——与结算场景/回探索提示共用同一份口径。
-const RewardLines := preload("res://src/feature/combat/combat_reward_lines.gd")
-## 渡劫金卡文案内核——渡劫结算报告 → 「获得：×××（金）」的中文行（GDD §6）。
-const TribRewardLines := preload("res://src/feature/tribulation/tribulation_reward_lines.gd")
 ## 数据快照与载荷构建工具（拆分自宿主——行数预算）。
 const Data := preload("res://src/ui/combat/settlement/settlement_host_data.gd")
+## 奖励中文行与掷骰缓存（拆分自宿主——行数预算）。
+const Lines := preload("res://src/ui/combat/settlement/settlement_grant_lines.gd")
+## 三面板的构建与信号回流（拆分自宿主——行数预算）。
+const Panels := preload("res://src/ui/combat/settlement/settlement_host_panels.gd")
+## 战斗系统信号接线（拆分自宿主——行数预算）。
+const Signals := preload("res://src/ui/combat/settlement/settlement_host_signals.gd")
+## 面板开合的焦点记忆（拆分自宿主——行数预算）。
+const FocusRestore := preload(
+		"res://src/ui/combat/settlement/settlement_focus_restore.gd")
 
 ## === 信号（对外出口——持久写入/转场归 interaction epic）====================
 
@@ -59,37 +70,41 @@ var deck_system: Node = null
 var is_tribulation: bool = false
 ## 减少动态偏好（三面板统一）。
 var reduce_motion: bool = false
-## 当前战斗的掷骰奖励缓存（用于发放后刷新汇总视图）。
-var _current_rolled_rewards: Dictionary = {}
 
 ## === 子面板 ===============================================================
 
-## 胜利/战败结算面板。
+## 胜利/战败结算面板（由 [member _panels] 建并写回）。
 var settlement_panel: Control = null
-## 撤退确认弹窗。
+## 撤退确认弹窗（同上）。
 var retreat_dialog: Control = null
-## 渡劫战前警示弹窗。
+## 渡劫战前警示弹窗（同上）。
 var tribulation_warning: Control = null
 
-## 已接线信号源的战斗系统（换源时先断开旧源——防一次战斗开两次面板）。
-var _bound_combat_system: Node = null
-## 键盘/手柄焦点记忆（弹窗打开前记下焦点，关闭后还给原处）。[br]
-## [br][b]由场景挂载侧注入一个共享实例[/b]（[method set_focus_memory]）：行囊面板
-## 挂在战场根上、不归本宿主，但它开合同样要还原焦点——两处分头记会把彼此的位置
-## 覆盖掉，故整场战斗只有一份记忆。
-var _focus_memory: RefCounted = null
+## 战斗系统信号接线（[method setup] 建——持「连过谁」的换源账）。
+var _signals: RefCounted = null
+## 面板开合的焦点记忆窗口（不碰场景树——字段处建好，未入树被直调也不撞 null）。
+var _focus: RefCounted = FocusRestore.new()
 ## 是否已在本场确认过渡劫战前警示（防重复拦）。
 var _pre_battle_confirmed: bool = false
 ## 战败上下文（阵亡角色名与绑定卡张数——由场景挂载侧在战斗结束时注入，
 ## 或随 [code]battle_ended[/code] 载荷下发；本宿主不自行推算阵亡名单）。
 var _dead_names: Array = []
 var _dead_binding_card_count: int = 0
+## 奖励中文行与掷骰缓存（本类只转发——见 [SettlementGrantLines]）。[br]
+## [br][b]在字段处就建好[/b]：它不碰场景树，构造即可用——这样未入树就被直调的
+## 路径（headless 用例、手动调试脚本）不会撞上 null。
+var _lines: RefCounted = Lines.new()
+## 三面板的构建与信号回流（[method _ready] 建——建面板要宿主已入树）。
+var _panels: RefCounted = null
 
 
 func _ready() -> void:
 	name = "SettlementHost"
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_build_panels()
+	_panels = Panels.new(self, Callable(self, &"_on_loot_confirmed"),
+		Callable(self, &"_on_loot_skipped"), Callable(_focus, &"restore"),
+		Callable(self, &"_on_pre_battle_confirmed"))
+	_panels.call(&"build", reduce_motion)
 
 
 ## 注入依赖并接线信号（场景挂载侧调用；可重复调用——幂等，[b]含换源[/b]：
@@ -111,6 +126,13 @@ func has_sources() -> bool:
 	return combat_system != null
 
 
+## 设置 reduce_motion（三面板统一——测试与设置变更时调用）。
+func set_reduce_motion(value: bool) -> void:
+	reduce_motion = value
+	if _panels != null:
+		_panels.call(&"apply_reduce_motion", value)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 触发入口（信号驱动——无轮询）
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -126,29 +148,21 @@ func has_sources() -> bool:
 func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 	var kind: StringName = Rules.panel_kind_for(result)
 	if kind != Rules.KIND_NONE:
-		# 开面板前记下焦点（关闭时还给原处——见 [method _restore_focus]）
-		_remember_focus()
+		# 开面板前记下焦点（关闭时还给原处——见 [SettlementFocusRestore]）
+		_focus.call(&"remember")
 	if kind == Rules.KIND_VICTORY:
-		_current_rolled_rewards = rewards.duplicate(true)
+		_lines.call(&"remember_rolled", rewards)
 		var counts: Dictionary = Data.deck_counts(deck_system)
 		var options: Array = Data.victory_options(rewards)
 		# 候选为空时直接显示汇总（不建三选一格子）
 		if options.is_empty():
-			var lines: Array = []
-			var lingshi: int = int(rewards.get("lingshi", 0))
-			var cultivation: int = int(rewards.get("cultivation", 0))
-			if lingshi > 0:
-				lines.append("灵石 +%d" % lingshi)
-			if cultivation > 0:
-				lines.append("修为 +%d" % cultivation)
-			lines.append_array(tribulation_reward_lines(rewards))
+			var lines: Array = _lines.call(&"empty_option_lines", rewards)
 			settlement_panel.show_victory(options, int(counts["count"]),
 					int(counts["limit"]), lines)
 			# 直接切换到汇总视图
 			settlement_panel.show_grant_summary(lines)
 		else:
-			var lines: Array = RewardLines.reward_lines(rewards)
-			lines.append_array(tribulation_reward_lines(rewards))
+			var lines: Array = _lines.call(&"victory_lines", rewards)
 			settlement_panel.show_victory(options, int(counts["count"]),
 					int(counts["limit"]), lines)
 	elif kind == Rules.KIND_DEFEAT:
@@ -160,7 +174,7 @@ func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 ## 撤退按钮点击（右上角常驻按钮的点击入口——AC-9）。[br]
 ## [br]打开撤退确认弹窗；渡劫战走红框 80% 变体（AC-7）。
 func request_retreat() -> void:
-	_remember_focus()
+	_focus.call(&"remember")
 	retreat_dialog.open(is_tribulation, _dead_binding_card_count)
 
 
@@ -176,124 +190,35 @@ func on_retreat_requested() -> void:
 func show_pre_battle_warning() -> bool:
 	if not Retreat.should_show_pre_battle_warning(is_tribulation, _pre_battle_confirmed):
 		return false
-	_remember_focus()
+	_focus.call(&"remember")
 	tribulation_warning.open()
 	return true
 
 
-## 设置 reduce_motion（三面板统一——测试与设置变更时调用）。
-func set_reduce_motion(value: bool) -> void:
-	reduce_motion = value
-	for panel: Control in [settlement_panel, retreat_dialog, tribulation_warning]:
-		if panel != null:
-			panel.reduce_motion = value
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# 内部：焦点记忆
+# 内部：焦点记忆（转发 [SettlementFocusRestore]——为什么记在宿主见该类文档）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 开弹窗之前记下当前键盘/手柄焦点。[br]
-## [br][b]为什么记在宿主而不是弹窗里[/b]：弹窗自己不知道「打开它的是谁」——
-## 撤退弹窗有两个入口（右上角按钮 / 战斗系统的撤退请求），战利品面板由战斗结束
-## 信号打开；「打开前焦点在哪」只有宿主这一层看得到。[br]
-## [br][b]记忆缺失时静默跳过[/b]：headless 单测里宿主不入树，焦点本就无从谈起。
-func _remember_focus() -> void:
-	if _focus_memory != null:
-		_focus_memory.call(&"remember_current")
-
-
-## 弹窗关闭后把焦点还给打开前的控件（还不了则落链注册的兜底默认焦点）。[br]
-## [br][b]三条路径共用一个出口[/b]：战利品面板（含战败返回）、撤退确认、渡劫警示
-## 各自在关闭时发信号到这里——一处实现，不必在每块面板里各写一遍。[br]
-## [br][b]为什么必须还原[/b]：不还原的话，玩家取消一次撤退确认之后焦点会跳到
-## 默认焦点（第一张手牌），每开一次面板就丢一次位置——手柄玩家尤其明显。
-func _restore_focus() -> void:
-	if _focus_memory != null:
-		_focus_memory.call(&"restore")
-
-
-## 注入共享的焦点记忆（场景挂载侧在建完焦点链后调用一次）。[br]
-## [br][b]为什么由外部注入[/b]：整场战斗只有一份记忆（见 [member _focus_memory]），
-## 而它的兜底（默认焦点）由交互接线在建立时注册——两件东西的装配点都在场景挂载侧。
+## 注入共享的焦点记忆（场景挂载侧在建完焦点链后调用一次）。
 func set_focus_memory(p_memory: RefCounted) -> void:
-	_focus_memory = p_memory
+	_focus.call(&"set_memory", p_memory)
 
 
 ## 焦点记忆实例（未注入为 null——测试探针）。
 func focus_memory() -> RefCounted:
-	return _focus_memory
+	return _focus.call(&"memory")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 内部：接线
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 构建三面板（隐藏——由触发入口打开）。
-func _build_panels() -> void:
-	settlement_panel = PanelScript.new()
-	settlement_panel.name = "SettlementPanel"
-	settlement_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	settlement_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(settlement_panel)
-	settlement_panel.loot_selected.connect(func(i: int) -> void: loot_selected.emit(i))
-	settlement_panel.loot_confirmed.connect(_on_loot_confirmed)
-	settlement_panel.loot_skipped.connect(_on_loot_skipped)
-	settlement_panel.defeat_confirmed.connect(func() -> void: defeat_confirmed.emit())
-	# 关闭后还焦点（四条关闭路径共用这一个出口——见 [signal SettlementPanel.closed]）
-	settlement_panel.closed.connect(_restore_focus)
-
-	retreat_dialog = RetreatScript.new()
-	retreat_dialog.name = "RetreatDialog"
-	retreat_dialog.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	retreat_dialog.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(retreat_dialog)
-	retreat_dialog.retreat_confirmed.connect(func() -> void: retreat_confirmed.emit())
-	retreat_dialog.retreat_cancelled.connect(func() -> void: retreat_cancelled.emit())
-	retreat_dialog.dialog_closed.connect(_restore_focus)
-
-	tribulation_warning = WarningScript.new()
-	tribulation_warning.name = "TribulationWarning"
-	tribulation_warning.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	tribulation_warning.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(tribulation_warning)
-	tribulation_warning.battle_confirmed.connect(func() -> void:
-		_pre_battle_confirmed = true
-		pre_battle_confirmed.emit())
-	tribulation_warning.battle_cancelled.connect(func() -> void:
-		pre_battle_cancelled.emit())
-	tribulation_warning.dialog_closed.connect(_restore_focus)
-
-	# 构建后统一继承当前 reduce_motion（setup/入树前设置的值不被子面板默认值吞掉）
-	set_reduce_motion(reduce_motion)
-
-
-## 连接战斗系统信号（幂等——重复 setup 不重复连；换源时先断开旧源）。
+## 连接战斗系统信号（转发接线件——幂等与换源见 [SettlementHostSignals]）。
 func _connect_signals() -> void:
-	var cs: Node = combat_system
-	if _bound_combat_system != null and _bound_combat_system != cs:
-		_disconnect_source(_bound_combat_system)
-	_bound_combat_system = cs
-	if cs == null:
-		return
-	if cs.has_signal(&"battle_ended") and not cs.battle_ended.is_connected(on_battle_ended):
-		cs.battle_ended.connect(on_battle_ended)
-	if cs.has_signal(&"retreat_requested") \
-			and not cs.retreat_requested.is_connected(on_retreat_requested):
-		cs.retreat_requested.connect(on_retreat_requested)
-
-
-## 断开旧信号源（换源 / 销毁时调用——只断本宿主连过的两个信号，
-## 不碰同一信号上的其他连接者）。[br]
-## [param source]: 之前接线过的战斗系统。
-func _disconnect_source(source: Node) -> void:
-	if source == null or not is_instance_valid(source):
-		return
-	if source.has_signal(&"battle_ended") and source.battle_ended.is_connected(on_battle_ended):
-		source.battle_ended.disconnect(on_battle_ended)
-	if source.has_signal(&"retreat_requested") \
-			and source.retreat_requested.is_connected(on_retreat_requested):
-		source.retreat_requested.disconnect(on_retreat_requested)
+	if _signals == null:
+		_signals = Signals.new(Callable(self, &"on_battle_ended"),
+			Callable(self, &"on_retreat_requested"))
+	_signals.call(&"bind", combat_system)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -312,12 +237,16 @@ func _binding_card_count() -> int:
 	return _dead_binding_card_count
 
 
+## 销毁时断开信号源（战斗系统是共享信号源——不摘会对着已释放的宿主开火）。[br]
+## [br][b]顺序无关[/b]：接线件自己记着「连过谁」，故这里不必先判 null。
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		if _bound_combat_system != null and is_instance_valid(_bound_combat_system):
-			_disconnect_source(_bound_combat_system)
-		_bound_combat_system = null
+	if what == NOTIFICATION_PREDELETE and _signals != null:
+		_signals.call(&"release")
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 内部：面板回调（全部由 [member _panels] 在构建时接上）
+# ═══════════════════════════════════════════════════════════════════════════════
 
 ## 战利品确认——调用 CombatSystem.grant_reward_selection 发放奖励。[br]
 ## [param index] 玩家选择的卡牌索引（-1 表示跳过卡牌）。
@@ -341,6 +270,13 @@ func _on_loot_skipped() -> void:
 	loot_skipped.emit()
 
 
+## 渡劫战前警示确认——钉「本场已确认」位后转发（[member _panels] 接在
+## [signal TribulationWarningDialog.battle_confirmed] 上）。
+func _on_pre_battle_confirmed() -> void:
+	_pre_battle_confirmed = true
+	pre_battle_confirmed.emit()
+
+
 ## 显示「已到账汇总」视图——三选一网格隐藏，只显示奖励汇总行。[br]
 ## [param result] grant_reward_selection 的返回值。
 func show_grant_summary(result: Dictionary) -> void:
@@ -349,42 +285,11 @@ func show_grant_summary(result: Dictionary) -> void:
 
 ## 内部实现——生成汇总行并调用面板。
 func _show_grant_summary(result: Dictionary) -> void:
-	var lines: Array = []
-	if not bool(result.get("no_rolled_rewards", true)):
-		var lingshi: int = int(_current_rolled_rewards.get("lingshi", 0))
-		var cultivation: int = int(_current_rolled_rewards.get("cultivation", 0))
-		if lingshi > 0:
-			lines.append("灵石 +%d" % lingshi)
-		if cultivation > 0:
-			lines.append("修为 +%d" % cultivation)
-		var cards: Array = result.get("cards", [])
-		for card: Variant in cards:
-			if card is Dictionary:
-				var name: String = str(card.get("name", ""))
-				var rarity: String = str(card.get("rarity", ""))
-				if not name.is_empty():
-					if not rarity.is_empty():
-						lines.append("获得卡牌：%s（%s）" % [name, rarity])
-					else:
-						lines.append("获得卡牌：%s" % name)
-		# 跳过卡牌时添加放弃文案
-		if cards.is_empty() and not _current_rolled_rewards.get("cards", []).is_empty():
-			lines.append("未选择即放弃，卡牌不进收藏")
-		lines.append_array(tribulation_reward_lines(_current_rolled_rewards))
-	# 无任何奖励时显示提示
-	if lines.is_empty():
-		lines.append("本次战斗无奖励")
-	# 隐藏战利品网格，只显示汇总
-	settlement_panel.show_grant_summary(lines)
+	settlement_panel.show_grant_summary(_lines.call(&"granted_lines", result))
 
 
-## 渡劫金卡奖励行——载荷里没有 [code]tribulation_rewards[/code] 时返回空数组。[br]
-## [br][b]为什么在宿主里再包一层[/b]：载荷键名是渡劫侧的口径（
-## [code]tribulation_reward_pool.gd[/code] 的 [code]KEY_PAYLOAD[/code]），宿主不该
-## 自己写一遍字符串；这一层只负责「取键 → 交给文案内核」。[br]
-## [br][b]普通战斗天然为空[/b]：键只在渡劫战结算时写入（见
-## [code]TribulationCombat.on_battle_ended[/code]），故这一段对普通战斗不产生任何行。
+## 渡劫金卡奖励行（对外窗口——[method SettlementGrantLines.tribulation_lines] 的转发）。[br]
+## [br][b]为什么留一个同名方法[/b]：它是既有的对外读窗口（渡劫结算屏与测试都走它），
+## 实现整体搬进了 [SettlementGrantLines]——这里只把问题转过去，不另写一份口径。
 func tribulation_reward_lines(p_rewards: Dictionary) -> Array:
-	if not p_rewards.has(TribRewardLines.PoolScript.KEY_PAYLOAD):
-		return []
-	return TribRewardLines.card_lines(p_rewards.get(TribRewardLines.PoolScript.KEY_PAYLOAD))
+	return _lines.call(&"tribulation_lines", p_rewards)

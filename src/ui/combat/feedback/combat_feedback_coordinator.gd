@@ -1,6 +1,6 @@
 class_name CombatFeedbackCoordinator
 extends Control
-## CombatFeedbackCoordinator —— 战斗反馈编排器（combat-ui-layout Story 003）。
+## CombatFeedbackCoordinator —— 战斗反馈编排器（combat-ui-layout Story 003）。[br]
 ##
 ## [b]职责[/b]：消费战斗/上场系统信号，编排角色卡视觉反馈——[br]
 ##   - AC-1：[code]character_damaged[/code]（缺省回退 [code]attack_resolved[/code]）
@@ -19,7 +19,14 @@ extends Control
 ## [b]零轮询[/b]：无 [code]_process()[/code]——信号驱动 + 帧边界 [code]call_deferred[/code]
 ## + 一次性 Tween；[b]依赖注入[/b]：信号源经 [method setup] 注入，HP 终值经 [code]hp_reader_cb[/code]。[br]
 ## [b]伤害入口优先级[/b]：信号源带 [code]character_damaged[/code] 时只订阅它（覆盖攻击
-## 结算与出牌两条来源）；同一次攻击两条信号都会发，同订会让飘字重影。缺省回退旧信号。
+## 结算与出牌两条来源）；同一次攻击两条信号都会发，同订会让飘字重影。缺省回退旧信号。[br]
+## [br][b]两件活分出去各成一件[/b]：[b]同帧伤害合并与结算帧调度[/b]归
+## [code]CombatDamageBatch[/code]；[b]单角色阵亡动画的生命周期[/b]归
+## [code]CombatDeathSequence[/code]。本类只剩「谁发来的信号 → 该谁记账」这一层编排
+## （加卡表与本场结果位），两条链路各自的内部顺序不再和对方混在一个文件里。[br]
+## [br][b]为什么代理仍留着 [_pending_deltas] / [_death_tweens][/b]：两张表是公共入口
+## [method register_card] / [method unregister_card] 的记账，也是长期对外的读窗口
+## ——拆出去的件借的是同一份字典引用（不复制），故这里读到的就是那里的现状。
 ##
 ## @experimental
 ## 来源: ADR-0031、design/gdd/combat-ui-system.md（HP条与视觉反馈 AC、角色阵亡 AC、
@@ -30,11 +37,12 @@ var floater_pool: FloaterPool = null
 ## 减少动态（进场时从设置读取——进场后静态，零轮询）。
 var reduce_motion: bool = false
 
-## 阵亡动画时长（秒——GDD 动画表「角色阵亡 0.5s」）。
-const DEATH_DURATION_SEC: float = 0.5
-
-## 阵亡终态的空位接替（卡 → 带「已阵亡」戳记的空位虚线框，见该模块类文档）。
-const DeathHandoff := preload("res://src/ui/combat/feedback/combat_death_handoff.gd")
+## 同帧伤害合并 / 结算帧调度（拆出——见类文档「两件活分出去各成一件」）。
+const Batch := preload(
+		"res://src/ui/combat/feedback/combat_damage_batch.gd")
+## 单角色阵亡动画生命周期（拆出——同上）。
+const DeathSequence := preload(
+		"res://src/ui/combat/feedback/combat_death_sequence.gd")
 
 ## 本场是否已转发结算结果（AC-3 全灭短路的布雷位）。[br]
 ## [br][b]为什么是布尔而不是结果码[/b]：这里要记的是「本场转没转过」这一位事实，
@@ -49,13 +57,13 @@ var _result_forwarded: bool = false
 ## === 瞬态视觉状态（§2.1 豁免）=================================================
 
 ## 待结算增量表——[code]{character_id: {delta: int, pending_death: bool}}[/code]；
-## 同帧多次伤害合并（每目标一条），结算帧清空。
+## 同帧多次伤害合并（每目标一条），结算帧清空。写读两侧都在
+## [member _batch] 手里（同一份字典引用）。
 var _pending_deltas: Dictionary = {}
-## 结算帧调度标志（防重复 call_deferred）。
-var _flush_scheduled: bool = false
 ## 角色 ID → 角色卡映射（场景层注册——card_registry 非游戏状态，是 UI 节点表）。
 var _cards: Dictionary = {}
-## 阵亡动画 Tween 句柄表——[code]{character_id: Tween}[/code]。
+## 阵亡动画 Tween 句柄表——[code]{character_id: Tween}[/code]（同一份引用归
+## [member _deaths] 记账）。
 var _death_tweens: Dictionary = {}
 ## 已连接信号源（防重——_connect_once 先例）。
 var _connected_sources: Array = []
@@ -64,8 +72,19 @@ var _connected_sources: Array = []
 ## 返回 [code]{current: int, max: int}[/code]（注入，读源系统——零状态所有权）。
 var hp_reader_cb: Callable = Callable()
 
+## 伤害批处理器（[method setup] 建——预建以便测试直调）。
+var _batch: RefCounted = null
+## 阵亡动画序列（同上）。
+var _deaths: RefCounted = null
+
 ## 结算信号（AC-3 全灭短路转发——结算面板本体归 story 008）。
 signal battle_result_forwarded(result: int, rewards: Dictionary)
+
+
+func _init() -> void:
+	# 两件拆出的助手借同一份字典引用（见类文档）——不复制，账目只此一份。
+	_batch = Batch.new(Callable(self, &"_flush_deltas"), _pending_deltas)
+	_deaths = DeathSequence.new(self, _cards, _death_tweens)
 
 
 ## 初始化（场景层挂载时调用）。[br]
@@ -91,11 +110,14 @@ func register_card(character_id: int, card: Control) -> void:
 	_cards[character_id] = card
 
 
-## 请求移除注册（战斗结束清理——防悬空引用）。
+## 请求移除注册（战斗结束清理——防悬空引用）。[br]
+## [br][b]三层清理各摘各的[/b]：卡表归本类、增量账归 [member _batch]、
+## 阵亡 Tween 归 [member _deaths]——合并成一次全清会让「单个角色阵亡」与
+## 「战斗结束清扫」两条路径互相误伤。
 func unregister_card(character_id: int) -> void:
 	_cards.erase(character_id)
-	_pending_deltas.erase(character_id)
-	_kill_death_tween(character_id)
+	_batch.call(&"forget", character_id)
+	_deaths.call(&"kill", character_id)
 
 
 ## === 信号订阅（_connect_once 防重——realm_bar 先例）===========================
@@ -155,12 +177,7 @@ func _enqueue_damage(target_id: int, delta: int, is_kill: bool,
 		reduced: bool = false) -> void:
 	if target_id < 0 or delta == 0:
 		return
-	var entry: Dictionary = _pending_deltas.get_or_add(target_id,
-		{"delta": 0, "pending_death": false})
-	entry["delta"] = int(entry["delta"]) + delta
-	if is_kill:
-		entry["pending_death"] = true
-	_pending_deltas[target_id] = entry
+	_batch.call(&"enqueue", target_id, delta, is_kill)
 	# 飘字（伤害红下落/治疗绿上浮——池化复用；显示值为实际扣血，非原始伤害）
 	if floater_pool != null:
 		var card: Control = _cards.get(target_id)
@@ -173,30 +190,21 @@ func _enqueue_damage(target_id: int, delta: int, is_kill: bool,
 				FloaterPool.FloaterKind.HEAL if delta < 0 \
 					else FloaterPool.FloaterKind.DAMAGE,
 				reduced)
-	_schedule_flush()
 
 
-## 结算帧调度——同帧多次信号仅调度一次（call_deferred 合并）。
-func _schedule_flush() -> void:
-	if _flush_scheduled:
-		return
-	_flush_scheduled = true
-	_flush_deltas.call_deferred()
-
-
-## 结算帧——每目标一次 apply_hp(终值)（终值从源系统读取——零状态所有权）。
+## 结算帧——每目标一次 apply_hp(终值)（终值从源系统读取——零状态所有权）。[br]
+## [br][b]由 [member _batch] 以 [code]call_deferred[/code] 唤起[/b]（同帧多次入队只派发一次）。
 func _flush_deltas() -> void:
-	_flush_scheduled = false
-	var entries: Array = _pending_deltas.keys()
+	var entries: Array = _batch.call(&"begin_flush")
 	for character_id: int in entries:
-		var entry: Dictionary = _pending_deltas[character_id]
+		var entry: Dictionary = _batch.call(&"entry_of", character_id)
 		var card: Control = _cards.get(character_id)
 		if card != null and hp_reader_cb.is_valid():
 			var hp: Dictionary = hp_reader_cb.call(character_id)
 			card.apply_hp(int(hp.get("current", 0)), int(hp.get("max", 0)))
 		if bool(entry.get("pending_death", false)):
 			_play_death(character_id)
-	_pending_deltas.clear()
+	_batch.call(&"clear")
 
 
 ## === AC-2：待命/已行动标记 ====================================================
@@ -238,13 +246,8 @@ func request_acted(character_id: int) -> void:
 ## 全灭等裁定归战斗系统）；本编排器取消全部待处理/进行中的视觉动画。
 func _on_battle_ended(result: int, rewards: Dictionary) -> void:
 	# 短路：清空待结算增量 + 杀死全部阵亡动画（不逐个播）
-	_pending_deltas.clear()
-	_flush_scheduled = false
-	for character_id: int in _death_tweens.keys():
-		var dying_card: Control = _cards.get(character_id)
-		if dying_card != null:
-			dying_card.modulate.a = 1.0  # L-2——中途杀动画恢复不透明（防半透明悬挂）
-		_kill_death_tween(character_id)
+	_batch.call(&"cancel")
+	_deaths.call(&"kill_all")
 	_result_forwarded = true
 	battle_result_forwarded.emit(result, rewards)
 
@@ -254,54 +257,13 @@ func _on_battle_ended(result: int, rewards: Dictionary) -> void:
 ## 播放阵亡动画（character_died 信号驱动——0.5s 碎裂淡出 stub → 移除 → 空位框）。[br]
 ## [b]reduce_motion[/b]：直接移除+显示空位框（瞬时替代——UX 减少动态条款）。[br]
 ## [b]幂等守卫[/b]：同一角色重复阵亡信号不重播（pending_death 队列 + 信号
-## 双路径汇合——GAP 防重入）。
+## 双路径汇合——GAP 防重入）。[br]
+## [br][b]全灭后不再播[/b]（M-1）：结算面板已接管，动画会把卡从面板底下抹掉。
 func _on_character_died(character_id: int, side: int,
 		binding_card_ids: Array) -> void:
 	_play_death(character_id)
 
 
-## 阵亡动画执行（两条路径汇合：pending_death 结算帧 / character_died 信号）。[br]
-## 幂等：已在播或已移除的卡不重播。
+## 阵亡动画执行（两条路径汇合：pending_death 结算帧 / character_died 信号）。
 func _play_death(character_id: int) -> void:
-	if _result_forwarded:
-		return  # 全灭短路后不再播动画（M-1——结算面板已接管）
-	var card: Control = _cards.get(character_id)
-	if card == null:
-		return
-	if _death_tweens.has(character_id):
-		return  # 幂等——动画进行中不重播
-	if reduce_motion:
-		_finish_death(character_id)
-		return
-	_kill_death_tween(character_id)
-	var tween: Tween = create_tween()
-	# 碎裂+消散 stub：整体 modulate alpha 淡出 0.5s（美术碎裂素材归后续 story）
-	tween.tween_property(card, "modulate:a", 0.0, DEATH_DURATION_SEC)
-	tween.tween_callback(_finish_death.bind(character_id))
-	_death_tweens[character_id] = tween
-
-
-## 阵亡动画完成——移除卡节点 + 原位显示带戳记的空位虚线框。[br]
-## [br][b]接替动作委托 [code]CombatDeathHandoff[/code][/b]：搬运节点与填「已阵亡」
-## 文字是同一件事的两半（框上没有字的终态等于把信息丢掉），收在一处才拆不开。[br]
-## [br][b]三层清理的分工[/b]：本方法只摘卡表（[code]_cards[/code]）；
-## [code]_pending_deltas[/code] 留给 [method unregister_card]（战斗结束统一清扫），
-## 阵亡 Tween 表由 [method _kill_death_tween] 先行摘干净——三者不合并，避免
-## 「战斗结束清理」与「单个角色阵亡」两条路径互相误伤。
-func _finish_death(character_id: int) -> void:
-	_kill_death_tween(character_id)
-	var card: Control = _cards.get(character_id)
-	if card == null:
-		return
-	DeathHandoff.replace_with_empty_slot(card)
-	_cards.erase(character_id)
-	card.queue_free()
-
-
-## === 内部 ====================================================================
-
-func _kill_death_tween(character_id: int) -> void:
-	var tween: Tween = _death_tweens.get(character_id)
-	if tween != null and tween.is_valid():
-		tween.kill()
-	_death_tweens.erase(character_id)
+	_deaths.call(&"play", character_id, _result_forwarded, reduce_motion)
