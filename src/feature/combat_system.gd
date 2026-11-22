@@ -251,6 +251,9 @@ var _roster_ops: RefCounted = null
 ## 三堆牌子模块（抽牌 / 洗牌 / 弃牌 / 开局发牌 / 读档恢复——本轮拆出）。
 var _piles: RefCounted = null
 
+## 阶段序列件（推进 / 手动确认 / 阶段条件检查——本轮拆出）。
+var _phase_sequencer: RefCounted = null
+
 ## 战斗生命周期编排模块（开战 / 终战 / 撤退 / 续战复位——本轮拆出）。
 var _lifecycle: RefCounted = null
 
@@ -702,71 +705,24 @@ func _get_scene_manager() -> Node:
 
 
 # === 阶段管理 ====================================================================
+# 推进与手动确认的实现在 combat_phase_sequencer.gd（advance_phase 的 8 步顺序 /
+# Phase 2、3 手动入口 / 两个阶段条件检查）；父节点保留同名薄转发——
+# [code]advance_phase[/code] 是 [code]combat_card_resolver.gd[/code] 与
+# [code]combat_phase_manager.gd[/code] 按名字回调的父节点接缝，
+# [code]_can_afford_any_card[/code] / [code]_all_characters_targeted[/code] 是
+# [code]combat_phase_manager.gd[/code] 的验证矩阵输入。
+# 阶段入口/出口与八个阶段钩子仍留在下面（它们直接委托既有的 phase_manager 子模块）。
 
-## advance_phase —— 确定性序列推进阶段。[br]
-## [br]序列（顺序不可更改，ADR-0008 §advance_phase 核心算法）：[br]
-##   1. 非活跃守卫 → push_error + return false[br]
-##   2. 计算 next 阶段（END 回绕到 PREPARATION）[br]
-##   3. _validate_transition(from, to) → 失败 push_warning + return false[br]
-##   4. _exit_phase(current) → 当前阶段清理[br]
-##   5. _enter_phase(next) → 下一阶段初始化[br]
-##   6. GSM._set_battle_phase(next) → GSM 第二层镜像（Cat 1）[br]
-##   7. PREPARATION 回绕时 GSM._increment_battle_turn()[br]
-##   8. _emit_safe("phase_changed", [old, next, turn]) → Cat 2b[br]
+## advance_phase —— 确定性序列推进阶段。委托阶段序列件。[br]
+## [br]序列（顺序不可更改，ADR-0008 §advance_phase 核心算法）见
+## [method CombatPhaseSequencer.advance_phase]。[br]
 ## [br][b]返回[/b]: true 推进成功，false 验证失败或非活跃战斗。
 func advance_phase() -> bool:
-	# AC-004：非活跃战斗拒绝推进
-	if not _is_active:
-		push_error("CombatSystem: advance_phase() called with no active battle")
-		return false
+	return _get_phase_sequencer().advance_phase()
 
-	var current: int = _phase
-	var next: int = _compute_next_phase(current)
 
-	# AC-002/003：阶段转换验证——失败不推进
-	if not _validate_transition(current, next):
-		push_warning("CombatSystem: phase transition %d→%d rejected——preconditions not met" % [current, next])
-		return false
-
-	# AC-002：退出当前阶段
-	_exit_phase(current)
-
-	# AC-002：进入下一阶段
-	_enter_phase(next)
-
-	# 更新内部状态
-	var old_phase: int = _phase
-	_phase = next
-
-	# AC-002：GSM 第二层镜像（非直接属性赋值——ADR-0008 §GSM 写入所有权）
-	_gsm_set_battle_phase(next)
-
-	# AC-005：END→PREPARATION 回绕时递增回合
-	# （Sprint 18：已判定结束的战斗不开启下一回合——回合数停在结束的那一回合）
-	var turn_changed: bool = false
-	if next == CombatPhase.PREPARATION and old_phase == CombatPhase.END \
-			and _pending_battle_result == CombatResult.NONE:
-		_turn += 1
-		_gsm_increment_battle_turn()
-		turn_changed = true
-
-	# AC-002：Cat 2b 信号——通过 _emit_signal_safe 路由（ADR-0007）
-	_emit_safe(&"phase_changed", [old_phase, next, _turn])
-
-	# 回合切换信号（新回合的显式广播——费用与手牌已在 END 阶段重置完毕，
-	# 读者拿到此信号时状态已是新回合的）
-	if turn_changed:
-		_emit_turn_started()
-
-	# AC-005 / DEBT-CBT-018-11：动画锁按阶段 4/5 配对持有
-	_sync_animation_lock(next)
-
-	# Sprint 18：Phase 6 END 判定出的结局收尾（簿记 + 信号完成后才退出，
-	# 保证 7 阶段序列与 phase_changed 不被 battle_end 截断——ADR-0008 §Phase 6）
-	_finish_pending_battle_end()
-
-	return true
-
+# 以下八个阶段钩子是 combat_phase_manager.gd 的薄委托，advance_phase 的
+# 8 步顺序会按名字回调它们（[code]_parent.call(...)[/code]）；名字与签名不动。
 
 ## 计算下一阶段——委托给 combat_phase_manager.gd 子模块（Sprint 9 Story 8 拆分）。
 func _compute_next_phase(current: int) -> int:
@@ -839,71 +795,39 @@ func _emit_turn_started() -> void:
 		"is_player_turn": true,
 	}])
 
-
 # === 手动确认 API（Phase 2/3 玩家交互入口）========================================
 
-## 玩家确认结束出牌阶段——UI "结束回合"按钮触发。[br]
-## 设置 _player_confirmed_end 标志后调用 advance_phase()。
+## 玩家确认结束出牌阶段——UI "结束回合"按钮触发。委托阶段序列件。[br]
+## 设置 [code]_player_confirmed_end[/code] 标志后调用 [method advance_phase]。
 func confirm_end_turn() -> bool:
-	if _phase != CombatPhase.PLAY:
-		push_warning("CombatSystem: confirm_end_turn() called outside PLAY phase (current=%d)" % _phase)
-		return false
-	_player_confirmed_end = true
-	return advance_phase()
+	return _get_phase_sequencer().confirm_end_turn()
 
 
-## 玩家确认攻击目标——UI "确认攻击"按钮触发。[br]
-## 设置 _player_confirmed_attack_skip 标志后调用 advance_phase()。[br]
-## [br][b]注意[/b]：此方法语义为"确认跳过/完成攻击声明"——实际目标分配属 Story 003 play_card 接线。
+## 玩家确认攻击目标——UI "确认攻击"按钮触发。委托阶段序列件。[br]
+## 设置 [code]_player_confirmed_attack_skip[/code] 标志后调用 [method advance_phase]。[br]
+## [br][b]注意[/b]：此方法语义为"确认跳过/完成攻击声明"——实际目标分配属
+## [code]play_card[/code] 接线。
 func confirm_attack_targets() -> bool:
-	if _phase != CombatPhase.ATTACK_DECLARATION:
-		push_warning("CombatSystem: confirm_attack_targets() called outside ATTACK_DECLARATION phase (current=%d)" % _phase)
-		return false
-	_player_confirmed_attack_skip = true
-	return advance_phase()
+	return _get_phase_sequencer().confirm_attack_targets()
 
 
-## 设置 Phase 2 超时标志——计时器到期时调用（AC-011）。
+## 设置 Phase 2 超时标志——计时器到期时调用（AC-011）。委托阶段序列件。
 func set_timer_exceeded() -> void:
-	_phase_timer_exceeded = true
+	_get_phase_sequencer().set_timer_exceeded()
 
 
 # === 阶段条件检查 ================================================================
 
-## 检查手牌中是否有任何可支付费用的卡牌（AC-006 条件）。[br]
-## 遍历手牌调用 CostSystem.can_afford——Sprint 8 Story 004 接线。[br]
+## 检查手牌中是否有任何可支付费用的卡牌（AC-006 条件）。委托阶段序列件。[br]
 ## CostSystem 不可用时回退旧逻辑（手牌非空即 true）。
 func _can_afford_any_card() -> bool:
-	if _hand.is_empty():
-		return false
-	var cs = _get_cost_system()
-	if cs == null or not cs.has_method("can_afford"):
-		return not _hand.is_empty()  # 回退
-	for card in _hand:
-		var cost: int = _get_card_cost(card)
-		if cs.can_afford(cost):
-			return true
-	return false
+	return _get_phase_sequencer().can_afford_any_card()
 
 
-## 检查所有可攻击角色是否已分配目标（AC-007/012 空真条件）。[br]
-## Sprint 8 Story 004 接线——查询 DeploymentSystem 待命角色。[br]
-## 攻击队列非空时返回 false（玩家正在分配目标）。[br]
-## 攻击队列空时查 DeploymentSystem：有待命角色则 false，无则 true。
+## 检查所有可攻击角色是否已分配目标（AC-007/012 空真条件）。委托阶段序列件。[br]
+## 攻击队列非空 → false；空则查 DeploymentSystem 待命角色，有则 false、无则 true。
 func _all_characters_targeted() -> bool:
-	# 攻击队列非空——玩家正在分配目标，尚未全部完成
-	if not _attack_queue.is_empty():
-		return false
-	# 攻击队列空——查 DeploymentSystem 是否有待命角色
-	var ds = _get_deployment_system()
-	if ds != null and ds.has_method("get_field") and ds.has_method("is_standby"):
-		var field: Array = ds.get_field()
-		for char_entry in field:
-			var char_id: int = _extract_character_id(char_entry)
-			if char_id >= 0 and ds.is_standby(char_id):
-				return false  # 有待命角色未分配目标
-	# 队列空且无待命角色——空真
-	return true
+	return _get_phase_sequencer().all_characters_targeted()
 
 
 # === 抽牌 + 牌库抽空返还（AC-013）================================================
@@ -1294,6 +1218,13 @@ func _get_piles() -> RefCounted:
 	if _piles == null:
 		_piles = preload("res://src/feature/combat/combat_card_piles.gd").new(self)
 	return _piles
+
+
+## 获取阶段序列件实例（推进 / 手动确认 / 阶段条件检查——本轮拆出）。
+func _get_phase_sequencer() -> RefCounted:
+	if _phase_sequencer == null:
+		_phase_sequencer = preload("res://src/feature/combat/combat_phase_sequencer.gd").new(self)
+	return _phase_sequencer
 
 
 ## 获取战斗生命周期模块实例（开战 / 终战 / 撤退 / 续战复位——本轮拆出）。
