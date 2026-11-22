@@ -1,51 +1,62 @@
 class_name AudioManager
 extends RefCounted
-## AudioManager —— 音频系统控制类骨架（audio Epic Story 001）。
+## AudioManager —— 音频系统门面（audio Epic Story 001）。
 ##
 ## [b]形态[/b]：RefCounted 控制类，非节点、非 Autoload（ADR-0031 §1——零新增
 ## Autoload）。启动时由 SceneManager 惰性实例化（[method SceneManager.get_audio_manager]），
 ## 生命周期与进程等长——SceneManager 持有引用防 RefCounted 提前释放。[br]
-## [br][b]节点池[/b]：[method _setup_node_pool] 创建 BGM 双播放器
-## （[code]bgm_player_a/bgm_player_b[/code]，交叉淡化归 story 002）挂入
-## SceneManager 的 PersistentLayer（经 [code]SceneManager.register_persistent()[/code]
-## ——ADR-0031 §1.2 定死结构）。节点 [code]process_mode = PROCESS_MODE_ALWAYS[/code]
-## （暂停时音频由暂停逻辑显式控制，节点本身不受 SceneTree.paused 冻结）。
-## SFX 池归 story 003，本 story 不创建。[br]
-## [br][b]API 骨架[/b]：11 个方法签名与 GDD §8 逐字一致——set_state 编排归
-## story 004；[method play_bgm]/[method stop_bgm] 自 story 002 起为真实实现
-## （[code]BgmFadePlanner[/code] 纯计划器 + Tween 薄执行层）；
-## [method play_sfx] 自 story 003 起委托 [code]SfxPool[/code] Logic 内核
-## （冷却/淘汰/随机化/UI 打断）。[br]
-## SFX 池（story 003）：16 节点（12 活跃 + 4 余量）+ UI 单实例播放器与
-## BGM 双播放器同挂 PersistentLayer（[method _setup_node_pool] 建好 16+1
-## 节点后经 [code]set_pool_nodes[/code]/[code]set_ui_player[/code] 注入）。[br]
+## [br][b]本类只做门面与执行出口[/b]：11 个 GDD §8 API 在此（公共 API 表面唯一
+## 入口），音频动作也在此一处发出——状态机只裁决「做什么」。[br]
+## [br][b]分工[/b]（细节各归其类，本类不重复叙述）：[AudioNodePool] 建节点池并
+## 挂 PersistentLayer；[BgmFadeExecutor] 演出淡化 Tween；[BgmPlayback] 编排 BGM
+## 播放与在播态；[AudioStateOrchestrator] 裁决状态矩阵；[AudioBusControl] 管总线
+## 音量与 Master 静音；[AudioSfxWiring] 装 SFX 池与流解析。[br]
 ## [br][b]静默模式[/b]（GDD 边缘 #14）：AudioServer 不可用时所有 API no-op
 ## 不崩溃、日志记录一次——经注入的 [member _adapter] 的
 ## [code]unavailable[/code] 标志实现。[br]
 ## [br][b]数据驱动[/b]：dB 默认值在 default_bus_layout.tres 资产中；
-## 本类不定义 dB 常量。总线访问一律按名称（经 AudioEnums.BUS_NAMES）。
+## 本类不定义 dB 常量。总线访问一律按名称（经 AudioEnums.BUS_NAMES）。[br]
+## [br][b]兼容转发[/b]：迁出态以同名只读属性转发、迁出方法以同名薄转发保留——
+## 既有测试与调用点无需改动（见「迁出态的兼容转发」「执行层门面转发」两段）。
 ##
 ## @experimental
 ## 来源: design/gdd/audio-system.md §2/§8/边缘 #14、audio Story 001、ADR-0031 §1.2。
 
-## 静音时 Master 总线音量（dB）——GDD AC-MUTE-01 语义（Master volume_db = -80）。
-const MUTE_VOLUME_DB: float = -80.0
-
-## BGM 淡化纯计划器（story 002——数值决策唯一落地处）。
+## BGM 淡化纯计划器（story 002——数值决策唯一落地处）。本类已不直接消费
+## （规划迁 [BgmPlayback] 与 [AudioStateOrchestrator]），保留常量以保
+## [code]AudioManager.BgmFadePlanner[/code] 既有引用点口径不变。
 const BgmFadePlanner := preload("res://src/ui/audio/bgm_fade_planner.gd")
 
-## BGM 流加载与缓存（story 002 AC-8——异步预加载 + 常驻 ≤2 首）。
-const BgmStreamCacheScript := preload("res://src/ui/audio/bgm_stream_cache.gd")
+## 常驻音频节点池（story 001/003——节点建造与挂载；本类只发指令）。
+const AudioNodePoolScript := preload("res://src/ui/audio/audio_node_pool.gd")
 
-## SFX 池 Logic 内核（story 003——冷却/淘汰/随机化/UI 打断确定性逻辑）。
-const SfxPoolScript := preload("res://src/ui/audio/sfx_pool.gd")
+## BGM 淡化 Tween 执行层（story 002——轮换映射/顺序延迟/总线插值演出）。
+const BgmFadeExecutorScript := preload("res://src/ui/audio/bgm_fade_executor.gd")
 
-## 状态过渡矩阵 Logic 内核（story 004——GDD §9 24 行唯一真源 + TransitionType 映射）。
+## BGM 播放编排（story 002——计划/解析/在播态推进）。
+const BgmPlaybackScript := preload("res://src/ui/audio/bgm_playback.gd")
+
+## 音频状态机（story 004——矩阵裁决，产出动作计划；执行留本类）。
+const AudioStateOrchestratorScript := preload("res://src/ui/audio/audio_state_orchestrator.gd")
+
+## 总线音量与 Master 静音（story 001/005——静音快照状态归它）。
+const AudioBusControlScript := preload("res://src/ui/audio/audio_bus_control.gd")
+
+## 静音时 Master 总线音量（dB）——真源在 [AudioBusControl]，此处同名转发
+## 以保 [code]AudioManager.MUTE_VOLUME_DB[/code] 既有引用点（settings_logic.gd 等）。
+const MUTE_VOLUME_DB: float = AudioBusControlScript.MUTE_VOLUME_DB
+
+## SFX 子系统接线（story 003——池的构造/解析器/转发；本类只发指令）。
+const AudioSfxWiringScript := preload("res://src/ui/audio/audio_sfx_wiring.gd")
+
+## 状态过渡矩阵 Logic 内核（story 004——GDD §9 24 行唯一真源 + TransitionType
+## 映射）。本类已不直接消费（裁决迁 [AudioStateOrchestrator]），保留常量以保
+## 既有引用点口径不变。
 const StateTransitionMatrixScript := preload("res://src/ui/audio/state_transition_matrix.gd")
 
-## SFX 池调优参数资产路径（story 003——数据驱动，改数值不改代码；
-## 与 default_bus_layout.tres 同构的 .tres 出厂基准）。
-const SFX_POOL_CONFIG_PATH := "res://resources/audio/sfx_pool_config.tres"
+## SFX 池调优参数资产路径（story 003——数据驱动；真源已迁 [AudioSfxWiring]，
+## 此处同名转发以保既有引用点）。
+const SFX_POOL_CONFIG_PATH: String = AudioSfxWiringScript.CONFIG_PATH
 
 ## AudioServer 适配器——依赖注入（测试可注入 unavailable/mock 实例）。
 var _adapter: AudioServerAdapter = null
@@ -53,46 +64,59 @@ var _adapter: AudioServerAdapter = null
 ## SceneManager 引用（Autoload 实例或测试注入的 mock）——节点池挂载目标。
 var _scene_manager: Node = null
 
-## BGM 双播放器节点池（交叉淡化实现归 story 002——本 story 仅挂载骨架）。
-var _bgm_players: Array[AudioStreamPlayer] = []
+## 常驻音频节点池（BGM 双播放器 + SFX 16+1）。节点所有权归该对象，
+## PersistentLayer 负责挂载。
+var _node_pool: RefCounted = null
 
-## Master 静音前音量快照（toggle_mute 恢复用——非游戏状态，UI 无关）。
-var _master_volume_before_mute: float = 0.0
+## BGM 播放编排（在播曲 id / 当前侧 / 流缓存三项状态归它——本类只转发）。
+var _bgm_playback: RefCounted = null
 
-## toggle_mute 状态标志——true 表示当前处于 Master 静音态。
-var _master_muted: bool = false
+## SFX 子系统接线（池的构造/解析/转发——节点池就绪后由本类注入节点）。
+var _sfx_wiring: RefCounted = null
 
-## === BGM 交叉淡化状态（story 002——BGM 播放状态归 AudioManager 自身，
-## 非 GSM 游戏状态——ADR-0031 §2 零状态所有权豁免注释）=========================
+## 音频状态机（当前音频状态归它——本类只转发 set_state/信号回调）。
+var _state_machine: RefCounted = null
 
-## 当前播放 BGM id（空 = 无播放）。
-var _current_bgm_id: StringName = &""
-## 当前播放侧索引（0/1 轮换——切曲后目标侧成为新的当前侧）。[br]
-## 执行层将计划器的「当前/目标」指令按轮换映射到物理播放器：当前侧
-## 淡出、目标侧（1 - 当前侧）淡入；完成后翻转。
-var _current_player_index: int = 0
-## 淡化 Tween 句柄（重入 kill 重建——中断续接条款 AC-BGM-10）。
-var _fade_tween: Tween = null
-## 测试注入的 bgm_id → 资源路径覆盖表（生产为空——按 id 推导默认路径）。
+## 总线音量与 Master 静音（静音态与静音前快照归它——本类只转发）。
+var _bus_control: RefCounted = null
+
+## 测试注入的 bgm_id → 资源路径覆盖表（生产为空——按 id 推导默认路径）。[br]
+## 本类是所有者；[BgmPlayback] 与 [BgmStreamCache] 持同一份引用（写入互见）。
 var _stream_path_overrides: Dictionary = {}
+
 ## 测试注入的 bgm_id → AudioStream 对象覆盖表（优先于路径——免落盘
-## 导入周期，headless GUT 下程序生成流直用）。
+## 导入周期，headless GUT 下程序生成流直用）。本类是所有者。
 var _stream_overrides: Dictionary = {}
-## BGM 流缓存（AC-8——异步加载/预加载/释放；共享 _stream_path_overrides）。
-var _stream_cache: RefCounted = null
 
-## SFX 池 Logic 内核（story 003——由 _init 构造并注入节点池/UI 槽/流解析器）。
-var _sfx_pool: RefCounted = null
+## 当前音频状态（[enum AudioEnums.AudioState]）——归 [AudioStateOrchestrator]，
+## 本类只读转发（set_state 幂等守卫与场景信号映射的源态，非游戏状态）。
+var _current_state: int:
+	get:
+		return _state_machine.current_state()
 
-## SFX 通用池播放器节点（16 个——12 活跃 + 4 余量，挂 PersistentLayer）。
-var _sfx_players: Array[AudioStreamPlayer] = []
+## === 迁出态的兼容转发（实现归 BgmPlayback，引用点不变）========================
+## 注入表经 getter 返回同一 Dictionary 引用——`am._stream_overrides[k] = v`
+## 这类下标写入作用于共享引用本身，语义与拆分前一致。
 
-## UI 音效单实例播放器（UI 总线——独立槽，不参与通用池）。
-var _ui_sfx_player: AudioStreamPlayer = null
+## 在播 BGM id（迁 BgmPlayback——只读转发；写入只在播放编排内）。
+var _current_bgm_id: StringName:
+	get:
+		return _bgm_playback.current_bgm_id()
 
-## 当前音频状态（[enum AudioEnums.AudioState]）——set_state 幂等守卫与
-## SceneManager 信号源状态映射的源态（非游戏状态，音频自身运行态）。
-var _current_state: int = -1
+## 当前播放侧索引 0/1（迁 BgmPlayback——只读转发）。
+var _current_player_index: int:
+	get:
+		return _bgm_playback.player_index()
+
+## BGM 流缓存（迁 BgmPlayback——只读转发；测试断言缓存内容用）。
+var _stream_cache: RefCounted:
+	get:
+		return _bgm_playback.stream_cache()
+
+## 淡化 Tween 句柄（迁 BgmFadeExecutor——只读转发；无 Tween 时为 null）。
+var _fade_tween: Tween:
+	get:
+		return _bgm_playback.fade_tween()
 
 
 ## 构造。[br]
@@ -108,13 +132,19 @@ func _init(scene_manager: Node = null, adapter: AudioServerAdapter = null) -> vo
 		_adapter = AudioServerAdapter.new()
 		if not _adapter.detect_availability():
 			_adapter.unavailable = true
-	_stream_cache = BgmStreamCacheScript.new(_stream_path_overrides)
-	var sfx_config: SfxPoolConfig = null
-	if ResourceLoader.exists(SFX_POOL_CONFIG_PATH):
-		sfx_config = load(SFX_POOL_CONFIG_PATH) as SfxPoolConfig
-	_sfx_pool = SfxPoolScript.new(Time.get_ticks_msec,
-			RandomNumberGenerator.new(), sfx_config)
+	_sfx_wiring = AudioSfxWiringScript.new(_stream_overrides)
+	# 节点池先建（BGM 双播放器就绪后执行层/播放编排才拿得到数组引用）；
+	# 节点全程常驻不重建，故一次注入即可。
+	_node_pool = AudioNodePoolScript.new()
 	_setup_node_pool()
+	var executor: RefCounted = BgmFadeExecutorScript.new(
+			_node_pool.bgm_players(), _adapter, _scene_manager)
+	_bgm_playback = BgmPlaybackScript.new(_node_pool, executor, _adapter,
+			_stream_path_overrides, _stream_overrides)
+	# 状态机（裁决矩阵独有——执行仍在本类，见 set_state/_apply_state_plan）。
+	_state_machine = AudioStateOrchestratorScript.new()
+	# 总线音量与静音（静音快照状态归它——本类 API 转发）。
+	_bus_control = AudioBusControlScript.new(_adapter)
 	# story 004：场景级转换自动触发——绑定 SceneManager pre_transition 信号
 	# → TransitionType→AudioState 映射 → set_state（AC-4 场景信号驱动）。
 	# is_connected 防护（与 hud.gd setup 先例对齐——防重复连接导致一次信号
@@ -124,7 +154,7 @@ func _init(scene_manager: Node = null, adapter: AudioServerAdapter = null) -> vo
 			_scene_manager.pre_transition.connect(_on_pre_transition)
 
 
-## === GDD §8 API 骨架（签名逐字一致——本 story 空桩）=========================
+## === GDD §8 API（签名逐字一致——实现按职责分给上面六个件）====================
 
 ## 播放 SFX（story 003——委托 SFX 池 Logic 内核）。[br]
 ## [br][param sfx_id]: SFX 资源标识符。[br]
@@ -133,7 +163,7 @@ func _init(scene_manager: Node = null, adapter: AudioServerAdapter = null) -> vo
 ## 归 story 004 编排（播放时机触发），本 story 忽略）。冷却/淘汰/随机化/
 ## UI 打断全部确定性逻辑在 SfxPool.request_sfx 内完成。
 func play_sfx(sfx_id: StringName, options: Dictionary = {}) -> void:
-	_sfx_pool.request_sfx(sfx_id, options)
+	_sfx_wiring.request(sfx_id, options)
 
 
 ## 播放 BGM（自动处理交叉淡入淡出）。[br]
@@ -144,50 +174,20 @@ func play_sfx(sfx_id: StringName, options: Dictionary = {}) -> void:
 ## [param options]: 可选参数（fade_in_sec/fade_out_sec/duck_db/sequential/
 ## loop——完整语义见 GDD §8）。
 func play_bgm(bgm_id: StringName, options: Dictionary = {}) -> void:
-	var fade_out_sec: float = float(options.get("fade_out_sec", 0.5))
-	var fade_in_sec: float = float(options.get("fade_in_sec", 0.5))
-	var duck_db: Variant = options.get("duck_db", null)
-	var sequential: bool = bool(options.get("sequential", false))
-	# 降低类起点读 BGM 总线实际音量——播放器 dB 与总线 dB 无关（duck
-	# 不触碰播放器音量）；duck 态二次切换从总线当前值续接（AC-BGM-10）
-	var from_db: float = _adapter.get_bus_volume_db(AudioEnums.AudioBus.BGM) \
-			if duck_db != null else _current_bgm_db()
-	var plan: Array[Dictionary] = BgmFadePlanner.plan_transition(
-		_current_bgm_id, bgm_id, from_db, _target_player_db(),
-		fade_out_sec, fade_in_sec, duck_db, sequential)
-	var executed: bool = _execute_fade_plan(plan)
-	if not executed:
-		return  # 边缘 #1：目标曲损坏——状态零变更（旧曲 id/当前侧均保留）
-	# id 更新仅限真实切曲（duck 不换流——id 始终反映实际在播曲目）
-	if bgm_id != _current_bgm_id and duck_db == null:
-		_current_bgm_id = bgm_id
-		if bgm_id != &"":
-			# 切曲成功——目标侧成为新的当前侧（降低类/仅停止不翻转）
-			_current_player_index = 1 - _current_player_index
-			# AC-8：当前曲置保留头 + 逐出超容量条目 + 预加载下一首（可缺省）
-			_stream_cache.set_current(bgm_id)
-			_stream_cache.trim()
-			var preload_next: Variant = options.get("preload_next", null)
-			if preload_next != null:
-				preload_bgm(preload_next)
+	_bgm_playback.play_bgm(bgm_id, options)
 
 
 ## 停止 BGM。[br]
 ## [br][param options]: 可选参数（fade_out_sec）——完整语义见 GDD §8。
 func stop_bgm(options: Dictionary = {}) -> void:
-	var fade_out_sec: float = float(options.get("fade_out_sec", 0.5))
-	var plan: Array[Dictionary] = BgmFadePlanner.plan_transition(
-		_current_bgm_id, &"", _current_bgm_db(), BgmFadePlanner.SILENCE_DB,
-		fade_out_sec, 0.0)
-	_execute_fade_plan(plan)
-	_current_bgm_id = &""
+	_bgm_playback.stop_bgm(options)
 
 
 ## 异步预加载 BGM（AC-8——[code]load_threaded_request[/code] 主线程不阻塞；
 ## 常驻 ≤2 首：当前 + 预加载下一首）。[br]
 ## [param bgm_id]: 预加载的 BGM id（路径经 [member _stream_path_overrides]）。
 func preload_bgm(bgm_id: StringName) -> void:
-	_stream_cache.preload_bgm(bgm_id)
+	_bgm_playback.preload_bgm(bgm_id)
 
 
 ## 暂停所有音频（用于游戏暂停状态）。实现归 story 005（暂停行为）。
@@ -212,304 +212,132 @@ func stop_ambient(fade_out_sec: float = 1.0) -> void:
 	pass  # story 006：环境音层
 
 
-## 设置总线音量（本 story 经 adapter 走真——最简单可用路径）。[br]
+## 设置总线音量（经 adapter 走真——最简单可用路径）。[br]
 ## [br][param bus]: [enum AudioEnums.AudioBus] 枚举值。[br]
 ## [param volume_db]: 目标音量（dB，范围 -80 ~ +6——范围钳制归 story 005 音量控制）。
 func set_bus_volume(bus: AudioEnums.AudioBus, volume_db: float) -> void:
-	_adapter.set_bus_volume_db(bus, volume_db)
+	_bus_control.set_volume(bus, volume_db)
 
 
 ## 获取总线当前音量（dB）。[br]
 ## [br][param bus]: [enum AudioEnums.AudioBus] 枚举值。[br]
 ## [b]返回[/b]：当前音量（dB）——静默模式时返回 0.0（无害默认）。
 func get_bus_volume(bus: AudioEnums.AudioBus) -> float:
-	return _adapter.get_bus_volume_db(bus)
+	return _bus_control.get_volume(bus)
 
 
 ## 静音/取消静音所有音频（F1 热键调用）。[br]
-## [br]本 story 经 adapter 走真（Master 总线 -80dB ↔ 恢复快照）。
+## [br]经 adapter 走真（Master 总线 -80dB ↔ 恢复快照——委托 [AudioBusControl]）。
 ## debounce 200ms（GDD 边缘 #5）归 story 005；HUD 静音图标信号
 ## [code]mute_state_changed[/code] 亦归 story 005。
 func toggle_mute() -> void:
-	if _master_muted:
-		_adapter.set_bus_volume_db(AudioEnums.AudioBus.MASTER, _master_volume_before_mute)
-		_master_muted = false
-		return
-	_master_volume_before_mute = _adapter.get_bus_volume_db(AudioEnums.AudioBus.MASTER)
-	_adapter.set_bus_volume_db(AudioEnums.AudioBus.MASTER, MUTE_VOLUME_DB)
-	_master_muted = true
+	_bus_control.toggle_mute()
 
 
 ## 切换指定场景音频状态（编排 BGM 切换、环境音淡入淡出、SFX 清理等）。[br]
-## [br][b]编排[/b]（story 004）：查 [code]StateTransitionMatrix.transition_params[/code]
-## 矩阵行（键 = 切换前状态 → 目标状态）→ 按行字段执行：[br]
-##   - [code]action == pause/resume[/code] → [method pause_all]/[method resume_all]；[br]
-##   - [code]duck_db != null[/code]（降低/恢复类）→ [method play_bgm] duck 语义
-##   （BGM 总线 dB 过渡，不切曲）；[br]
-##   - 切曲类 → [method play_bgm] 交叉淡化（sequential 渡劫顺序式）；[br]
-##   - 无行（N/A 或同态）→ 幂等 no-op。[br]
-## [br][b]幂等[/b]（AC-6）：同 [param state] 重复调用直接返回（无重启/无重复淡化）。[br]
-## [br][b]N/A 转换回滚[/b]（2026-10-29 code-review 阻塞项修复）：无矩阵行的转换
-## 视为「拒绝转换」——[member _current_state] 不推进、保持源态，并 push_warning
-## 一次。状态与音频实际状态始终保持同源一致（避免 N/A 后从错误源态出发的
-## 漂移链，如商店→战斗被误触发后战斗→探索错误切曲而非恢复）。[br]
+## [br][b]编排[/b]（story 004）：裁决委托 [AudioStateOrchestrator]（矩阵查询 →
+## 动作计划），执行在本类 [method _apply_state_plan]。[br]
+## [br][b]幂等[/b]（AC-6）：同 [param state] 重复调用无副作用。[br]
+## [br][b]N/A 转换回滚[/b]：无矩阵行的转换视为拒绝转换——状态不推进、保持源态
+## 并 push_warning 一次（状态与音频实际状态始终同源，避免漂移链）。[br]
 ## [br][param state]: [enum AudioEnums.AudioState] 枚举值。
 func set_state(state: AudioEnums.AudioState) -> void:
-	var target: int = int(state)
-	if _current_state == target:
-		return  # AC-6 幂等：同状态重复调用无副作用
-	var from_state: int = _current_state
-	if from_state < 0:
-		# 引导进入（无前置状态）——按入口 BGM 直接淡入，查目标态参数
-		_current_state = target
-		_enter_state(target)
-		return
-	var row: Dictionary = StateTransitionMatrixScript.transition_params(
-			from_state, target)
-	if row.is_empty():
-		# N/A 转换 / 无行——拒绝转换：状态回滚（不推进），音频零动作
-		push_warning("AudioManager.set_state: N/A 转换 %d → %d 无矩阵行——拒绝，状态保持 %d" % [from_state, target, from_state])
-		return
-	_current_state = target
-	var action: StringName = row[StateTransitionMatrixScript.K_ACTION]
-	if action == StateTransitionMatrixScript.ACTION_PAUSE:
+	# 裁决归状态机（只算不做），执行留本类（音频动作仍只有一处出口）
+	_apply_state_plan(_state_machine.plan_state(state, _current_bgm_id))
+
+
+## 执行状态机产出的动作计划（[AudioStateOrchestrator.plan_state]）。[br]
+## [br][param plan]: 计划 Dictionary（键见 [constant AudioStateOrchestrator.K_KIND]）。[br]
+## [code]none[/code]（同态 / N/A 拒绝）零动作；pause/resume 走本类对应方法；
+## duck 与切曲都经 [method play_bgm]（duck 不切曲、sequential 渡劫顺序式）。
+func _apply_state_plan(plan: Dictionary) -> void:
+	var kind: StringName = plan[AudioStateOrchestratorScript.K_KIND]
+	if kind == AudioStateOrchestratorScript.KIND_PAUSE:
 		pause_all()
-		return
-	if action == StateTransitionMatrixScript.ACTION_RESUME:
+	elif kind == AudioStateOrchestratorScript.KIND_RESUME:
 		resume_all()
-		return
-	var duck_db: Variant = row[StateTransitionMatrixScript.K_DUCK_DB]
-	var fade_out_sec: float = float(row[StateTransitionMatrixScript.K_FADE_OUT_SEC])
-	var fade_in_sec: float = float(row[StateTransitionMatrixScript.K_FADE_IN_SEC])
-	var sequential: bool = bool(row[StateTransitionMatrixScript.K_SEQUENTIAL])
-	var bgm_id: StringName = row[StateTransitionMatrixScript.K_BGM]
-	if duck_db != null:
-		# 降低/恢复类——BGM 总线 dB 过渡，不切曲（play_bgm duck 语义）
-		play_bgm(_current_bgm_id, {"fade_out_sec": fade_out_sec,
-				"fade_in_sec": fade_in_sec, "duck_db": duck_db})
-	else:
-		# 切曲类——交叉淡化（sequential 渡劫顺序式）
-		play_bgm(bgm_id, {"fade_out_sec": fade_out_sec,
-				"fade_in_sec": fade_in_sec, "sequential": sequential})
-	# 环境音 dB 偏移（story 006 接口——未实现前静默跳过，仅记录数据）
-	# 经 call() 间接调用：story 006 尚未定义 set_ambient_delta，直接调用
-	# 会在本脚本编译期解析失败（GDScript 静态解析非存在方法）。
-	var ambient_delta: float = float(row[StateTransitionMatrixScript.K_AMBIENT_DELTA_DB])
+	elif kind == AudioStateOrchestratorScript.KIND_DUCK:
+		play_bgm(plan[AudioStateOrchestratorScript.K_BGM],
+				{"fade_out_sec": plan[AudioStateOrchestratorScript.K_FADE_OUT_SEC],
+				"fade_in_sec": plan[AudioStateOrchestratorScript.K_FADE_IN_SEC],
+				"duck_db": plan[AudioStateOrchestratorScript.K_DUCK_DB]})
+	elif kind == AudioStateOrchestratorScript.KIND_SWITCH:
+		play_bgm(plan[AudioStateOrchestratorScript.K_BGM],
+				{"fade_out_sec": plan[AudioStateOrchestratorScript.K_FADE_OUT_SEC],
+				"fade_in_sec": plan[AudioStateOrchestratorScript.K_FADE_IN_SEC],
+				"sequential": plan[AudioStateOrchestratorScript.K_SEQUENTIAL]})
+	_apply_ambient_delta(plan[AudioStateOrchestratorScript.K_AMBIENT_DELTA_DB])
+
+
+## 环境音 dB 偏移（story 006 接口——未实现前静默跳过，仅记录数据）。[br]
+## [br]经 [code]call()[/code] 间接调用：story 006 尚未定义 set_ambient_delta，
+## 直接调用会在本脚本编译期解析失败（GDScript 静态解析非存在方法）。
+func _apply_ambient_delta(ambient_delta: float) -> void:
 	if ambient_delta != 0.0 and has_method(&"set_ambient_delta"):
 		call(&"set_ambient_delta", ambient_delta)
 
 
-## 引导进入状态（无前置状态）——入口 BGM 直接淡入（切曲类）或 no-op（duck 态）。[br]
-## [br][param target]: 目标 [enum AudioEnums.AudioState]。[br]
-## 时长参数查 [BgmFadePlanner.params_for_state]（目标态塌缩查询——与矩阵同源）。
-func _enter_state(target: int) -> void:
-	var bgm_id: StringName = StateTransitionMatrixScript.entry_bgm(target)
-	if bgm_id == &"":
-		return  # duck/no-bgm 态——无入口曲（引导进入 no-op）
-	var params: Dictionary = BgmFadePlanner.params_for_state(target)
-	play_bgm(bgm_id, {"fade_out_sec": 0.0, "fade_in_sec": float(params["fade_in_sec"]),
-			"sequential": bool(params["sequential"])})
-
-
 ## === 内部实现 ==================================================================
 
-## 实例化节点池并挂入 PersistentLayer。[br]
-## [br]节点命名与 GDD §4/§5 架构一致（bgm_player_a/bgm_player_b 交叉淡化归
-## story 002；sfx_player_0..15 + ui_sfx_player 归 story 003）。
-## [code]process_mode = PROCESS_MODE_ALWAYS[/code]（ADR-0031 §1.2——暂停中节点
-## 不被冻结，暂停行为由暂停逻辑显式控制）。[br]
-## [br]_scene_manager 为 null 时跳过挂载（单元测试直建 AudioManager 场景——
-## 无须 SceneManager）。
+## 建造节点池并挂入 PersistentLayer（story 001/003——委托 [AudioNodePool]）。[br]
+## [br]节点命名/总线路由/process_mode 与 SFX 池接线全在池对象内完成；
+## AudioManager 只提供 SFX 流解析器（归本类所有）。[br]
+## [br]_scene_manager 为 null 时池对象整池跳过（单元测试直建 AudioManager
+## 场景——无须 SceneManager）。
 func _setup_node_pool() -> void:
-	if _scene_manager == null:
-		return
-	for player_name: String in [&"bgm_player_a", &"bgm_player_b"]:
-		var player := AudioStreamPlayer.new()
-		player.name = player_name
-		player.bus = AudioEnums.BUS_NAMES[AudioEnums.AudioBus.BGM]
-		player.process_mode = Node.PROCESS_MODE_ALWAYS
-		_bgm_players.append(player)
-		_scene_manager.register_persistent(player)
-	# SFX 通用池：16 节点（12 活跃 + 4 余量——GDD §5/§7 调优表）
-	for i: int in _sfx_pool.pool_size():
-		var sfx_player := AudioStreamPlayer.new()
-		sfx_player.name = "sfx_player_%d" % i
-		sfx_player.bus = AudioEnums.BUS_NAMES[AudioEnums.AudioBus.SFX]
-		sfx_player.process_mode = Node.PROCESS_MODE_ALWAYS
-		_sfx_players.append(sfx_player)
-		_scene_manager.register_persistent(sfx_player)
-	# UI 音效单实例槽（独立——不参与通用池，GDD §7 打断语义）
-	_ui_sfx_player = AudioStreamPlayer.new()
-	_ui_sfx_player.name = "ui_sfx_player"
-	_ui_sfx_player.bus = AudioEnums.BUS_NAMES[AudioEnums.AudioBus.UI]
-	_ui_sfx_player.process_mode = Node.PROCESS_MODE_ALWAYS
-	_scene_manager.register_persistent(_ui_sfx_player)
-	# 注入 SFX 池（节点池所有权仍归本类/PersistentLayer——SfxPool 只持引用）
-	_sfx_pool.set_pool_nodes(_sfx_players)
-	_sfx_pool.set_ui_player(_ui_sfx_player)
-	_sfx_pool.set_stream_resolver(_resolve_sfx_stream)
+	_node_pool.build(_scene_manager, _sfx_wiring.pool(), _sfx_wiring.resolve)
 
 
 ## 获取 BGM 播放器池（story 002 交叉淡化消费；测试断言挂载结构用）。
 func get_bgm_players() -> Array[AudioStreamPlayer]:
-	return _bgm_players
+	return _node_pool.bgm_players()
 
 
 ## 获取 SFX 通用池播放器节点（story 003 测试断言挂载结构用）。
 func get_sfx_players() -> Array[AudioStreamPlayer]:
-	return _sfx_players
+	return _node_pool.sfx_players()
 
 
 ## 获取 UI 音效单实例播放器（story 003 测试断言挂载结构用）。
 func get_ui_sfx_player() -> AudioStreamPlayer:
-	return _ui_sfx_player
+	return _node_pool.ui_player()
 
 
-## 解析 sfx_id → AudioStream（注入 SfxPool 的流解析器——AC-7）。[br]
+## 解析 sfx_id → AudioStream（既有引用点兼容——实现已迁 [AudioSfxWiring]）。[br]
 ## 当前 SFX 资产（~50）归资产管线任务（story Out of Scope）——资产未落盘前
 ## 解析始终返回 null，由 SfxPool 静默丢弃 + push_warning（每 id 一次）。
-## 对象覆盖表 [member _stream_overrides] 优先（测试注入程序生成流直用）。
 func _resolve_sfx_stream(sfx_id: StringName) -> AudioStream:
-	if _stream_overrides.has(sfx_id):
-		return _stream_overrides[sfx_id]
-	return null
+	return _sfx_wiring.resolve(sfx_id)
 
 
-## === BGM 交叉淡化执行层（story 002——Tween 薄执行）===========================
+## === 执行层门面转发（既有引用点兼容——实现已迁 BgmFadeExecutor / BgmPlayback）
 
-## 当前播放侧 dB——中断续接时新计划以当前实际 dB 为起点（非 -80）。[br]
-## 无播放器时返回 [constant BgmFadePlanner.SILENCE_DB]。
-func _current_bgm_db() -> float:
-	if _bgm_players.is_empty() or not _bgm_players[_current_player_index].playing:
-		return BgmFadePlanner.SILENCE_DB
-	return _bgm_players[_current_player_index].volume_db
-
-
-## 目标播放器当前 dB（双播放器轮换——目标侧为 players[1]；池空/未挂载时
-## 返回 [constant BgmFadePlanner.SILENCE_DB]，计划器据此从静音起淡入）。
-func _target_player_db() -> float:
-	if _bgm_players.size() < 2:
-		return BgmFadePlanner.SILENCE_DB
-	var target: AudioStreamPlayer = _bgm_players[1 - _current_player_index]
-	if not target.playing:
-		return BgmFadePlanner.SILENCE_DB
-	return target.volume_db
-
-
-## 解析 bgm_id → 音频流（对象注入优先 → 流缓存 → 路径表）。[br]
-## 文件损坏/缺失（GDD 边缘 #1）：返回 null——调用侧保留旧曲继续播放。
-## 路径加载经 [member _stream_cache]（AC-8——缓存命中免 IO；冷路径
-## [code]load_threaded_request + get[/code] 回退）。
-func _resolve_stream(bgm_id: StringName) -> AudioStream:
-	# 对象注入优先（测试直用程序生成流——优先级高于缓存）
-	if _stream_overrides.has(bgm_id):
-		return _stream_overrides[bgm_id]
-	return _stream_cache.resolve(bgm_id)
-
-
-## 执行淡化计划（Tween 薄执行层——数值决策全在 BgmFadePlanner）。[br]
-## [br][b]中断续接[/b]：重入 kill 旧 Tween——正在插值的属性停留在当前实际值，
-## 新计划以该值为起点（AC-BGM-10）。[br]
-## [br][b]顺序式[/b]（渡劫例外）：sequential 指令经 [code]set_delay[/code]
-## 前移等待前序时长。[br]
-## [br][b]边缘 #1[/b]：计划内任一目标曲解析失败 → 整份计划放弃（旧曲原样
-## 继续播放——不淡出、不停止、不翻转当前侧）。
-func _execute_fade_plan(plan: Array[Dictionary]) -> bool:
-	if plan.is_empty():
-		return true  # 同 id/无事可做——非失败
-	if _bgm_players.is_empty():
-		return true  # 静默模式/测试无挂载——计划放弃（API 不崩溃）
-	# 前置解析全部 play_stream（边缘 #1：任一目标曲损坏/缺失 → 放弃整份计划，
-	# 旧曲保持原样继续播放——「不切换」而非「淡出旧曲后无声」）
-	var resolved: Dictionary = {}
-	for cmd: Dictionary in plan:
-		var play_stream: StringName = cmd[BgmFadePlanner.K_PLAY_STREAM]
-		if play_stream != &"" and not resolved.has(play_stream):
-			var stream: AudioStream = _resolve_stream(play_stream)
-			if stream == null:
-				return false  # 损坏/缺失：保留旧曲继续播放（边缘 #1）
-			resolved[play_stream] = stream
-	_kill_fade_tween()
-	_fade_tween = _scene_manager.create_tween() if _scene_manager != null \
-			else null
-	if _fade_tween == null:
-		return true  # 无场景树——非失败
-	_fade_tween.set_parallel(true)
-	var sequential_delay_sec: float = 0.0
-	for cmd: Dictionary in plan:
-		var target: StringName = cmd[BgmFadePlanner.K_TARGET]
-		var from_db: float = cmd[BgmFadePlanner.K_FROM_DB]
-		var to_db: float = cmd[BgmFadePlanner.K_TO_DB]
-		var duration: float = cmd[BgmFadePlanner.K_DURATION]
-		var is_sequential: bool = cmd[BgmFadePlanner.K_SEQUENTIAL]
-		if target == &"bus":
-			# 降低类：BGM 总线 dB 过渡（不切曲——AC-BGM-06/07）
-			_bus_fade_cmd(from_db, to_db, duration)
-			continue
-		# 计划器「当前/目标」→ 物理播放器轮换映射（a = 当前侧 / b = 目标侧）
-		var player_idx: int = _current_player_index if target == &"a" 				else 1 - _current_player_index
-		if player_idx >= _bgm_players.size():
-			continue
-		var player: AudioStreamPlayer = _bgm_players[player_idx]
-		var play_stream: StringName = cmd[BgmFadePlanner.K_PLAY_STREAM]
-		var delay_sec: float = sequential_delay_sec if is_sequential else 0.0
-		if play_stream != &"":
-			var stream: AudioStream = resolved[play_stream]
-			player.stream = stream
-			player.volume_db = from_db
-			# 顺序式起音延迟：淡出完成前目标侧不起音（AC-BGM-08 字面
-			# 语义——play() 经回调延迟触发，音量插值同窗口 set_delay）
-			if delay_sec > 0.0:
-				_fade_tween.tween_callback(player.play) \
-					.set_delay(delay_sec)
-			else:
-				player.play()
-		# 初值不经 .from()——属性当前值已是计划起点（play 分支显式赋
-		# from_db；续接分支为播放器实际 dB）；且 .from() 在
-		# set_parallel+set_delay 组合下会吞掉 delay（帧级探针实证）
-		# set_delay 须先于 set_trans/set_ease 链式调用——后置会吞掉 delay
-		# 4.6 PropertyTweener 链式顺序敏感（帧级探针实证）
-		var step: PropertyTweener = _fade_tween.tween_property(player,
-			"volume_db", to_db, duration)
-		if delay_sec > 0.0:
-			step.set_delay(delay_sec)
-		step.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		# 每条指令时长均累入顺序等待池（sequential 指令消费其当前值——
-		# 平行指令在前时其淡出时长同样构成「前序」，渡劫 b 须等 a 完成）
-		sequential_delay_sec += duration
-		if cmd[BgmFadePlanner.K_STOP_AFTER]:
-			_fade_tween.tween_callback(player.stop) \
-				.set_delay(duration + delay_sec)
-	return true
-
-
-## 总线淡化指令（降低类——经 adapter 操作 AudioServer BGM 总线）。
-func _bus_fade_cmd(from_db: float, to_db: float, duration: float) -> void:
-	# 总线音量过渡经 _fade_tween 插值方法回调（无总线对象可 tween——
-	# AudioServer 静态 API，用 tween_method 驱动）
-	var bus: int = AudioEnums.AudioBus.BGM
-	_fade_tween.tween_method(
-		func(value: float) -> void: _adapter.set_bus_volume_db(bus, value),
-		from_db, to_db, duration) 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-
-## 淡化 Tween 重入清理（中断续接——kill 停留在当前实际值）。
+## 淡化 Tween 重入清理——转发执行层。[br]
+## 公开形态保留：audio story 002 的 QA 规格按此名引用执行层，改名会打断
+## 既有引用点（本轮要求「拆出的件用同名转发保持外部引用可用」）。
 func _kill_fade_tween() -> void:
-	if _fade_tween != null and _fade_tween.is_valid():
-		_fade_tween.kill()
-	_fade_tween = null
+	_bgm_playback.kill_fade_tween()
 
 
-## === 状态编排内部（story 004——矩阵执行与场景信号绑定）======================
+## 总线淡化指令——转发执行层（总线插值演出）。
+func _bus_fade_cmd(from_db: float, to_db: float, duration: float) -> void:
+	_bgm_playback.bus_fade(from_db, to_db, duration)
+
+
+## 执行淡化计划——转发播放编排（解析归 BgmPlayback，演出归 BgmFadeExecutor）。[br]
+## [b]返回[/b]：true = 已演出或无事可做；false = 目标曲损坏（状态零变更）。
+func _execute_fade_plan(plan: Array[Dictionary]) -> bool:
+	return _bgm_playback.execute_plan(plan)
+
+
+## === 状态编排内部（story 004——信号绑定；矩阵执行归 AudioStateOrchestrator）=
 
 ## 场景转场前信号回调（AC-4）——TransitionType→AudioState 映射 → set_state。[br]
-## [br]转场中二次 pre_transition（续接语义）：中断当前 Tween 由
-## [method _execute_fade_plan] 的 kill 重建实现（委托 story 002），本回调仅
-## 按最新转场类型触发目标态。[br]
+## [br]转场中二次 pre_transition（续接语义）：中断当前 Tween 由执行层的
+## kill 重建实现（委托 story 002），本回调仅按最新转场类型触发目标态。[br]
 ## [br][param from]: 源场景 ID。[param to]: 目标场景 ID。[param type]: 转场类型。
 func _on_pre_transition(from: int, to: int, type: int) -> void:
-	var target_state: int = StateTransitionMatrixScript.map_transition_type(
-			from, to, type)
+	var target_state: int = _state_machine.resolve_transition(from, to, type)
 	if target_state < 0:
 		return  # 未映射（NONE/防御性）——跳过
 	# 状态对齐：当前态与目标态一致时无动作（幂等）；当前态与本次转场的
