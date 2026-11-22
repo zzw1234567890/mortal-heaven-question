@@ -1,40 +1,33 @@
 class_name MainMenu
 extends Control
-## MainMenu —— 主菜单场景（main-menu Story 001）。
-##
-## [b]节点形态[/b]（ADR-0031 §1）：场景内 Control 树（零新增 Autoload），
-## 由 SceneManager 场景路径注册表 [code]res://src/ui/main_menu/MainMenu.tscn[/code]
-## 挂载（[constant SceneManager.SCENE_PATHS] MAIN_MENU 条目）。[br]
-## [br][b]结构[/b]（UX 规范「左序右境」方案 B 骨架——背景动态场景归打磨 story，
-## 本 story 为布局/交互骨架）：标题 + 4 按钮（新游戏/继续游戏/设置/退出）+
-## 存档摘要行（继续按钮旁，无存档时 visible=false 占位保留）+ 版本号（左下角）
-## + 损坏提示对话框（AcceptDialog——存档损坏路径）。[br]
-## [br][b]Logic 内核[/b]：全部存档判定走 [MainMenuLogic] 纯函数（control-manifest
-## Presentation 必需模式——「存档存在性判定提取纯函数」）。[br]
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：存档存在性/摘要不缓存——
-## [method _refresh_save_state] 每次从 SaveLoadSystem [code]list_slots()[/code]
-## 读取（_ready + 返回主菜单时 [method _on_save_load_completed] 刷新）。[br]
-## [br][b]场景导航[/b]：新游戏→身份选择经 [code]SceneManager.request_scene_change(
-## MAIN_MENU, IDENTITY_SELECT)[/code]（control-manifest 必需——禁止直调
-## change_scene_to_file）；设置按钮（Story 002 恢复启用）→ 实例化
-## [SettingsPanel] 挂载本节点树并打开（ADR-0031 §1 场景内节点——设置面板为
-## 主菜单子 Control，非独立场景切换，不经 SceneManager）。[br]
-## [br][b]损坏路径[/b]（GDD 边缘情况）：点击继续 → [code]load_game()[/code] 返回非
-## SUCCESS 或 [signal SaveLoadSystem.save_corrupted] → 弹「存档损坏，无法读取」
-## AcceptDialog → 确认后返回主菜单（按钮恢复可用）。[br]
-## [br][b]焦点导航[/b]（story Implementation Notes）：焦点顺序 新游戏→继续→设置→
-## 退出（VBox 树序天然满足）；初始焦点 = 继续游戏（无存档回退新游戏）。[br]
-## [code]grab_focus()[/code] 在 4.6 双焦点下只影响键盘/手柄焦点（story Engine
-## Notes）。焦点环+悬停双视觉（ADR-0031 §4）由引擎默认主题 + 后续视觉 story
-## 落实（本 story 骨架先例 PauseMenu 同源）。[br]
-## [br][b]动画[/b]：0.8s 淡入 + 标题滑落（GDD §视觉/音频需求表）——Tween 纯视觉
-## 变换豁免（ADR-0031 §3 零轮询）。[member animate] 为 reduce-motion 预留接线点
-##（设置系统 Story 003 入库后接入——先例 [member NotificationToastArea.animate]）。
-## [br][br][b]零轮询[/b]：无 [code]_process()[/code]。
-## [br][br][b]启动承载者[/b]（gate-check 2026-11-08 §B1）：主菜单是 [code]run/main_scene[/code]，
+## MainMenu —— 主菜单场景（main-menu Story 001）。[br]
+## [br][b]节点形态[/b]（ADR-0031 §1）：场景内 Control 树（零新增 Autoload），场景路径
+## [code]res://src/ui/main_menu/MainMenu.tscn[/code] 由 [constant SceneManager.SCENE_PATHS]
+## 的 MAIN_MENU 条目挂载。[br]
+## [br][b]结构[/b]（UX 规范「左序右境」方案 B 骨架——背景动态场景归打磨 story）：标题 +
+## 按钮列（新游戏 / 继续游戏 / 设置 / 卡组编辑 / 退出）+ 底行（行囊与道友 / 读档）+
+## 存档摘要行（无存档时 visible=false 占位保留）+ 版本号 + 损坏提示对话框。[br]
+## [br][b]零状态所有权[/b]（ADR-0031 §2）：存档存在性/摘要不缓存——每次从
+## [code]SaveLoadSystem.list_slots()[/code] 现读；[b]零轮询[/b]：无 [code]_process()[/code]。[br]
+## [br][b]场景导航[/b]：一律经 [code]SceneManager.request_scene_change[/code]
+## （control-manifest 必需——禁止直调 [code]change_scene_to_file[/code]）；设置 /
+## 行囊与道友 / 读档槽位三块面板是场景内覆盖层，不经 SceneManager。[br]
+## [br][b]焦点导航[/b]（story Implementation Notes）：焦点顺序 = VBox 树序（新游戏 →
+## 继续 → 设置 → 退出）；初始焦点 = 继续游戏（无存档回退新游戏）。[code]grab_focus()[/code]
+## 在 4.6 双焦点下只影响键盘/手柄焦点。[br]
+## [br][b]动画[/b]：0.8s 淡入 + 标题滑落（GDD §视觉/音频需求）——Tween 纯视觉变换豁免
+## （ADR-0031 §3）。[member animate] 为 reduce-motion 接线点。[br]
+## [br][b]启动承载者[/b]（gate-check 2026-11-08 §B1）：本场景是 [code]run/main_scene[/code]，
 ## 由它在 [method _ready] 经 [HudBootstrap] 把全局 HUD 挂进
-## [code]SceneManager.PersistentLayer[/code]——此后所有转场 HUD 常驻，主菜单本体结构不变。
-## 「只在当前主场景时挂载」的守卫见 [method _mount_global_hud]。
+## [code]SceneManager.PersistentLayer[/code]，此后所有转场 HUD 常驻；「只在当前主场景时
+## 挂载」的守卫见 [method _mount_global_hud]。[br]
+## [br][b]按职责拆出的五件[/b]（.claude/docs/coding-standards.md「单文件 ≤300 行」）：
+## [MainMenuTexts]（固定词条与版本号）、[MainMenuBootstrap]（HUD 挂载 / 探索装配 /
+## 按键加载）、[MainMenuSaveState]（存档判定与按钮态）、[MainMenuOverlays]（三块覆盖层
+## 的建造与开合）、[MainMenuRoutes]（按钮路由与导航出口）。本类保留门面职责——节点引用、
+## 生命周期、入场动画——以及上述五件的[b]同名薄转发[/b]（既有用例与场景
+## [code]connection[/code] 一律按名字取用，转发后取法不变）；词条常量同样转发，
+## 定义的唯一出处是 [MainMenuTexts]。
 ##
 ## @experimental
 ## 来源: ADR-0031、design/gdd/main-menu-system.md、design/ux/main-menu.md、
@@ -42,80 +35,63 @@ extends Control
 
 ## === Visual 常量（数据驱动）====================================================
 
-## 冷启动入场动画总时长——0.8s（GDD §视觉/音频需求「主菜单加载 0.8s」）。
+## 冷启动入场动画总时长——0.8s（GDD §视觉/音频需求「主菜单加载 0.8s」）；标题滑落起始
+## 位移（px，自上方滑入——UX 规范「标题从上方滑落」）。
 const INTRO_DURATION: float = 0.8
-## 标题滑落起始位移（px，自上方 -60 滑入——UX 规范「标题从上方滑落」）。
 const TITLE_SLIDE_OFFSET: float = -60.0
 
-## 固定 UI 词条（GDD main-menu-system.md §2 原文；项目暂无本地化系统——
-## 先例 CultivationBarState LABEL_* 同源豁免注记，本地化入库后替换为键）。
-const TEXT_TITLE: String = "仙途问道"
-const TEXT_NEW_GAME: String = "新游戏"
-const TEXT_CONTINUE: String = "继续游戏"
-const TEXT_SETTINGS: String = "设置"
-const TEXT_QUIT: String = "退出"
-## 「行囊与道友」入口文案——一个按钮开两个界面（背包 + 角色状态，宿主内页签切换）。
-## 名字取「行囊（物）与道友（人）」：玩家的两类诉求各占一字，比「背包」更贴实际内容。
-const TEXT_INVENTORY: String = "行囊与道友"
-## 「读档」入口文案——与「继续游戏」（读最新档）并列的第三条路径：这一条让玩家
-## 自己挑槽位。两条路径都能进游戏，差别只在这里（GDD §新游戏/继续游戏/读档）。
-const TEXT_LOAD: String = "读档"
-## 「卡组编辑」入口文案——独立场景（[code]SceneID.DECK_EDITING[/code]），
-## 与「行囊与道友」（场景内覆盖层）不同：那里改的是行囊，这里改的是出战卡组。[br]
-## [br][b]为什么放在这里而不是背包里[/b]：卡组编辑是一屏两栏的编辑界面，塞进页签会
-## 与背包的「一件物品一行」形态打架；GDD 也把它列在主菜单入口下。
-const TEXT_DECK_EDIT: String = "卡组编辑"
-## 无存档时的中文提示（GDD 边界：无档时继续游戏置灰并给出说明）。[br]
-## [br][b]为什么两个按钮各说一句[/b]：它们被禁用的原因不同——「继续游戏」要的是
-## 「至少有一份档」，「读档」要的是「有一格非空槽位」；共用一句会让其中一边说谎。
-const TEXT_NO_SAVE_CONTINUE: String = "还没有存档——先点「新游戏」开始一轮"
-const TEXT_NO_SAVE_LOAD: String = "还没有任何存档槽位可读"
-
-## 版本号缺省回退（ProjectSettings 未配置 version 键时的安全默认——
-## story Implementation Notes「不硬编码」指不在 UI 层写死版本值，读取失败
-## 仍需一个可显示占位）。
-const VERSION_FALLBACK: String = "v?"
-
-## === Logic 内核（preload——class_name 在测试动态加载下不可靠，先例
+## === 拆出件的脚本常量（preload——class_name 在测试动态加载下不可靠，先例
 ## scene_manager 持有子模块模式）===============================================
 
+## 五件拆出件（实现归各件，本类只经它们转发）。
+const TextsScript := preload("res://src/ui/main_menu/main_menu_texts.gd")
+const BootstrapScript := preload("res://src/ui/main_menu/main_menu_bootstrap.gd")
+const SaveStateScript := preload("res://src/ui/main_menu/main_menu_save_state.gd")
+const OverlaysScript := preload("res://src/ui/main_menu/main_menu_overlays.gd")
+const RoutesScript := preload("res://src/ui/main_menu/main_menu_routes.gd")
+## 存档判定内核（纯函数——control-manifest「存档存在性判定提取纯函数」必需模式）。
+## 本类已不直接消费（判定迁 [MainMenuSaveState]），保留常量以保
+## [code]MainMenu.Logic[/code] 既有引用点口径不变（先例 [code]AudioManager[/code] 的
+## [code]BgmFadePlanner[/code] 同款注记）。
 const Logic := preload("res://src/ui/main_menu/main_menu_logic.gd")
+## 读档 → 进探索这一跳的编排（[method _get_launch] 懒建它；含「成功但空载荷」判别）。
+const LaunchScript := preload("res://src/ui/main_menu/main_menu_launch.gd")
 
-## SettingsPanel 场景——设置面板实例化源（Story 002；场景内节点模式 ADR-0031 §1）。
-const SETTINGS_PANEL_SCENE: PackedScene = \
-		preload("res://src/ui/main_menu/SettingsPanel.tscn")
+## 固定 UI 词条——定义在 [MainMenuTexts]，此处同名转发（既有用例按实例取用，
+## 先例 [code]identity_select.gd[/code] 转发 [code]INTRO_DURATION[/code]）。
+const TEXT_TITLE: String = TextsScript.TEXT_TITLE
+const TEXT_NEW_GAME: String = TextsScript.TEXT_NEW_GAME
+const TEXT_CONTINUE: String = TextsScript.TEXT_CONTINUE
+const TEXT_SETTINGS: String = TextsScript.TEXT_SETTINGS
+const TEXT_QUIT: String = TextsScript.TEXT_QUIT
+const TEXT_INVENTORY: String = TextsScript.TEXT_INVENTORY
+const TEXT_LOAD: String = TextsScript.TEXT_LOAD
+const TEXT_DECK_EDIT: String = TextsScript.TEXT_DECK_EDIT
+const TEXT_NO_SAVE_CONTINUE: String = TextsScript.TEXT_NO_SAVE_CONTINUE
+const TEXT_NO_SAVE_LOAD: String = TextsScript.TEXT_NO_SAVE_LOAD
+## 版本号缺省回退（同上转发）。本类已不直接消费（读取迁 [MainMenuTexts]），
+## 保留常量以保既有引用点口径不变。
+const VERSION_FALLBACK: String = TextsScript.VERSION_FALLBACK
+## SettingsPanel 场景——设置面板实例化源（同上，转发 [MainMenuOverlays] 的同名常量）。
+const SETTINGS_PANEL_SCENE: PackedScene = OverlaysScript.SETTINGS_PANEL_SCENE
 
-## SceneManager 脚本常量——枚举单一真理来源（SceneID/TransitionType 均为
-## const，preload 引用不依赖 Autoload 实例存在，与注入式设计兼容——
-## code-review H-1 裁决：替换裸数字，防枚举重排静默漂移）。
+## SceneManager / SaveLoadSystem 脚本常量——SceneID / TransitionType / LoadResult
+## 枚举真理来源（preload 引用不依赖 Autoload 实例存在，与注入式设计兼容——
+## code-review H-1：替换裸数字，防枚举重排静默漂移）。本类已不直接消费（路由迁
+## [MainMenuRoutes]），保留常量以保既有引用点口径不变。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
-## SaveLoadSystem 脚本常量——LoadResult 枚举单一真理来源（同上，H-1 姊妹项：
-## 点击继续的返回值判定去魔数）。
 const SLScript := preload("res://src/foundation/save_load_system.gd")
-## KeybindStore 脚本常量——启动按键加载（Story 004：键位持久化加载，
-## GDD 边界澄清「重启不失效」）。
+## 以下启动承载者 / 覆盖层素材的脚本常量——实现已迁 [MainMenuBootstrap] /
+## [MainMenuOverlays]，此处同名转发以保既有引用点（测试与排障按
+## [code]MainMenu.XXX[/code] 取用）。
 const KeybindStoreScript := preload("res://src/ui/main_menu/keybind_store.gd")
-## HudBootstrap 脚本常量——全局 HUD 的生产挂载入口（gate-check §B1）。
-## 主菜单是进程启动后的第一个场景（[code]run/main_scene[/code]），因此由它担任
-## 「启动承载者」：HUD 经 [code]SceneManager.register_persistent()[/code] 挂入
-## PersistentLayer 后跨场景常驻，主菜单本体结构不变（ADR-0031 §1.2）。
 const HudBootstrapScript := preload("res://src/ui/hud/hud_bootstrap.gd")
-## ExplorationBootstrap 脚本常量——探索系统的生产装配入口（地图配置 + 敌人池）。
-## 与 HUD 同源：主菜单是启动承载者，探索系统的回调注入点必须在场景层装配，
-## 而不是写进 ExplorationSystem 内部（DEBT-EUI-006-3 / DEBT-EUI-006-5）。
 const ExplorationBootstrapScript := preload("res://src/feature/exploration/exploration_bootstrap.gd")
-## 「行囊与道友」界面（背包 + 角色状态双页）——主菜单的覆盖层入口。
 const InventoryScreensHostScript := preload("res://src/ui/inventory/inventory_screens_host.gd")
-## 两页的只读模型——主菜单在装配时把 Autoload 接进去（面板不直连 Autoload）。
 const InventoryModelScript := preload("res://src/feature/inventory/inventory_model.gd")
 const StatusModelScript := preload("res://src/feature/inventory/character_status_model.gd")
-## 背包内「使用丹药」的结算层——背包页只发意图，由宿主持有它去结算。
 const PillUseScript := preload("res://src/feature/inventory/inventory_pill_use.gd")
-## 读档槽位选择面板——「读档」按钮打开的覆盖层（纯代码构建，与设置面板同形态）。
 const LoadSlotPanelScript := preload("res://src/ui/main_menu/load_slot_panel.gd")
-## 读档 → 进探索这一跳的编排（含「成功但空载荷」的判别——见该模块类文档）。
-const LaunchScript := preload("res://src/ui/main_menu/main_menu_launch.gd")
-## 卡组编辑的来路意图（「保存并返回」该回哪——见那边类文档）。
 const DeckEditingEntryScript := preload("res://src/ui/deck_editing/deck_editing_entry.gd")
 
 ## === 依赖注入（测试可替换）=====================================================
@@ -124,23 +100,19 @@ const DeckEditingEntryScript := preload("res://src/ui/deck_editing/deck_editing_
 var scene_manager: Node = null
 ## SaveLoadSystem 引用——存档列表/读档用（null 时回退 Autoload，先例 PauseMenu）。
 var save_load: Node = null
-## 动画开关——测试注入 + reduce-motion 预留接线点（头注释）。
+## 动画开关——测试注入 + reduce-motion 预留接线点（类文档）。
 var animate: bool = true
 
 ## === 瞬态交互状态（ADR-0031 §2.1）=============================================
 
 ## 入场 Tween 句柄（新请求时 kill 防悬挂——先例 PauseMenu._blur_tween）。
 var _intro_tween: Tween = null
-
-## 设置面板实例——复用式单例（首次点击实例化，重开不重建——关闭后
-## [code]visible=false[/code] 留树）。
+## 设置面板 / 行囊界面 / 读档槽位面板实例——复用式单例（首次点击实例化，关闭留树）；
+## 建造与开合归 [MainMenuOverlays]，句柄归本类（测试按名字读）。
 var _settings_panel: SettingsPanel = null
-## 「行囊与道友」界面实例——复用式单例（同设置面板的形态：首次点击实例化，
-## 关闭留树）。它自带背包与角色状态两页，故主菜单只需一个入口按钮。[br]
 ## 类型写作 [Control] 而非其 [code]class_name[/code]：本脚本在测试里被动态加载，
 ## 全局类名注册时序不保证（先例 card_system 的「不依赖 class_name」注记）。
 var _inventory_screens: Control = null
-## 读档槽位选择面板实例——复用式单例（同设置面板形态：首次点击实例化，关闭留树）。
 var _load_slot_panel: Control = null
 ## 读档编排子模块——懒建一次（注入引用在 [method _get_launch] 里透传）。
 var _launch: RefCounted = null
@@ -185,78 +157,43 @@ func _exit_tree() -> void:
 	if _intro_tween != null and _intro_tween.is_valid():
 		_intro_tween.kill()
 
-## === 全局 HUD 生产挂载（gate-check 2026-11-08 §B1）=============================
+## === 启动承载者三件事（HUD 挂载 / 探索装配 / 按键加载）=========================
 
-## 仅在「本节点就是运行中的主场景」时挂载全局 HUD。[br]
-## [br][b]为什么延后一帧[/b]：场景切换时 [code]current_scene[/code] 要到整个装载流程
-## 结束才落定，[code]_ready[/code] 内读取可能还是旧值；[method Node.call_deferred]
-## 在空闲帧执行，读到的一定是最终值。[br]
-## [br][b]为什么要这道守卫[/b]：集成测试把 MainMenu.tscn 当普通节点 add_child，
-## 此时 [code]current_scene[/code] 不是它——不挂载，避免测试进程里凭空多出一个
-## 常驻 HUD（它订阅全局 ESC 信号与转场信号）。生产路径（[code]run/main_scene[/code]，
-## 含读档/转场回到主菜单）守卫恒真。
+## 生产挂载全局 HUD（gate-check 2026-11-08 §B1）——实现见 [MainMenuBootstrap]。[br]
+## [br]自动路径延后一帧 + 加 [code]current_scene[/code] 守卫（守卫拦住集成测试里
+## 被当普通节点 [code]add_child[/code] 的主菜单，避免测试进程多出常驻 HUD）。
 func _mount_global_hud_if_boot_scene() -> void:
-	if not is_inside_tree():
-		return
-	call_deferred(&"_mount_global_hud")
+	BootstrapScript.mount_global_hud_if_boot_scene(self)
 
-## 守卫实现——[b]测试可直接调用 [method _mount_global_hud]（守卫）/ [method _mount_hud]（无守卫）[/b]。
-## [br][b]current_scene 为 null 时放行[/b]：场景切换的中间态（旧场景已释放、新场景
-## 尚未登记）不该被误判成「不是主场景」而漏挂；此时本节点必然就是刚装载的主菜单。
+## 守卫实现——[b]测试可直接调用本方法（守卫）/ [method _mount_hud]（无守卫）[/b]；
+## [code]current_scene[/code] 为 null 时放行（场景切换的中间态不该漏挂）。
 func _mount_global_hud() -> void:
-	if not is_inside_tree():
-		return
-	var tree: SceneTree = get_tree()
-	if tree == null:
-		return
-	var current: Node = tree.current_scene
-	if current != null and current != self:
-		return
-	_mount_hud()
+	BootstrapScript.mount_global_hud(self, _get_scene_manager())
 
 ## 挂载全局 HUD（幂等——重复进入主菜单复用同一实例）。[br]
 ## [br][b]返回[/b]：已挂载的 HUD；SceneManager 不可用/不支持时 null（静默降级）。
 func _mount_hud() -> CanvasLayer:
-	return HudBootstrapScript.mount(_get_scene_manager())
+	return BootstrapScript.mount_hud(_get_scene_manager())
 
-## === 探索系统生产装配（地图配置 + 敌人池）====================================
-
-## 把地图配置目录与敌人池接进 ExplorationSystem 的注入点。[br]
-## [br][b]为什么由主菜单做[/b]：与 HUD 挂载同源——启动承载者负责把「数据实现」
-## 接到「系统接口」上；系统内部不硬编码地图表与敌人池。[br]
-## [br][b]为什么不做 current_scene 守卫[/b]：本装配只改回调字段、不挂节点，
-## 集成测试把主菜单当普通节点 add_child 时装配同样有意义（测试正是要验真实
-## 回调路径）；重复执行幂等。[br]
+## 探索系统生产装配（地图配置 + 敌人池）。[br]
+## [br][b]为什么由主菜单做[/b]：与 HUD 挂载同源——启动承载者把「数据实现」接到
+## 「系统接口」上；系统内部不硬编码地图表与敌人池。不做 current_scene 守卫（只改
+## 回调字段、不挂节点，测试正是要验真实回调路径），重复执行幂等。[br]
 ## [br][b]返回[/b]：是否装配成功（探索系统缺失时为 false，静默降级）。
 func _mount_exploration_bootstrap() -> bool:
-	var es: Node = get_node_or_null(NodePath("/root/ExplorationSystem"))
-	if es == null:
-		return false
-	return ExplorationBootstrapScript.mount(es, get_node_or_null(NodePath("/root/AISystem")))
-
-## === 按键绑定启动加载（Story 004）==============================================
+	return BootstrapScript.mount_exploration(self)
 
 ## 启动加载自定义按键（GDD 边界澄清「键位持久化加载」——重启不失效）。[br]
-## [b]顺序[/b]：先快照当前 InputMap 为默认基准（首次 [code]_ready[/code]——
-## 快照法，QL-STORY-READY 2026-09-20 裁决），后从设置文件加载并应用——
-## 顺序不可逆（先加载再快照会把自定义键污染进默认基准）。[br]
-## 文件无 keybinds 键（首次启动）→ 空绑定 → 跳过应用（InputMap 维持
-## project.godot 默认）。
+## [br][b]顺序不可逆[/b]：先快照当前 InputMap 为默认基准，再加载设置文件并应用
+## （反了会把自定义键污染进默认基准）。文件无 keybinds 键 → 空绑定 → 跳过应用。
 func _load_keybinds() -> void:
-	var store: KeybindStore = keybind_store
-	if store == null:
-		store = KeybindStoreScript.new()
-		keybind_store = store  # 留存共享——SettingsPanel 装配时注入（H-3）
-	store.snapshot_defaults()
-	var bindings: Dictionary = store.load_bindings()
-	if not bindings.is_empty():
-		KeybindStoreScript.apply_bindings(bindings)
+	BootstrapScript.load_keybinds(self)
 
 ## === 文本与版本 ================================================================
 
 ## 应用固定词条（本地化入库后改为键查找——头注释豁免注记）。[br]
-## 全部按钮文案统一由代码赋值（单一真理来源——code-review S-1 裁决：
-## 常量声明而不消费会与 .tscn text 属性形成双源漂移）。
+## [br]全部按钮文案统一由代码赋值（单一真理来源——code-review S-1：常量声明而不消费
+## 会与 .tscn text 属性形成双源漂移）。词条出处见 [MainMenuTexts]。
 func _apply_texts() -> void:
 	title_label.text = TEXT_TITLE
 	new_game_button.text = TEXT_NEW_GAME
@@ -269,242 +206,118 @@ func _apply_texts() -> void:
 	save_summary_label.text = ""
 	no_save_hint_label.text = ""
 
-## 版本号——从 ProjectSettings 读取（story：不硬编码）。[br]
-## project.godot [code]application/config/version[/code] = "0.1.0-dev"。[br]
-## _ready 经 [method _apply_texts] 后调用（[method _read_version] 结果直写标签）。
+## 版本号（project.godot [code]application/config/version[/code]，story：不硬编码）。
 func _apply_version() -> void:
-	version_label.text = _read_version()
+	TextsScript.apply_version(version_label)
 
-## 版本号——从 ProjectSettings 读取（story：不硬编码）。[br]
-## project.godot [code]application/config/version[/code] = "0.1.0-dev"。
+## 版本号读取（实现见 [MainMenuTexts.read_version]）。
 func _read_version() -> String:
-	var version: String = str(ProjectSettings.get_setting(
-			&"application/config/version", ""))
-	if version.is_empty():
-		push_warning("MainMenu: project.godot 未配置 application/config/version")
-		return VERSION_FALLBACK
-	return "v" + version
+	return TextsScript.read_version()
 
-## === 存档状态（零缓存——每刷新周期从 SaveLoadSystem 读取）=====================
+## === 存档状态（零缓存——每刷新周期从 SaveLoadSystem 读取；实现见
+## [MainMenuSaveState]）========================================================
 
-## 刷新存档存在性 + 摘要（_ready + 读档完成信号驱动）。[br]
-## UI 不缓存列表——每次调用重新 [code]list_slots()[/code]（ADR-0031 §2）。[br]
-## [br][b]两个入口一起刷[/b]：「继续游戏」（读最新档）与「读档」（挑槽位）读的是
-## 同一份 [code]list_slots()[/code]，只是判定宽严不同——前者只要有档，后者要有非空
-## 槽位。分两次读会出现「继续游戏亮着、读档灰着」这种自相矛盾的界面。[br]
-## [br][b]中文提示的落点[/b]：无档时下方提示行说明原因（GDD 边界：无档时置灰并给出
-## 说明）——只说一句，且两个按钮的说明不同（见 TEXT_NO_SAVE_* 常量注记）。
+## 刷新存档存在性 + 摘要 + 两个按钮态（_ready 与两张存档信号驱动）。[br]
+## [br][b]两个入口一起刷[/b]：「继续游戏」（读最新档）与「读档」（挑槽位）读的是同一份
+## 列表，只是判据宽严不同（前者只要有档，后者要有非空槽位）——分两次读会出现
+## 「继续游戏亮着、读档灰着」这种自相矛盾的界面。实现见 [MainMenuSaveState]。
 func _refresh_save_state() -> void:
-	var slots: Array = _list_slots_safe()
-	var has_save: bool = Logic.has_continuable_save(slots)
-	continue_button.disabled = not has_save
-	if has_save:
-		var latest: Dictionary = Logic.select_latest_save(slots)
-		save_summary_label.text = Logic.build_save_summary(latest)
-	else:
-		save_summary_label.text = ""
-	# 摘要行 visible 控制（story AC：无存档时隐藏，布局占位保留——
-	# visible 而非从树移除）
-	save_summary_label.visible = has_save
-	# 「读档」按槽位判定——自动槽空但有手动档时它仍该亮着（两者不等价）
-	var entries: Array[Dictionary] = Logic.loadable_slots(slots)
-	load_button.disabled = not _has_any_slot(entries)
-	no_save_hint_label.text = "" if has_save else TEXT_NO_SAVE_CONTINUE
-	if _load_slot_panel != null and is_instance_valid(_load_slot_panel) \
-			and bool(_load_slot_panel.call(&"is_open")):
-		# 面板正开着（读档失败退回的场景）：列表可能已变，跟着重刷一次
-		_load_slot_panel.call(&"populate", entries)
-
+	SaveStateScript.refresh(self)
 
 ## 槽位条目里是否有至少一个非空（「读档」按钮的启用判据）。[br]
-## [br][b]与 [method Logic.has_continuable_save] 的差别[/b]：那个判的是
-## [code]list_slots()[/code] 的原始列表（含战前快照槽），本判据只看玩家可在读档
-## 界面里选到的那几格——快照槽非空不该让「读档」亮起来（点进去列表里没有它）。
+## [br][b]与 [method MainMenuLogic.has_continuable_save] 的差别[/b]：那个判的是
+## [code]list_slots()[/code] 的原始列表（含战前快照槽），本判据只看玩家可在读档界面里
+## 选到的那几格——快照槽非空不该让「读档」亮起来（点进去列表里没有它）。
 static func _has_any_slot(p_entries: Array) -> bool:
-	for entry: Dictionary in p_entries:
-		if bool(entry.get("exists", false)):
-			return true
-	return false
+	return SaveStateScript.has_any_slot(p_entries)
 
-## list_slots 防御读取——SaveLoadSystem 不可用时返回空数组（安全默认：
-## 按无存档处理，按钮禁用——Logic 内核空状态防御对齐）。
+## list_slots 防御读取——SaveLoadSystem 不可用时返回空数组（安全默认：按无存档处理，
+## 按钮禁用——Logic 内核空状态防御对齐）。
 func _list_slots_safe() -> Array:
-	var sl: Node = _get_save_load()
-	if sl != null and sl.has_method(&"list_slots"):
-		return sl.list_slots()
-	push_warning("MainMenu: SaveLoadSystem 不可用——按无存档处理")
-	return []
+	return SaveStateScript.list_slots_safe(self)
 
-## 连接读档完成信号——返回主菜单（暂停菜单退出路径）后刷新存档状态。
+## 连接两张存档信号（返回主菜单后刷新存档状态）；回调仍指着本类的
+## [method _on_save_load_completed] / [method _on_save_corrupted]。
 func _connect_save_signals() -> void:
-	var sl: Node = _get_save_load()
-	if sl != null and sl.has_signal(&"load_completed"):
-		if not sl.load_completed.is_connected(_on_save_load_completed):
-			sl.load_completed.connect(_on_save_load_completed)
-	if sl != null and sl.has_signal(&"save_corrupted"):
-		if not sl.save_corrupted.is_connected(_on_save_corrupted):
-			sl.save_corrupted.connect(_on_save_corrupted)
+	SaveStateScript.connect_signals(self,
+			Callable(self, &"_on_save_load_completed"),
+			Callable(self, &"_on_save_corrupted"))
 
-## 读档完成信号回调——无论成败（转场或弹窗路径）刷新存档状态。[br]
-## Cat 2b 动作通知（ADR-0007）——UI 只读刷新，不写状态。
+## 读档完成信号回调——无论成败（转场或弹窗路径）刷新存档状态（Cat 2b 动作通知
+## ADR-0007——UI 只读刷新，不写状态）。
 func _on_save_load_completed(_success: bool) -> void:
-	_refresh_save_state()
+	RoutesScript.save_load_completed(self, _success)
 
-## save_corrupted 信号回调（GDD 边缘情况）——弹「存档损坏，无法读取」提示。[br]
-## 对话框确认后 [method _on_corrupt_dialog_confirmed] 恢复按钮可用态。
+## save_corrupted 信号回调（GDD 边缘情况）——弹「存档损坏，无法读取」提示；
+## 确认后 [method _on_corrupt_dialog_confirmed] 恢复按钮可用态。
 func _on_save_corrupted(_slot_type: int, _slot_id: int, _reason: String) -> void:
-	corrupt_dialog.show_corrupt()
+	RoutesScript.save_corrupted(self, _slot_type, _slot_id, _reason)
 
-## === 按钮路由 ==================================================================
+## === 按钮路由（实现见 [MainMenuRoutes]；本类只保留同名入口——场景
+## [code]connection[/code] 与既有用例一律按这些名字取用）======================
 
-## 新游戏 → 身份选择（AC-main-menu-004）。[br]
-## 经 SceneManager 唯一入口（control-manifest 必需——绝不直调
-## change_scene_to_file）。from 动态取当前场景 ID（先例 PauseMenu M-2 去魔数）。
+## 新游戏 → 身份选择（AC-main-menu-004，经 SceneManager 唯一入口）。
 func _on_new_game_pressed() -> void:
-	var sm: Node = _get_scene_manager()
-	if sm == null or not sm.has_method(&"request_scene_change"):
-		push_error("MainMenu: SceneManager 不可用——新游戏导航中止")
-		return
-	var from_id: int = SceneManagerScript.SceneID.MAIN_MENU  # 守卫失败回退
-	if sm.has_method(&"get_current_scene_id"):
-		from_id = sm.get_current_scene_id()
-	sm.request_scene_change(from_id,
-			SceneManagerScript.SceneID.IDENTITY_SELECT,
-			SceneManagerScript.TransitionType.MENU_TO_GAME)
+	RoutesScript.new_game(self)
 
 ## 继续游戏 → 读最近存档并[b]回到上次那张图[/b]（AC-main-menu-003 + 损坏路径）。[br]
-## [br][b]此前这里是死路[/b]：读档成功后没有任何导航——玩家点了按钮，界面纹丝不动，
-## 只有损坏分支有后续（弹对话框）。「继续游戏」的全部意义就在读完那一跳。[br]
-## [br][b]导航归 [MainMenuLaunch][/b]：读档 → 发跨场景意图 → 请求转场三件事在那里
-## 一条线走完（本类已超 300 行，且这条链与「读档按钮」共用同一份实现）。[br]
-## [br][b]失败才弹损坏框[/b]：成功但载荷为空、或依赖不可用，都[b]不[/b]弹——文件没坏，
-## 弹「存档损坏」是在对玩家说谎（那条链的判别见 [method MainMenuLaunch.load_and_resume]）。
+## [br][b]此前这里是死路[/b]：读档成功后没有任何导航——玩家点了按钮，界面纹丝不动。
+## 「继续游戏」的全部意义就在读完那一跳，而那条链（读档 → 发跨场景意图 → 请求转场）
+## 归 [MainMenuLaunch]。[br]
+## [br][b]失败才弹损坏框[/b]：成功但载荷为空、或依赖不可用都[b]不[/b]弹——文件没坏，
+## 弹「存档损坏」是在对玩家说谎。
 func _on_continue_pressed() -> void:
-	if continue_button.disabled:
-		return  # 守卫：disabled 态不可达（键盘焦点防御）
-	var slots: Array = _list_slots_safe()
-	var latest: Dictionary = Logic.select_latest_save(slots)
-	if latest.is_empty():
-		# 零状态所有权副作用：disabled 判定与点击间列表可能已变——重刷一次，
-		# 仍空则按无存档处理（不弹损坏框，静默禁用）。
-		_refresh_save_state()
-		return
-	var code: int = int(_get_launch().call(&"load_and_resume",
-			int(latest.get("slot_type", 0)), int(latest.get("slot_id", 0))))
-	if code != SLScript.LoadResult.SUCCESS:
-		corrupt_dialog.show_corrupt()
+	RoutesScript.continue_game(self)
 
-
-## 读档 → 打开槽位选择面板（第三条路径）。[br]
-## [br][b]与设置/行囊同源形态[/b]：场景内覆盖层、复用式单例、首次点击实例化后
-## [code]add_child[/code] 挂本节点树（ADR-0031 §1——不经 SceneManager 转场）。[br]
-## [br][b]每次打开都重新 populate[/b]：槽位状态可能在主菜单停留期间变了（另一个
-## 进程、或刚从暂停菜单退出来），面板不缓存列表（ADR-0031 §2）。[br]
-## [br][b]空列表也照开[/b]（按钮 disabled 时不可达，键盘焦点防御除外）：面板会把四格
-## 全画成「（空）」——比什么都不发生更能说明「你还没有存档」。
+## 读档 → 打开槽位选择面板（第三条路径；场景内覆盖层，不经 SceneManager 转场）。[br]
+## [br]每次打开都重新 populate（槽位状态可能在停留期间变了——零状态所有权）；
+## 空列表也照开：面板把四格全画成「（空）」，比什么都不发生更能说明「你还没有存档」。
 func _on_load_pressed() -> void:
-	if _load_slot_panel == null or not is_instance_valid(_load_slot_panel):
-		_load_slot_panel = LoadSlotPanelScript.new()
-		_load_slot_panel.connect(&"slot_chosen", _on_load_slot_chosen)
-		_load_slot_panel.connect(&"back_requested", _on_load_panel_back)
-		add_child(_load_slot_panel)
-	_load_slot_panel.call(&"populate", Logic.loadable_slots(_list_slots_safe()))
-	_load_slot_panel.call(&"open")
-	var first: Variant = _load_slot_panel.call(&"first_enabled_button")
-	if first is Button and (first as Button).is_inside_tree():
-		(first as Button).grab_focus()
+	OverlaysScript.open_load_panel(self)
 
-
-## 玩家在读档面板选中一格——执行与「继续游戏」同一条读档链。[br]
-## [br]面板已在 [method LoadSlotPanel._on_slot_pressed] 里自行收起（先收起再报意图，
-## 避免读档成功转场时两层画面叠在一起）。[br]
-## [br]失败弹损坏框——与「继续游戏」同一条判别（同一份存档，两条路径不该给两种说法）。
+## 玩家在读档面板选中一格——与「继续游戏」同一条读档链、同一条失败判别
+## （同一份存档，两条路径不该给两种说法）；面板已自行收起，避免两层画面叠在一起。
 func _on_load_slot_chosen(p_slot_type: int, p_slot_id: int) -> void:
-	var code: int = int(_get_launch().call(&"load_and_resume", p_slot_type, p_slot_id))
-	if code != SLScript.LoadResult.SUCCESS:
-		corrupt_dialog.show_corrupt()
+	RoutesScript.load_slot(self, p_slot_type, p_slot_id)
 
-
-## 读档面板「返回」——关闭并重刷按钮态（关闭期间槽位可能已变）。
+## 读档面板「返回」——重刷按钮态（关闭期间槽位可能已变）。
 func _on_load_panel_back() -> void:
 	_refresh_save_state()
 
-
 ## 设置 → 打开设置面板（AC-main-menu-007；Story 002 恢复启用）。[br]
-## 首次点击实例化 [SettingsPanel] 挂载本节点树（顶层 CanvasItem——
-## 覆盖主菜单按钮区）；重复点击复用实例。[member animate] 透传（reduce-motion
-## 接线点随设置面板动画行为统一）。
+## [br]场景内覆盖层、复用式单例；[member animate] 与已快照的 keybind store 在装配时
+## 透传（「恢复默认」要的是启动时那份默认基准）。实现见 [MainMenuOverlays]。
 func _on_settings_pressed() -> void:
-	if _settings_panel == null or not is_instance_valid(_settings_panel):
-		_settings_panel = SETTINGS_PANEL_SCENE.instantiate()
-		_settings_panel.animate = animate
-		# 已快照的 keybind store 注入面板（LP-CODE-REVIEW H-3——共享同一实例，
-		# 面板注册的「恢复默认」才能拿到启动时快照的默认基准）
-		if keybind_store != null:
-			_settings_panel.keybind_store = keybind_store
-		add_child(_settings_panel)
-	_settings_panel.open()
+	OverlaysScript.open_settings(self, animate)
 
 ## 退出 → 关闭进程（AC-main-menu-006；UX 规范：直接退出无确认）。
 func _on_quit_pressed() -> void:
-	get_tree().quit()
+	RoutesScript.quit(self)
 
 ## 「卡组编辑」→ 进卡组编辑场景（[code]SceneID.DECK_EDITING[/code]）。[br]
-## [br][b]与「行囊与道友」相反：这一条是转场而不是覆盖层[/b]——整屏两栏编辑与主菜单
-## 的按钮列没有共存的余地（ADR-0031 §1：能一屏共存才用覆盖层）。[br]
-## [br][b]先记来路再请求转场[/b]：编辑屏挂载时已无从知道是谁开的它，[code]DeckEditingEntry[/code]
-## 记下这一枚场景 ID，「保存并返回」据此回到主菜单（而不是把玩家丢进探索）。[br]
-## [br][b]转场类型 MENU_TO_GAME[/b]：音频矩阵按它索引（主菜单 → 游戏的长淡入）。
+## [br][b]与「行囊与道友」相反：这一条是转场而不是覆盖层[/b]——整屏两栏编辑与主菜单的
+## 按钮列没有共存的余地（ADR-0031 §1：能一屏共存才用覆盖层）。先记来路（编辑屏挂载时
+## 已无从知道是谁开的它）再请求转场。
 func _on_deck_edit_pressed() -> void:
-	var sm: Node = _get_scene_manager()
-	if sm == null or not sm.has_method(&"request_scene_change"):
-		push_error("MainMenu: SceneManager 不可用——卡组编辑导航中止")
-		return
-	var from_id: int = SceneManagerScript.SceneID.MAIN_MENU  # 守卫失败回退
-	if sm.has_method(&"get_current_scene_id"):
-		from_id = int(sm.call(&"get_current_scene_id"))
-	DeckEditingEntryScript.request_edit(from_id)
-	sm.call(&"request_scene_change", from_id,
-			SceneManagerScript.SceneID.DECK_EDITING,
-			SceneManagerScript.TransitionType.MENU_TO_GAME)
+	RoutesScript.deck_edit(self)
 
 ## 「行囊与道友」→ 打开背包 + 角色状态界面（两页签，共用一次开合）。[br]
-## [br][b]与设置按钮同源形态[/b]：场景内覆盖层、复用式单例、首次点击实例化后
-## [code]add_child[/code] 挂本节点树（ADR-0031 §1 场景内节点——不经 SceneManager
-## 转场）。面板自带输入锁与「返回」出口，主菜单只负责开。[br]
-## [br][b]两页的模型在这里装配[/b]：面板不直连 Autoload（零状态所有权），
-## 由主菜单把「数据实现」接到「界面接口」上——与 [method _mount_exploration_bootstrap]
-## 同一分工。面板在 [method InventoryScreensHost.open] 时现读，故不必在此预热数据。
+## [br][b]两页的模型在装配时接线[/b]：面板不直连 Autoload（零状态所有权），由主菜单把
+## 「数据实现」接到「界面接口」上——与探索装配同一分工。实现见 [MainMenuOverlays]。
 func _on_inventory_pressed() -> void:
-	if _inventory_screens == null or not is_instance_valid(_inventory_screens):
-		_inventory_screens = InventoryScreensHostScript.new()
-		_inventory_screens.inventory_model = InventoryModelScript.new(
-				get_node_or_null(NodePath("/root/GameStateManager")),
-				get_node_or_null(NodePath("/root/CardSystem")))
-		_inventory_screens.status_model = StatusModelScript.new(
-				get_node_or_null(NodePath("/root/GameStateManager")),
-				get_node_or_null(NodePath("/root/RealmSystem")))
-		# 丹药结算层也在这里接线（背包页的确认 → 用丹药走它）。它自己也会去找
-		# Autoload，但显式接上与其余依赖同口径——装配点漏接这类依赖不会报错，
-		# 只会让功能静默失效（先例见 test_character_status_flow 的阵亡标记用例）。
-		var pill_use: RefCounted = PillUseScript.new(
-				get_node_or_null(NodePath("/root/GameStateManager")),
-				get_node_or_null(NodePath("/root/CardSystem")))
-		_inventory_screens.pill_use = pill_use
-		add_child(_inventory_screens)
-	_inventory_screens.open()
+	OverlaysScript.open_inventory(self)
 
 ## === 损坏对话框 ================================================================
 
-## 对话框确认回调——刷新存档状态（确认后按钮恢复可用态语义：若损坏存档
-## 仍为唯一存档，重刷后依旧亮起——点击再次走损坏路径，与 AC-3 自洽）。
+## 对话框确认回调——刷新存档状态（确认后按钮恢复可用态语义：若损坏存档仍为唯一存档，
+## 重刷后依旧亮起——点击再次走损坏路径，与 AC-3 自洽）。
 func _on_corrupt_dialog_confirmed() -> void:
-	_refresh_save_state()
+	RoutesScript.corrupt_confirmed(self)
 
 ## === 入场动画（Tween 纯视觉变换——ADR-0031 §3 豁免）=========================
 
-## 0.8s 淡入 + 标题滑落（GDD §视觉/音频需求）。[br]
-## [member animate] false（测试/reduce-motion）时直接跳到位。
+## 0.8s 淡入 + 标题滑落（GDD §视觉/音频需求）。[member animate] false
+##（测试/reduce-motion）时直接跳到位。
 func _play_intro() -> void:
 	if not is_inside_tree():
 		return
@@ -520,10 +333,10 @@ func _play_intro() -> void:
 			title_label.position.y - TITLE_SLIDE_OFFSET,
 			INTRO_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
-## === 内部辅助 ==================================================================
+## === 内部辅助（拆出件的解析面——注入覆盖只有这一处）==========================
 
-## 获取 SceneManager——注入对象优先，否则回退 Autoload（get_node_or_null
-## 保持脚本可脱离 Autoload 环境解析——先例 RealmBar._get_gsm）。
+## 获取 SceneManager——注入对象优先，否则回退 Autoload（[code]get_node_or_null[/code]
+## 保持脚本可脱离 Autoload 环境解析——先例 [code]RealmBar._get_gsm[/code]）。
 func _get_scene_manager() -> Node:
 	if scene_manager != null:
 		return scene_manager
@@ -535,8 +348,8 @@ func _get_save_load() -> Node:
 		return save_load
 	return get_node_or_null("/root/SaveLoadSystem")
 
-## 取/建读档编排子模块——注入引用透传（本类已超 300 行，编排实现见该模块）。[br]
-## [br][b]为什么每次都透传一遍注入引用[/b]：测试在 [code]_ready[/code] 之后才注入
+## 取/建读档编排子模块——注入引用透传（编排实现见该模块）。[br]
+## [br][b]为什么每次都透传一遍[/b]：测试在 [code]_ready[/code] 之后才注入
 ## [code]save_load[/code] / [code]scene_manager[/code]（[code]before_each[/code] 先
 ## [code]add_child[/code] 再赋值），只认建模块那一刻的注入会让读档打到真实 Autoload。
 func _get_launch() -> RefCounted:
