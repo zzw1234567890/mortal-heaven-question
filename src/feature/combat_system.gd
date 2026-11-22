@@ -245,6 +245,9 @@ var _rewards: RefCounted = null
 ## 名册 / HP 状态表 / 战绩子模块（开战种子 + 结束定格 + 取数口 + 读档落位——本轮拆出）。
 var _roster_ops: RefCounted = null
 
+## 三堆牌子模块（抽牌 / 洗牌 / 弃牌 / 开局发牌 / 读档恢复——本轮拆出）。
+var _piles: RefCounted = null
+
 ## 攻击队列减伤覆盖子模块（DEBT-CBT-018-8 残留——Attack 阶段写入防御方减伤来源）。
 var _attack_coverage: RefCounted = null
 
@@ -1050,130 +1053,69 @@ func _all_characters_targeted() -> bool:
 
 
 # === 抽牌 + 牌库抽空返还（AC-013）================================================
+# 实现全部在 combat_card_piles.gd 子模块（抽牌 / 洗牌 / 弃牌 / 开局发牌 / 读档恢复 /
+# 三处查询口）；父节点只保留同名薄转发——[code]_draw_cards[/code] 与 [code]discard_card[/code]
+# 是 [code]combat_phase_manager.gd[/code] / [code]combat_card_resolver.gd[/code]
+# 按名字回调的父节点接缝，其余是同名公开面。
 
-## 从牌库抽 n 张牌到手牌——牌库抽空时从弃牌堆随机返还 1 张到牌库底部。[br]
+## 从牌库抽 n 张牌到手牌——牌库抽空时从弃牌堆随机返还 1 张到牌库底部。委托子模块。[br]
 ## [br]来源: GDD §2 抽牌规则 / AC-013。
 func _draw_cards(count: int) -> void:
-	for i in range(count):
-		if _deck.is_empty():
-			# AC-013：牌库抽空 + 弃牌堆非空 → 随机返还 1 张到牌库底部
-			if _discard_pile.is_empty():
-				# 牌库和弃牌堆均空 → 跳过抽牌，不报错
-				return
-			var idx: int = _rng.randi_range(0, _discard_pile.size() - 1)
-			var card = _discard_pile[idx]
-			_discard_pile.remove_at(idx)
-			_deck.append(card)
-		if _deck.is_empty():
-			return
-		var drawn = _deck[0]
-		_deck.remove_at(0)
-		_hand.append(drawn)
+	_get_piles().draw_cards(count)
 
 
-## 初始化战斗牌库——接收卡组 ID 列表并洗牌。[br]
+## 初始化战斗牌库——接收卡组 ID 列表并洗牌。委托子模块。[br]
 ## [br][param card_ids] 卡组卡牌实例 ID 列表。[br]
-## [br]洗牌使用 _rng——set_rng_seed 后确定性可复现。
+## [br]洗牌使用 [code]_rng[/code]——[method set_rng_seed] 后确定性可复现。
 func init_deck(card_ids: Array) -> void:
-	_deck = card_ids.duplicate()
-	_discard_pile.clear()
-	_hand.clear()
-	# Fisher-Yates 洗牌
-	var n: int = _deck.size()
-	for i in range(n - 1, 0, -1):
-		var j: int = _rng.randi_range(0, i)
-		var tmp = _deck[i]
-		_deck[i] = _deck[j]
-		_deck[j] = tmp
+	_get_piles().init_deck(card_ids)
 
 
-## 发开局手牌——GDD §2「开局手牌：先手 4 张，后手 5 张」。<br>
-## [br][b]为什么需要显式发牌[/b]：GDD 抽牌表里「先手第 1 回合不抽牌」的前提是
-## 玩家手里[b]已经有[/b]开局手牌。此前该前提没有兑现——第 1 回合不抽牌就等于空手开局
-## （无牌可出），所以旧实现用「恒抽 2 张」绕过。本方法把开局手牌补上，
-## 抽牌表才能按 GDD 原样执行。<br>
-## [br][b]与 [method init_deck] 的分工[/b]：init_deck 只负责「洗牌 + 清手牌」
-## （既有 Story 001 契约，不改），发牌是它的下一步——单独成方法让
-## 「牌堆就绪」与「发牌」可以分别测试，也让 battle_start 能在牌堆为空时安全跳过。<br>
+## 发开局手牌——GDD §2「开局手牌：先手 4 张，后手 5 张」。委托子模块。[br]
 ## [br][b]牌堆不足时发多少算多少[/b]：不从弃牌堆返还（那会让开局凭空多出牌），
-## 有多少发多少——不足是牌组配置问题，应由组牌侧暴露。<br>
+## 有多少发多少——不足是牌组配置问题，应由组牌侧暴露。[br]
 ## [br][b]返回[/b]: 实际发出的张数（牌堆为空时为 0）。
 func deal_opening_hand() -> int:
-	var count: int = TurnEconomy.opening_hand_size(_is_first_player())
-	# 沿用既有抽牌路径（含牌库抽空返还与手牌追加语义）——不另开一条发牌实现，
-	# 否则「开局手牌」与「回合抽牌」的手牌顺序语义会分家。
-	var before: int = _hand.size()
-	_draw_cards(count)
-	return _hand.size() - before
+	return _get_piles().deal_opening_hand()
 
 
-## 先手标志——开战 config 供数（回合经济规则的输入）。
+## 先手标志——开战 config 供数（回合经济规则的输入）。委托子模块。
 func _is_first_player() -> bool:
-	return TurnEconomy.is_first_player(_battle_config)
+	return _get_piles().is_first_player()
 
 
-## 弃牌——将手牌中的指定卡牌移到弃牌堆。[br]
+## 弃牌——将手牌中的指定卡牌移到弃牌堆。委托子模块。[br]
 ## [br][param card_instance_id] 卡牌实例 ID。
 func discard_card(card_instance_id: int) -> void:
-	for i in range(_hand.size() - 1, -1, -1):
-		var card = _hand[i]
-		var cid: Variant = null
-		if card is Dictionary:
-			cid = card.get("card_instance_id", card.get("instance_id", -1))
-		elif card is int:
-			cid = card
-		elif card != null and card.has_method("get"):
-			cid = card.get("card_instance_id", -1)
-		if cid == card_instance_id:
-			_hand.remove_at(i)
-			_discard_pile.append(card)
-			return
-	push_warning("CombatSystem: discard_card card_instance_id=%d not found in hand" % card_instance_id)
+	_get_piles().discard_card(card_instance_id)
 
 
-## 洗牌——将弃牌堆全部洗回牌库，弃牌堆清空。
+## 洗牌——将弃牌堆全部洗回牌库，弃牌堆清空。委托子模块。
 func shuffle_discard_into_deck() -> void:
-	while not _discard_pile.is_empty():
-		var idx: int = _rng.randi_range(0, _discard_pile.size() - 1)
-		var card = _discard_pile[idx]
-		_discard_pile.remove_at(idx)
-		_deck.append(card)
+	_get_piles().shuffle_discard_into_deck()
 
 
-## 添加卡牌到牌库底部（绑定卡阵亡洗回——BindingManager 回调）。
+## 添加卡牌到牌库底部（绑定卡阵亡洗回——BindingManager 回调）。委托子模块。
 func add_card_to_deck(card_instance_id: int) -> void:
-	_deck.append(card_instance_id)
+	_get_piles().add_card_to_deck(card_instance_id)
 
 
-## 添加卡牌到弃牌堆（绑定卡覆盖进弃牌——BindingManager 回调）。
+## 添加卡牌到弃牌堆（绑定卡覆盖进弃牌——BindingManager 回调）。委托子模块。
 func add_card_to_discard(card_instance_id: int) -> void:
-	_discard_pile.append(card_instance_id)
+	_get_piles().add_card_to_discard(card_instance_id)
 
 
-## 设置牌库/弃牌堆/手牌（[b]deprecated[/b]——测试注入用，生产代码使用 init_deck）。
+## 设置牌库/弃牌堆/手牌（[b]deprecated[/b]——测试注入用，生产代码使用 init_deck）。委托子模块。
 func set_deck_state(deck: Array, discard: Array, hand: Array) -> void:
-	_deck = deck.duplicate()
-	_discard_pile = discard.duplicate()
-	_hand = hand.duplicate()
+	_get_piles().set_deck_state(deck, discard, hand)
 
 
-## 按存档快照原样恢复三堆牌——读档续战专用（顺序与内容都取存档值）。[br]
-## [br][b]与 [method init_deck] 的分工[/b]：[code]init_deck[/code] 是「开一场新仗」——
-## 拿本局卡组洗一遍再清空手牌；本方法是「接着打」——牌面已经在存档里了，
-## 洗牌会把它洗没（玩家攥着的那两张关键牌、已经垫进弃牌堆的那几张，全都会变）。[br]
-## [br][b]不洗牌、不发牌[/b]：顺序就是抽牌顺序（[method _draw_cards] 取
-## [code]_deck[0][/code]），动了顺序等于换了一副牌；开局手牌也已经在 [code]hand[/code] 里，
-## 再发一次等于凭空多几张。[br]
-## [br][b]参数顺序与 [method set_deck_state] 不同[/b]（那里是牌库 / 弃牌堆 / 手牌）：
-## 本方法的调用方（读档重建）按「手上 / 待抽 / 已弃」的自然顺序给，且带名字的类型
-## 让写错的调用点在编译期就红。[br]
+## 按存档快照原样恢复三堆牌——读档续战专用（顺序与内容都取存档值）。委托子模块。[br]
 ## [br][param p_hand] 存档里的手牌（实例 ID 列表，顺序即存档顺序）。[br]
 ## [param p_draw_pile] 存档里的抽牌堆。[br]
 ## [param p_discard_pile] 存档里的弃牌堆。
 func restore_piles(p_hand: Array, p_draw_pile: Array, p_discard_pile: Array) -> void:
-	_hand = p_hand.duplicate()
-	_deck = p_draw_pile.duplicate()
-	_discard_pile = p_discard_pile.duplicate()
+	_get_piles().restore_piles(p_hand, p_draw_pile, p_discard_pile)
 
 
 ## 设置攻击队列（测试桩注入——Story 003 接线 play_card 后替换）。
@@ -1186,19 +1128,19 @@ func get_attack_queue() -> Array:
 	return _attack_queue
 
 
-## 返回牌库（查询 API）。
+## 返回牌库（查询 API）。委托子模块。
 func get_deck() -> Array:
-	return _deck
+	return _get_piles().get_deck()
 
 
-## 返回弃牌堆（查询 API）。
+## 返回弃牌堆（查询 API）。委托子模块。
 func get_discard_pile() -> Array:
-	return _discard_pile
+	return _get_piles().get_discard_pile()
 
 
-## 返回手牌（查询 API）。
+## 返回手牌（查询 API）。委托子模块。
 func get_hand() -> Array:
-	return _hand
+	return _get_piles().get_hand()
 
 
 # === 出牌结算（Story 003）=======================================================
@@ -1511,6 +1453,13 @@ func _get_roster_ops() -> RefCounted:
 	if _roster_ops == null:
 		_roster_ops = preload("res://src/feature/combat/combat_roster_ops.gd").new(self)
 	return _roster_ops
+
+
+## 获取三堆牌子模块实例（抽牌 / 洗牌 / 弃牌 / 开局发牌 / 读档恢复——本轮拆出）。
+func _get_piles() -> RefCounted:
+	if _piles == null:
+		_piles = preload("res://src/feature/combat/combat_card_piles.gd").new(self)
+	return _piles
 
 
 # === 只读/落库子模块的公开取数口（战斗域之外的表现层装配用）=====================
