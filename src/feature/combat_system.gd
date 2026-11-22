@@ -239,6 +239,9 @@ var _hp_carryover: RefCounted = null
 ## 本场已掷骰但未发放的奖励（胜利后暂存，等待 UI 选择）。
 var _rolled_rewards: Dictionary = {}
 
+## 奖励结算子模块（掷骰 / 持久化 / 发放——本轮从本类拆出）。
+var _rewards: RefCounted = null
+
 ## 攻击队列减伤覆盖子模块（DEBT-CBT-018-8 残留——Attack 阶段写入防御方减伤来源）。
 var _attack_coverage: RefCounted = null
 
@@ -323,37 +326,24 @@ func set_rng_seed(seed_value: int) -> void:
 	_rng.seed = seed_value
 
 
-## 设置[b]奖励掷骰[/b]的种子（确定性测试用）。[br]
+## 设置[b]奖励掷骰[/b]的种子（确定性测试用）——转发 [CombatRewards]。[br]
 ## [br][b]与 [method set_rng_seed] 分开[/b]：洗牌流的消耗次数随对局走向变化，
 ## 共用一条流会让「固定种子 → 固定掉落」不成立。[br]
-## [br][b]调用后本场及后续各场都不再自动播种[/b]（显式种子优先）；调用
-## [method set_reward_rng] 注入实例同样视为显式。[br]
-## [br][b]生产自动播种口径[/b]（[method battle_start]）：[br]
-##   [code]reward_seed = GSM.meta.seed + 本进程已开战场数[/code]——同一存档的
-##   第一场、第二场……结果各自可复现，且不会两场共用同一串随机数；
-##   GSM / meta.seed 缺失时用 [code]本进程已开战场数[/code] 起步（仍可复现，
-##   只是不再跨存档对齐）。[br]
-## [br][b]一次胜利会消耗的随机数[/b]：灵石区间掷 1 次 [code]randi_range[/code]
-## （仅当配置了 [code]lingshi_min/max[/code]）；随后每张 [code]0 < chance < 1[/code]
-## 的卡牌掷 1 次 [code]randf()[/code]，顺序与配置数组一致（[code]chance >= 1[/code] /
-## [code]<= 0[/code] 与缺 [code]chance[/code] 的条目都不消耗）。
+## [br]播种口径、显式优先规则与一次胜利消耗的随机数次数见
+## [code]combat_rewards.gd[/code] 的 [method CombatRewards.set_reward_rng_seed] 文档。
 func set_reward_rng_seed(seed_value: int) -> void:
-	_reward_rng.seed = seed_value
-	_reward_rng_explicit = true
+	_get_rewards().set_reward_rng_seed(seed_value)
 
 
-## 注入奖励掷骰 RNG 实例（测试用——自行决定种子与推进方式）。[br]
+## 注入奖励掷骰 RNG 实例（测试用——自行决定种子与推进方式）——转发 [CombatRewards]。[br]
 ## [br]注入后 [method battle_start] 不再自动播种，直到 [method reset_reward_rng]。
 func set_reward_rng(p_rng: RandomNumberGenerator) -> void:
-	_reward_rng = p_rng if p_rng != null else RandomNumberGenerator.new()
-	_reward_rng_explicit = p_rng != null
+	_get_rewards().set_reward_rng(p_rng)
 
 
-## 恢复自动播种（注入/显式种子之后的复位入口——测试隔离用）。
+## 恢复自动播种（注入/显式种子之后的复位入口——测试隔离用）——转发 [CombatRewards]。
 func reset_reward_rng() -> void:
-	_reward_rng = RandomNumberGenerator.new()
-	_reward_rng_explicit = false
-	_reward_battle_count = 0
+	_get_rewards().reset_reward_rng()
 
 
 ## 设置自动推进使能——测试时设 false 禁用 call_deferred。
@@ -736,206 +726,85 @@ func resume_auto_advance() -> void:
 	_schedule_auto_advance()
 
 
-## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。[br]
-## [br]Sprint 8 Story 005 接线——通过 ResourceSystem / CultivationSystem 派生奖励。[br]
-## [br][b]胜利时[/b]：只掷骰不发放，结果存 _rolled_rewards 并持久化到 GSM battle 字段；[br]
+## 战斗结果结算——按 VICTORY/DEFEAT/RETREAT 分支。转发 [CombatRewards]。[br]
+## [br][b]胜利时[/b]：只掷骰不发放，结果存 [code]_rolled_rewards[/code] 并持久化到
+## GSM battle 字段；[br]
 ## [b]失败/撤退时[/b]：不发奖、不掷骰，只带 retain_ratio。[br]
-## [br][b]返回[/b]: rewards Dictionary。
+## [br]实现与口径（幂等守卫、掷骰顺序）见 [code]combat_rewards.gd[/code] 的
+## [method CombatRewards.settle_result]。
 func _settle_result(result: int) -> Dictionary:
-	var rewards: Dictionary = {"result": result}
-	if result != CombatResult.VICTORY:
-		# 失败/撤退——保留 50% 资源（不发奖、不掷骰）
-		rewards["retain_ratio"] = 0.5
-		return rewards
-	# 幂等守卫：同一场重复调用不再掷骰、不再发放
-	if _is_rewards_settled():
-		rewards["grant_skipped"] = true
-		return rewards
-	_mark_rewards_settled()
-	# 胜利时只掷骰不发放
-	var rolled: Dictionary = RewardRoller.roll(_configured_rewards(), _reward_rng)
-	# 未命中条目也要带展示名/稀有度——结算界面要说明「没抽到什么」
-	RewardRoller.enrich(rolled.get("cards_missed", []), _get_card_system())
-	# 存入内部状态
-	_rolled_rewards = rolled.duplicate(true)
-	# 持久化到 GSM battle 字段
-	_persist_rolled_rewards(rolled)
-	# 返回掷骰结果（不含发放标记，因为还没发放）
-	rewards.merge(rolled, true)
-	return rewards
+	return _get_rewards().settle_result(result)
 
 
-## 本场是否已结算过奖励（重复 [method battle_end] 的幂等守卫）。[br]
-## [br][b]没开过战不参与守卫[/b]：序号为 0 说明没有「场」的概念（测试桩、
-## 直接调 [method battle_end] 的旧用例），重复调用照常走结算——此时掉落本身也是空的。[br]
-## [br][b]已结束的场次直接调 [method _settle_result] 也算重复[/b]：`_battle_config`
-## 在战斗结束后不清（旧口径），比对序号正是为了不让「上一场的配置」被再发一次。
+## 本场是否已结算过奖励（重复 [method battle_end] 的幂等守卫）——转发 [CombatRewards]。
 func _is_rewards_settled() -> bool:
-	return _battle_serial != 0 and _rewards_settled_for == _battle_serial
+	return _get_rewards().is_rewards_settled()
 
 
-## 标记本场已结算——记下当前开战序号；下一场 [method battle_start] 递增后自然失效。
+## 标记本场已结算——转发 [CombatRewards]。
 func _mark_rewards_settled() -> void:
-	_rewards_settled_for = _battle_serial
+	_get_rewards().mark_rewards_settled()
 
 
-## 持久化已掷骰奖励到 GSM battle 字段——供 UI 选择时读取。
+## 持久化已掷骰奖励到 GSM battle 字段——转发 [CombatRewards]。
 func _persist_rolled_rewards(p_rolled: Dictionary) -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null or not gsm.has_method(&"set"):
-		push_warning("CombatSystem: GSM 不可用，奖励掷骰结果无法持久化")
-		return
-	if gsm.battle == null:
-		gsm.battle = {}
-	var battle: Dictionary = gsm.battle
-	battle["rolled_rewards"] = p_rolled.duplicate(true)
-	gsm.set("battle", battle)
+	_get_rewards().persist_rolled_rewards(p_rolled)
 
 
-## 从 GSM battle 字段读取已掷骰奖励——供 grant_reward_selection 使用。
+## 从 GSM battle 字段读取已掷骰奖励——转发 [CombatRewards]。
 func _load_rolled_rewards() -> Dictionary:
-	var gsm: Node = _get_gsm()
-	if gsm == null or gsm.battle == null:
-		return {}
-	var battle: Dictionary = gsm.battle
-	return battle.get("rolled_rewards", {})
+	return _get_rewards().load_rolled_rewards()
 
 
-## 奖励选择发放——index>=0 发灵石+修为+该张卡，index<0 只发灵石+修为。[br]
-## [br]发放后清空 _rolled_rewards（重复调用返回 no_rolled_rewards 且不重复发奖）。[br]
+## 奖励选择发放——index>=0 发灵石+修为+该张卡，index<0 只发灵石+修为。转发 [CombatRewards]。[br]
+## [br]发放后清空 [code]_rolled_rewards[/code]（重复调用返回 no_rolled_rewards
+## 且不重复发奖）。[br]
 ## [br][param index] 卡牌索引（>=0 选择该卡，<0 跳过卡牌）。[br]
 ## [br][b]返回[/b]: [code]{no_rolled_rewards, lingshi_granted, cultivation_granted,
 ## cards, cards_failed}[/code]——no_rolled_rewards=true 表示已发放或无掷骰结果。
 func grant_reward_selection(index: int) -> Dictionary:
-	var result: Dictionary = {"no_rolled_rewards": true}
-	# 幂等守卫：已清空或无掷骰结果
-	if _rolled_rewards.is_empty():
-		var loaded: Dictionary = _load_rolled_rewards()
-		if loaded.is_empty():
-			return result
-		_rolled_rewards = loaded.duplicate(true)
-	if _rolled_rewards.is_empty():
-		return result
-
-	# 准备发放内容——灵石和修为始终发放，卡牌按 index 选择
-	var to_grant: Dictionary = _rolled_rewards.duplicate(true)
-	var cards: Array = to_grant.get("cards", [])
-	var selected_cards: Array = []
-
-	if index >= 0 and index < cards.size():
-		# 选择指定卡牌
-		selected_cards.append(cards[index])
-	else:
-		# 跳过卡牌
-		selected_cards = []
-
-	to_grant["cards"] = selected_cards
-
-	# 发放
-	var granted: Dictionary = RewardRoller.apply(to_grant, _get_resource_system(),
-			_get_cultivation_system(), _get_card_system(), _get_gsm())
-
-	# 清空掷骰结果（幂等）
-	_rolled_rewards.clear()
-	_clear_rolled_rewards_from_gsm()
-
-	# 返回发放结果
-	result["no_rolled_rewards"] = false
-	result["lingshi_granted"] = bool(granted.get("lingshi_granted", true))
-	result["cultivation_granted"] = bool(granted.get("cultivation_granted", true))
-	result["cards"] = granted.get("cards", [])
-	result["cards_failed"] = granted.get("cards_failed", [])
-	return result
+	return _get_rewards().grant_reward_selection(index)
 
 
-## 清空 GSM battle 字段中的 rolled_rewards——发放后调用。
+## 清空 GSM battle 字段中的 rolled_rewards——转发 [CombatRewards]。
 func _clear_rolled_rewards_from_gsm() -> void:
-	var gsm: Node = _get_gsm()
-	if gsm == null or gsm.battle == null:
-		return
-	var battle: Dictionary = gsm.battle
-	battle.erase("rolled_rewards")
-	gsm.set("battle", battle)
+	_get_rewards().clear_rolled_rewards_from_gsm()
 
 
-## 本场奖励掷骰播种——每开一场推进一步（见 [method set_reward_rng_seed]）。[br]
-## [br][b]显式种子/注入实例优先[/b]：测试设过种子后不被开战覆盖，
-## 否则「固定种子」的口径在第二场就断了。
+## 本场奖励掷骰播种——每开一场推进一步（见 [method set_reward_rng_seed]）——转发 [CombatRewards]。
 func _seed_reward_rng() -> void:
-	_reward_battle_count += 1
-	if _reward_rng_explicit:
-		return
-	_reward_rng.seed = _reward_seed_base() + _reward_battle_count
+	_get_rewards().seed_reward_rng()
 
 
-## 自动播种基数——[code]GSM.meta.seed[/code]（缺失/类型不符时为 0）。[br]
-## [br][b]为什么要全局种子参与[/b]：不同存档（不同轮次）应得到不同掉落；
-## 同一存档内按开战场数递增，保证各场互不相同且可复现。
-func _reward_seed_base() -> int:
-	var gsm: Node = _get_gsm()
-	if gsm == null:
-		return 0
-	var meta: Variant = gsm.get("meta")
-	if not (meta is Dictionary):
-		return 0
-	return int((meta as Dictionary).get("seed", 0))
-
-
-## 计算灵石奖励——[b]由开战配置的 [code]rewards[/code] 决定[/b]（探索节点掉落）。[br]
-## [br][b]为什么读配置而不是现算[/b]：掉落属于「哪一格打哪一批人、给什么」的
-## 探索侧数据（[code]combat_launch_context.gd[/code] 在节点生成时定档）；战斗系统
-## 只负责结算，不重复一套掉落表。配置缺失时为 0（不臆造奖励）。[br]
+## 计算灵石奖励——[b]由开战配置的 [code]rewards[/code] 决定[/b]（探索节点掉落）。转发 [CombatRewards]。[br]
 ## [br][b]这是预览值[/b]：配置了区间时返回区间中值；实得值见 [method _settle_result]
-## 掷骰后的 [code]rewards.lingshi[/code]（两者在结算面板上都有展示口径）。[br]
-## [br][b]为什么区间也要兜底[/b]：探索侧经 [code]EncounterFields[/code] 写出的配置
-## 同时带中值与区间，但手写配置可能只给区间——只读 [code]lingshi[/code] 会让预览恒为 0，
-## 与实得对不上。
+## 掷骰后的 [code]rewards.lingshi[/code]（两者在结算面板上都有展示口径）。
 func _calculate_lingshi_reward() -> int:
-	var rewards: Dictionary = _configured_rewards()
-	if rewards.has("lingshi"):
-		return maxi(int(rewards.get("lingshi", 0)), 0)
-	if rewards.has("lingshi_min") or rewards.has("lingshi_max"):
-		var lo: int = maxi(int(rewards.get("lingshi_min", 0)), 0)
-		var hi: int = maxi(int(rewards.get("lingshi_max", 0)), 0)
-		return int(round((float(lo) + float(hi)) * 0.5))
-	return 0
+	return _get_rewards().calculate_lingshi_reward()
 
 
-## 计算修为奖励——同上，读开战配置 [code]rewards.cultivation[/code]。
+## 计算修为奖励——同上，读开战配置 [code]rewards.cultivation[/code]——转发 [CombatRewards]。
 func _calculate_cultivation_reward() -> int:
-	return maxi(_configured_rewards().get("cultivation", 0), 0)
+	return _get_rewards().calculate_cultivation_reward()
 
 
-## 计算卡牌掉落配置——读开战配置 [code]rewards.cards[/code]（字典列表深拷贝）。[br]
+## 计算卡牌掉落配置——读开战配置 [code]rewards.cards[/code]（字典列表深拷贝）。转发 [CombatRewards]。[br]
 ## [br][b]返回的是配置清单，不是实得[/b]：每项 [code]{card_id, chance}[/code]
 ## 是否到手由 [method _settle_result] 的掷骰决定。
 func _calculate_card_drops() -> Array:
-	var raw: Variant = _configured_rewards().get("cards", [])
-	if not (raw is Array):
-		return []
-	return (raw as Array).duplicate(true)
+	return _get_rewards().calculate_card_drops()
 
 
-## 开战配置里的掉落字典（缺失/类型不符时为空——结算侧按 0/空处理）。
+## 开战配置里的掉落字典（缺失/类型不符时为空——结算侧按 0/空处理）——转发 [CombatRewards]。
 func _configured_rewards() -> Dictionary:
-	var raw: Variant = _battle_config.get("rewards", {})
-	return raw if raw is Dictionary else {}
+	return _get_rewards().configured_rewards()
 
 
-## 应用胜利奖励——[b]保留为公开测试接缝[/b]（旧测试直调它验证资源写入）。[br]
+## 应用胜利奖励——[b]保留为公开测试接缝[/b]（旧测试直调它验证资源写入）。转发 [CombatRewards]。[br]
 ## [br][b]生产路径不再走这里[/b]：结算改由 [constant RewardRoller] 统一掷骰 + 发放
 ## （灵石/修为/卡牌三者在同一处），本方法只做「金额已知时发一笔」的兼容入口。
 func _apply_victory_rewards(rewards: Dictionary) -> void:
-	var lingshi: int = int(rewards.get("lingshi", 0))
-	if lingshi > 0:
-		var rs = _get_resource_system()
-		if rs != null and rs.has_method("add_resource"):
-			rs.add_resource(&"ling_shi", lingshi)
-	var cultivation: int = int(rewards.get("cultivation", 0))
-	if cultivation > 0:
-		var cs = _get_cultivation_system()
-		if cs != null and cs.has_method("gain_cultivation"):
-			cs.gain_cultivation(cultivation, "battle_victory")
+	_get_rewards().apply_victory_rewards(rewards)
 
 
 ## 创建战斗快照——SaveLoad.create_battle_snapshot(GSM.serialize())（AC-004）。[br]
@@ -1685,6 +1554,14 @@ func _get_attack_coverage() -> RefCounted:
 	if _attack_coverage == null:
 		_attack_coverage = preload("res://src/feature/combat/combat_attack_coverage.gd").new(self)
 	return _attack_coverage
+
+
+## 获取奖励结算子模块实例（掷骰 / 持久化 / 发放 / 奖励 RNG——本轮拆出）。[br]
+## [br][b]为什么惰性[/b]：同其余子模块口径——未开战/未结算的战斗不该多建对象。
+func _get_rewards() -> RefCounted:
+	if _rewards == null:
+		_rewards = preload("res://src/feature/combat/combat_rewards.gd").new(self)
+	return _rewards
 
 
 # === 只读/落库子模块的公开取数口（战斗域之外的表现层装配用）=====================
