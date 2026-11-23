@@ -38,6 +38,12 @@ const NAME_BASE_SIZE: int = 13
 const STAT_BASE_SIZE: int = 12
 const BADGE_BASE_SIZE: int = 11
 
+## 焦点环颜色（松石青——与 [code]hand_card.gd[/code] / [code]map_card.gd[/code] 同色，
+## 全项目「这一格是键盘游标所在」只用这一种颜色）。
+const FOCUS_RING_COLOR: Color = Color(0.35, 0.85, 0.8)
+## 焦点环线宽（px——比状态边框粗，一眼分得出「边框」与「焦点」）。
+const FOCUS_RING_WIDTH: float = 3.0
+
 ## === 状态视觉常量（GDD §8 4 态表）==========================================
 
 ## 已选边框色（金色高亮）。
@@ -72,6 +78,16 @@ const MARK_UNAVAILABLE: String = "💀"
 
 ## 角色实例 ID（card_instance_id）。
 var character_id: int = -1
+## 玩家左键点了这张卡——由 [DeployPanel] 接住去 [code]toggle_selection[/code]。[br]
+## [br][b]为什么需要这条信号[/b]：卡片此前只接了 [code]mouse_entered[/code] /
+## [code]mouse_exited[/code]（悬停提示），而 [code]mouse_filter = STOP[/code] 会把
+## 左键[b]吞掉[/b]——玩家点卡什么都不发生。备战阶段玩家唯一能做的事就是改选出战
+## 角色，点不动等于这一屏只有「确认出战」可操作。[br]
+## [br][b]本卡不决策[/b]（零状态所有权）：能不能选、超没超上限、要不要走替换流程
+## 全归面板的 [code]toggle_selection[/code]，本卡只上报「有人点了这张」。
+signal card_pressed
+
+
 ## 渲染快照（由 [method apply_data] 下发）。
 var data: Dictionary = {}
 ## 当前 4 态（[DeployPanelRules] 常量之一）。
@@ -81,7 +97,17 @@ var selection_state: String = Rules.STATE_SELECTABLE
 func _init() -> void:
 	custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 	size = custom_minimum_size
+	# 鼠标左键由卡自己收（见 [signal card_pressed]）——悬停提示与点选同属本卡。
+	# [b]STOP 是必需的[/b]：IGNORE 会让点击穿透到面板底下，玩家点卡仍然什么都不发生。
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# 键盘/手柄（.claude/rules/ui-code.md 双输入）：纯 Control 默认 FOCUS_NONE，
+	# 显式开启才能被 Tab 走到、才收得到 ui_accept；焦点环自绘（引擎不为自绘控件
+	# 画焦点视觉，同 [code]hand_card.gd[/code] 口径）。
+	focus_mode = Control.FOCUS_ALL
+	focus_entered.connect(_on_focus_changed)
+	focus_exited.connect(_on_focus_changed)
+	gui_input.connect(_on_gui_input)
 	# 绘制入口——状态变化只需 queue_redraw（零轮询）
 	draw.connect(_draw_card)
 
@@ -170,6 +196,33 @@ func _draw_card() -> void:
 				Vector2(badge_rect.position.x + 3, badge_rect.position.y + 13),
 				str(binding_count), HORIZONTAL_ALIGNMENT_LEFT, -1,
 				_font_size(BADGE_BASE_SIZE), Color(0.95, 0.85, 0.55))
+	# 焦点环画在最后（压在所有内容之上——键盘游标所在的那一格要一眼找得到）
+	if has_focus():
+		draw_rect(Rect2(Vector2.ZERO, size), FOCUS_RING_COLOR, false, FOCUS_RING_WIDTH)
+
+
+## === 内部：输入 ============================================================
+
+## 左键点击 / 键盘确认（Tab 走到本卡后按 Enter / 空格）。
+## [br][b]只上报不决策[/b]：选中与否归面板的 [code]toggle_selection[/code]。
+## [br][b]为什么同时认 [code]ui_accept[/code][/b]：焦点在纯 [Control] 上时引擎内置的
+## 焦点导航不会替它把确认键翻译成点击（那是 [Button] 的行为），不显式处理等于
+## 键盘玩家能选中这一格却按不动。
+func _on_gui_input(p_event: InputEvent) -> void:
+	if p_event is InputEventMouseButton:
+		var mouse: InputEventMouseButton = p_event
+		if mouse.button_index == MOUSE_BUTTON_LEFT and mouse.pressed:
+			accept_event()
+			card_pressed.emit()
+		return
+	if p_event.is_action_pressed(&"ui_accept"):
+		accept_event()
+		card_pressed.emit()
+
+
+## 焦点进出——重画焦点环（引擎不为自绘控件画焦点视觉）。
+func _on_focus_changed() -> void:
+	queue_redraw()
 
 
 ## 响应式字号——统一经 [CombatUiFont]（story 001 共享模块条款：组件内禁内联字号）。

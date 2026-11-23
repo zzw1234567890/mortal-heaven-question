@@ -171,3 +171,27 @@ func _on_slot_pressed(p_slot_type: int, p_slot_id: int) -> void:
 func _on_back_pressed() -> void:
 	close()
 	back_requested.emit()
+
+
+## Esc 关闭——与「返回」按钮同一个出口（[signal back_requested]）。[br]
+## [br][b]为什么必须有[/b]：主菜单的读档面板此前只认「返回」按钮；它的
+## [code]mouse_filter = STOP[/code] 把键盘事件也一并吃掉，玩家按 Esc 既关不掉面板、
+## 也走不到主菜单那一层（[code]MainMenu[/code] 不处理 Esc），面板就此挂住全屏。[br]
+## [br][b]事件层级 = [code]_input[/code] 而不是 [code]_unhandled_input[/code][/b]：
+## 主菜单态下锁栈是空的，[code]InputManager._input[/code] 的 UI_NAV 判定会通过、
+## 它把 Esc 标成已处理并 [code]emit pause_requested[/code]——[code]_unhandled_input[/code]
+## 那层根本收不到（主菜单没有暂停菜单接管，这一下 Esc 就此静默消失）。而场景节点的
+## [code]_input[/code] 实测早于 Autoload 的 [code]_input[/code]，是本面板唯一能拿到的层
+## （先例 [code]map_clear_panel_screen.gd[/code] 同源理由：消费走
+## [method Viewport.set_input_as_handled]，顺带挡住 InputManager）。[br]
+## [br][b]与 [code]SettingsPanel[/code] 的差别[/b]：那个面板自己 push 了 MODAL 锁，
+## InputManager 因此放行、[code]_unhandled_input[/code] 收得到；本面板没有自己的锁
+## （暂停菜单下靠菜单那把），故必须走在更前的一层。[br]
+## [br][b]只在自己可见时吃[/b]：隐藏着还消费 Esc 会把暂停菜单那层关菜单的 Esc 吞掉。
+func _input(p_event: InputEvent) -> void:
+	if not visible:
+		return
+	if p_event is InputEventKey and p_event.pressed and not p_event.echo \
+			and (p_event as InputEventKey).keycode == KEY_ESCAPE:
+		get_viewport().set_input_as_handled()
+		_on_back_pressed()

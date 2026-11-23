@@ -257,7 +257,12 @@ func _roster_line(entry: Dictionary) -> String:
 ## 本地化 epic 落地后统一替换（同 [code]PlaceholderScene[/code] 的 TEXT_* 豁免口径）。
 func summary_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
-	lines.append("结局: %s (result=%d)" % [title(), result])
+	# [b]只写结局名，不写 result 枚举值[/b]：这一份既进日志（[code]battle_record_scene.gd[/code]
+	# 逐行 print）也[b]直接进玩家可见的摘要标签[/b]——带上 `(result=1)` 的那版，
+	# 玩家在结算屏上读到的第一行是「结局: 战斗胜利 (result=1)」，一个没人看得懂的
+	# 开发者字段（真机试玩走查在结算屏上截到）。结局名已经是玩家要的全部信息；
+	# 需要枚举值的调用方直接读 [member result]，不必从文案里反解。
+	lines.append("结局: %s" % title())
 	# 奖励段插在结局之后、战绩之前——玩家最关心「拿到了什么」
 	lines.append_array(PackedStringArray(reward_lines()))
 	lines.append("回合数: %d" % turn_count)

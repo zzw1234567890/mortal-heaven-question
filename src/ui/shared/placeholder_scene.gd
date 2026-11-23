@@ -104,6 +104,18 @@ var hint_label: Label = null
 
 func _ready() -> void:
 	_build()
+	# [b]落地即给键盘/手柄玩家一个可操作点[/b]：[method _build] 里没有一处
+	# [code]grab_focus[/code]，整屏的焦点停在 [code]none[/code]——键盘玩家进到结算 /
+	# 战败屏后 Tab 之前按回车什么都不发生，唯一的出路是用鼠标点「返回」。
+	# 这跟「点不动」是一回事，只是发生在键盘上。[br]
+	# [br][b]为什么在 [method _ready] 而不是 [_build][/b]：[code]_build[/code] 被
+	# [code]battle_record_scene.gd[/code] 覆写并追加摘要/战报，若在基类 [_build] 里抓焦点，
+	# 那时子树还没长全；等在 [code]_ready[/code] 末尾抓，无论子类追加了什么都已经在树上。[br]
+	# [br][b]已经有焦点的场景不抢[/b]：视口当前焦点非空说明别处（如弹窗）正在接管，
+	# 本屏不越权。
+	if return_button != null and get_viewport() != null \
+			and get_viewport().gui_get_focus_owner() == null:
+		return_button.grab_focus()
 
 
 ## 构建静态界面（一次——`_ready` 时调用；[member screen_id] 已由 .tscn 赋值）。

@@ -245,8 +245,21 @@ func _rebuild_cards() -> void:
 		card.apply_data(int(entry.get("character_id", -1)), entry)
 		card.mouse_entered.connect(_on_card_hover.bind(card, true))
 		card.mouse_exited.connect(_on_card_hover.bind(card, false))
+		# [b]点选接线[/b]：卡自己不决策，只上报「有人点了这张」——
+		# 能不能选 / 超没超上限 / 走不走替换流程全归 [method toggle_selection]。
+		# 不接的话，mouse_filter = STOP 会让左键被卡吞掉：玩家点卡什么都不发生。
+		card.connect(&"card_pressed",
+				_on_card_pressed.bind(int(entry.get("character_id", -1))))
 		_grid.add_child(card)
 		_cards.append(card)
+
+
+## 卡片被点/被键盘确认——转发到公开的选中入口。[br]
+## [br][b]为什么不直接调 [method toggle_selection][/b]：签名带 [code]character_id[/code]，
+## 而按钮信号不带参数——绑定一次比在每个卡实例上装 lambda 干净（同
+## [code]map_select_cards[/code] 的 [code]card_activated[/code] 口径）。
+func _on_card_pressed(p_character_id: int) -> void:
+	toggle_selection(p_character_id)
 
 
 ## === 内部：刷新 ============================================================
