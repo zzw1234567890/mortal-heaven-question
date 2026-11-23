@@ -60,6 +60,15 @@ var input_frozen: bool = false:
 		input_frozen = value
 		if input_frozen and _panning:
 			_panning = false
+## 视角是否仍归自动整图适配管。[code]true[/code] = 上一次写视角的是
+## [method fit_to_content]（含它发起的平滑过渡），[code]false[/code] = 玩家已接管。
+## [br]
+## [br][b]为什么用归属标记而不是比较数值[/b]：复位走 0.25s 平滑过渡，
+## 过渡途中 [code]zoom/offset[/code] 是插值中间值、不等于目标值；比较数值会
+## 把「正在飞向整图」误判成「玩家接管」，此时尺寸变化就不再重适配。
+## 标记由 [method _apply_transform] 统一清除（所有写视角的路径都经它），
+## 由 [method fit_to_content] 在写入后认回——单一判定点，不靠浮点巧合。
+var _auto_fit_owned: bool = false
 
 
 ## 注入 stub DAG 并初始整图适配（透传 renderer.setup）。
@@ -82,6 +91,8 @@ func fit_to_content(instant: bool = false) -> void:
 	var content_center: Vector2 = content.position + content.size * 0.5
 	var target_offset: Vector2 = size * 0.5 - content_center * target_zoom
 	_apply_transform(target_zoom, target_offset, RESET_TWEEN_SEC if not instant else 0.0)
+	# 认领视角（_apply_transform 一律清掉归属——见该函数说明）
+	_auto_fit_owned = true
 
 
 ## === 内部 ====================================================================
@@ -101,7 +112,9 @@ func _notification(what: int) -> void:
 	# 视口尺寸变化后重新整图适配：setup 时的 size 可能还是设计尺寸或 0
 	# （进树前的布局尺寸），只适配一次会让内容停在左上角并被裁掉——窗口缩放、
 	# 全屏切换、分辨率不同都会踩到（玩家反馈「节点只显示一部分、挤在左边」）。
-	if what == NOTIFICATION_RESIZED and renderer != null:
+	# 但只在「视角仍归自动适配管」时重适配：玩家手动缩放/平移过就不动，
+	# 否则拖窗口边框会把正在看的支线拽走（见 _auto_fit_owned 的文档）。
+	if what == NOTIFICATION_RESIZED and renderer != null and _auto_fit_owned:
 		fit_to_content(true)
 
 func _gui_input(event: InputEvent) -> void:
@@ -153,8 +166,12 @@ func _zoom_at(cursor: Vector2, factor: float) -> void:
 			- (cursor - offset) * (target_zoom / zoom)
 	_apply_transform(target_zoom, target_offset, ZOOM_TWEEN_SEC)
 
-## 应用缩放/偏移（renderer.scale/position 单一写入点）+ 标签联动。
+## 应用缩放/偏移（renderer.scale/position 单一写入点）+ 标签联动。[br]
+## [br][b]顺带放弃自动适配的视角归属[/b]：所有玩家输入（滚轮缩放、拖拽平移、边缘平移）
+## 都经这里，而 [method fit_to_content] 在调用之后会立刻把归属认回去——
+## 于是「归属为真」只在整图适配写下的那一刻成立。
 func _apply_transform(target_zoom: float, target_offset: Vector2, tween_sec: float) -> void:
+	_auto_fit_owned = false
 	if tween_sec <= 0.0:
 		_kill_tween()
 		zoom = target_zoom

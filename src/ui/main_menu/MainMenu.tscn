@@ -1,8 +1,10 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_menu/main_menu.gd" id="1_script"]
 [ext_resource type="Script" path="res://src/ui/main_menu/corrupt_save_dialog.gd" id="2_corrupt_dialog"]
 [ext_resource type="Script" path="res://src/ui/shared/app_backdrop.gd" id="3_backdrop"]
+[ext_resource type="Script" path="res://src/ui/main_menu/world_seam.gd" id="4_seam"]
+[ext_resource type="Texture2D" path="res://assets/environments/backgrounds/menu/main_menu_cloud_sea.png" id="5_cloud_sea"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -24,13 +26,47 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_backdrop")
 
+[node name="WorldDisplay" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_cloud_sea")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="WorldScrim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 0
+anchor_bottom = 1.0
+offset_right = 748.0
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_backdrop")
+
+[node name="WorldSeam" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 0
+anchor_right = 0.8
+anchor_bottom = 1.0
+offset_left = 748.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 0
+script = ExtResource("4_seam")
+
 [node name="LayoutAnchor" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 96.0
 offset_top = 120.0
-offset_right = 640.0
-offset_bottom = 608.0
+offset_right = 748.0
+offset_bottom = 696.0
 
 [node name="TitleLabel" type="Label" parent="LayoutAnchor"]
 layout_mode = 1
