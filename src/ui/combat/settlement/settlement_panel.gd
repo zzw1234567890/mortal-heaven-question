@@ -2,20 +2,20 @@ class_name SettlementPanel
 extends Control
 ## SettlementPanel —— 胜利/战败结算面板（combat-ui-layout Story 008）。
 ##
-## [b]职责[/b]：两类结算面板的视觉框架与状态渲染——胜利面板（战利品三选一
-## 等宽网格 + 0.5s 延迟可点 + 选中高亮 + 确认/跳过按钮）与战败面板（损失摘要
-## + 返回探索按钮）。判定全部委托 [SettlementRules]（Logic 内核，BLOCKING 单测）；
-## 外框由 [SettlementFrame] 构建、控件树由 [SettlementPanelView] 搭建；
-## 开合由 [SettlementFade] 驱动；本面板只编排与转发点击。[br]
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：数据由宿主按信号载荷下发；
-## 选中态与延迟窗口是瞬态交互状态（§2.1 豁免）——确认前不写任何系统。[br]
-## [br][b]零轮询[/b]（ADR-0031 §3）：0.5s 延迟由一次性 [Timer] 驱动，开合为 Tween。[br]
-## [br][b]不自动关闭[/b]（AC-10 / GDD「无穷」）：只在玩家点击确认/跳过/返回时关闭。[br]
-## [br][b]确认后的持久写入归 interaction epic[/b]（Out of Scope）：只发信号。
+## [b]职责[/b]：两类面板的视觉框架与状态渲染。判定全部委托 [SettlementRules]（Logic
+## 内核，BLOCKING 单测）；外框 [SettlementFrame] 建、控件树 [SettlementPanelView] 搭、
+## 开合 [SettlementFade] 驱动——本面板只编排与转发点击。[br]
+## [br][b]两段分工[/b]（DEBT-CUI-008-3）：胜利面板先给「要挑的那一份」（选择段标题按
+## 实际候选数写 + 网格），确认后才换成「已入账」清单——顺序即语义。[br]
+## [br][b]零状态所有权[/b]（ADR-0031 §2）：数据由宿主按信号载荷下发；选中态与延迟窗口
+## 是瞬态交互状态（§2.1 豁免），确认前不写任何系统。[br]
+## [br][b]零轮询[/b]（§3）：0.5s 延迟由一次性 [Timer] 驱动，开合为 Tween。[br]
+## [br][b]不自动关闭[/b]（AC-10）：只在玩家点确认/跳过/返回时关闭；持久写入归
+## interaction epic（Out of Scope）——此处只发信号。
 ##
 ## @experimental
-## 来源: ADR-0031、design/gdd/combat-ui-system.md §9 战斗结算面板 /
-## §边界情况（均匀网格）/ §调优参数、combat-ui-layout Story 008（AC-1~AC-5/AC-10）。
+## 来源: ADR-0031、design/gdd/combat-ui-system.md §9、
+## Story 008（AC-1~AC-5/AC-10）、DEBT-CUI-008-3。
 
 const Rules := preload("res://src/ui/combat/shared/settlement_rules.gd")
 const View := preload("res://src/ui/combat/settlement/settlement_panel_view.gd")
@@ -50,15 +50,14 @@ const DEFEAT_PANEL_HEIGHT: float = 320.0
 
 ## 当前面板种类（[SettlementRules.KIND_*]）。
 var kind: StringName = Rules.KIND_NONE
-## 战利品选项快照。
+## 战利品选项快照（与 [member loot_options] 同序的卡片见 [member _cards]）。
 var loot_options: Array = []
 ## 当前选中下标（-1 = 未选中）。
 var selected_index: int = -1
 ## 是否已过 0.5s 延迟窗口。
 var loot_ready: bool = false
-## 延迟窗口已走过的秒数（[b]阈值判定唯一入口[/b]是
-## [method SettlementRules.loot_clickable]——本字段只承载「走了多久」，
-## 不在面板内重复写 0.5s 阈值语义）。
+## 延迟窗口已走过的秒数（阈值判定唯一入口是 [method SettlementRules.loot_clickable]
+## ——本字段只承载「走了多久」，不在面板内重写 0.5s 语义）。
 var _elapsed_sec: float = 0.0
 ## 减少动态偏好（开合动画直跳终态）。
 var reduce_motion: bool = false
@@ -80,6 +79,8 @@ var skip_button: Button = null
 var defeat_lines_label: Label = null
 ## 本场奖励汇总（实得 / 未抽到 / 未入库——仅胜利面板显示）。
 var reward_lines_label: Label = null
+## 选择段标题（「本次奖励：N 选 1」/「这份直接带走」——仅胜利面板且候选非空时显示）。
+var pick_title_label: Label = null
 ## 外框（[SettlementFrame.build] 返回）。
 var frame: Control = null
 
@@ -111,6 +112,7 @@ func _build() -> void:
 	loot_grid = parts["loot_grid"] as VBoxContainer
 	defeat_lines_label = parts["defeat_lines"] as Label
 	reward_lines_label = parts["reward_lines"] as Label
+	pick_title_label = parts["pick_title"] as Label
 	confirm_button = parts["confirm_button"] as Button
 	skip_button = parts["skip_button"] as Button
 	loot_delay_timer = parts["loot_delay_timer"] as Timer
@@ -124,10 +126,12 @@ func _build() -> void:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ## 打开胜利结算面板。[br]
-## [param options]: 战利品选项列表（3 项——少于/多于 3 项也按网格流式排布）。[br]
+## [param options]: 战利品选项列表（按实际数量排布——1 项时没有选择器，
+## 标题写「这份直接带走」；≥2 项写「N 选 1」）。[br]
 ## [param deck_count]: 当前卡组张数（卡组满判定）。[br]
 ## [param deck_limit]: 当前境界卡组上限。[br]
 ## [param reward_lines]: 本场奖励行（空 = 隐藏该段——旧调用方照常工作）。
+## 此处是该段的[b]入账前[/b]形态（前缀「本场奖励（尚未入账）：」）。
 func show_victory(options: Array, deck_count: int, deck_limit: int,
 		reward_lines: Array = []) -> void:
 	kind = Rules.KIND_VICTORY
@@ -136,14 +140,18 @@ func show_victory(options: Array, deck_count: int, deck_limit: int,
 	loot_ready = false
 	_elapsed_sec = 0.0
 	title_label.text = Rules.TEXT_VICTORY_TITLE
+	# 选择段标题按实际候选数写（0 → 整段隐藏；1 → 直接带走；≥2 → N 选 1）
+	pick_title_label.text = Rules.loot_pick_title(loot_options.size())
+	pick_title_label.visible = not pick_title_label.text.is_empty()
 	hint_label.text = Rules.victory_hint_text(false, loot_options.size())
 	hint_label.visible = true
 	defeat_lines_label.visible = false
-	View.apply_reward_lines(reward_lines_label, reward_lines)
+	View.apply_reward_lines(reward_lines_label,
+			Rules.pending_section_lines(reward_lines))
 	loot_grid.visible = true
 	skip_button.visible = true
 	skip_button.text = Rules.TEXT_SKIP_LOOT
-	confirm_button.text = Rules.TEXT_CONFIRM_LOOT
+	confirm_button.text = Rules.confirm_button_text(loot_options.size())
 	Frame.resize(frame, Vector2(PANEL_WIDTH, VICTORY_PANEL_HEIGHT))
 	Frame.set_border_color(frame, Rules.COLOR_PANEL_BORDER)
 	_rebuild_loot_cards(deck_count, deck_limit)
@@ -212,6 +220,7 @@ func show_defeat(summary: Dictionary) -> void:
 	_elapsed_sec = 0.0
 	loot_delay_timer.stop()
 	title_label.text = Rules.defeat_title()
+	pick_title_label.visible = false
 	hint_label.visible = false
 	# 战败没有奖励段（损失摘要已覆盖负面信息，混排会削弱可读性）
 	View.apply_reward_lines(reward_lines_label, [])
@@ -274,7 +283,7 @@ func get_loot_cell_width() -> float:
 	return View.loot_cell_width(PANEL_WIDTH)
 
 
-## 是否处于「已到账汇总」视图（三选一网格隐藏，只显示奖励汇总行）。
+## 是否处于「已到账汇总」视图（战利品网格隐藏，只显示奖励汇总行）。
 func is_showing_grant_summary() -> bool:
 	return kind == Rules.KIND_VICTORY and not loot_grid.visible
 
@@ -323,10 +332,19 @@ func _notification(what: int) -> void:
 		_fade.kill()
 
 
-## 显示「已到账汇总」视图——三选一网格隐藏，只显示奖励汇总行。[br]
-## [param lines] 奖励汇总行数组（["灵石 +10", "修为 +5", "获得卡牌：培元丹（白）"]）。
+## 显示「已到账汇总」视图——选择器（网格 + 选择段标题 + 跳过）整体让位，只留
+## 入账清单。[br]
+## [param lines] 奖励汇总行数组（["灵石 +10", "修为 +5", "获得卡牌：培元丹（白）"]）。[br]
+## [br][b]入账标记由内核加[/b]（[method SettlementRules.granted_section_lines]）：
+## 行的字面量是发放返回值原文，UI 只负责前置一句「已入账：」——真假由发放返回值
+## 决定，不是 UI 自己编的。[br]
+## [br][b]选择器必须真的消失[/b]：段标题与跳过按钮一并隐藏——留着「本次奖励：3 选 1」
+## 却已无可选之物，正是真机走查里「两组奖励信息不知哪组已到手」的来源。
 func show_grant_summary(lines: Array) -> void:
 	loot_grid.visible = false
 	_clear_loot_cards()
 	skip_button.visible = false
-	View.apply_reward_lines(reward_lines_label, lines)
+	pick_title_label.visible = false
+	selected_index = -1
+	View.apply_reward_lines(reward_lines_label,
+			Rules.granted_section_lines(lines))

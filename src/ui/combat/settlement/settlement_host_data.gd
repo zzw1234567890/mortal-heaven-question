@@ -27,7 +27,8 @@ static func deck_counts(deck_system: Node) -> Dictionary:
 ## 胜利面板的战利品选项（GDD §9「卡牌正面 / 消耗品」）。[br]
 ## [br][b]不做战利品生成逻辑[/b]（Out of Scope）：只把战斗系统已给出的
 ## [code]cards[/code] / [code]consumables[/code] 映射成选项；灵石是全局奖励，
-## 始终发放，不列入三选一选项。不足 3 项时按实际数量展示（不伪造填充项）。[br]
+## 始终发放，不列入战利品选项。不足 3 项时按实际数量展示（不伪造填充项——
+## 选择段标题按实际条数写「N 选 1」/「这份直接带走」）。[br]
 ## [br][b]上游缺口[/b]：`CombatSystem._settle_result()` 暂不产出 `consumables`——
 ## 映射已就位，战斗系统补字段后无需改 UI（DEBT-CUI-008-3）。
 static func victory_options(rewards: Dictionary) -> Array:

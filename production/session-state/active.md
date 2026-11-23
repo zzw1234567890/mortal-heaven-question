@@ -2,9 +2,22 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: 一周目端到端冒烟（整条路真实走一遍）
-Task: 主菜单 → 身份 → 首图 → Boss → 通关 → 解锁 → 存读档，八步全绿；下一步 敌方数量随境界（headcount 轴）
+Feature: 真机走查尾巴（游玩时长落盘 + 结算屏两段分工）
+Task: playtime_seconds 三处缺失修复 + DEBT-CUI-008-3 文案分层；下一步 主菜单停留时间是否计入游玩时长
 <!-- /STATUS -->
+
+## Session Extract — 游玩时长落盘 + 结算屏两段分工（2026-11-24）
+- 任务单两条：① `playtime_seconds` 从不写入（主菜单恒「游玩 0小时0分」）；② 结算屏「战利品三选一」与「已到账汇总」并列同权重（DEBT-CUI-008-3）
+- **①唯一数据源**：`GameStateManager.session.playtime_seconds`，由新增 Autoload `SessionClock`（`src/feature/session/session_clock.gd`，134 行）每帧累加。**为什么用 `_process(delta)` 累加而不是 `Time.get_ticks_msec()`**：后者是墙上时钟（挂起/最小化/暂停菜单/断点调试全算），且读档 / 新开局都要额外记起点、每次重算差值；累加 delta 的语义就是「这一帧游戏真的推进了多少」。判定与算术拆到 `session_clock_rules.gd`（90 行，纯函数：`should_accumulate` / `tick` 跨帧凑整 / `format_duration` / `format_playtime`），测试不必真等时间
+- **三重缺失逐条补齐**：`SaveAutoSave.build_meta()` 补 `playtime_seconds` 字段（新 `playtime_seconds()` / `session_of()` 走 `Object.get`，替身 GSM 不崩）；暂停菜单改调 `SaveLoadSystem.build_slot_meta()`（此前传 `{}`）；`session` 从 `NON_PERSISTABLE_DOMAINS` 移入 `PERSISTABLE_DOMAINS`（`gsm_serializer` 的 session 默认值补 `playtime_seconds: 0`），`_build_save_container` 那行才读到数
+- **读档续算零额外接线**：`SessionClock` 刻意不缓存总数——读档把 GSM 值改写为存档基线，下一个整秒自然往上加。**副作用收尾**：`session.input_locks` 是运行时锁镜像，读档后不清会让 `InputManager.has_lock` 说谎 → `SaveLoadSystem._clear_session_input_locks()` 在读档落地阶段清空
+- **展示口径**：向下取整到分钟；`< 60s` 写「游玩不到 1 分钟」（连写、不带空格），`≥ 60s` 写「游玩 2小时3分」（带空格）；0/负数同样走不足 1 分钟档（0 秒与 59 秒对玩家是同一件事，「0小时0分」反倒像存档没生效）
+- **②两段分工**：措辞与分档阈值进新文件 `settlement_section_text.gd`（101 行），几何/状态/标签进 `settlement_loot_rules.gd`（147 行），`settlement_rules.gd` 保留同名常量与转发（295 行，从 366 降回上限内）。选择段标题按实际候选数写（1 项 →「本次奖励：这份直接带走」+ 按钮「直接带走」；≥2 →「本次奖励：N 选 1」）；`SettlementPanelView.build` 把汇总块从「标题/提示之间」移到**网格之后**并新增 `PickTitle` 在其上——顺序即语义，玩家先挑再看到手了什么；入账段加「已入账：」前缀、选择阶段加「本场奖励（尚未入账）：」前缀；`show_grant_summary` 隐藏网格 + 选择段标题 + 跳过并清卡
+- **新增测试 57 例**：`test_session_clock_rules.gd`（16，含 59/61/3700 三档与空格规则）、`test_playtime_paths.gd`（8，三路径同源 + 往返基线 + meta.json 闭环 + input_locks 清理）、`test_settlement_section_text.gd`（21，1/2/3 项精确字符串）、`test_settlement_two_sections.gd`（12，真实面板控件断言 + 控件顺序）
+- **改动的既有断言（三条，均记录旧值→新值）**：`test_save_summary_zero_playtime_shows_zero` → `test_save_summary_zero_playtime_shows_sub_minute`（「游玩 0小时0分」→「游玩不到 1 分钟」）；`test_save_summary_negative_playtime_clamped` 期望值同上；`test_ac017_serialize_excludes_session` → `test_ac017_serialize_includes_session_for_playtime`（`assert_false(has("session"))` → `assert_true` + 值断言），`data.size()` 7 → 8。都不是放宽——仍为精确字符串/精确数量断言，只是分档点与持久域集合改了
+- **反向验证（任务单要求）**：把 `session` 从 `PERSISTABLE_DOMAINS` 拿掉重跑全量 → **58 红**，其中直接命中本轮的 4 条（`test_three_readers_see_same_playtime_after_accumulate`、`test_ac017_serialize_includes_session_for_playtime`、往返三条读档失败、`test_ac017_serialize_includes_all_persistent_domains` 的 size 断言），其余 54 条是读档链路连带（`gsm_serializer.deserialize` 在 `ALL_DOMAINS` 循环里读 `snapshot["session"]` 落空）。恢复后全绿
+- 全量：**5788 tests / 5788 passing / 0 failing / 3 orphans 存量**，`.\run_tests.ps1` 零失败（5730 → 5788，净增 58：新增 57 + 拆出的 1 条 59 秒边界用例）
+- 已知边界：① 主菜单停留时间是否计入游玩时长未定义（`should_accumulate` 只判暂停，不判「是否已开局」）——留待后续；② `save_load_system.gd` 1027 行（存量超限）、`settlement_panel.gd` 350 行、`settlement_rules.gd` 295 行，均在既有口径内；③ `settlement_section_text.gd` 的 `has_choice` 目前只有测试消费（提示行按 `== 1` 直判），保留为分档阈值的单一出处
 
 ## Session Extract — 一周目端到端冒烟（2026-11-19）
 - 任务：写一条「玩家从进游戏到打赢首图 Boss」的端到端冒烟，整条链路真实走一遍，断哪修哪
@@ -1277,3 +1290,17 @@ Task: 主菜单 → 身份 → 首图 → Boss → 通关 → 解锁 → 存读�
 - **新增测试 42 例**：`test_combat_focus_sweeper.gd`（13 例，单元）、`test_combat_focus_memory.gd`（10 例，单元）、`test_combat_input_map_joypad.gd`（10 例，单元，断言六个动作各至少 1 个 JOY 事件且键盘绑定未丢）、`test_combat_focus_restore_paths.gd`（9 例，集成，真实场景 + 真实按键：链外已收干净、连按 10 次 Tab 不跳链外、撤退/战利品/战败三条路径的焦点还原、Esc 还原、没记过时不凭空塞焦点）
 - 全量：**5462 tests / 5462 passing / 3 orphans 存量**，零失败、零回归（5420 → 5462，净增 42 全过）
 - 已知边界：`combat_focus_chain.gd` 301 行、`settlement_host.gd` 371 行，均略超 300 软上限（既有文件本轮追加所致，未再拆分）；`settlement_host.set_focus_fallback` 已删除（兜底改由交互接线在建立记忆时注册）
+
+## Session Extract — 真机试玩式走查（2026-11-23）
+- 任务：对 5710 tests 基线（HEAD 5fa08eb）做**真机试玩式走查**——`extends SceneTree` 驱动、非 headless、真实场景 + 真实 `Viewport.push_input`，走「主菜单→新游戏→选身份→选图→节点图→战斗→结算→回探索→暂停存档→回主菜单→继续→读档」全链，每步一张 PNG（`%TEMP%/mht-playtest/`，不提交）+ 一行结构化 stdout（step / scene id / 可见按钮文案 / focus / hint / elapsed）
+- **驱动**：`tools/playtest_driver.gd`（不提交）；命令 `Godot_v4.6.3-stable_win64.exe --path . --script res://tools/playtest_driver.gd`（**绝不能加 `--headless`**，否则无渲染截图全空）；`DisplayServer.window_set_position(Vector2i(0,0))`，1920×1080
+- **修掉 4 处**（每处都有红→绿断言，逐条验证）：
+  1. 🔴 备战面板角色卡点不动（`deploy_character_card.gd` 只接悬停、`mouse_filter = STOP` 吞左键）→ 补 `card_pressed` 信号 + `gui_input` + `FOCUS_ALL` 焦点环 + `ui_accept`；`deploy_panel.gd` 转发 `toggle_selection`
+  2. 🔴 主菜单读档面板 Esc 关不掉（主菜单态 `InputManager` 锁栈空 → UI_NAV 判定通过并消费 Esc → `_unhandled_input` 收不到）→ 改走 `_input`（先例 `map_clear_panel_screen.gd`）
+  3. 🔴 结算/战败屏焦点停在 `none`（`placeholder_scene._build` 无 `grab_focus`）→ `_ready` 末尾抓「返回」按钮，且视口已有焦点拥有者时不抢
+  4. 🟡 摘要首行泄露 `(result=1)` 开发者字段（该文案直接进玩家可见摘要标签）→ 去掉枚举后缀，`result` 仍可从视图直读
+- **新增回归 20 例**：`test_deploy_card_click.gd`（8，真实左键）、`test_load_slot_panel_close_paths.gd`（6，含真实 Esc 投递）、`test_settlement_screen_playability.gd`（6，真实 .tscn + 桩）
+- **踩到的坑**：GridContainer 子节点排列在 `NOTIFICATION_SORT_CHILDREN`（晚于 `add_child` 那帧）——不在 `before_each` 里 `await process_frame` 两次，6 张卡全叠原点，「点第 0 张」会落到最后一张（实测选中 205）；GUT `-gtest=` 不限定范围，应用 `-gselect=<文件名子串>`
+- **登记未修**：`playtime_seconds` 从不写入（`SaveAutoSave.build_meta` 缺字段 + 暂停菜单传 `{}` + `session` 属 `NON_PERSISTABLE_DOMAINS` 三重缺失 → 主菜单恒显示「游玩 0小时0分」）；结算屏战利品三选一与已到账汇总并存（DEBT-CUI-008-3）；`pop_lock('scene_manager') source not found` 重入警告 ×8（外观性）；`assets/` 无 BGM 资源 → `BgmStreamCache` 警告
+- 全量：**5730 tests / 5730 passing / 0 failing / 3 orphans 存量**，零回归（5710 → 5730，净增 20 全过）
+- 提交：`ebd5d01 fix: 真机走查修四处 UI 阻塞`（5 生产文件 + 3 测试文件，未提交任何 `prompt_*` / `run_out*` / `tools/probe_*` / `tools/shot_*` / `tools/playtest_*` / png）

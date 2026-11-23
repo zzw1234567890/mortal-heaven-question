@@ -18,7 +18,7 @@ func after_each() -> void:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# AC-017：序列化排除 battle 和 session 域
+# AC-017：序列化排除 battle（session 自 playtime 修复起改为持久域）
 # ═════════════════════════════════════════════════════════════════════════════
 
 func test_ac017_serialize_excludes_battle() -> void:
@@ -27,10 +27,18 @@ func test_ac017_serialize_excludes_battle() -> void:
 	assert_false(data.has("battle"), "battle 域不应出现在序列化输出中")
 
 
-func test_ac017_serialize_excludes_session() -> void:
+func test_ac017_serialize_includes_session_for_playtime() -> void:
+	## 改自 test_ac017_serialize_excludes_session（旧断言 assert_false(data.has("session"))）。
+	## 旧值→新值：session 从排除域改为持久域。为什么不算放宽——理由与断言都换了方向：
+	## session.playtime_seconds 是「已游玩时长」的唯一数据源（SessionClock 每帧写入），
+	## 排除它则存档容器顶层的 playtime_seconds 恒为 0、主菜单恒显示「游玩 0小时0分」。
+	## 本条仍是精确断言（data.has("session") 为真 + 值确实随序列化带出）。
 	gsm.session.current_scene = "battle_scene"
+	gsm.session.playtime_seconds = 3700
 	var data: Dictionary = gsm.serialize()
-	assert_false(data.has("session"), "session 域不应出现在序列化输出中")
+	assert_true(data.has("session"), "session 域应出现在序列化输出中（playtime 的唯一数据源）")
+	assert_eq(int(data["session"].get("playtime_seconds", -1)), 3700,
+			"session.playtime_seconds 应随序列化带出")
 
 
 func test_ac017_serialize_includes_all_persistent_domains() -> void:
@@ -45,7 +53,12 @@ func test_ac017_serialize_includes_all_persistent_domains() -> void:
 	assert_true(data.has("battle_resume"), "battle_resume 域应存在（可持久）")
 	assert_true(data.has("exploration"), "exploration 域应存在")
 	assert_true(data.has("narrative"), "narrative 域应存在")
-	assert_eq(data.size(), 7, "仅 7 个持久域")
+	# session（本轮新增）——playtime_seconds 是「已游玩时长」的唯一数据源，
+	# 它必须随档落盘，否则读档无法把计时基线恢复到存档值（见 test_playtime_paths）。
+	assert_true(data.has("session"), "session 域应存在（可持久——playtime 数据源）")
+	# 旧值 7 → 新值 8：session 加入持久域。不是放宽——本条仍逐个域断言存在性
+	# 并用 size() 锁死总数，多一个域就必须在这里显式登记。
+	assert_eq(data.size(), 8, "仅 8 个持久域")
 
 
 func test_ac017_serialize_preserves_values() -> void:

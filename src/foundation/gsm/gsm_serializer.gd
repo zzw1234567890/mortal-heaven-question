@@ -149,7 +149,10 @@ func _get_default_for_domain(domain_name: String) -> Dictionary:
 				"story_flags": {},
 			}
 		"session":
-			return {"current_scene": "", "scene_id": 0, "ui_state": {}, "input_locks": []}
+			# playtime_seconds 是「已游玩时长」的唯一数据源（SessionClock 每帧累加）；
+			# 默认 0 让不含该字段的旧档读进来仍能走通（coerce_dict 按默认值补键）。
+			return {"current_scene": "", "scene_id": 0, "ui_state": {},
+					"input_locks": [], "playtime_seconds": 0}
 	return {}
 
 
@@ -170,7 +173,12 @@ func init_all_domains() -> void:
 # === 序列化 / 反序列化 =========================================================
 
 ## 将当前游戏状态序列化为纯 Dictionary。[br]
-## [br]排除 battle 和 session 域（不可持久化）。返回深拷贝——调用方修改不影响 GSM 内部状态。[br]
+## [br]只排除 [code]battle[/code] 域（[code]NON_PERSISTABLE_DOMAINS[/code]）——它含
+## 运行时对象，过不了 JSON 校验，且战斗结束即置 null。[code]session[/code] 自本轮起
+## [b]在[/b]持久域内：它的 [code]playtime_seconds[/code] 是「已游玩时长」的唯一数据源，
+## 存档容器顶层的 [code]playtime_seconds[/code] 从它取（见
+## [method SaveLoadSystem._build_save_container]）。返回深拷贝——调用方修改不影响
+## GSM 内部状态。[br]
 ## [br][b]输出一定是 JSON 安全形态[/b]：[code]talents[/code] /
 ## [code]owned_cards[*].template_id[/code] / [code]deck.slots[/code] /
 ## [code]exploration.current_map[/code] 等处含 StringName，[code]map_states[*].graph[/code] /

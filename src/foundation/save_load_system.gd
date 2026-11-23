@@ -414,13 +414,20 @@ static func _migrate_v3_to_v4(data: Dictionary) -> Dictionary:
 ##          playtime_seconds / meta / game_state / complete。[br]
 ## [br][b]⚠️ ADR-0002 规则[/b]: [code]version[/code] 为语义化版本字符串——仅用于
 ## 面向用户的展示，不参与任何迁移逻辑判断。[br][b]playtime_seconds[/b] 从
-## [code]serialized_gsm.session.playtime_seconds[/code] 提取，缺失时默认 0。
+## [code]serialized_gsm.session.playtime_seconds[/code] 提取，缺失时默认 0。[br]
+## [br][b]该字段真的会写进去了[/b]：[code]session[/code] 自本轮起在
+## [constant GameStateManager.PERSISTABLE_DOMAINS] 内，其 [code]playtime_seconds[/code]
+## 由 [code]SessionClock[/code] 每帧累加——此前这一句读的一直是空（域不在持久表里，
+## [code]serialize()[/code] 从不输出它），故容器里恒为 0、主菜单摘要行永远是
+## 「游玩 0小时0分」。[br]
+## [br][b]展示口径归 [code]SessionClockRules.format_duration[/code][/b]：本方法只负责把
+## 秒数原样放进容器，取整与「不到 1 分钟」的中文写法在那一处（不在此二次加工）。
 func _build_save_container(serialized_gsm: Dictionary, meta: Dictionary) -> Dictionary:
 	return {
 		"schema_version": CURRENT_SCHEMA_VERSION,
 		"version": "1.0.0",
 		"timestamp": Time.get_datetime_string_from_system(true),  # true = UTC
-		"playtime_seconds": serialized_gsm.get("session", {}).get("playtime_seconds", 0),
+		"playtime_seconds": int(serialized_gsm.get("session", {}).get("playtime_seconds", 0)),
 		"meta": {
 			"player_name": meta.get("player_name", ""),
 			"realm": meta.get("realm", "炼气"),
@@ -735,6 +742,26 @@ func auto_save() -> Variant:
 	return _auto_save.call(&"run")
 
 
+## 槽位元信息（境界显示名 / 场景落点 / 已游玩时长）——[b]唯一的构建入口[/b]。[br]
+## [br][b]为什么要有这个门[/b]：[code]save_game[/code] 的 [param meta] 由调用方给
+## （自动存档、暂停菜单手动存档各一处），而它决定 meta.json 里那条槽位记录写什么。
+## 暂停菜单此前传的是空字典 [code]{}[/code]——存档容器顶层的
+## [code]playtime_seconds[/code] 是对的，meta.json 里却是 0，主菜单读 meta.json，
+## 于是摘要行写「游玩 0小时0分」。两处共用一个构建入口，就没有第二份口径。[br]
+## [br][b]实现仍在 [code]SaveAutoSave[/code][/b]（它的 [method SaveAutoSave.build_meta]
+## 已是「境界名要查 RealmSystem」这一条的唯一实现处）——本方法只做转发，
+## 不重复一份「怎么拼 meta」。[br]
+## [br][b]缺席即空字典[/b]：GSM 不可用时返回 [code]{}[/code]——[code]save_game[/code]
+## 的默认值填充会把缺失字段写成默认，存档照常（不比「因为没有 meta 而不存」更差）。
+func build_slot_meta(p_gsm: Node = null) -> Dictionary:
+	var gsm: Node = p_gsm if p_gsm != null else _get_gsm()
+	if gsm == null:
+		return {}
+	if _auto_save == null:
+		_auto_save = SaveAutoSaveScript.new(self)
+	return _auto_save.call(&"build_meta", gsm)
+
+
 ## [b]读取游戏[/b]——从指定槽位读取存档并恢复完整游戏状态。
 ##
 ## 完整流程（5 阶段）：[br]
@@ -797,11 +824,32 @@ func load_game(slot_type: SaveSlotType, slot_id: int = 0) -> Dictionary:
 	# 下次存档又抹平死亡记录」。GSM 不可用 / 系统缺席时静默跳过（前向兼容）。
 	_restore_deployment_from_gsm()
 
+	# 输入锁栈镜像清空（session 域自本轮起可持久——见 NON_PERSISTABLE_DOMAINS 注记）。
+	# 存档里的 input_locks 是「上一次退出时栈的样子」，而读档时真实的 InputManager
+	# 栈是进程级的另一回事：把镜像带回来会让它声称一把并不存在的锁（
+	# [method InputManager.has_lock] 读的正是这个镜像）。故读档后显式清成空。
+	_clear_session_input_locks()
+
 	# 清理旧战斗快照
 	clear_battle_snapshot()
 
 	load_completed.emit(true)
 	return {"result": LoadResult.SUCCESS, "data": data}
+
+
+## 读档后清空 [code]session.input_locks[/code] 镜像——见 [method load_game] 的调用点注记。[br]
+## [br][b]为什么不用 [method InputManager.clear_locks][/b]：那把锁是真的要清（读档后
+## 任何旧锁都不该生效），但 InputManager 是 Autoload、可能缺席（headless 单测）；
+## 而本方法要保证的是「镜像与真实栈一致」这个不变式——直接写空数组即可，真实栈在
+## 转场管线里由 [code]SceneManager[/code] 统一清（同 [code]clear_locks()[/code] 的
+## 既有职责，本方法不越界去重设它）。
+func _clear_session_input_locks() -> void:
+	var gsm: Node = _get_gsm()
+	if gsm == null:
+		return
+	var session: Variant = gsm.get(&"session")
+	if session is Dictionary:
+		(session as Dictionary)["input_locks"] = []
 
 
 ## 读档后把 GSM 里的阵亡名单拉回 DeploymentSystem（读档链路第 6 阶段）。[br]

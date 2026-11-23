@@ -322,10 +322,21 @@ const ALL_DOMAINS: PackedStringArray = ["meta", "player", "collection", "deck", 
 ## 写进存档的域——[method serialize] 只取这些。[br]
 ## [br][b]battle_resume 可持久、battle 不可[/b]：前者是「回到这场战斗」所需的
 ## 最小状态快照（见 [member battle_resume]），后者是战斗中的活状态（含运行时对象，
-## 过不了 JSON 校验，且战斗结束即置 null）。
-const PERSISTABLE_DOMAINS: PackedStringArray = ["meta", "player", "collection", "deck", "battle_resume", "exploration", "narrative"]
-## 不写进存档的域——读档时原样保留内存现值（不被存档覆盖）。
-const NON_PERSISTABLE_DOMAINS: PackedStringArray = ["battle", "session"]
+## 过不了 JSON 校验，且战斗结束即置 null）。[br]
+## [br][b]session 自本轮起可持久[/b]：它的 [code]playtime_seconds[/code] 是「已游玩时长」
+## 的唯一数据源（[code]SessionClock[/code] 每帧累加），存档容器顶层的
+## [code]playtime_seconds[/code] 正是从这一段取的——不持久化的话那一句读的是空气，
+## 主菜单摘要行永远写「游玩 0小时0分」。读档续算也因此免费：基线就是存档里的那个数
+## （见 [method SaveLoadSystem.load_game] 的落地说明）。[br]
+## [br][b]session 里唯一不该回来的那一项[/b]：[code]input_locks[/code] 是 InputManager
+## 锁栈的镜像（运行时状态），读档把它带回来会让镜像声称一把并不存在的锁——
+## [method SaveLoadSystem.load_game] 读档后显式清掉它（同
+## [code]_restore_deployment_from_gsm[/code] 的「读档后落地」口径）。
+const PERSISTABLE_DOMAINS: PackedStringArray = ["meta", "player", "collection", "deck", "battle_resume", "exploration", "narrative", "session"]
+## 不写进存档的域——读档时原样保留内存现值（不被存档覆盖）。[br]
+## [br][b]只剩 battle[/b]：它含运行时对象（过不了 JSON 校验），战斗结束即置 null，
+## 「回到这场战斗」由 [code]battle_resume[/code] 承担。
+const NON_PERSISTABLE_DOMAINS: PackedStringArray = ["battle"]
 
 # === 域初始化与默认值 ========================================================
 

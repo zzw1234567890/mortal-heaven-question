@@ -48,6 +48,7 @@ TribulationSystem="*res://src/feature/tribulation_system.gd"
 IdentitySelectionSystem="*res://src/feature/identity_selection_system.gd"
 StorySystem="*res://src/feature/story_system.gd"
 ProgressionSystem="*res://src/meta/progression_system.gd"
+SessionClock="*res://src/feature/session/session_clock.gd"
 
 [display]
 

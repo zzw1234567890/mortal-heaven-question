@@ -60,17 +60,48 @@ func has_started(p_gsm: Node) -> bool:
 	return not str(p_gsm.player.get("identity_id", "")).is_empty()
 
 
-## 自动存档的槽位元信息——境界显示名 + 场景落点。[br]
+## 自动存档的槽位元信息——境界显示名 + 场景落点 + 已游玩时长。[br]
 ## [br][b]为什么境界要查 RealmSystem[/b]：主菜单摘要行显示的是「上次：炼气期 · 游玩 …」，
 ## 而 GSM 里存的是境界[b]等级[/b]（1-5）。等级到显示名的映射只有
 ## [code]RealmSystem.realm_table[/code] 有——UI 不自己拼一份表（同一事实不出现两处）。[br]
+## [br][b]为什么时长在这里也要写一遍[/b]：它有两个落点——[code].json[/code] 存档容器
+## 顶层（由 [code]save_game[/code] 从 [code]session.playtime_seconds[/code] 取）与
+## meta.json 的槽位条目（由 [code]_update_meta_json[/code] 从本字典取）。
+## 两者读的是[b]同一个数[/b]（见 [method playtime_seconds]），只是落点不同；
+## 只写一处的话，「继续游戏」摘要行与存档容器会各说各话。[br]
 ## [br][param p_gsm] GSM（非空——调用方已守卫）。
 func build_meta(p_gsm: Node) -> Dictionary:
 	return {
 		"realm": realm_display_name(int(p_gsm.player.get("realm", 1))),
-		"current_scene": str(p_gsm.session.get("current_scene", "main_menu")),
-		"current_scene_id": int(p_gsm.session.get("scene_id", 0)),
+		"current_scene": str(session_of(p_gsm).get("current_scene", "main_menu")),
+		"current_scene_id": int(session_of(p_gsm).get("scene_id", 0)),
+		"playtime_seconds": playtime_seconds(p_gsm),
 	}
+
+
+## session 域（不可用 / 非字典时给空字典——缺失键一律走调用方的默认值）。[br]
+## [br][b]为什么经 [method Object.get] 而不是 [code]p_gsm.session[/code][/b]：GSM 在用例里
+## 常被换成只实现少数几个面的替身（[code]serialize[/code] / [code]player[/code]），
+## 点属性会在替身上抛「Invalid get index」；本模块的其余取数（[code]player[/code] /
+## [code]identity_id[/code]）同样走 [method Object.get]。替身没这一面即空字典，
+## 三处消费者读到的都是同一个「没有时长」而不是崩溃。
+func session_of(p_gsm: Node) -> Dictionary:
+	var session: Variant = p_gsm.get(&"session")
+	if session is Dictionary:
+		return session
+	return {}
+
+
+## 已游玩时长（秒）——[b]全库唯一数据源[/b] [code]GSM.session.playtime_seconds[/code]
+## 的读取面（由 [code]SessionClock[/code] 每帧累加）。[br]
+## [br][b]为什么要有这个方法而不是各处直接读[/b]：三处消费者（本类的 [method build_meta]、
+## 暂停菜单手动存档的 meta、[code]SaveLoadSystem._build_save_container] 的容器字段）
+## 需要同一份「怎么取、缺失怎么办、负数怎么算」的口径——三份 [code].get(...)[/code]
+## 迟早会在某一处写歪（例如忘了钳负数）。[br]
+## [br][b]缺失给 0[/b]：老存档 / 手工改过的内存状态里可能没有这个键；不臆造时长。[br]
+## [br][param p_gsm] GSM（非空——调用方已守卫）。
+func playtime_seconds(p_gsm: Node) -> int:
+	return maxi(int(session_of(p_gsm).get("playtime_seconds", 0)), 0)
 
 
 ## 境界等级 → 中文显示名（[code]RealmSystem.realm_table[/code] 的唯一读取面）。[br]

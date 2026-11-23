@@ -101,7 +101,7 @@ func save_now() -> Dictionary:
 		result["message"] = TEXT_SAVE_UNAVAILABLE
 		return result
 	var code: int = save_load.save_game(
-			SLScript.SaveSlotType.AUTOSAVE, 0, payload, {})
+			SLScript.SaveSlotType.AUTOSAVE, 0, payload, slot_meta())
 	if code != SLScript.SaveResult.SUCCESS:
 		push_error("PauseMenu: 保存失败（code=%d）" % code)
 		result["message"] = TEXT_SAVE_FAILED % code
@@ -109,6 +109,23 @@ func save_now() -> Dictionary:
 	result["ok"] = true
 	result["message"] = _saved_message(battle)
 	return result
+
+
+## 槽位元信息——[b]复用自动存档那一份[/b]（此前这里传的是 [code]{}[/code]）。[br]
+## [br][b]为什么不能传空字典[/b]：它决定 meta.json 里这条槽位记录写什么，而主菜单的
+## 摘要行（「上次：炼气期 · 游玩 2小时3分」）读的正是 meta.json——传空的话，玩家
+## 手动存档后回到主菜单，看到的是「游玩 0小时0分」，而存档容器里存的其实是真值。[br]
+## [br][b]为什么经 [code]SaveLoadSystem.build_slot_meta[/code][/b]：那是全库唯一的
+## 「槽位元信息长什么样」构建入口（自动存档走同一处）；在这里自己拼一份，就等于
+## 把「境界名要查 RealmSystem」这类口径复制成第二份。[br]
+## [br][b]替身缺席时降级[/b]：夹具里的 SaveLoadSystem 替身只实现 [code]save_game[/code]
+## ——没这一面就给空字典（与旧行为逐位一致，存量用例照常绿）。[br]
+## [br][b]为什么用 [code]gsm[/code] 而不是另取一次[/b]：载荷就是从它 [code]serialize()[/code]
+## 来的，同一份 GSM 出的两个字段才自洽。
+func slot_meta() -> Dictionary:
+	if save_load == null or not save_load.has_method(&"build_slot_meta"):
+		return {}
+	return save_load.call(&"build_slot_meta", gsm) as Dictionary
 
 
 ## 抓一次战斗快照写进 GSM（**必须在 [method serialize_gsm] 之前调**）。[br]

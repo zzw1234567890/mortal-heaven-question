@@ -168,23 +168,40 @@ func test_save_summary_playtime_formats_hours_minutes() -> void:
 	assert_eq(summary, "上次：炼气期 · 游玩 2小时3分", "7385s 应格式化为 2小时3分")
 
 
-func test_save_summary_zero_playtime_shows_zero() -> void:
-	## 摘要时长边界：0s（首局刚存档）→「0小时0分」（语义正确不崩溃）
+func test_save_summary_zero_playtime_shows_sub_minute() -> void:
+	## 摘要时长边界：0s（首局刚存档）→「游玩不到 1 分钟」。
+	## 改自 test_save_summary_zero_playtime_shows_zero（旧值「游玩 0小时0分」）：
+	## 0 秒与 59 秒对玩家是同一件事，写「0小时0分」反倒像存档没生效
+	## （真机走查第一反应正是「主菜单恒显示 0小时0分，以为档没存上」）。
+	## 不是放宽——断言仍是精确字符串，只是分档点从「0 → 0小时0分」改成「<60 → 不到 1 分钟」。
 	# Arrange
 	var meta: Dictionary = _slot(0, 0, true, "2026-09-12T00:00:00",
 			"炼气期", 0)
 	# Act
 	var summary: String = LOGIC.build_save_summary(meta)
 	# Assert
-	assert_eq(summary, "上次：炼气期 · 游玩 0小时0分", "0 秒应显示 0小时0分")
+	assert_eq(summary, "上次：炼气期 · 游玩不到 1 分钟", "0 秒应显示「游玩不到 1 分钟」")
 
 
 func test_save_summary_negative_playtime_clamped() -> void:
-	## 摘要防御：负 playtime（meta 损坏）→ 钳 0 不显示负数。
+	## 摘要防御：负 playtime（meta 损坏）→ 钳 0 后走不足 1 分钟档。
+	## 改自同名用例的期望值（旧值「游玩 0小时0分」）：钳 0 的语义不变，
+	## 只是 0 落在新的「不到 1 分钟」档里。不是放宽——精确字符串依旧。
 	# Arrange
 	var meta: Dictionary = _slot(0, 0, true, "2026-09-12T00:00:00",
 			"炼气期", -100)
 	# Act
 	var summary: String = LOGIC.build_save_summary(meta)
 	# Assert
-	assert_eq(summary, "上次：炼气期 · 游玩 0小时0分", "负值应钳为 0小时0分")
+	assert_eq(summary, "上次：炼气期 · 游玩不到 1 分钟", "负值应钳 0 后显示「不到 1 分钟」")
+
+
+func test_save_summary_fifty_nine_seconds_is_sub_minute() -> void:
+	## 分档边界：59s 仍是不足 1 分钟（阈值是 <60，不是 <=60）。
+	# Arrange
+	var meta: Dictionary = _slot(0, 0, true, "2026-09-12T00:00:00",
+			"炼气期", 59)
+	# Act
+	var summary: String = LOGIC.build_save_summary(meta)
+	# Assert
+	assert_eq(summary, "上次：炼气期 · 游玩不到 1 分钟", "59 秒应走不足 1 分钟档")

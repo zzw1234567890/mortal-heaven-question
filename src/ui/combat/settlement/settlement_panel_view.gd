@@ -43,15 +43,16 @@ static func build(root: Control, frame_size: Vector2) -> Dictionary:
 	title_label.add_theme_color_override("font_color", Rules.COLOR_TITLE)
 	body_box.add_child(title_label)
 
-	# 本场奖励汇总（实得/未抽到/发放失败）——胜利面板才显示，默认隐藏。
-	# 放在标题与提示之间：玩家先看到「拿到了什么」，再看到「怎么选」。
-	var reward_lines := Label.new()
-	reward_lines.name = "RewardLines"
-	reward_lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	reward_lines.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	reward_lines.add_theme_color_override("font_color", Rules.COLOR_BODY)
-	reward_lines.visible = false
-	body_box.add_child(reward_lines)
+	# 选择段标题（「本次奖励：N 选 1」/「这份直接带走」）——[b]排在网格之上[/b]：
+	# 先让玩家看到「这一段是要挑的」，再看到可挑的东西，最后才读到「已入账」那一块
+	# （顺序即语义——两段并列同权重正是 DEBT-CUI-008-3 的困惑来源）。
+	var pick_title := Label.new()
+	pick_title.name = "PickTitle"
+	pick_title.custom_minimum_size = Vector2(0, HINT_HEIGHT)
+	pick_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pick_title.add_theme_color_override("font_color", Rules.COLOR_TITLE)
+	pick_title.visible = false
+	body_box.add_child(pick_title)
 
 	var hint_label := Label.new()
 	hint_label.name = "LootHint"
@@ -65,6 +66,17 @@ static func build(root: Control, frame_size: Vector2) -> Dictionary:
 	loot_grid.add_theme_constant_override("separation", int(Rules.LOOT_GAP))
 	loot_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body_box.add_child(loot_grid)
+
+	# 奖励汇总块（胜利时是「尚未入账」的预告，发放后换成「已入账」清单）。
+	# [b]刻意排在网格之后[/b]：玩家先做完选择，才读到结算结果——两段不再是并列同权重的
+	# 两组数字（真机走查里玩家分不清哪组是「已经拿到」）。
+	var reward_lines := Label.new()
+	reward_lines.name = "RewardLines"
+	reward_lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	reward_lines.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reward_lines.add_theme_color_override("font_color", Rules.COLOR_BODY)
+	reward_lines.visible = false
+	body_box.add_child(reward_lines)
 
 	var defeat_lines := Label.new()
 	defeat_lines.name = "DefeatLines"
@@ -103,7 +115,7 @@ static func build(root: Control, frame_size: Vector2) -> Dictionary:
 	return {
 		"frame": parts["frame"], "body_box": body_box,
 		"title_label": title_label, "hint_label": hint_label,
-		"reward_lines": reward_lines,
+		"pick_title": pick_title, "reward_lines": reward_lines,
 		"loot_grid": loot_grid, "defeat_lines": defeat_lines,
 		"confirm_button": confirm_button, "skip_button": skip_button,
 		"loot_delay_timer": delay_timer,
@@ -116,6 +128,7 @@ static func build(root: Control, frame_size: Vector2) -> Dictionary:
 ## 视口高度；未入树时按 1080 基准（[constant CombatUiFont.TIER_FULL_HEIGHT]）。
 static func apply_fonts(parts: Dictionary, screen_height: int) -> void:
 	Frame.apply_font(parts.get("title_label") as Control, TITLE_BASE_SIZE, screen_height)
+	Frame.apply_font(parts.get("pick_title") as Control, BODY_BASE_SIZE, screen_height)
 	Frame.apply_font(parts.get("hint_label") as Control, HINT_BASE_SIZE, screen_height)
 	Frame.apply_font(parts.get("reward_lines") as Control, HINT_BASE_SIZE, screen_height)
 	Frame.apply_font(parts.get("defeat_lines") as Control, BODY_BASE_SIZE, screen_height)

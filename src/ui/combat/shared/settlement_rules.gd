@@ -2,24 +2,31 @@ class_name SettlementRules
 extends RefCounted
 ## SettlementRules —— 结算面板 Logic 内核纯函数（combat-ui-layout Story 008）。
 ##
-## [b]职责[/b]：胜利结算（战利品三选一）与战败摘要的全部判定逻辑——战利品
-## 0.5s 延迟可点判定 [method loot_clickable]、三选一网格等宽计算
-## [method loot_grid_layout]、战利品选项 3 态判定 [method loot_option_state]、
-## 确认按钮启用判定 [method confirm_button_enabled]、战斗结果→面板种类映射
-## [method panel_kind_for]、战败文案构建 [method defeat_lines]。
-## 撤退双变体与渡劫战前警示见 [RetreatRules]（同 story、同目录，按职责拆分）。[br]
+## [b]职责[/b]：[b]结算面板对外唯一入口[/b]——把三类判定与文案转发给各自的实现文件，
+## 组件层（面板 / 视图 / 卡片 / 宿主）只 preload 本文件：[br]
+##   · 延迟窗口与结果映射：[method loot_clickable] / [method panel_kind_for] /
+##     [method confirm_button_enabled] / [method defeat_lines]（本文件实现）；[br]
+##   · 战利品选项几何 / 状态 / 标签：[SettlementLootRules]（同目录）；[br]
+##   · 两段式文案（选择段标题 / 入账段标记）：[SettlementSectionText]（同目录）；[br]
+##   · 撤退双变体与渡劫战前警示：[RetreatRules]（同 story、同目录）。[br]
+## [br][b]为什么拆成三份而本文件保留同名转发[/b]：三块职责彼此不相关
+## （几何计算 / 中文措辞 / 延迟与结果），挤在一份里超出 300 行软上限
+## （.claude/docs/coding-standards.md）；而[b]调用方不该知道拆分发生在我们内部[/b]
+## ——多一个 preload 入口就等于「结算规则在哪」有两个答案。常量同样转发，
+## 因此 [code]Rules.OPTION_DECK_FULL[/code] 这类既有写法一处都不用改。[br]
 ## [br][b]纯函数[/b]（ADR-0031 Logic 内核模式）：无状态、无副作用、确定映射——
 ## 单元测试零依赖。[br]
-## [br][b]文案集中[/b]（GDD §9 线框逐行）：全部中文文案为本文件常量，组件层
+## [br][b]文案集中[/b]（GDD §9 线框逐行）：全部中文文案为常量，组件层
 ## 不出现业务字面量（本地化豁免同 S16/S17 口径，待 localization epic 抽 key）。[br]
 ## [br][b]阈值集中[/b]（control-manifest 禁止硬编码数值）：0.5s 延迟、三选一列数、
-## 50%/80% 修为损失比例、朱砂红色值均定义于此，组件只读。[br]
+## 50%/80% 修为损失比例、朱砂红色值均有单一出处，组件只读。[br]
 ## [br][b]结果取值不硬编码[/b]：战斗结果走 [code]CombatSystem.CombatResult[/code]
 ## 枚举（信号载荷契约的真理来源），不在本文件重复写 1/2/3。
 ##
 ## @experimental
 ## 来源: ADR-0031、design/gdd/combat-ui-system.md §9 战斗结算面板 /
-## §边界情况（三选一网格）/ §调优参数、combat-ui-layout Story 008（AC-1~AC-5）。
+## §边界情况（三选一网格）/ §调优参数、combat-ui-layout Story 008（AC-1~AC-5）、
+## DEBT-CUI-008-3（两段式结算文案）。
 
 ## CombatSystem 战斗结果枚举真理来源（preload 避免 Autoload 全局名解析）。
 const CombatSystemScript := preload("res://src/feature/combat_system.gd")
@@ -34,34 +41,11 @@ const KIND_VICTORY: StringName = &"victory"
 const KIND_DEFEAT: StringName = &"defeat"
 ## 撤退确认（普通/渡劫两变体——见 [RetreatRules]）。
 const KIND_RETREAT: StringName = &"retreat"
-## === 战利品选项状态/种类常量 ==============================================
-
-## 可选（可点高亮）。
-const OPTION_AVAILABLE: String = "available"
-## 已选中（高亮——非确认）。
-const OPTION_SELECTED: String = "selected"
-## 卡组已满（卡牌选项灰显不可选）。
-const OPTION_DECK_FULL: String = "deck_full"
-
-## 卡牌类战利品（唯一受卡组上限约束的种类）。
-const OPTION_KIND_CARD: String = "card"
-## 灵石类战利品。
-const OPTION_KIND_LINGSHI: String = "lingshi"
-## 消耗品类战利品。
-const OPTION_KIND_CONSUMABLE: String = "consumable"
 
 ## === 数值常量（GDD 明文）==================================================
 
 ## 战利品展示后延迟可点时长（秒——GDD §9「先看清，再选择」）。
 const LOOT_CLICK_DELAY_SEC: float = 0.5
-## 三选一网格列数（GDD §边界情况：均匀网格 `(panel_width - margins) / 3`）。
-const LOOT_COLUMNS: int = 3
-## 网格列间隔（px——1920×1080 基准渲染参数）。
-const LOOT_GAP: float = 16.0
-## 战利品卡格高度（px——渲染参数，非游戏数值）。
-const LOOT_CELL_HEIGHT: float = 210.0
-## 战利品卡内容块高度（标题 + 副标题 + 角标三段的总高，px——垂直居中基数）。
-const CARD_CONTENT_BLOCK_HEIGHT: float = 70.0
 
 ## 普通战败/撤退的修为损失比例（GDD §9「损失 50% 本次战斗修为」）。
 const CULTIVATION_LOSS_NORMAL: float = 0.5
@@ -91,16 +75,96 @@ const COLOR_SELECTED: Color = Color("#E8C06A")
 
 const TEXT_VICTORY_TITLE: String = "🎉 胜利！"
 const TEXT_DEFEAT_TITLE: String = "💀 战败"
-const TEXT_LOOT_PROMPT: String = "战利品选择（三选一）："
 const TEXT_LOOT_WAITING: String = "战利品展示中…"
 const TEXT_LOOT_READY: String = "点击战利品选中，再点确认生效"
 const TEXT_CONFIRM_LOOT: String = "确认选择"
 const TEXT_SKIP_LOOT: String = "跳过"
 const TEXT_RETURN_EXPLORE: String = "返回探索"
-const TEXT_DECK_FULL: String = "卡组已满"
-const TEXT_SELECTED: String = "已选中"
 ## 本次无战利品（上游未产出选项时的兜底提示——不显示"点击选中"以免误导）。
 const TEXT_NO_LOOT: String = "本次无战利品"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 两段式结算文案（选择段 / 入账段——DEBT-CUI-008-3）与战利品选项
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 两块的实现分别在 [SettlementSectionText]（措辞与分档阈值）与 [SettlementLootRules]
+# （几何 / 状态 / 标签）——本文件按行数预算把实现搬了出去，保留[b]同名常量与同名
+# 转发[/b]：调用方（卡片 / 视图 / 面板 / 宿主 / 测试）只 preload 本文件，
+# 既有写法一处都不用改，也不必知道拆分发生在内部。
+
+## 文案分档内核（选择段标题 / 确认按钮 / 入账段标记）。
+const Section := preload("res://src/ui/combat/shared/settlement_section_text.gd")
+## 选项几何与状态内核。
+const Loot := preload("res://src/ui/combat/shared/settlement_loot_rules.gd")
+
+
+## 选择段标题（按实际候选数——见 [method SettlementSectionText.loot_pick_title]）。
+static func loot_pick_title(p_option_count: int) -> String:
+	return Section.loot_pick_title(p_option_count)
+
+
+## 候选是否构成「选择」（≥2 项——见 [method SettlementSectionText.has_choice]）。
+static func has_choice(p_option_count: int) -> bool:
+	return Section.has_choice(p_option_count)
+
+
+## 已入账 / 未入账两段的段首标记。
+static func granted_section_lines(p_lines: Array) -> Array:
+	return Section.granted_section_lines(p_lines)
+
+
+static func pending_section_lines(p_lines: Array) -> Array:
+	return Section.pending_section_lines(p_lines)
+
+
+## 战利品选项状态 / 种类（转发——见 [SettlementLootRules]）。
+const OPTION_AVAILABLE: String = Loot.OPTION_AVAILABLE
+const OPTION_SELECTED: String = Loot.OPTION_SELECTED
+const OPTION_DECK_FULL: String = Loot.OPTION_DECK_FULL
+const OPTION_KIND_CARD: String = Loot.OPTION_KIND_CARD
+const OPTION_KIND_LINGSHI: String = Loot.OPTION_KIND_LINGSHI
+const OPTION_KIND_CONSUMABLE: String = Loot.OPTION_KIND_CONSUMABLE
+
+## 网格与卡格渲染参数（转发）。
+const LOOT_COLUMNS: int = Loot.LOOT_COLUMNS
+const LOOT_GAP: float = Loot.LOOT_GAP
+const LOOT_CELL_HEIGHT: float = Loot.LOOT_CELL_HEIGHT
+const CARD_CONTENT_BLOCK_HEIGHT: float = Loot.CARD_CONTENT_BLOCK_HEIGHT
+
+## 选项角标文案（转发）。
+const TEXT_DECK_FULL: String = Loot.TEXT_DECK_FULL
+const TEXT_SELECTED: String = Loot.TEXT_SELECTED
+
+
+static func loot_grid_layout(content_width: float, gap: float = LOOT_GAP,
+		columns: int = LOOT_COLUMNS) -> Dictionary:
+	return Loot.loot_grid_layout(content_width, gap, columns)
+
+
+static func loot_card_content_top(cell_height: float) -> float:
+	return Loot.loot_card_content_top(cell_height)
+
+
+static func is_deck_full(deck_count: int, deck_limit: int) -> bool:
+	return Loot.is_deck_full(deck_count, deck_limit)
+
+
+static func loot_option_state(option: Dictionary, deck_count: int,
+		deck_limit: int) -> String:
+	return Loot.loot_option_state(option, deck_count, deck_limit)
+
+
+static func option_clickable(state: String) -> bool:
+	return Loot.option_clickable(state)
+
+
+static func loot_option_note(state: String) -> String:
+	return Loot.loot_option_note(state)
+
+
+static func loot_option_label(option: Dictionary) -> Dictionary:
+	return Loot.loot_option_label(option)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -123,128 +187,38 @@ static func loot_hint_text(clickable: bool) -> String:
 
 ## 胜利面板提示文案（含空战利品兜底）。[br]
 ## [param clickable]: 是否已过 0.5s 延迟窗口。[br]
-## [param option_count]: 战利品选项数量（0 → 本次无战利品）。[br]
+## [param option_count]: 战利品选项数量（0 → 本次无战利品；1 → 没有可挑的，
+## 就绪期改说「直接确认带走」——「点击选中」在只有一项时是无意义的指引）。[br]
 ## [br]空战利品时上游没给任何选项（战斗系统暂不产出 loot），若仍显示
-## 「点击战利品选中」会让玩家对着空网格点——本函数给出明确兜底文案。
+## 「点击战利品选中」会让玩家对着空网格点——本函数给出明确兜底文案。[br]
+## [br][b]阈值与选择段标题同源[/b]：两处都按「实际候选数」分档（0 / 1 / ≥2），
+## 分档点与 [method SettlementSectionText.loot_pick_title] 逐条对齐
+## （[code]<= 0[/code] / [code]== 1[/code]），一处改档另一处必须跟着改
+## ——否则会出现「标题写 2 选 1 而提示说点确认带走」这类自相矛盾。
 static func victory_hint_text(clickable: bool, option_count: int) -> String:
 	if option_count <= 0:
 		return TEXT_NO_LOOT
-	return loot_hint_text(clickable)
+	if not clickable:
+		return TEXT_LOOT_WAITING
+	if option_count == 1:
+		return Section.TEXT_PICK_ONE_HINT
+	return TEXT_LOOT_READY
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 三选一网格（AC-1）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-## 三选一均匀等宽网格布局。[br]
-## [br][b]公式[/b]（GDD §边界情况）：
-## [code]cell_width = (content_width - gap × (columns - 1)) / columns[/code]，
-## 即「(panel_width - margins) / 3」在含列间隔时的严格形式。[br]
-## [br][b]窄面板不产负宽[/b]：内容宽度不足以容纳间隔时 cell_width 钳制为 0
-## （布局退化但不产生负尺寸——Godot 负 width 会触发警告）。[br]
-## [param content_width]: 可用内容宽度（已扣除面板左右内边距）。[br]
-## [param gap]: 列间隔（px）。[br]
-## [param columns]: 列数（≤0 时按 1 处理）。
-## [br][b]返回[/b]: [code]{columns, cell_width, gap, used_width}[/code]。
-static func loot_grid_layout(content_width: float, gap: float = LOOT_GAP,
-		columns: int = LOOT_COLUMNS) -> Dictionary:
-	var cols: int = maxi(columns, 1)
-	var safe_gap: float = maxf(gap, 0.0)
-	var total_gap: float = safe_gap * float(cols - 1)
-	var cell_width: float = maxf((maxf(content_width, 0.0) - total_gap)
-			/ float(cols), 0.0)
-	return {
-		"columns": cols,
-		"cell_width": cell_width,
-		"gap": safe_gap,
-		"used_width": cell_width * float(cols) + total_gap,
-	}
-
-
-## 战利品卡内容块顶边（垂直居中于卡面——标题/副标题/角标三段整体居中）。[br]
-## [br][b]为什么进内核[/b]：垂直居中是 GDD §边界情况「均匀网格」的可见要求，
-## 但纯几何计算若散落在自绘组件里就无法断言；本函数把口径固定下来，
-## 组件只负责调用（窄卡片时钳制为 0，不产生负基线）。[br]
-## [param cell_height]: 卡格高度（px）。
-static func loot_card_content_top(cell_height: float) -> float:
-	return maxf((cell_height - CARD_CONTENT_BLOCK_HEIGHT) * 0.5, 0.0)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 卡组满判定与选项状态（AC-4）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-## 卡组是否已满——[b]上限未初始化按未满处理[/b]（deck_limit ≤ 0 时不误拦）。[br]
-## [param deck_count]: 当前卡组张数。[br]
-## [param deck_limit]: 当前境界卡组上限。
-static func is_deck_full(deck_count: int, deck_limit: int) -> bool:
-	if deck_limit <= 0:
-		return false
-	return deck_count >= deck_limit
-
-
-## 战利品选项初始态判定。[br]
-## [br][b]只有卡牌受卡组上限约束[/b]——灵石/消耗品在卡组满时仍可选（不占卡位）。[br]
-## [param option]: 选项字典（[code]{kind, ...}[/code]）。[br]
-## [param deck_count]: 当前卡组张数。[br]
-## [param deck_limit]: 当前境界卡组上限。
-static func loot_option_state(option: Dictionary, deck_count: int,
-		deck_limit: int) -> String:
-	if str(option.get("kind", "")) == OPTION_KIND_CARD \
-			and is_deck_full(deck_count, deck_limit):
-		return OPTION_DECK_FULL
-	return OPTION_AVAILABLE
-
-
-## 选项是否可点（[constant OPTION_DECK_FULL] 不可点，其余可点）。[br]
-## [param state]: [method loot_option_state] 的结果。
-static func option_clickable(state: String) -> bool:
-	return state != OPTION_DECK_FULL
-
-
-## 选项角标文案（已选中 / 卡组已满 / 空）。
-static func loot_option_note(state: String) -> String:
-	match state:
-		OPTION_SELECTED:
-			return TEXT_SELECTED
-		OPTION_DECK_FULL:
-			return TEXT_DECK_FULL
-		_:
-			return ""
-
-
-## 战利品选项标题与副标题（GDD §9 线框「青云剑诀 / (蓝·功法)」「灵石 / ×25」）。[br]
-## [param option]: 选项字典——卡牌 [code]{kind, name, rarity, school}[/code]；
-## 灵石 [code]{kind, amount}[/code]；消耗品 [code]{kind, name}[/code]。
-## [br][b]返回[/b]: [code]{title, subtitle}[/code]。
-static func loot_option_label(option: Dictionary) -> Dictionary:
-	match str(option.get("kind", "")):
-		OPTION_KIND_CARD:
-			var rarity: String = str(option.get("rarity", ""))
-			var school: String = str(option.get("school", ""))
-			var sub: String = ""
-			if not rarity.is_empty() and not school.is_empty():
-				sub = "（%s·%s）" % [rarity, school]
-			else:
-				sub = "（功法）"
-			return {"title": str(option.get("name", "未知卡牌")), "subtitle": sub}
-		OPTION_KIND_LINGSHI:
-			return {"title": "灵石", "subtitle": "×%d" % int(option.get("amount", 0))}
-		OPTION_KIND_CONSUMABLE:
-			return {"title": str(option.get("name", "未知物品")), "subtitle": "（消耗品）"}
-		_:
-			return {"title": str(option.get("name", "未知")), "subtitle": ""}
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 确认按钮（AC-3）
-# ═══════════════════════════════════════════════════════════════════════════════
 
 ## 确认选择按钮是否可点——[b]必须同时满足[/b]「已选中某项」与「已过延迟窗口」。[br]
 ## [param selected_index]: 已选中选项下标（-1 = 未选中）。[br]
 ## [param clickable]: 是否已过延迟窗口（[method loot_clickable]）。
 static func confirm_button_enabled(selected_index: int, clickable: bool) -> bool:
 	return clickable and selected_index >= 0
+
+
+## 确认按钮文案——按候选数分档（1 项时是「直接带走」，不是「从 N 项里挑一个」）。[br]
+## [br][b]与 [method loot_pick_title] 同一阈值[/b]：一处写「N 选 1」而按钮写「确认选择」，
+## 玩家会以为漏了一步（真机走查里「候选不足 3 项仍写三选一」正是同一类错）。[br]
+## [br][b]转发给 [method SettlementSectionText.confirm_button_text][/b]：多项文案由本
+## 文件给（[constant TEXT_CONFIRM_LOOT]），分档阈值与标题共用一处。
+static func confirm_button_text(p_option_count: int) -> String:
+	return Section.confirm_button_text(p_option_count, TEXT_CONFIRM_LOOT)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

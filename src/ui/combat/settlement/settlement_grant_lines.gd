@@ -46,8 +46,8 @@ func rolled() -> Dictionary:
 
 ## 胜利面板的汇总行（发放前——哪些到手、哪些没抽到、哪些发放失败）。[br]
 ## [br][b]读同一份载荷两处消费[/b]：[code]cards[/code] / [code]lingshi[/code] 尚未到账，
-## 面板把它们列成「三选一」供玩家选择（选项由 [code]SettlementHostData[/code] 映射），
-## 而全文汇总行在这里——两处读的是同一个 [param p_rewards]。
+## 面板把它们列成「本次奖励：N 选 1」供玩家选择（选项由 [code]SettlementHostData[/code]
+## 映射，N 是实际条数），而全文汇总行在这里——两处读的是同一个 [param p_rewards]。
 func victory_lines(p_rewards: Dictionary) -> Array:
 	var lines: Array = RewardLines.reward_lines(p_rewards)
 	lines.append_array(tribulation_lines(p_rewards))

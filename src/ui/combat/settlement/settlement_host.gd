@@ -143,8 +143,10 @@ func set_reduce_motion(value: bool) -> void:
 ## cultivation, cards, cards_missed, cards_failed, ...}[/code]（尚未发放）；
 ## 战败/撤退为 [code]{retain_ratio}[/code]。[br]
 ## [br][b]战利品 vs 奖励汇总[/b]：[code]cards[/code] / [code]lingshi[/code] 尚未到账，
-## 面板把它们列成「三选一」供玩家选择；「实得/未抽到/未入库」
-## 的全文由 [code]CombatRewardLines[/code] 以汇总行呈现——两处读同一份载荷。
+## 面板把它们列成「本次奖励：N 选 1」供玩家选择（N 即实际候选数，见
+## [code]SettlementSectionText.loot_pick_title[/code]）；「实得/未抽到/未入库」
+## 的全文由 [code]CombatRewardLines[/code] 以汇总行呈现——两处读同一份载荷，
+## 且面板里后者排在网格[b]之后[/b]（玩家先挑，再看到手了什么）。
 func on_battle_ended(result: int, rewards: Dictionary = {}) -> void:
 	var kind: StringName = Rules.panel_kind_for(result)
 	if kind != Rules.KIND_NONE:
@@ -277,7 +279,7 @@ func _on_pre_battle_confirmed() -> void:
 	pre_battle_confirmed.emit()
 
 
-## 显示「已到账汇总」视图——三选一网格隐藏，只显示奖励汇总行。[br]
+## 显示「已到账汇总」视图——战利品网格隐藏，只显示奖励汇总行。[br]
 ## [param result] grant_reward_selection 的返回值。
 func show_grant_summary(result: Dictionary) -> void:
 	_show_grant_summary(result)

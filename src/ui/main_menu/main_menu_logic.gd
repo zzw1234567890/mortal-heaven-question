@@ -18,6 +18,9 @@ extends RefCounted
 ## 来源: ADR-0031、control-manifest §Presentation、design/gdd/main-menu-system.md
 ## §边缘情况、story-001-main-menu-scene.md（2026-09-19 裁决）。
 
+## 时长文案内核（「X小时Y分」/「不到 1 分钟」的口径——与计时器共用一份）。
+const SessionClockRules := preload("res://src/feature/session/session_clock_rules.gd")
+
 ## === 数据驱动配置 =============================================================
 
 ## 时间戳相同槽位的 tie-break——升序取首个（语义：低槽序号优先）。[br]
@@ -33,9 +36,12 @@ const SLOT_ORDER: Dictionary = {
 
 ## 存档摘要文本模板（GDD 边界澄清 2026-09-19——realm + playtime 均取自
 ## meta.json；chapter 不在 meta.json，本 MVP 不引入）。[br]
+## [br][b]空格写进模板里[/b]：时长那句自己可能不带空格（「不到 1 分钟」时写成
+## 「游玩不到 1 分钟」），故时长部分由 [code]SessionClockRules.format_playtime[/code]
+## 整句产出（含「游玩」二字与它前面的空格）——本模板只拼它前面那一段。[br]
 ## 项目暂无本地化系统——先例 [CultivationBarState] LABEL_* 同源豁免注记，
 ## 本地化入库后替换为本地化键。
-const SUMMARY_TEMPLATE: String = "上次：%s · 游玩 %s"
+const SUMMARY_TEMPLATE: String = "上次：%s · %s"
 
 ## 「读档」界面列出的槽位（见 [method loadable_slots]）。[br]
 ## [br][b]为什么不遍历 [code]list_slots()[/code][/b]：那份列表是给判定用的（含战前
@@ -156,8 +162,10 @@ static func select_latest_save(save_meta_list: Variant) -> Dictionary:
 ## （同 [method has_continuable_save] 注记；空字典走空串分支，防御路径可达）。[br]
 ## [b]返回[/b]: 「上次：[境界] · 游玩 [时长]」；槽位不存在（[code]exists != true[/code]）
 ## 或入参无效 → 空串（UI 判空隐藏摘要行）。[br]
-## [br]时长格式：秒 → [code]X小时Y分[/code]（向下取整；<1 分钟显示 [code]0小时0分[/code]
-## ——首局刚存档的极端场景，语义仍正确）。[br]
+## [br][b]时长文案的真理来源是 [code]SessionClockRules.format_playtime[/code][/b]：
+## 它负责「X小时Y分」的向下取整、不足 1 分钟时写「游玩不到 1 分钟」（连写、不带空格）
+## 以及负数钳 0。本函数只拼「上次：境界 · 」这一半——两处各写一半必然在某一侧
+## 把空格或取整写歪。[br]
 ## [b]不产生额外 IO[/b]——纯文本组装，境界名原样透传（本地化入库后由调用方
 ## 先行翻译）。
 static func build_save_summary(meta: Variant) -> String:
@@ -169,7 +177,7 @@ static func build_save_summary(meta: Variant) -> String:
 	var dict_meta: Dictionary = meta
 	var realm: String = str(dict_meta.get("realm", ""))
 	var playtime_sec: int = int(dict_meta.get("playtime", 0))
-	return SUMMARY_TEMPLATE % [realm, _format_playtime(playtime_sec)]
+	return SUMMARY_TEMPLATE % [realm, SessionClockRules.format_playtime(playtime_sec)]
 
 
 ## === 内部辅助 ================================================================
@@ -210,12 +218,3 @@ static func _slot_order(meta: Dictionary) -> int:
 			return int(meta.get("slot_id", 0))
 		return int(SLOT_ORDER[slot_type])
 	return 99  # 未知槽位类型——殿后（防御，不影响语义）
-
-
-## 游玩秒数 → 「X小时Y分」文本（数据驱动组装，无本地化——同 SUMMARY_TEMPLATE 注记）。
-static func _format_playtime(playtime_sec: int) -> String:
-	if playtime_sec < 0:
-		playtime_sec = 0  # 防御：meta 损坏负值钳 0
-	var hours: int = playtime_sec / 3600
-	var minutes: int = (playtime_sec % 3600) / 60
-	return "%d小时%d分" % [hours, minutes]

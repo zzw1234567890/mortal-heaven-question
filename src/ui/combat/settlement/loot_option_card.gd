@@ -1,6 +1,6 @@
 class_name LootOptionCard
 extends Control
-## LootOptionCard —— 战利品三选一选项卡（combat-ui-layout Story 008）。
+## LootOptionCard —— 战利品选项卡（combat-ui-layout Story 008）。
 ##
 ## [b]职责[/b]：单个战利品选项的自绘卡片——卡牌正面标题/副标题（稀有度·流派
 ## 或「×25」或「消耗品」）+ 3 态视觉（可选 / 已选中 / 卡组已满灰显）。
