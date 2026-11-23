@@ -100,8 +100,7 @@ offset_left = 16.0
 offset_top = 188.0
 offset_right = 884.0
 offset_bottom = 218.0
-theme_override_font_sizes/font_size = 13
-theme_override_colors/font_color = Color(0.42, 0.4, 0.37, 1)
+theme_type_variation = &"CaptionText"
 
 [node name="ConfirmButton" type="Button" parent="LayoutAnchor"]
 layout_mode = 1

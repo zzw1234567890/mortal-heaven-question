@@ -1,8 +1,7 @@
 class_name NotificationToastArea
 extends Control
-## NotificationToastArea —— 中央顶部通知区域组件（hud Story 004）。
-##
-## [b]结构[/b]：VBoxContainer 动态堆叠容器——push 时生成 Toast（双层：外层
+## NotificationToastArea —— 中央顶部通知区域组件（hud Story 004）。[br]
+## [br][b]结构[/b]：VBoxContainer 动态堆叠容器——push 时生成 Toast（双层：外层
 ## holder 占容器布局槽位 + 内层 SlidePanel 为动画目标，滑入 0.2s），
 ## 到期/关闭/被挤出时播滑出动画后释放（挤出经 UI 对账同步——见
 ## [method _reconcile_toast_nodes]）。[br]
@@ -13,15 +12,23 @@ extends Control
 ## [method request_notification] + 信号 [signal notification_requested]——
 ## HUD 侧经方法转发；各系统经此请求显示，HUD 不主动轮询（信号按 ADR-0007
 ## 归类为 Cat 2b 动作通知，供未来系统连接）。[br]
+## [br][b]三件外援[/b]（本组件超 300 行软上限后按职责拆出，本类只留接线与门面）：[br]
+##   · [NotificationStack]（先于本组件存在）——队列与时间推进的 Logic 内核；[br]
+##   · [NotificationToastRender]——Toast 长什么样、占多高、文字什么颜色（版式为纯计算）；[br]
+##   · [NotificationToastAnim]——滑入/滑出/blink 三条 Tween 与键空间簿记。[br]
+## 拆因：三者都是「照本念」的纯件（无宿主上下文 / 只吃入参），留在组件里只会让
+## 「队列接线」与「版式数字」混在一个文件里。[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2.1）：通知队列是瞬态交互状态（story ADR
 ## 摘要明示「可存于 HUD 组件本地，不写回 GSM」）——[member _stack] 为 UI 本地
-## 合法持有的瞬态队列；[code]_last_*[/code]/[code]_toast_*[/code] 前缀成员均为
-## 瞬态交互状态（§2.1 三分类，见各成员注释）。[br]
+## 合法持有的瞬态队列；[code]_toast_*[/code] 前缀成员为瞬态交互状态。[br]
 ## [br][b]零轮询边界[/b]：无 [code]_process()[/code]——Timer 驱动的时间推进是
 ## 内核 [code]advance[/code] 的注入源（到期判定属 Logic 而非游戏状态读取）；
-## Tween 动画属输入驱动的纯视觉变换豁免（ADR-0031 §3）。[br]
+## Tween 动画属输入驱动的纯视觉变换豁免（ADR-0031 §3，落在 [NotificationToastAnim]）。[br]
 ## [br][b]mouse_filter[/b]（story Engine Notes）：通知可点击关闭——本区域根
-## IGNORE 透传（无通知时不拦截下层点击），内层 SlidePanel STOP 使 gui_input 可达。
+## IGNORE 透传（无通知时不拦截下层点击），内层 SlidePanel STOP 使 gui_input 可达。[br]
+## [br][b]常量在本类留同名转发[/b]：既有用例按 [code]AreaScript.TOAST_*[/code] 读它们，
+## 转发后取法不变——[NotificationToastRender] 是定义的唯一出处，本类只转述
+## （先例 [code]main_menu.gd[/code] 转发 [code]MainMenuTexts[/code] 的词条）。[br]
 ##
 ## [br]来源: ADR-0031、design/gdd/hud-system.md §4、design/ux/hud.md「元素 12」、
 ## design/ux/interaction-patterns.md「通知堆叠」、hud Story 004（2026-09-10
@@ -32,43 +39,36 @@ extends Control
 ## 显示（ADR-0007 Cat 2b 动作通知：请求本身不携带游戏状态变更——通知只读展示）。
 signal notification_requested(type: String, text: String)
 
-## === Visual 常量（数据驱动）===================================================
+## === 拆出的两件外援（定义出处——先于下方转发常量声明，GDScript 常量按书写序解析）==
 
-## 通知文本颜色映射（类型映射 color 标识 → 美术圣经 §4.1 主色调色板 +
-## design/ux/hud.md 元素 12 视觉规范）：[br]
-## green=松石青 #4A9494（获得/正向——修为运转语义复用）、gold=琉璃金 #C8A84E（稀有/
-## 灵石）、purple=烟灰紫 #6E6878（修为变更——烟灰阶紫）、red=朱砂红 #C23B3B
-## （战斗事件攻/错误——生命语义）、blue=松石青 #4A9494（战斗事件守——松石青复用，
-## 界定交互模式库「朱砂红/松石青」双编码）、white=淡墨 #6B675E（系统提示——中性）。
-const TEXT_COLORS: Dictionary = {
-	"green": Color("#4A9494"),
-	"gold": Color("#C8A84E"),
-	"purple": Color("#6E6878"),
-	"red": Color("#C23B3B"),
-	"blue": Color("#4A9494"),
-	"white": Color("#6B675E"),
-}
+## Toast 渲染与版式（长什么样、占多高、文字什么颜色）。
+const RenderScript := preload("res://src/ui/hud/notification_toast_render.gd")
+## Tween 动效与生命周期账本（滑入/滑出/blink）。
+const AnimScript := preload("res://src/ui/hud/notification_toast_anim.gd")
 
-## 滑入/滑出动画时长——0.2s（GDD §视觉/音频需求表「通知弹出/消失 0.2s」+
-## story Guardrail）。
-const SLIDE_DURATION: float = 0.2
-## 时间推进 Timer 间隔（秒）——每 0.1s 调 advance(0.1)（到期判定精度 0.1s，
-## 远小于最短通知 2s 的展示时长，帧预算友好）。
-const TICK_INTERVAL: float = 0.1
-## error 类型 blink 闪烁全周期（先例 realm_bar FALLEN_FLICKER_PERIOD 风格）。
-const BLINK_PERIOD: float = 0.8
+## === 版式/视觉常量（定义见 [NotificationToastRender]——此处转发保取法不变）=======
 
-## === 版式常量（数据驱动——Toast 高度随文本行数走）================================
+## 通知文本颜色映射（color 标识 → 美术圣经 §4.1 调色板）。
+const TEXT_COLORS: Dictionary = RenderScript.TEXT_COLORS
 ## Toast 最小宽度（通知区的设计宽——短提示不缩成一条）。
-const TOAST_MIN_WIDTH: float = 360.0
+const TOAST_MIN_WIDTH: float = RenderScript.TOAST_MIN_WIDTH
 ## 单行 Toast 高度（与容器 offset 高度同源）。
-const TOAST_LINE_HEIGHT: float = 32.0
+const TOAST_LINE_HEIGHT: float = RenderScript.TOAST_LINE_HEIGHT
 ## 通知文本字号。
-const TOAST_FONT_SIZE: int = 13
+const TOAST_FONT_SIZE: int = RenderScript.TOAST_FONT_SIZE
 ## 文本左右留白（Toast 内的内边距——文字不贴面板边）。
-const TOAST_PAD_H: float = 12.0
+const TOAST_PAD_H: float = RenderScript.TOAST_PAD_H
 ## 文本可用宽 = 最小宽度减两侧留白——超长文案在这里折行，不裁字。
-const TOAST_TEXT_WIDTH: float = TOAST_MIN_WIDTH - TOAST_PAD_H * 2.0
+const TOAST_TEXT_WIDTH: float = RenderScript.TOAST_TEXT_WIDTH
+## 滑入/滑出动画时长（定义见 [NotificationToastAnim]）。
+const SLIDE_DURATION: float = AnimScript.SLIDE_DURATION
+## blink 闪烁全周期。
+const BLINK_PERIOD: float = AnimScript.BLINK_PERIOD
+
+## 时间推进 Timer 间隔（秒）——每 0.1s 调 advance(0.1)（到期判定精度 0.1s，
+## 远小于最短通知 2s 的展示时长，帧预算友好）。归于本类：它描述的是「谁在推时间」，
+## 不是「动画多长」。
+const TICK_INTERVAL: float = 0.1
 
 ## === 依赖注入 ==================================================================
 
@@ -86,12 +86,10 @@ var animate: bool = true
 ## id → Toast holder 节点映射（渲染同步用——advance 移除/点击关闭/对账挤出时
 ## 定位节点）。
 var _toast_nodes: Dictionary = {}
-## id → 活跃 Tween（滑入/blink/滑出——一个 id 同时至多一个：后来者经
-## [method _stop_blink] kill 并 erase 前任；各类 Tween 均在 [code]finished[/code]
-## 回调 erase，键空间随 Toast 生命周期回收不泄漏——S-1 语义梳理）。
-var _toast_tweens: Dictionary = {}
 ## 时间推进 Timer（本组件生命周期内创建/销毁）。
 var _tick_timer: Timer = null
+## Tween 账本（滑入/滑出/blink——键空间回收的簿记在件内，见 [NotificationToastAnim]）。
+var _anim: RefCounted = null
 
 ## === 节点引用 ==================================================================
 
@@ -105,6 +103,7 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	if _stack == null:
 		_stack = NotificationStack.new()
+	_anim = AnimScript.new(self)
 	_start_tick_timer()
 
 func _exit_tree() -> void:
@@ -112,10 +111,8 @@ func _exit_tree() -> void:
 		_tick_timer.stop()
 		_tick_timer = null
 	# 清理全部 Tween（滑出/blink）——_exit_tree Tween 清理先例 realm_bar。
-	for tween: Tween in _toast_tweens.values():
-		if tween != null and tween.is_valid():
-			tween.kill()
-	_toast_tweens.clear()
+	if _anim != null:
+		_anim.stop_all()
 
 ## === 通知请求接口（G7 裁决——本 story 实现）====================================
 
@@ -178,7 +175,9 @@ func _reconcile_toast_nodes() -> void:
 ## FULL_RECT 锚跟随 holder 尺寸）为动画目标——滑入/滑出对其做
 ## [code]position.y + modulate.a[/code]，彻底消除对容器布局槽位读数的依赖
 ## （add_child 同帧读布局结果是 OVERLAP 缺陷根因）。点击关闭绑在内层
-## STOP 节点上（gui_input 可达）。
+## STOP 节点上（gui_input 可达）。[br]
+## [br][b]面板构建交给 [NotificationToastRender][/b]：颜色映射与版式数字都在那边，
+## 本方法只管「挂哪、叫什么名字、存进哪个映射」。
 func _spawn_toast(id: int) -> void:
 	var entry: Dictionary = _find_entry(id)
 	if entry.is_empty():
@@ -191,7 +190,7 @@ func _spawn_toast(id: int) -> void:
 	holder.custom_minimum_size = Vector2(TOAST_MIN_WIDTH,
 			toast_height(str(entry[&"text"])))
 	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var panel: Panel = _build_toast_panel(entry)
+	var panel: Panel = RenderScript.build_panel(entry, _on_toast_gui_input)
 	holder.add_child(panel)
 	_stack_container.add_child(holder)
 	_toast_nodes[id] = holder
@@ -199,54 +198,15 @@ func _spawn_toast(id: int) -> void:
 	if bool(entry[&"blink"]):
 		_start_blink(id, panel)
 
-
-## Toast 应占高度——按文本在可用宽度下折成几行算。[br]
+## Toast 应占高度——按文本在可用宽度下折成几行算（算法与常量见
+## [method NotificationToastRender.height_for_text]）。[br]
 ## [br][b]为什么要算[/b]：内层 Label 开了 [code]autowrap[/code] 后高度由布局决定，
 ## 而外层 holder 的高度是 VBox 分配槽位的依据——holder 先按 32px 占位，文本折成
 ## 两行时第二行会画到下一个 Toast 上（堆叠重叠）。[br]
-## [br][b]按字符量宽[/b]：中文在 [code]AUTOWRAP_WORD_SMART[/code] 下可逐字折行，
-## 「整串宽 ÷ 可用宽」向上取整即行数（英文单词折行的误差落在一行以内，只多不少——
-## 多给的高度是空白，少给才是裁字）。[br]
 ## [br][param p_text] 通知文本。[br]
 ## [br][b]返回[/b]：高度（至少一行）。
 func toast_height(p_text: String) -> float:
-	var font: Font = _stack_container.get_theme_font(&"font")
-	var lines: int = 1
-	if font != null and TOAST_TEXT_WIDTH > 0.0:
-		var width: float = font.get_string_size(p_text, HORIZONTAL_ALIGNMENT_LEFT,
-				-1, TOAST_FONT_SIZE).x
-		lines = maxi(1, int(ceil(width / TOAST_TEXT_WIDTH)))
-	return TOAST_LINE_HEIGHT * float(lines)
-
-## 构建内层 Toast 面板（文本 + 颜色映射 + 点击关闭绑定——B-2 双层结构拆出，
-## 保持 _spawn_toast 紧凑）。Panel 与 Label 均 FULL_RECT 锚——跟随 holder
-## 尺寸（holder 为普通 Control，无容器布局覆写内层 position）。
-func _build_toast_panel(entry: Dictionary) -> Panel:
-	var panel: Panel = Panel.new()
-	panel.name = "SlidePanel"
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.mouse_filter = MOUSE_FILTER_STOP
-	var label: Label = Label.new()
-	label.name = "Text"
-	label.text = str(entry[&"text"])
-	label.mouse_filter = MOUSE_FILTER_IGNORE
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	# 超长文案折行而不是被裁：holder 高度已按 [method toast_height] 给足行数，
-	# 折行后的第二行落在面板内，不会画到隔壁 Toast 上。
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	label.offset_left = TOAST_PAD_H
-	label.offset_right = -TOAST_PAD_H
-	if label.label_settings == null:
-		label.label_settings = LabelSettings.new()
-		label.label_settings.font_size = TOAST_FONT_SIZE
-	# 颜色 String→Color 映射在 UI 层（G3 裁决——内核不返回 Color）。
-	label.label_settings.font_color = TEXT_COLORS.get(
-			str(entry[&"color"]), TEXT_COLORS["white"])
-	panel.add_child(label)
-	panel.gui_input.connect(_on_toast_gui_input.bind(int(entry[&"id"])))
-	return panel
+	return RenderScript.height_for_text(p_text, _stack_container.get_theme_font(&"font"))
 
 ## 从内核队列查找条目（get_active 只读快照遍历）。
 func _find_entry(id: int) -> Dictionary:
@@ -264,77 +224,26 @@ func _on_toast_gui_input(event: InputEvent, id: int) -> void:
 		if _stack.dismiss(id):
 			_play_slide_out(id)
 
-## === 动画（Tween——输入驱动的纯视觉变换，零轮询豁免）===========================
+## === 动画转发（实现见 [NotificationToastAnim]）=================================
 
-## 滑入：内层 SlidePanel 从上方 -32px 落位 + 淡入，0.2s（GDD 视觉表「通知弹出
-## 0.2s」——AC-5）。动画目标为内层 Panel（holder 为普通 Control——position 不受
-## 容器布局管理，B-2 修复：不再读 add_child 同帧布局槽位，消除滑入目标过期导致的
-## 堆叠重叠）。[code]from(-32)[/code] 显式起点。Tween 入 [member _toast_tweens][id]
-## ——滑出/blink 接管键位时经 [method _stop_blink] kill（避免同写 position:y 冲突）。
+## 滑入（[code]animate=false[/code] 时件内直接返回，不动面板）。
 func _play_slide_in(id: int, panel: Panel) -> void:
-	if not animate or not is_inside_tree():
-		return
-	panel.modulate.a = 0.0
-	var tween: Tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(panel, "position:y", 0.0,
-			SLIDE_DURATION).from(-32.0) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(panel, "modulate:a", 1.0,
-			SLIDE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.finished.connect(func() -> void: _toast_tweens.erase(id))
-	_toast_tweens[id] = tween
+	_anim.slide_in(id, panel, animate)
 
-## 滑出：内层 SlidePanel 向上滑出 + 淡出 0.2s，完成后释放 holder 节点（GDD 视觉表
-## 「通知消失 0.2s」+ story Guardrail）。VBoxContainer 堆叠重排由引擎布局自动完成
-## （后续 Toast 上移填补空位——AC-5 堆叠重排无重叠）。[br]
-## [b]Tween 生命周期[/b]（S-1 修复）：滑出 Tween 存入 [member _toast_tweens][id]，
-## [code]finished[/code] 回调 erase——字典不随通知量增长持有已失效 Tween 引用；
-## 一个 id 同时至多一个活跃 Tween（滑入/blink 由 [method _stop_blink] kill 腾位）。
+## 滑出 + 释放 holder（[code]animate=false[/code] 时件内走 queue_free 快路径）。
 func _play_slide_out(id: int) -> void:
 	var holder: Control = _toast_nodes.get(id, null)
 	if holder == null or not is_instance_valid(holder):
 		return
 	_toast_nodes.erase(id)
-	_stop_blink(id)
-	if not animate or not is_inside_tree():
-		holder.queue_free()
-		return
-	var panel: Panel = holder.get_node_or_null("SlidePanel") as Panel
-	if panel == null:
-		holder.queue_free()
-		return
-	var tween: Tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(panel, "position:y", -32.0,
-			SLIDE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(panel, "modulate:a", 0.0,
-			SLIDE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(holder.queue_free)
-	# S-1：完成时 erase——滑出是该 id 最后一个 Tween，键空间被回收不泄漏。
-	tween.finished.connect(func() -> void: _toast_tweens.erase(id))
-	_toast_tweens[id] = tween
+	_anim.stop(id)
+	_anim.slide_out(id, holder, animate)
 
-## error 类型 blink 闪烁：0.8s 周期循环（透明度闪烁——GDD §4「红色闪烁」）。
-## [b]reduce-motion 技债注记[/b]（TD-008 同源）：animate=false 时不建循环
-## Tween，静态呈现。
+## error 类型 blink 闪烁（0.8s 周期循环——GDD §4「红色闪烁」）。
 func _start_blink(id: int, panel: Panel) -> void:
-	if not animate or not is_inside_tree():
-		return
-	# 滑入 Tween 仍在播时 kill——blink 与滑入同写 modulate.a 会冲突；blink 自身
-	# 循环（0→0.35→1.0）覆盖淡入语义，视觉无损。
-	_stop_blink(id)
-	var tween: Tween = create_tween().set_loops()
-	tween.tween_property(panel, "modulate:a", 0.35,
-			BLINK_PERIOD * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(panel, "modulate:a", 1.0,
-			BLINK_PERIOD * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_toast_tweens[id] = tween
+	_anim.start_blink(id, panel, animate)
 
-## 停止指定 Toast 的当前 Tween（滑入/blink——滑出前调用避免 Tween 泄漏到已隐藏
-## 节点，同时腾出 [member _toast_tweens] 键位给滑出 Tween——一个 id 同时至多一个）。
+## 停止指定 Toast 的当前 Tween（滑入/blink——滑出前调用避免 Tween 写到已隐藏节点，
+## 同时腾出键位给滑出 Tween）。
 func _stop_blink(id: int) -> void:
-	var tween: Tween = _toast_tweens.get(id, null)
-	if tween != null and tween.is_valid():
-		tween.kill()
-	_toast_tweens.erase(id)
+	_anim.stop(id)

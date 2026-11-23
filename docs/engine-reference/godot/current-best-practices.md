@@ -73,6 +73,29 @@ Last verified: 2026-02-12 | 引擎：Godot 4.6
   - 旧的 `duplicate()` 行为保留以向后兼容
   - 当你需要嵌套资源的逐实例副本时使用 `duplicate_deep()`
 
+## 资源 UID 边车（4.4+）
+
+- **`.uid` 边车文件由编辑器生成**，每个 `.gd` / `.gdshader` 旁各一个，内容一行
+  `uid://xxxxx`。它们是 `uid://` 引用的解析表：`.tscn` / `.tres` 用
+  `[ext_resource uid="uid://..."]` 引用资源时，靠它找到文件。
+- **同一个 `res://` 路径生成的 UID 是确定的**——UID 由路径哈希得出，不随机。实测：
+  删掉 `src/ui/main_menu/world_seam.gd.uid` 后重跑编辑器，生成的仍是
+  `uid://c5gkxtx7smlog`（与删除前逐字相同）。因此「谁在哪台机器上补的」不影响结果。
+- **生成方式**（无需开图形界面）：
+
+  ```powershell
+  godot --headless --editor --quit
+  ```
+
+  缺边车时编辑器启动会补齐；不打开编辑器则永远不生成。
+- **本仓库的策略是提交 `.uid`**（`git ls-files "*.uid"` 可核对）。理由：路径哈希确定 ⇒
+  提交它零成本；而「一半提交一半不提交」会让新克隆的机器在[b]首次打开编辑器之前[/b]
+  对 `uid://` 引用解析失败。新增脚本提交时请一并 `git add` 其 `.uid`。
+
+> 截至 2026-11-23，`src/` 下的 `.tscn` / `.tres` 全部用 `path="res://..."` 引用、
+> 尚未使用 `uid://`——所以缺边车[b]当下[/b]不会立刻报错；但 `prototypes/` 与
+> `resources/audio/` 已经用上了 `uid://`，那条路上缺边车就是硬失败。
+
 ## Navigation（4.5+）
 
 - **专用 2D 导航服务器**：不再通过 3D NavigationServer 代理

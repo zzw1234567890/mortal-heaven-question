@@ -160,7 +160,6 @@ offset_right = 224.0
 offset_bottom = -12.0
 grow_vertical = 0
 theme_type_variation = &"CaptionText"
-text = "v?"
 
 [node name="CorruptDialog" type="AcceptDialog" parent="."]
 dialog_text = "存档损坏，无法读取"

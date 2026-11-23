@@ -124,9 +124,15 @@ Godot 默认清屏色 `Color(0.3, 0.3, 0.3)`（实测战斗屏 93.3% 像素 RGB(
 
 其余未动项：
 
-1. **`identity_select.tscn` 的 `HintLabel`**：留着 `Color(0.42, 0.4, 0.37, 1)`
-   ——比 T-3（`#68645C`）还暗。语义像是「比正文更弱的提示」，但它比禁用色还暗，
-   属于设计判断（该用 T-2 还是 T-3？）而不是收敛重复值，留待下一轮定夺。
+1. **~~`identity_select.tscn` 的 `HintLabel`~~ —— 已于 2026-11-23 定夺**：原值
+   `Color(0.42, 0.4, 0.37, 1)`（≈`#6B6660`，比 T-3 还暗）已删除，改用
+   `theme_type_variation = &"CaptionText"`（T-2 `#98948C`）。判据：该标签显示的是
+   身份的「出牌风格提示」，在身份已选中时照常显示——**不是禁用态**，而 T-3 是
+   art-bible §4.7.2 的**禁用**档；比禁用档更暗等于把可读信息画得比不能用的更弱。
+   不选 `DisabledText` 的原因同理（它表达「不能操作」）。
+   收掉这处之后全库 `src/` 下再无 `theme_override_colors`，由
+   `tests/integration/ui_theme/test_identity_hint_text_style.gd` 守住
+   （其中一案全扫 `src/**/*.tscn`，任何新写的节点级配色覆写都会让它转红）。
    （该屏的**背板**已接——它与四屏同值、同 `Background` 节点形态。）
 2. **地图选择 / 主菜单 / 身份选择弹窗内的 `theme_override_font_sizes`**：是排版
    （密集弹窗要更小的字号），本轮只收敛配色，不动。地图选择那处已在场景里写了注释说明。
