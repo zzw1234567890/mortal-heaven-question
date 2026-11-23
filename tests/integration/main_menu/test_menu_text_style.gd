@@ -11,19 +11,31 @@ extends GutTest
 ## [br][b]为什么同时验列宽[/b]：同一轮的像素走查发现 [code]UtilityBox[/code] 两枚
 ## 按钮（行囊与道友 / 读档）的 [code]custom_minimum_size.x[/code] 是 314，而主按钮列是
 ## 320——同屏两列按钮右边界差 7px（409 vs 416）。统一为 320 后列宽一致。[br]
-## [br][b]不进场景树[/b]：本文件只读节点上的主题覆写与尺寸常量，不验 [code]_ready[/code]
-## 后的行为（那由 [code]test_menu_navigation.gd[/code] 覆盖）。
+## [br][b]2026-11-23 主题化后的两处调整[/b]：[br]
+## ① [b]要进场景树[/b]。原先本文件不进树，断言的是 [code].tscn[/code] 里逐节点写的
+## [code]theme_override_colors[/code]——那是节点自己的属性，脱树也在。改成主题
+## [code]theme_type_variation[/code] 后，变体的解析需要 [code]ThemeDB[/code] 的上下文，
+## [b]脱树解析不到[/b]（实测：脱树的 [code]CaptionText[/code] 标签回落到基类
+## [code]Label[/code] 的 T-1，本用例当场红）。进树 + [code]animate = false[/code]
+## （不播入场 Tween），断言口径不变——仍然只读主题色，不验 [code]_ready[/code] 后的
+## 行为（那由 [code]test_menu_navigation.gd[/code] 覆盖）。[br]
+## ② 色阶常量改用 [code]Color("#hex")[/code] 写法。原先是十进制字面量
+## （[code]0.941176[/code] 等），换成主题后比的是主题里 [code]Color("#F0EBE0")[/code]
+## 序列化出的 float32 值——两者[b]小数点后第七位不同[/b]，[code]==[/code] 判假却打印
+## 一模一样。改用 hex 写法后与 art-bible、与生成器三处同一口径，逐位相等。[br]
+## [br]依据：[code]design/art/art-bible.md[/code] §4.7.2、§4.7.3；主题落点
+## [code]theme/main.tres[/code]（生成器 [code]tools/gen_theme.gd[/code]）。
 
 const MAIN_MENU_SCENE: PackedScene = preload("res://src/ui/main_menu/MainMenu.tscn")
 
-## art-bible §4.7.2 文字色阶（暖色四级）。
-const T0: Color = Color(0.941176, 0.921569, 0.878431, 1)  # #F0EBE0 主标题 / 高亮
-const T1: Color = Color(0.784314, 0.768627, 0.737255, 1)  # #C8C4BC 正文
-const T2: Color = Color(0.596078, 0.580392, 0.54902, 1)  # #98948C 次要说明
-const T3: Color = Color(0.407843, 0.392157, 0.360784, 1)  # #68645C 禁用
+## art-bible §4.7.2 文字色阶（暖色四级）——hex 口径与主题生成器同源。
+const T0: Color = Color("#F0EBE0")  # 主标题 / 高亮
+const T1: Color = Color("#C8C4BC")  # 正文
+const T2: Color = Color("#98948C")  # 次要说明
+const T3: Color = Color("#68645C")  # 禁用
 
-## 项目深色基底（MainMenu.tscn 的 Background）。
-const BG: Color = Color(0.071, 0.071, 0.086, 1)
+## 项目深色基底（[code]theme/main.tres[/code] 的 [code]GamePalette/backdrop[/code]）。
+const BG: Color = Color("#0E0F16")
 
 const MAIN_BUTTONS: Array[String] = [
 	"NewGameButton", "ContinueButton", "SettingsButton", "DeckEditButton", "QuitButton",
@@ -41,6 +53,9 @@ var _menu: Control = null
 
 func before_each() -> void:
 	_menu = MAIN_MENU_SCENE.instantiate() as Control
+	# animate = false：不播 0.8s 入场 Tween（本用例只看配色，不看动画）；进树原因见文件头。
+	_menu.animate = false
+	add_child(_menu)
 
 
 func after_each() -> void:

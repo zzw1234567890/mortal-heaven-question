@@ -63,6 +63,9 @@ project/assembly_name="仙途问道"
 
 [gui]
 
+; 全局默认主题（UI 配色的唯一落点——见 theme/main.tres 与 src/ui/shared/app_backdrop.gd）
+theme/custom="res://theme/main.tres"
+
 timers/tooltip_delay_sec=0.1
 
 [input]

@@ -1,0 +1,156 @@
+[gd_resource type="Theme" format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_o6bca"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.078431375, 0.078431375, 0.078431375, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2901961, 0.2901961, 0.27450982, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_i0ir6"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.27482355, 0.27482355, 0.26760784, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.39666668, 0.39666668, 0.38333336, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pcump"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.21176471, 0.21176471, 0.20392157, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2901961, 0.2901961, 0.27450982, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5l6cs"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.18, 0.18, 0.17333335, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.46764708, 0.46764708, 0.45588237, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_klomd"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.15686275, 0.15686275, 0.14901961, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2901961, 0.2901961, 0.27450982, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lw8ei"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.15686275, 0.15686275, 0.14901961, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2901961, 0.2901961, 0.27450982, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[resource]
+BodyText/base_type = &"Label"
+BodyText/colors/font_color = Color(0.78431374, 0.76862746, 0.7372549, 1)
+BodyText/font_sizes/font_size = 16
+Button/colors/font_color = Color(0.78431374, 0.76862746, 0.7372549, 1)
+Button/colors/font_disabled_color = Color(0.40784314, 0.39215687, 0.36078432, 1)
+Button/colors/font_focus_color = Color(0.9411765, 0.92156863, 0.8784314, 1)
+Button/colors/font_hover_color = Color(0.9411765, 0.92156863, 0.8784314, 1)
+Button/colors/font_pressed_color = Color(0.9411765, 0.92156863, 0.8784314, 1)
+Button/font_sizes/font_size = 16
+Button/styles/disabled = SubResource("StyleBoxFlat_o6bca")
+Button/styles/hover = SubResource("StyleBoxFlat_i0ir6")
+Button/styles/normal = SubResource("StyleBoxFlat_pcump")
+Button/styles/pressed = SubResource("StyleBoxFlat_5l6cs")
+CaptionText/base_type = &"Label"
+CaptionText/colors/font_color = Color(0.59607846, 0.5803922, 0.54901963, 1)
+CaptionText/font_sizes/font_size = 13
+DangerText/base_type = &"Label"
+DangerText/colors/font_color = Color(0.7019608, 0.25882354, 0.2901961, 1)
+DangerText/font_sizes/font_size = 16
+DisabledText/base_type = &"Label"
+DisabledText/colors/font_color = Color(0.40784314, 0.39215687, 0.36078432, 1)
+DisabledText/font_sizes/font_size = 13
+DisplayText/base_type = &"Label"
+DisplayText/colors/font_color = Color(0.9411765, 0.92156863, 0.8784314, 1)
+DisplayText/font_sizes/font_size = 48
+GamePalette/colors/accent_danger = Color(0.7607843, 0.23137255, 0.23137255, 1)
+GamePalette/colors/accent_danger_soft = Color(0.7019608, 0.25882354, 0.2901961, 1)
+GamePalette/colors/accent_success = Color(0.2901961, 0.5803922, 0.5803922, 1)
+GamePalette/colors/accent_warning = Color(0.78431374, 0.65882355, 0.30588236, 1)
+GamePalette/colors/backdrop = Color(0.05490196, 0.05882353, 0.08627451, 1)
+GamePalette/colors/control = Color(0.21176471, 0.21176471, 0.20392157, 1)
+GamePalette/colors/control_border = Color(0.2901961, 0.2901961, 0.27450982, 1)
+GamePalette/colors/disabled_fill = Color(0.078431375, 0.078431375, 0.078431375, 1)
+GamePalette/colors/ink_black = Color(0.101960786, 0.101960786, 0.101960786, 1)
+GamePalette/colors/panel = Color(0.15686275, 0.15686275, 0.14901961, 1)
+GamePalette/colors/panel_border = Color(0.2901961, 0.2901961, 0.27450982, 1)
+GamePalette/colors/text_disabled = Color(0.40784314, 0.39215687, 0.36078432, 1)
+GamePalette/colors/text_primary = Color(0.9411765, 0.92156863, 0.8784314, 1)
+GamePalette/colors/text_secondary = Color(0.78431374, 0.76862746, 0.7372549, 1)
+GamePalette/colors/text_tertiary = Color(0.59607846, 0.5803922, 0.54901963, 1)
+Label/colors/font_color = Color(0.78431374, 0.76862746, 0.7372549, 1)
+Label/font_sizes/font_size = 16
+NavButton/base_type = &"Button"
+NavButton/font_sizes/font_size = 18
+Panel/styles/panel = SubResource("StyleBoxFlat_klomd")
+PanelContainer/styles/panel = SubResource("StyleBoxFlat_lw8ei")
+RichTextLabel/colors/default_color = Color(0.78431374, 0.76862746, 0.7372549, 1)
+RichTextLabel/font_sizes/normal_font_size = 16
+SubtitleText/base_type = &"Label"
+SubtitleText/colors/font_color = Color(0.9411765, 0.92156863, 0.8784314, 1)
+SubtitleText/font_sizes/font_size = 22
+TitleText/base_type = &"Label"
+TitleText/colors/font_color = Color(0.9411765, 0.92156863, 0.8784314, 1)
+TitleText/font_sizes/font_size = 32
+WarningText/base_type = &"Label"
+WarningText/colors/font_color = Color(0.78431374, 0.65882355, 0.30588236, 1)
+WarningText/font_sizes/font_size = 16

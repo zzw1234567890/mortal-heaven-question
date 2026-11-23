@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://src/ui/exploration/map_select_screen.gd" id="1_script"]
+[ext_resource type="Script" path="res://src/ui/shared/app_backdrop.gd" id="2_backdrop"]
 
 [node name="MapSelectScreen" type="Control"]
 layout_mode = 3
@@ -20,7 +21,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.071, 0.071, 0.086, 1)
+script = ExtResource("2_backdrop")
 
 [node name="LayoutAnchor" type="Control" parent="."]
 layout_mode = 1
@@ -44,7 +45,7 @@ offset_bottom = 56.0
 grow_horizontal = 2
 clip_text = true
 text_overrun_behavior = 3
-theme_override_font_sizes/font_size = 32
+theme_type_variation = &"TitleText"
 
 [node name="BalanceLabel" type="Label" parent="LayoutAnchor"]
 layout_mode = 1
@@ -59,7 +60,7 @@ grow_horizontal = 0
 custom_minimum_size = Vector2(260, 0)
 clip_text = true
 text_overrun_behavior = 3
-theme_override_font_sizes/font_size = 22
+theme_type_variation = &"SubtitleText"
 horizontal_alignment = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="LayoutAnchor"]
@@ -112,8 +113,9 @@ theme_override_font_sizes/font_size = 15
 [node name="WarnLabel" type="Label" parent="ReentryDialog/VBox"]
 layout_mode = 2
 autowrap_mode = 3
+theme_type_variation = &"WarningText"
+# 字号保留局部偏离：重入弹窗四行是密集排版，警示行要比正文档小（主题档为 16）
 theme_override_font_sizes/font_size = 13
-theme_override_colors/font_color = Color(0.9, 0.75, 0.3, 1)
 
 [connection signal="confirmed" from="ReentryDialog" to="." method="_on_reentry_confirmed"]
 [connection signal="canceled" from="ReentryDialog" to="." method="_on_reentry_canceled"]

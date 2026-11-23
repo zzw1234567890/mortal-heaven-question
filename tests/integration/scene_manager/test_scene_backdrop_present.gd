@@ -12,10 +12,19 @@ extends GutTest
 ## 插任何节点都会打破它；容器的既有测试按名取件，与子节点数量无关。[br]
 ## [br][b]为什么不挂进场景树[/b]：本文件只验结构（节点在场 / 类型 / 锚点 / 颜色 /
 ## 绘制次序），[code]instantiate()[/code] 不进树即可拿到完整节点结构，
-## 且不会触发 [code]_ready[/code] 的开战与转场接线——确定性最好。
+## 且不会触发 [code]_ready[/code] 的开战与转场接线——确定性最好。[br]
+## [br][b]2026-11-23 主题化后基准色改口径[/b]：[code]BG_COLOR[/code] 原先是四屏里
+## 各写一份的字面量 [code]Color(0.071, 0.071, 0.086)[/code]，现在是主题
+## [code]theme/main.tres[/code] 的 [code]GamePalette/backdrop[/code]
+## （[code]Color("#0E0F16")[/code]，取四屏中最深的那一支，即节点图原值）。
+## 背板色由 [code]AppBackdrop[/code] 脚本在 [code]_init[/code] 从主题读取——
+## 脱树也能解析自定义 type（实测），所以「不挂树」的前提不变。断言强度[b]没有放宽[/b]：
+## 仍是「逐位等于基准色」，只是基准色从散落的字面量换成了唯一来源；下面
+## [code]test_backdrop_color_is_not_godot_default_clear_color[/code] 的两条反向断言
+## 原样保留。
 
-## 项目深色基底（与 MainMenu.tscn / map_select_screen.tscn 的 Background 同值）。
-const BG_COLOR: Color = Color(0.071, 0.071, 0.086, 1)
+## 项目深色基底 = [code]theme/main.tres[/code] 的 [code]GamePalette/backdrop[/code]。
+const BG_COLOR: Color = Color("#0E0F16")
 
 const CombatScenePath: String = "res://src/feature/combat/combat_scene.tscn"
 const TribulationScenePath: String = "res://src/feature/tribulation/tribulation_scene.tscn"
