@@ -35,6 +35,26 @@ const MIDDLE_GAP_MIN: float = 100.0
 ## 地图选择把卡片滚动区压在它下面，改高度时两处一起改）。
 const BAR_HEIGHT: float = 48.0
 
+## 左上角留给全局 HUD「境界修为区」的宽度（px）——顶栏左侧元素从这里[b]之后[/b]起。[br]
+## [br][b]为什么顶栏要让 HUD[/b]：HUD 是 [code]CanvasLayer.layer = 90[/code] 的常驻层，
+## 在探索/地图选择/商店/事件/卡组编辑里都可见，它的境界修为区锚在左上角
+## [code](16,12)-(256,72)[/code]（[code]HUD.tscn[/code] 的 [code]RealmBarArea[/code]）。
+## 两块矩形一重叠，Godot 的控件拾取先按 [code]layer[/code] 降序排——HUD 在上，
+## 落在顶栏按钮上的左键会被它吃掉（[code]RealmBar[/code] 根节点
+## [code]mouse_filter = STOP[/code]，G8 裁决为 tooltip 悬停而设），玩家鼠标点不动
+## [code]TopBar/ExitButton[/code]。鼠标点不动「退出探索」= 主动结束探索这条退路断开。[br]
+## [br][b]为什么让的是顶栏而不是把 HUD 挪走/改成 IGNORE[/b]：境界修为区在左上角是
+## GDD/UX 两处写死的全局约定（[code]design/gdd/hud-system.md[/code] §布局表、
+## [code]design/ux/hud.md[/code]「元素 1」，五个场景共用），而为 tooltip 而设的
+## STOP 是 G8 裁决的既有结论——两者都不该为探索顶栏的一个按钮让路。顶栏的位置反倒是
+## 本模块能定的：横向排布，往右挪一段不影响任何语义。[br]
+## [br][b]取值 = HUD 锚区右缘（256）+ 一段留白[/b]：256 是 [code]HUD.tscn[/code] 里
+## [code]RealmBarArea.offset_right[/code] 的设计值，本模块不 import 场景——那会把
+## 「读 .tscn」变成编译期依赖。改 HUD 锚区宽度时这里要一起改，由
+## [code]tests/integration/playtest/test_top_bar_hud_occlusion.gd[/code] 的真实矩形
+## 断言兜住（改了不同步会红）。
+const HUD_LEFT_ANCHOR_EDGE: float = 256.0
+
 
 ## 两个控件之间的水平间距（[param p_right] 左缘 - [param p_left] 右缘）。[br]
 ## [br][param p_left] 左侧控件（可 null——返回 0 表示无从判定）。[br]

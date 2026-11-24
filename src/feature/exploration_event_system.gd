@@ -154,6 +154,15 @@ func resolve_option(p_event_id: String, p_option_index: int,
 	if not (raw_option is EventDefOption):
 		return _failure("选项类型不正确：%s" % p_event_id)
 	var option: EventDefOption = raw_option
+	# 付费选项先验余额：付不起就整条不落（见 [method _cost_of]）。
+	var cost: int = _cost_of(option)
+	if cost > 0 and not _can_afford(cost, p_deps):
+		return {
+			"ok": true,
+			"result_text": "你摸了摸储物袋——灵石不够，此事只好作罢。",
+			"lines": ["灵石不足（需 %d）" % cost],
+			"applied": 0,
+		}
 	var lines: Array = []
 	var applied: int = 0
 	for raw_effect: Variant in option.effects:
@@ -209,7 +218,14 @@ func _apply_effect(p_effect: EventDefEffect, p_amount: int,
 	return ""
 
 
+## 灵石效果——正负分走两条路。[br]
+## [br][b]为什么负值必须走 [method ResourceSystem.spend_resource][/b]：资源系统的
+## [code]add_resource[/code] 明令拒收负数（防变相增加资源），拿它落「炉资 40」
+## 这类收费效果只会得到一条 [code]push_error[/code] 而余额纹丝不动——玩家白拿奖励。
+## 收费用 [code]spend_resource[/code]（先验余额再原子扣减），与商店购买同一口径。
 func _apply_ling_shi(p_amount: int, p_deps: Dictionary) -> String:
+	if p_amount < 0:
+		return _charge_ling_shi(-p_amount, p_deps)
 	var system: Variant = p_deps.get("resource_system")
 	if system == null or not (system is Node) or not system.has_method(&"add_resource"):
 		return "灵石 +%d（未能发放：资源系统不可用）" % p_amount
@@ -217,6 +233,48 @@ func _apply_ling_shi(p_amount: int, p_deps: Dictionary) -> String:
 	if not ok:
 		return "灵石 +%d（未能发放）" % p_amount
 	return "灵石 +%d" % p_amount
+
+
+## 扣灵石——[param p_cost] 为正的应付额。[br]
+## [br][b]返回[/b]：可直接显示的文案行；扣款失败（余额不足/系统不可用）时如实说明。
+func _charge_ling_shi(p_cost: int, p_deps: Dictionary) -> String:
+	var system: Variant = p_deps.get("resource_system")
+	if system == null or not (system is Node) or not system.has_method(&"spend_resource"):
+		return "灵石 -%d（未能扣除：资源系统不可用）" % p_cost
+	var ok: bool = bool(system.call(&"spend_resource", &"ling_shi", p_cost))
+	if not ok:
+		return "灵石 -%d（未能扣除：灵石不足）" % p_cost
+	return "灵石 -%d" % p_cost
+
+
+## 选项的应付灵石总额（无收费效果时为 0）。[br]
+## [br][b]为什么不带动 rng[/b]：这是「付款前先验余额」用的[b]上界[/b]——真掷一次骰
+## 会把 rng 推进一格，等真正结算时数额就与验资时看到的不是同一个数。区间效果取
+## 最负的一端（花费最大），固定效果取原值。[br]
+func _cost_of(p_option: EventDefOption) -> int:
+	var total: int = 0
+	for raw: Variant in p_option.effects:
+		if not (raw is EventDefEffect):
+			continue
+		var effect: EventDefEffect = raw
+		if effect.kind != KIND_LING_SHI:
+			continue
+		var amount: int = effect.amount
+		if effect.use_range:
+			amount = mini(effect.min_amount, effect.max_amount)
+		if amount < 0:
+			total += -amount
+	return total
+
+
+## 余额够不够付 [param p_cost]。[br]
+## [br][b]资源系统缺席时不拦[/b]：那属于「依赖缺失」的降级路径，
+## 由 [method _charge_ling_shi] 给出「未能扣除」的如实文案，不该冒充「灵石不足」。
+func _can_afford(p_cost: int, p_deps: Dictionary) -> bool:
+	var system: Variant = p_deps.get("resource_system")
+	if system == null or not (system is Node) or not system.has_method(&"can_spend"):
+		return true
+	return bool(system.call(&"can_spend", &"ling_shi", p_cost))
 
 
 func _apply_cultivation(p_amount: int, p_deps: Dictionary) -> String:
