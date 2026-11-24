@@ -9,7 +9,10 @@ extends Node
 ## [b]push/pop 配对[/b]: 以 [StringName] source 标识调用方，重复 push 同 source 记录警告。[br]
 ## [b]GSM 同步[/b]: push/pop/clear 通过 [method _sync_to_gsm] 写入 GSM.session.input_locks，
 ##               由 GSM [signal batch_updated] 传播锁状态变更。[br]
-## [b]场景切换[/b]: 连接 [signal SceneTree.tree_changed] 自动清除锁栈。[br]
+## [b]场景切换[/b]: 连接 [signal SceneTree.tree_changed] 自动清除锁栈——
+##               但 [constant SCENE_TRANSITION_SOURCE] 的锁（SceneManager 的转场锁）
+##                除外，它跨场景存续到 Phase 4 由持有方 pop（见
+##                [code]input_lock_stack.gd[/code] 同名常量注记）。[br]
 ## [br]
 ## [b]调用示例[/b]:[br]
 ## [codeblock]

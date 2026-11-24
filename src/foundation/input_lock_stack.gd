@@ -10,6 +10,22 @@ extends RefCounted
 ## 父节点引用——InputManager Autoload 实例。
 var _parent: Node = null
 
+## 跨场景存续的锁 source——[method on_tree_changed] 对它网开一面。[br]
+## [br]
+## 转场锁的持有周期「跨场景」：[code]SceneManager[/code] 在 Phase 2 推入、
+## Phase 4 才 pop，而两者之间恰好夹着 Phase 3 的 [code]change_scene_to_file[/code]
+## ——它必然触发 [signal SceneTree.tree_changed]。[br]
+## [br][b]若把它一并清掉[/b]（本方法此前的行为）后果有两条：①转场窗口内锁栈
+## 实际为空，UI_NAV 输入（ESC）照样通过判定——TRANSITION 锁「阻止一切输入」
+## 的契约在最需要它的那一段失效，玩家能在加载时按开暂停菜单；②Phase 4 的
+## [method InputManager.pop_lock] 找不到配对条目，刷出「source not found」警告。[br]
+## [br][b]唯一推入方[/b]是 [code]SceneManager.request_scene_change[/code]（Phase 2），
+## 受 [code]_transitioning[/code] 守卫约束不会重复推；[b]唯一释放方[/b]是
+## [code]SceneTransition._execute_post_load[/code] 与
+## [code]SceneTransition._cleanup_on_error[/code]——转场的每条终点都 pop，
+## 不存在只推不放的路径（[method InputManager._exit_tree] 另有整栈兜底）。
+const SCENE_TRANSITION_SOURCE: StringName = &"scene_manager"
+
 
 ## 构造——传入父节点引用。
 func _init(parent: Node = null) -> void:
@@ -114,13 +130,23 @@ func has_lock(source: StringName) -> bool:
 	return false
 
 
-## 场景树变更回调——场景切换时自动清除输入锁。[br]
-## [br][b]优化[/b]: 仅当栈非空时清除——避免不必要的 GSM 写入。
+## 场景树变更回调——场景切换时清除输入锁。[br]
+## [br][b]保留[/b]：[constant SCENE_TRANSITION_SOURCE] 的锁——见该常量注记
+## （SceneManager 的转场锁跨场景存续，由 Phase 4 pop 释放）。[br]
+## [br][b]优化[/b]: 栈内无待清条目时不做任何事——避免不必要的 GSM 写入。
 func on_tree_changed() -> void:
 	var lock_stack: Array = _parent.get("_lock_stack")
-	if not lock_stack.is_empty():
-		lock_stack.clear()
-		_sync_to_gsm()
+	var kept: Array = []
+	for entry in lock_stack:
+		if entry.source == SCENE_TRANSITION_SOURCE:
+			kept.append(entry)
+	if kept.size() == lock_stack.size():
+		return  # 无可清条目——保持旧行为（含空栈早退）
+	var cleared: int = lock_stack.size() - kept.size()
+	lock_stack.assign(kept)
+	print("InputManager: tree_changed 清除 %d 个遗留锁（保留转场锁 %s）"
+			% [cleared, str(SCENE_TRANSITION_SOURCE)])
+	_sync_to_gsm()
 
 
 ## 将锁栈序列化写入 GSM.session.input_locks 并通过 batch_updated 信号传播。[br]
