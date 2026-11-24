@@ -276,7 +276,8 @@ func test_ac002_batch_path_set_exploration_ap_updates_display() -> void:
 func test_ac002_domain_signal_path_restore_updates_display() -> void:
 	## AC-2 ②（GAP-2 修订新增）: restore_action_points(2) 单写 action_points →
 	## 帧末 flush 单条变更 → 域信号 action_points_changed 路径（行动力恢复
-	## 节点事件的真实路径——gsm_atomic_writes.gd L349）。max_val 恒 0 不消费。
+	## 节点事件的真实路径——gsm_exploration_writes.gd
+	## [method GSMExplorationWrites.restore_action_points]）。max_val 恒 0 不消费。
 	# Arrange —— 消耗到 1/5（直写基线，绕过信号）
 	gsm.exploration.action_points = 1
 	info._refresh()
