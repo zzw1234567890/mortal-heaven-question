@@ -45,6 +45,8 @@ const EntryScript := preload("res://src/ui/deck_editing/deck_editing_entry.gd")
 const WatchScript := preload("res://src/ui/deck_editing/deck_editing_template_watch.gd")
 ## 依赖解析（注入优先、否则 Autoload——与 [code]deck_view_sources.gd[/code] 同口径）。
 const SourcesScript := preload("res://src/ui/hud/deck_view_sources.gd")
+## 消费输入的包装（Esc 返回会把自己摘走——见 [method UiInputConsume.mark_handled]）。
+const ConsumeScript := preload("res://src/ui/shared/ui_input_consume.gd")
 const TEXT_TITLE: String = "📜 卡组编辑"
 
 ## 依赖注入（null 时按 /root 找 Autoload——同 [code]InventoryModel[/code] 的回退口径）。
@@ -218,7 +220,9 @@ func _input(p_event: InputEvent) -> void:
 		return
 	if not bool(_navigator.call(&"handle_event", p_event)):
 		return
-	get_viewport().set_input_as_handled()
+	# Esc 那条路会经导航器发出转场（change_scene_to_file 当场把本屏摘走），
+	# 回到这里时本节点已不在树上——消费走空安全包装，见那边类文档。
+	ConsumeScript.mark_handled(self)
 
 
 ## 游标变化——把键盘焦点搬到新栏的新行（焦点环由样式的 focus 状态随焦点绘制）。

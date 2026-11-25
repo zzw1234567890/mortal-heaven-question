@@ -63,6 +63,8 @@ const WatchScript := preload("res://src/ui/deck_editing/deck_editing_template_wa
 ## SceneManager 脚本常量——SceneID / TransitionType 枚举真理来源
 ## （preload 而非 Autoload 全局名——同 placeholder_scene.gd 口径）。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
+## 消费输入的包装（Esc 离开会把自己摘走——见 [method UiInputConsume.mark_handled]）。
+const ConsumeScript := preload("res://src/ui/shared/ui_input_consume.gd")
 
 ## 标题与提示词条。
 const TEXT_TITLE: String = "🏪 坊市"
@@ -233,7 +235,9 @@ func _input(p_event: InputEvent) -> void:
 		return
 	if not bool(_navigator.call(&"handle_event", p_event)):
 		return
-	get_viewport().set_input_as_handled()
+	# Esc 那条路会发出回主菜单的转场（当场把本屏摘走），回到这里时本节点已不在
+	# 树上——消费走空安全包装，见那边类文档。
+	ConsumeScript.mark_handled(self)
 
 
 ## 游标变化——把键盘焦点搬到新行（焦点环由样式的 focus 状态随焦点绘制）。

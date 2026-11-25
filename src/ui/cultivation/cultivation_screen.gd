@@ -48,6 +48,8 @@ const RulesScript := preload("res://src/ui/cultivation/cultivation_view_rules.gd
 const ActionsScript := preload("res://src/ui/cultivation/cultivation_actions.gd")
 ## 屏外接线（GSM 信号订阅 / 渡劫回流 / 回主菜单出口——本屏不自己订）。
 const BindingScript := preload("res://src/ui/cultivation/cultivation_screen_binding.gd")
+## 消费输入的包装（Esc 返回会把自己摘走——见 [method UiInputConsume.mark_handled]）。
+const ConsumeScript := preload("res://src/ui/shared/ui_input_consume.gd")
 
 ## 依赖注入（null 时按 /root 找 Autoload——同坊市 / 卡组编辑的回退口径）。[br]
 ## [br][b]接入半边现读这些字段[/b]：故「进树前注入」即可被采信——[member _actions_] /
@@ -226,7 +228,9 @@ func press_leave() -> void:
 func _input(p_event: InputEvent) -> void:
 	if not bool(_input_router.call(&"handle_event", p_event)):
 		return
-	get_viewport().set_input_as_handled()
+	# Esc 那条路会发出回主菜单的转场（当场把本屏摘走），回到这里时本节点已不在
+	# 树上——消费走空安全包装，见那边类文档。
+	ConsumeScript.mark_handled(self)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

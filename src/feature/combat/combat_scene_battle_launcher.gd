@@ -36,15 +36,19 @@ func start(p_combat: Node, p_root: Control, p_interaction: RefCounted,
 		return ""  # 已开战——重复确认是空操作，不是失败
 	if not bool(p_launch.call(&"can_start", p_required)):
 		return str(p_launch.call(&"failure_text"))
-	var setup: RefCounted = _make_setup(p_deps, p_launch)
+	var setup: RefCounted = make_setup(p_deps, p_launch)
 	setup.call(&"launch", p_combat, p_root, p_interaction,
 			p_character_ids, p_realm, p_is_tribulation)
 	return ""
 
 
 ## 构建开战前置——依赖顺序：AI / 布阵 / 卡组 / 显式遭遇 / 运行时名册 /
-## 节点三件套（模板 ID / 等级 / 掉落，由上下文模块给出）。
-func _make_setup(p_deps: Dictionary, p_launch: RefCounted) -> RefCounted:
+## 节点三件套（模板 ID / 等级 / 掉落，由上下文模块给出）。[br]
+## [br][b]为什么公开[/b]：渡劫战的开战入口不在这里（它走
+## [code]TribulationSystem.start_tribulation_combat[/code]），但那条路同样需要
+## 「布阵 + 牌堆」先就位——渡劫场景借本方法拿到同一个 setup 实例，
+## [code]setup_field[/code] / [code]init_deck[/code] 的实现与顺序仍只有一处。
+func make_setup(p_deps: Dictionary, p_launch: RefCounted) -> RefCounted:
 	var setup: RefCounted = BattleSetupScript.new()
 	var args: Array = [p_deps.get("ai"), p_deps.get("deployment"), p_deps.get("deck"),
 			p_deps.get("encounter"), p_deps.get("roster_override")]

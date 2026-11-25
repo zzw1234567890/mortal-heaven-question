@@ -142,6 +142,14 @@ func _max_cultivation() -> int:
 	return int(GameStateManager.player.max_cultivation)
 
 
+## 一条「按下取消」的动作事件（界面判的是动作名，不是键码）。
+func _cancel_event() -> InputEventAction:
+	var event := InputEventAction.new()
+	event.action = &"ui_cancel"
+	event.pressed = true
+	return event
+
+
 ## 刷新 GSM 帧末缓冲（境界信号与上限重算在这一帧到账）。
 func _flush() -> void:
 	await get_tree().process_frame
@@ -405,6 +413,26 @@ func test_cultivation_scene_leave_button_returns_to_main_menu() -> void:
 	# Assert——与 Esc 同一出口，且只发一次（不重复接线）
 	assert_eq(sm.requests.size(), 1, "「离开」应恰好发出一次转场请求")
 	assert_eq(int(sm.requests[0]["to"]), SceneManagerScript.SceneID.MAIN_MENU, "应回主菜单")
+
+
+## Esc 返回之后本屏已离树（转场把当前场景摘走了）——消费不得再碰取不到的 viewport。[br]
+## [br][b]真机走查现场[/b]：[code]get_viewport().set_input_as_handled()[/code] 在离树后
+## 报 [code]Cannot call method 'set_input_as_handled' on a null value[/code]
+## （机制与修法见 [code]ui_input_consume.gd[/code] 类文档；同构的卡组编辑 / 坊市各有
+## 同名用例）。[br]
+## [br][b]为什么手工摘出树[/b]：真实转场要过 [code]change_scene_to_file[/code]，
+## 会换掉测试树；摘出树就复现了同一个瞬间（探针实测：离树同帧
+## [code]get_viewport()[/code] 即为 null）。
+func test_cultivation_scene_escape_after_leaving_tree_does_not_error() -> void:
+	# Arrange
+	screen = _mount()
+	remove_child(screen)
+	sm.requests.clear()
+	# Act——界面读的就是取消动作本身（离树后引擎不再派发到这里，直接调同一条
+	# 处理链：SceneInput → 回主菜单转场 → 消费，正是崩的那一段）
+	screen._input(_cancel_event())
+	# Assert——转场照旧发出（修的是崩溃，不是把这条路堵死）
+	assert_eq(sm.requests.size(), 1, "Esc 的返回请求仍应发出（离树只是消费不了事件）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

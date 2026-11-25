@@ -222,6 +222,20 @@ func _launch_deps() -> Dictionary:
 	}
 
 
+## 开战前置实例（布阵 / 牌堆 / 敌方阵容的装配件）——[b]子类覆写点的配套入口[/b]。[br]
+## [br][b]为什么公开[/b]：[method _start_battle] 的父类实现经
+## [code]combat_scene_battle_launcher[/code] 一次做完「备数据 → 洗牌 → 开战」；
+## 渡劫场景覆写了 [method _start_battle]（开战改由渡劫系统委托），那条路上没人
+## 替它备数据——少了洗牌就是开局发 0 张手牌（真机走查现场：牌库 0 / 无手牌 /
+## 第 21 回合打不完）。子类据此自己走 [code]arm_field_and_deck[/code] →
+## [code]start_tribulation_combat[/code] → [code]attach[/code]，
+## [b]顺序与实现仍只有本工厂一处[/b]。[br]
+## [br][b]用 [method _setup_kit] 而不是 [method _launch_deps] 单独取[/b]：
+## 依赖包与开战上下文要一起交给工厂装配，两条路读的是同一份口径。
+func _setup_kit() -> RefCounted:
+	return LauncherScript.new().call(&"make_setup", _launch_deps(), launch)
+
+
 ## 三个面板出口（备战返回 / 撤退确认 / 战败确认）——导航细节见
 ## [code]combat_scene_exits.gd[/code]（本容器只做转发）。
 func _on_deploy_back() -> void:

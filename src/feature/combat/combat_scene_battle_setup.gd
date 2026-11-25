@@ -61,14 +61,11 @@ func setup(p_ai: Node, p_deployment: Node, p_deck: Node,
 func prepare(p_character_ids: Array, p_realm: int,
 		p_is_tribulation: bool) -> Dictionary:
 	_setup_field(p_character_ids)
-	var deck_ids: Array = _deck_ids()
-	if deck_ids.is_empty():
-		push_warning("CombatSceneBattleSetup: 本局卡组为空——开局手牌将发出 0 张（无法出牌）")
 	var roster: Array = _resolve_roster(p_realm)
 	if roster.is_empty():
 		push_warning("CombatSceneBattleSetup: 敌方阵容为空——本场无法判定胜利")
 	return {
-		"deck_ids": deck_ids,
+		"deck_ids": _deck_ids(),
 		"config": {
 			"character_ids": p_character_ids.duplicate(),
 			"enemy_roster": roster,
@@ -82,7 +79,7 @@ func prepare(p_character_ids: Array, p_realm: int,
 
 
 ## 开战执行——备齐输入 → [code]init_deck[/code] → [code]battle_start[/code] →
-## 建卡 → 放行输入。[br]
+## 建卡 → 放行输入 = [method arm] + [code]battle_start[/code] + [method attach]。[br]
 ## [br][b]为什么顺序写在这里[/b]：[code]init_deck[/code] 必须在
 ## [code]battle_start[/code] 之前（开局手牌在 battle_start 内发出，先开战再发牌
 ## 只会发出 0 张）；建卡又必须在开战之后（敌方名册快照与 HP 种子由 battle_start
@@ -91,16 +88,49 @@ func prepare(p_character_ids: Array, p_realm: int,
 ## [br][b]返回[/b]：是否真的开战（战斗系统不可用时 false）。
 func launch(p_combat: Node, p_root: Control, p_interaction: RefCounted,
 		p_character_ids: Array, p_realm: int, p_is_tribulation: bool) -> bool:
-	var plan: Dictionary = prepare(p_character_ids.duplicate(), p_realm, p_is_tribulation)
-	var deck_ids: Array = plan.get("deck_ids", [])
-	if not deck_ids.is_empty() and p_combat.has_method(&"init_deck"):
-		p_combat.call(&"init_deck", deck_ids)
+	var plan: Dictionary = arm(p_combat, p_character_ids, p_realm, p_is_tribulation)
 	p_combat.call(&"battle_start", plan.get("config", {}))
+	attach(p_root, p_interaction, p_character_ids)
+	return true
+
+
+## 开战[b]前[/b]的前置：布阵 + 牌堆就绪 + 敌方阵容（[method prepare] 那三份输入的
+## 执行侧）。[br]
+## [br][b]为什么拆出来单独公开[/b]：渡劫战的开战入口不是本类的
+## [code]launch()[/code]——那条路由 [code]TribulationSystem.start_tribulation_combat[/code]
+## 自己拿 [code]tribulation_data[/code] 组配置调 [code]battle_start[/code]。于是
+## 「先后顺序」出现了第二个调用方：它必须在本方法之后、[code]battle_start[/code] 之前
+## 是唯一的红线。把两段公开出来，顺序仍只有这一处可审（渡劫场景调的也是这两个方法，
+## 不另抄一份）。[br]
+## [br][b]返回[/b]：[code]{deck_ids, config}[/code]——[code]config[/code] 归调用方自己的
+## 开战入口用；走 [method launch] 的那条路直接取它。
+func arm(p_combat: Node, p_character_ids: Array, p_realm: int,
+		p_is_tribulation: bool) -> Dictionary:
+	var plan: Dictionary = prepare(p_character_ids.duplicate(), p_realm, p_is_tribulation)
+	_init_deck(p_combat)
+	return plan
+
+
+## 只备「布阵 + 牌堆」两样——[b]渡劫战那条开战入口用这个[/b]。[br]
+## [br][b]为什么渡劫不备敌方名册[/b]：渡劫的敌人由 [code]tribulation_data.boss_config[/code]
+## 决定（[code]TribulationSystem[/code] 自己组装），不该被本类按探索节点模板或
+## AISystem 的存量名册顶掉——那会把上一场留下的敌人算进天劫。名册缺口的归属见
+## [method prepare] 的说明。[br]
+## [br][b]顺序与 [method arm] 同源[/b]：布阵在前（判据读阵位）、洗牌在后，
+## 两处走的是同一对私有方法，不另抄一份。
+func arm_field_and_deck(p_combat: Node, p_character_ids: Array) -> void:
+	_setup_field(p_character_ids)
+	_init_deck(p_combat)
+
+
+## 开战[b]后[/b]的收尾：按名册建卡（HP 条 / 飘字 / 阵亡动效的对象）+ 放行出牌输入。[br]
+## [br][b]必须在 [code]battle_start[/code] 之后[/b]：敌方名册快照与 HP 种子由它定格，
+## 先建卡只会读到 0/0（见 [method launch] 的顺序说明）。
+func attach(p_root: Control, p_interaction: RefCounted, p_character_ids: Array) -> void:
 	if p_root != null:
 		p_root.call(&"build_battle_roster", p_character_ids.duplicate())
 	if p_interaction != null:
 		p_interaction.call(&"enable")
-	return true
 
 
 ## 布阵——失败不阻断开战（无阵位时胜负判定走「信息不足则不判」）。
@@ -110,6 +140,18 @@ func _setup_field(p_character_ids: Array) -> void:
 		return
 	if not bool(_deployment.call(&"setup_field", p_character_ids.duplicate(), {})):
 		push_warning("CombatSceneBattleSetup: 布阵失败（角色不可用或超出境界上限）——战斗继续，阵位为空")
+
+
+## 洗牌就位——[code]battle_start[/code] 之前必须做完（开局手牌在里面发出）。[br]
+## [br][b]空牌堆不阻断[/b]：只 push_warning，让战斗照常开（GDD §边缘情况「抽空牌库」
+## 有明确分支）——「本局卡组为空」是组牌侧的问题，不该表现成一场开不起来的仗。
+func _init_deck(p_combat: Node) -> void:
+	var deck_ids: Array = _deck_ids()
+	if deck_ids.is_empty():
+		push_warning("CombatSceneBattleSetup: 本局卡组为空——开局手牌将发出 0 张（无法出牌）")
+		return
+	if p_combat != null and p_combat.has_method(&"init_deck"):
+		p_combat.call(&"init_deck", deck_ids)
 
 
 ## 本局卡组实例 ID（DeckEditingSystem 不可用时为空）。

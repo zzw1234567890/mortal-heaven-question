@@ -334,6 +334,26 @@ func test_shop_scene_leave_button_returns_to_main_menu() -> void:
 	assert_eq(int(sm.requests[0]["to"]), SceneManagerScript.SceneID.MAIN_MENU, "应回主菜单")
 
 
+## Esc 离开之后本屏已离树（转场把当前场景摘走了）——消费不得再碰取不到的 viewport。[br]
+## [br][b]真机走查现场[/b]：[code]get_viewport().set_input_as_handled()[/code] 在离树后
+## 报 [code]Cannot call method 'set_input_as_handled' on a null value[/code]
+## （机制与修法见 [code]ui_input_consume.gd[/code] 类文档；同构的卡组编辑 / 修炼室
+## 各有同名用例）。[br]
+## [br][b]为什么手工摘出树[/b]：真实转场要过 [code]change_scene_to_file[/code]，
+## 会换掉测试树；摘出树就复现了同一个瞬间（探针实测：离树同帧
+## [code]get_viewport()[/code] 即为 null）。
+func test_shop_scene_escape_after_leaving_tree_does_not_error() -> void:
+	# Arrange
+	screen = _mount(RICH)
+	remove_child(screen)
+	sm.requests.clear()
+	# Act——界面读的就是取消动作本身（离树后引擎不再派发到这里，直接调同一条
+	# 处理链；导航器 → 转场 → 消费，正是崩的那一段）
+	screen._input(_cancel_event())
+	# Assert——转场照旧发出（修的是崩溃，不是把这条路堵死）
+	assert_eq(sm.requests.size(), 1, "Esc 的离开请求仍应发出（离树只是消费不了事件）")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 空货架
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -356,6 +376,14 @@ func test_shop_scene_empty_shelf_shows_empty_state_without_error() -> void:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 辅助：读商品表（按屏幕行下标取——测试里两者相等，见上架用例）
 # ═══════════════════════════════════════════════════════════════════════════════
+
+## 一条「按下取消」的动作事件（界面判的是动作名，不是键码）。
+func _cancel_event() -> InputEventAction:
+	var event := InputEventAction.new()
+	event.action = &"ui_cancel"
+	event.pressed = true
+	return event
+
 
 func _goods_id(p_index: int) -> String:
 	var goods: Array[Dictionary] = CatalogScript.goods()

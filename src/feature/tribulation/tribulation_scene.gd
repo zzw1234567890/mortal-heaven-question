@@ -39,15 +39,29 @@ func _requires_launch_context() -> bool:
 ## 开战——优先走渡劫系统委托（其内部进入 IN_COMBAT 状态并组装 boss config）。[br]
 ## [br][b]降级路径[/b]：渡劫系统不可用或状态非 PREPARING（例如玩家直接从节点图
 ## 撞上渡劫台）时退回父类的最小开战，并 push_warning 说明——避免玩家卡在
-## 空战场无法离开。
+## 空战场无法离开。[br]
+## [br][b]委托路径必须先自己备齐前置[/b]：父类 [method CombatScene._start_battle]
+## 经 [code]combat_scene_battle_launcher[/code] 一次做完「备数据 → 开战」，
+## 而本方法把开战交给了渡劫系统——那条路上没人替我们备数据。少掉洗牌的后果
+## 不是「少洗一次」而是[b]开局发 0 张手牌[/b]（开局手牌在 [code]battle_start[/code]
+## 里从牌堆发），玩家出不了牌、对局永远打不完、结算永远不触发（真机走查现场：
+## 「≡牌库:0｜无手牌｜第 21 回合」）。故委托前先经父类的 [method CombatScene._setup_kit]
+## 走 [code]arm_field_and_deck[/code]，接战后再走 [code]attach[/code]
+## ——[b]顺序与实现只有那一个工厂一处[/b]。[br]
+## [br][b]降级时不能重复备[/b]：走了委托就自己收尾并 return；只有确定降级才落到
+## [code]super._start_battle[/code]（它会再备一次，重复布阵虽幂等但会把上面的
+## 洗牌结果覆盖成同一副牌的另一次洗牌）。
 func _start_battle(character_ids: Array) -> void:
 	var ts: Node = _autoload(&"TribulationSystem")
 	var cs: Node = _combat()
 	if ts != null and ts.has_method(&"start_tribulation_combat") \
 			and cs != null and cs.has_method(&"is_battle_active") \
 			and not bool(cs.call(&"is_battle_active")):
+		var kit: RefCounted = _setup_kit()
+		kit.call(&"arm_field_and_deck", cs, character_ids)
 		ts.call(&"start_tribulation_combat")
 		if bool(cs.call(&"is_battle_active")):
+			kit.call(&"attach", combat_root, interaction_wiring, character_ids)
 			return
 		push_warning("TribulationScene: 渡劫系统未接战（状态非 PREPARING）——"
 				+ "降级为普通开战")
