@@ -2,9 +2,31 @@
 
 <!-- STATUS -->
 Epic: presentation-layer
-Feature: 真机走查尾巴（游玩时长落盘 + 结算屏两段分工）
-Task: playtime_seconds 三处缺失修复 + DEBT-CUI-008-3 文案分层；下一步 主菜单停留时间是否计入游玩时长
+Feature: 行数治理（超 300 行文件按职责拆继承链）
+Task: scene_manager.gd 430 → 133 行四段链（contract/access/pipeline/leaf）；Autoload 首次拆链，下一步 files 清单里剩余的 settle_host 系列
 <!-- /STATUS -->
+
+## Session Extract — scene_manager 四段继承链（2026-11-25）
+- 任务单：`src/foundation/scene_manager.gd`（430 行）按职责拆继承链；沿用前四轮「先写公开面锁定用例跑绿 → 逐字搬运 → 每段跑全量」三步法。基线 5865/5865，head `686b551`
+- **拆不拆的判定（任务单要求先判四项，逐项实测）**：① **是 Autoload**——`project.godot` 的 `[autoload]` 把 `SceneManager` 绑在 `*res://src/foundation/scene_manager.gd`，但**不带 `class_name`**（Foundation Autoload 固有权衡，同 `game_state_manager.gd`）；实测链尾脚本 `get_instance_base_type()` 仍是 `Node`、`.new()` 正常、继承链长 3 也照常实例化——**Autoload 不妨碍拆链，只要链尾保持 `extends Node` 血统**。② **有 static 成员**——`create_fade_overlay` / `fade_out_overlay`，且全工程 16 处调用点按路径 `preload` 后**静态形式**取用（`SceneManagerScript.SceneID.COMBAT`、`SceneManagerScript.create_fade_overlay()`）——实测链尾脚本能静态解析**祖先段**的枚举 / 常量 / static 方法，此路可走。③ **有按名分派**——`scene_transition.gd` 用 `_parent.get("_test_mode")` / `.set("_phase3_in_progress", …)` / `.call("_get_gsm")` 跨文件按字符串取 6 个字段与 3 个方法，继承链下 `get`/`set`/`call` 穿透全链，实测通过。④ **无 `@onready` / 无 `%节点路径`**——全文 0 处节点依赖，控件树与 `_ready` 时序无关，拆段不动初始化顺序。**结论：拆**。
+- **切 4 段**：`scene_manager_contract.gd` 183 行（声明面：2 枚举 / 2 信号 / 2 常量表 / 11 实例字段 / 0 方法）、`scene_manager_access.gd` 105 行（依赖与访问面 11 成员：注入 + 惰性获取 + 音频门面 + 持久层注册）、`scene_manager_pipeline.gd` 134 行（转场管线面 7 方法：请求入口 + 信号发射包装 + 异步管线四转发）、`scene_manager.gd` 133 行（链尾装配与出口面 6 成员：`_ready` + 两查询 + 自检 + 两 static）。**41 个成员一个不多一个不少**，文件名与 Autoload 注册串逐字不动
+- **链序由 GDScript 解析期硬约束定死**（本轮探针实测，前四轮结论复用）：祖先段用裸标识符调后代段方法直接 `Parse Error: Function "xxx()" not found in base self`；反向（后代调祖先）成功。故 `_ready`（要调 `_get_persistent_layer` / `_get_audio_manager` / `verify_scene_paths`）**必须落链尾**，而 `scene_transition.gd` 按名调的 `_get_gsm` / `_get_im` / `_execute_post_load` 等必须落前段——链序不是自由选择
+- **另一条实测硬约束**：`SCENE_PATHS` 同时是 `verify_scene_paths(paths: Dictionary = SCENE_PATHS)` 的**默认参数值**，而默认值表达式只能引用本段或祖先段的常量 → 常量必须随声明落链首，不能跟着用它的方法走
+- **字节级搬运 + 四项独立对拍**（临时脚本按显式行区间切片拼接，跑完即删）：① 9 个区间在目标文件**各自唯一且连续**命中；② 原文非空行**无遗漏**；③ 代码体（去注释 / 去空行 / 去 `extends` 行）**195 行多重集完全相同**，且各段内是原文代码行序列的**子序列**；④ 成员表 41 项多重集相同且各段内保序
+- **守卫用例** `tests/unit/scene_manager/test_scene_manager_public_face_lock.gd`（20 例 / 329 断言）：反射沿 `get_base_script()` 合并全链，锁 23 方法形参个数 + 默认参数值 + 返回类型、2 信号形参名、11 实例字段类型且**非 static**（两实例互不影响）、5 张常量表逐项值（SceneID 12 / TransitionType 6 / SCENE_PATHS 12 / TRANSITION_AUDIO_PARAMS 5 / `_AUDIO_MANAGER_SCRIPT` 路径）、`resource_path` + 原生基类 + `project.godot` Autoload 注册值，末四例真实跑完整转场（Phase 2 推锁 + 存档 + `pre_transition` → `_execute_post_load` 的 Phase 4-5 GSM 写入 / 解锁 / `post_transition` / 状态复位）、`_cleanup_on_error`、音频门面与 PersistentLayer 接线。**改前在未改动的 430 行原文件上先跑绿 20/20**（踩一坑：mock 依赖没释放留孤儿 → `after_each` 统一 `free`；另一处最初用 `_test_mode=false` 真跑了 `change_scene_to_file`，把宿主当前场景换掉并留孤儿场景 → 改回 `true` 走同步接缝）
+- **`verify_scene_paths` 的默认值是整张表**这件事单独一条用例守（`test_verify_scene_paths_default_is_scene_paths_table`）——默认值走样在别的断言里看不出来，但「不传参即全表自检」的语义就断了
+- 全量：**5885 / 5885 passing / 0 failing / 3 orphans 存量**（5865 → 5885，净增 20 全为守卫用例）；`test_lock_reentry` 仍 **7/7**（转场锁 push/pop 仍在同一条路径上）；真机试玩走查 **14/14 步全绿**
+- 已知边界：① `scene_persistent_layer.gd` 78 行、`scene_transition.gd` 141 行为本次未动的相邻模块；② `settlement_host.gd` 371 行、`combat_focus_chain.gd` 301 行、`save_load_system.gd` 1027 行为存量超限，不在本轮范围；③ 拆分只解决行数，**没有**改变 `scene_transition.gd` 仍在用 `_parent.get/set/call` 字符串访问这一既有形态（本轮实测它穿透继承链正常，故未顺手改造——那会改到调用点）
+
+## Session Extract — settlement_panel 三段继承链（2026-11-25）
+- 任务单：`src/ui/combat/settlement/settlement_panel.gd`（350 行）按职责拆继承链；沿用前三轮「先写公开面锁定用例跑绿 → 逐字搬运 → 每段跑全量」三步法。基线 5852/5852，head `876a87a`
+- **行构成 / 调用形态**：全文 0 处 `@onready`、0 处 `%节点路径`——控件树由 `_init` → `_build()` → `View.build()` 纯代码搭建并缓存进字段，`_notification(NOTIFICATION_READY)` 只下发字号，故**不是节点结构重度依赖**，拆段不改变 `_ready` 时序（那条「先验一道」的分支没走）。外部消费者 6 个文件按路径取类（`settlement_host_panels.gd` 的 `PanelScript.new()` + 三个集成测试 + debug 场景）；`settlement_host.gd` 持 `var settlement_panel: Control` 按名直呼三个 show_*，属按名动态分派（名字打错只是运行时 `push_error`）
+- **切 3 段**（不是硬凑 2 段）：`settlement_panel_contract.gd` 102 行（声明面：4 preload / 5 信号 / 3 尺寸常量 / 20 实例字段 / 0 方法）、`settlement_panel_flows.gd` 166 行（流程面 7 方法：胜利/战败两面板 + 战利品交互 + 卡片清空 + 已到账汇总）、`settlement_panel.gd` 151 行（链尾：装配与出口面 14 方法）。`class_name SettlementPanel` 与文件路径留链尾逐字不动
+- **本轮最重要的实测发现（GDScript 解析期硬约束）**：**祖先段不能用裸标识符引用后代段成员**。链尾 `_build()` 按名接线三个回调，其中 `_on_loot_delay_timeout` 在上一段——把构造/装配放在链首会直接 `Parse Error: Could not resolve class`。四级递进探针实测（含对照组 `pb.gd extends pa.gd` 后代调祖先**成功**），故链序由「谁接线谁靠后」定死，不是自由选择。probe 脚手架跑完即删
+- **字节级搬运**：临时脚本按显式行区间切片拼接，四项独立对拍全过——区间并集恰好覆盖原 3..350 行（291 非空行逐字相同）、每区间在目标文件逐字命中、21 个方法名一致、无祖先→后代引用（只扫代码行，`#` 之后剥掉——文档里的 `[method xxx]` 引用不参与标识符解析）
+- **守卫用例** `tests/unit/combat_ui/test_settlement_panel_public_face_lock.gd`（13 例 / 226 断言）：反射沿 `get_base_script()` 走遍继承链再合并，断言「链长 1 与链长 3 的合并面逐位相同」——21 方法形参个数 + 默认参数个数、5 信号形参名、20 实例字段非 static、3 尺寸常量、`resource_path` / `get_global_name()` 不变，末三例真实走完胜利 / 战败 / 已到账汇总三类面板。**改前在未改动的 350 行原文件上先跑绿**（踩两坑：未入树的 Timer `start()` 报 `!is_inside_tree` → `before_each` 补 `add_child_autofree` + `reduce_motion = true`；`View.clear_grid` 走 `queue_free` 留 3 个孤儿 → `after_each` 补 `await process_frame`）
+- 全量：**5865 / 5865 passing / 0 failing / 3 orphans 存量**（5852 → 5865，净增 13 全为守卫用例），真机试玩走查 32 步全绿。提交 `686b551`
+- 已知边界：`settlement_host.gd` 371 行、`combat_focus_chain.gd` 301 行、`save_load_system.gd` 1027 行为存量超限，未在本轮范围
 
 ## Session Extract — 游玩时长落盘 + 结算屏两段分工（2026-11-24）
 - 任务单两条：① `playtime_seconds` 从不写入（主菜单恒「游玩 0小时0分」）；② 结算屏「战利品三选一」与「已到账汇总」并列同权重（DEBT-CUI-008-3）

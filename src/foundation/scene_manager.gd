@@ -1,4 +1,3 @@
-extends Node
 ## SceneManager (Autoload #3) —— 场景转换的单一仲裁者。
 ##
 ## 所有场景转换必须通过 [method request_scene_change]——禁止任何系统直接调用
@@ -20,154 +19,29 @@ extends Node
 ##                                     SceneManager.SceneID.COMBAT,
 ##                                     SceneManager.TransitionType.EXPLORE_TO_COMBAT)
 ## [/codeblock]
+##
+## [b]继承链[/b]（各段守 300 行内，成员名与访问路径逐字不变）：[br]
+## [code]  scene_manager_contract.gd [/code] ← 声明面：2 枚举 / 2 信号 / 2 常量表 / 11 实例字段[br]
+## [code]  scene_manager_access.gd   [/code] ← 依赖与访问面：注入 / 惰性获取 / 音频门面 / 持久层注册[br]
+## [code]  scene_manager_pipeline.gd [/code] ← 转场管线面：请求入口 / 信号发射包装 / 异步管线[br]
+## [code]  scene_manager.gd          [/code] ← 本层：装配与出口面（_ready / 查询 / 自检 / 静态工具）[br]
+##
+## [b]链序不是自由选择[/b]：GDScript 解析期要求被调方在[b]本段或祖先段[/b]——祖先段用裸
+## 标识符引用后代段成员会直接报 [code]Function "xxx()" not found in base self[/code]。
+## 故 [code]scene_transition.gd[/code] 按名字符串调的 [code]_get_gsm[/code] /
+## [code]_get_im[/code] / [code]_execute_post_load[/code] 等落在前段，而
+## [method _ready]（要调全部惰性获取器与 [method verify_scene_paths]）必须在链尾。[br]
+## [b]路径即契约[/b]：[code]project.godot[/code] 的 [code][autoload][/code] 把
+## [code]SceneManager[/code] 绑在 [code]res://src/foundation/scene_manager.gd[/code]
+## 这一串字符上，另有 16 处调用点按同一路径 [code]preload[/code] 取类，故本文件名逐字不动
+## （本类[b]不声明[/b] [code]class_name[/code]——Foundation Autoload 固有权衡，
+## 同 [code]game_state_manager.gd[/code] 头注释）。[br]
+## 守卫用例：[code]tests/unit/scene_manager/test_scene_manager_public_face_lock.gd[/code]。
+##
+## 来源: ADR-0005 §5 阶段异步转换管线、ADR-0031 §1.2、.claude/docs/coding-standards.md
+## §文件行数限制（300 行软上限）。
 
-## === SceneID 枚举 ==============================================================
-
-## 游戏内全部场景标识符——新增场景需同步更新 [constant SCENE_PATHS]。
-enum SceneID {
-	MAIN_MENU = 0,            ## 主菜单
-	IDENTITY_SELECT = 1,      ## 开局身份选择
-	DECK_EDITING = 2,         ## 卡组编辑
-	EXPLORATION = 3,          ## 探索地图
-	COMBAT = 4,               ## 战斗场景
-	TRIBULATION = 5,          ## 渡劫场景
-	SHOP = 6,                 ## 商店
-	EVENT_PANEL = 7,          ## 事件面板
-	RESULT_SCREEN = 8,        ## 战斗结算
-	DEFEAT_SCREEN = 9,        ## 战败画面
-	CULTIVATION = 10,         ## 修炼室
-	LOADING = 99,             ## 加载画面（内部使用）
-}
-
-## === TransitionType 枚举 =======================================================
-
-## 场景转换类型——驱动音频系统的 BGM 过渡矩阵（见 audio-system.md）。
-enum TransitionType {
-	NONE = 0,              ## 无转换（初始状态）
-	MENU_TO_GAME = 1,      ## 主菜单→游戏（长淡入，1.5s BGM 过渡）
-	GAME_TO_MENU = 2,      ## 游戏→主菜单（长淡出，1.5s BGM 过渡）
-	EXPLORE_TO_COMBAT = 3, ## 探索→战斗（快速切入，0.5s BGM 过渡）
-	COMBAT_TO_EXPLORE = 4, ## 战斗→探索（正常切回，1.0s BGM 过渡）
-	TRIBULATION = 5,       ## 渡劫战斗（特殊 BGM，0.3s 过渡）
-}
-
-## === 信号 ======================================================================
-
-## Cat 2a：转场前通知。Phase 2 发射——音频/HUD 做转场前准备。
-## [param from] 源场景 ID，[param to] 目标场景 ID，[param type] 转换类型。
-signal pre_transition(from: int, to: int, type: int)
-
-## Cat 2a：转场后通知。Phase 4 发射——音频/HUD/探索初始化新场景。
-## [param from] 源场景 ID，[param to] 目标场景 ID。
-signal post_transition(from: int, to: int)
-
-## === 场景路径注册表 ============================================================
-
-## 编译时常量字典——所有场景文件路径的单一真理来源。O(1) 查询，无文件 I/O。
-const SCENE_PATHS: Dictionary = {
-	SceneID.MAIN_MENU:       "res://src/ui/main_menu/MainMenu.tscn",
-	SceneID.IDENTITY_SELECT: "res://src/ui/identity_select/identity_select.tscn",
-	SceneID.DECK_EDITING:    "res://src/ui/deck_editing/deck_editing.tscn",
-	SceneID.EXPLORATION:     "res://src/feature/exploration/exploration_scene.tscn",
-	SceneID.COMBAT:          "res://src/feature/combat/combat_scene.tscn",
-	SceneID.TRIBULATION:     "res://src/feature/tribulation/tribulation_scene.tscn",
-	SceneID.SHOP:            "res://src/feature/shop/shop_scene.tscn",
-	SceneID.EVENT_PANEL:     "res://src/ui/event_panel/event_panel.tscn",
-	SceneID.RESULT_SCREEN:   "res://src/ui/result_screen/result_screen.tscn",
-	SceneID.DEFEAT_SCREEN:   "res://src/ui/defeat_screen/defeat_screen.tscn",
-	SceneID.CULTIVATION:     "res://src/feature/cultivation/cultivation_scene.tscn",
-	SceneID.LOADING:         "res://src/ui/loading/loading_screen.tscn",
-}
-
-## === 音频过渡参数表 ==========================================================
-
-## 编译时常量——TransitionType → BGM 过渡参数的映射表。[br]
-## 音频系统通过 [signal pre_transition] 的 [code]type[/code] 参数索引本表。[br]
-## [br][b]角色[/b]: SceneManager 提供数据契约——音频系统执行实际的 BGM 淡入/淡出。[br]
-## [b]维护[/b]: 新增 TransitionType 值时必须同步向本表添加条目——否则音频系统
-## 的 [code]match[/code] 语句将报 missing-branch 编译警告。[br]
-## [br][b]真源裁定[/b]（ADR-0031 + GDD 边界澄清 2026-09-07）：音频行为唯一真源是
-## GDD §9 过渡矩阵（audio-manager story 004 [code]state_transition_matrix.gd[/code]）；
-## 本表降级为场景级引用层。数值已与矩阵对齐：探索→战斗 0.5s 淡出（非硬切）、
-## 渡劫 0.3s 顺序式（先淡出完成再淡入，[code]sequential[/code] 标记）。
-const TRANSITION_AUDIO_PARAMS: Dictionary = {
-	TransitionType.MENU_TO_GAME: {
-		duration_seconds = 1.5,
-		from_behavior = &"fade_out",
-		to_behavior = &"fade_in",
-	},
-	TransitionType.GAME_TO_MENU: {
-		duration_seconds = 1.5,
-		from_behavior = &"fade_out",
-		to_behavior = &"fade_in",
-	},
-	TransitionType.EXPLORE_TO_COMBAT: {
-		duration_seconds = 0.5,
-		from_behavior = &"fade_out",
-		to_behavior = &"fade_in",
-	},
-	TransitionType.COMBAT_TO_EXPLORE: {
-		duration_seconds = 1.0,
-		from_behavior = &"fade_out",
-		to_behavior = &"fade_in",
-	},
-	TransitionType.TRIBULATION: {
-		duration_seconds = 0.3,
-		from_behavior = &"fade_out",
-		to_behavior = &"fade_in",
-		sequential = true,
-	},
-}
-
-## === 内部状态 ==================================================================
-
-## 转场进行中标志——true 时拒绝所有新的转换请求。
-var _transitioning: bool = false
-
-## 当前转换类型——Phase 2 设置，Phase 5 重置为 NONE。
-var _transition_type: TransitionType = TransitionType.NONE
-
-## 当前活跃场景 ID——成功完成转场后更新。
-var _current_scene_id: int = SceneID.MAIN_MENU
-
-## 测试模式标志——为 true 时跳过 [method _execute_transition] 中的异步场景加载。
-## [br][b]仅测试使用[/b]——GUT 单元测试无有效 .tscn 文件，await 会永久挂起。
-var _test_mode: bool = false
-
-## Phase 3 进行中标志位——await 中断双重保底。
-## Phase 3 开始时设为 true，Phase 4 正常到达时设为 false。
-## tree_changed 信号可能在非场景切换场景下触发——此标志位作为语义校验。
-var _phase3_in_progress: bool = false
-
-## 转换管线子模块（惰性初始化，Sprint 10 Story 7 拆分）。
-var _transition: RefCounted = null
-
-## 持久层子模块（惰性初始化，hud Story 001 / GAP-2 裁决）。
-var _persistent_layer: ScenePersistentLayer = null
-
-## AudioManager 实例（audio Story 001——RefCounted 控制类，非 Autoload）。[br]
-## 启动时惰性创建并持有引用（防 RefCounted 提前释放）——节点池经
-## [method register_persistent] 挂入 PersistentLayer（ADR-0031 §1.2）。[br]
-## [br]类型注记：AudioManager 虽定义于表现层，但 [code]class_name[/code]
-## 为全局注册类型，Foundation 层直接静态引用无循环依赖（audio_manager.gd
-## 只引用 AudioEnums/AudioServerAdapter，不反向引用 SceneManager 类型——
-## 同文件 [member _persistent_layer]: ScenePersistentLayer 先例）。静态类型
-## 使消费方免于运行时强转。
-var _audio_manager: AudioManager = null
-
-## === 依赖注入 ==================================================================
-
-## 注入的 GSM 引用。null 时使用 GameStateManager Autoload。
-## 测试中可替换为轻量 mock（需实现 session Dictionary + set_session_scene 方法）。
-var _gsm: Node = null
-
-## 注入的 InputManager 引用。null 时使用 InputManager Autoload。
-## 测试中可替换为 mock（需实现 push_lock / pop_lock 方法）。
-var _im: Node = null
-
-## 注入的 SaveLoad 引用。null 时使用 SaveLoadSystem Autoload。
-## 测试中可替换为 mock（需实现 auto_save 方法）。
-var _save_load: Node = null
+extends "res://src/foundation/scene_manager_pipeline.gd"
 
 ## === 内置虚方法 ================================================================
 
@@ -186,125 +60,8 @@ func _ready() -> void:
 	# 的 change_scene_to_file → 静默回退 MAIN_MENU。启动即 push_error 暴露。
 	verify_scene_paths()
 
-## === 依赖注入方法 ==============================================================
 
-## 设置依赖引用。不传参数则使用 Autoload 默认值。
-func set_dependencies(gsm: Node = null, im: Node = null, save_load: Node = null) -> void:
-	if gsm != null:
-		_gsm = gsm
-	if im != null:
-		_im = im
-	if save_load != null:
-		_save_load = save_load
-
-## 获取当前使用的 GSM 引用——注入对象优先，否则回退到 Autoload。
-func _get_gsm() -> Node:
-	if _gsm != null:
-		return _gsm
-	return GameStateManager
-
-## 获取当前使用的 InputManager 引用。
-func _get_im() -> Node:
-	if _im != null:
-		return _im
-	return InputManager
-
-## 获取当前使用的 SaveLoad 引用。
-func _get_save_load() -> Node:
-	if _save_load != null:
-		return _save_load
-	return SaveLoadSystem
-
-
-## 惰性获取转换管线子模块（Sprint 10 Story 7 拆分）。
-func _get_transition() -> RefCounted:
-	if _transition == null:
-		_transition = load("res://src/foundation/scene_transition.gd").new(self)
-	return _transition
-
-
-## 惰性获取持久层子模块（hud Story 001 / GAP-2 裁决）。
-func _get_persistent_layer() -> ScenePersistentLayer:
-	if _persistent_layer == null:
-		_persistent_layer = ScenePersistentLayer.new(self)
-	return _persistent_layer
-
-
-## 惰性获取 AudioManager 实例（audio Story 001）。[br]
-## 优先消费外部已设置实例（测试经 [method set_audio_manager] 注入 mock）；
-## 否则新建 AudioManager 并将节点池挂入 PersistentLayer。[br]
-## [br][param scene_manager]: 经 [code]preload[/code] 常量静态解析——
-## 路径错误在解析期暴露（优于运行期 [code]load()[/code] 的 null 风险）。
-const _AUDIO_MANAGER_SCRIPT: GDScript = \
-		preload("res://src/ui/audio/audio_manager.gd")
-
-
-func _get_audio_manager() -> AudioManager:
-	if _audio_manager == null:
-		_audio_manager = _AUDIO_MANAGER_SCRIPT.new(self)
-	return _audio_manager
-
-
-## 获取 AudioManager 公共入口（各系统经此消费音频 API——零新增 Autoload）。
-func get_audio_manager() -> AudioManager:
-	return _get_audio_manager()
-
-
-## 注入 AudioManager 实例（测试专用——mock 替代真实创建）。
-func set_audio_manager(am: AudioManager) -> void:
-	_audio_manager = am
-
-## === 公共 API ==================================================================
-
-## 注册跨场景持久节点——挂入 PersistentLayer（ADR-0031 §1.2 契约）。[br]
-## HUD CanvasLayer、audio 节点池等需要跨场景存活的节点均经此 API 挂载。[br]
-## [br][b]防呆规则[/b]：重复注册（节点已在 PersistentLayer 下）push_warning 并忽略；
-## null 节点或已有其他父节点的节点 push_error 并忽略。
-func register_persistent(node: Node) -> void:
-	_get_persistent_layer().register(node)
-
-## 请求场景转换——SceneManager 唯一入口点。
-## 返回 [code]false[/code] 的条件：[br]
-##   - [member _transitioning] 为 [code]true[/code]（拒绝并发请求）[br]
-##   - [param to] 不在 [constant SCENE_PATHS] 中（未注册的场景 ID）[br]
-## [br][param from] 与内部 [_current_scene_id] 不匹配时记录警告但不阻止执行。
-## [br]返回 [code]true[/code] = 转换已被接受并将异步执行。
-func request_scene_change(from: int, to: int, type: TransitionType) -> bool:
-	# Phase 1 —— VALIDATE
-	if _transitioning:
-		push_warning("SceneManager: 拒绝并发转换请求——_transitioning=true")
-		return false
-
-	if not SCENE_PATHS.has(to):
-		push_error("SceneManager: 未注册的目标场景 ID '%d'" % to)
-		return false
-
-	if from != _current_scene_id:
-		push_warning("SceneManager: from 不匹配（请求=%d, 内部=%d）——继续执行" % [from, _current_scene_id])
-
-	# Phase 2 —— PRE-TRANSITION
-	_transitioning = true
-	_transition_type = type
-
-	# 锁输入——TRANSITION 级阻止所有输入（AC-1：null 检查防御性编程）
-	var im: Node = _get_im()
-	if im != null and im.has_method("push_lock"):
-		im.push_lock(3, &"scene_manager")  # LockType.TRANSITION = 3
-
-	# 自动存档——fire-and-forget，不阻塞管线推进（AC-2）
-	var sl: Node = _get_save_load()
-	if sl != null and sl.has_method("auto_save"):
-		sl.auto_save()
-
-	# 发射 pre_transition（Cat 2a——通过 _emit_signal_safe 路由）
-	_emit_pre_transition(from, to, type)
-
-	# Phase 3-5 执行
-	# 测试模式：跳过异步部分——测试需手动调用 _execute_post_load 验证 Phase 4-5
-	if not _test_mode:
-		_execute_transition(from, to)
-	return true
-
+## === 公共 API：查询与自检 ============================================================
 
 ## 获取当前场景 ID（O(1) 查询——不依赖 GSM）。
 func get_current_scene_id() -> int:
@@ -334,62 +91,7 @@ func verify_scene_paths(paths: Dictionary = SCENE_PATHS) -> Array:
 	return missing
 
 
-## === 信号发射包装 ==============================================================
-
-## 发射 [signal pre_transition]——通过 ADR-0007 信号链深度追踪路由。[br]
-## 当 GSM._emit_signal_safe 不可用时（单元测试 mock 场景），回退到直接 emit。
-func _emit_pre_transition(from: int, to: int, type: TransitionType) -> void:
-	var _gsm_script: GDScript = GameStateManager.get_script()
-	if _gsm_script.has_method("_emit_signal_safe"):
-		_gsm_script._emit_signal_safe(self, &"pre_transition", [from, to, type])
-	else:
-		pre_transition.emit(from, to, type)
-
-
-## 发射 [signal post_transition]——通过 ADR-0007 信号链深度追踪路由。
-func _emit_post_transition(from: int, to: int) -> void:
-	var _gsm_script: GDScript = GameStateManager.get_script()
-	if _gsm_script.has_method("_emit_signal_safe"):
-		_gsm_script._emit_signal_safe(self, &"post_transition", [from, to])
-	else:
-		post_transition.emit(from, to)
-
-
-## === 异步转换管线 ==============================================================
-
-## Phase 3-4-5 异步执行体。[br]
-## [br]Phase 3: 加载画面 → 目标场景（两段式 change_scene_to_file）。[br]
-## 测试中直接调用 [method _execute_post_load]（同步的 Phase 4-5），无需 mock SceneTree。[br]
-## [br]AC-7（Story 004）：[b]优雅降级[/b]——加载画面缺失时跳过加载画面，直接加载目标场景。[br]
-## [b]错误恢复[/b]: 目标场景缺失 → 清理状态 + 回退 MAIN_MENU。
-func _execute_transition(from: int, to: int) -> void:
-	_get_transition()._execute_transition(from, to)
-
-
-## 错误恢复——统一清理入口。[br]
-## 恢复 _transitioning + _transition_type + _phase3_in_progress 到初始状态，
-## 并强制释放 TRANSITION 级输入锁，防止死锁和锁泄漏。
-func _cleanup_on_error(reason: StringName) -> void:
-	_get_transition()._cleanup_on_error(reason)
-
-
-## 向加载画面场景注入上下文（from, to, type）。[br]
-## 提取为独立方法以便测试覆盖。[br]
-## 在加载画面场景的 [code]await tree_changed[/code] 之后、
-## [code]change_scene_to_file(target)[/code] 之前调用。[br]
-## [br][b]AC-2[/b]（Story 004）：上下文传递为同步调用——不依赖 [code]_ready()[/code] 的 await。
-func _inject_loading_context(from: int, to: int) -> void:
-	_get_transition()._inject_loading_context(from, to)
-
-
-## Phase 4-5 同步执行体。[br]
-## [br][b]生产[/b]: 由 [method _execute_transition] 在 [code]await tree_changed[/code] 成功后调用。[br]
-## [b]测试[/b]: 可直接调用——绕过 [code]await[/code] 和 Godot SceneTree 依赖。[br]
-## [br]Phase 4: GSM 写入 → 解锁输入 → 发射 [signal post_transition]。[br]
-## Phase 5: [_current_scene_id] = [param to], [_transitioning] = false, [_transition_type] = NONE.
-func _execute_post_load(from: int, to: int, target_path: String) -> void:
-	_get_transition()._execute_post_load(from, to, target_path)
-
+## === 静态叠加工具 ==============================================================
 
 ## 创建全屏不透明 ColorRect 用于目标场景的淡入保护。[br]
 ## [br][b]D3D12 闪烁缓解[/b]（ADR-0005 风险 #5）：目标场景在 [code]_ready()[/code] 中调用
