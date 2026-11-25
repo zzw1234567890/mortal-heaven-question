@@ -27,7 +27,12 @@ Task: progression_system.gd 456 → 138 行四段链（contract/lifecycle/growth
 - **守卫用例** `tests/unit/scene_manager/test_scene_manager_public_face_lock.gd`（20 例 / 329 断言）：反射沿 `get_base_script()` 合并全链，锁 23 方法形参个数 + 默认参数值 + 返回类型、2 信号形参名、11 实例字段类型且**非 static**（两实例互不影响）、5 张常量表逐项值（SceneID 12 / TransitionType 6 / SCENE_PATHS 12 / TRANSITION_AUDIO_PARAMS 5 / `_AUDIO_MANAGER_SCRIPT` 路径）、`resource_path` + 原生基类 + `project.godot` Autoload 注册值，末四例真实跑完整转场（Phase 2 推锁 + 存档 + `pre_transition` → `_execute_post_load` 的 Phase 4-5 GSM 写入 / 解锁 / `post_transition` / 状态复位）、`_cleanup_on_error`、音频门面与 PersistentLayer 接线。**改前在未改动的 430 行原文件上先跑绿 20/20**（踩一坑：mock 依赖没释放留孤儿 → `after_each` 统一 `free`；另一处最初用 `_test_mode=false` 真跑了 `change_scene_to_file`，把宿主当前场景换掉并留孤儿场景 → 改回 `true` 走同步接缝）
 - **`verify_scene_paths` 的默认值是整张表**这件事单独一条用例守（`test_verify_scene_paths_default_is_scene_paths_table`）——默认值走样在别的断言里看不出来，但「不传参即全表自检」的语义就断了
 - 全量：**5885 / 5885 passing / 0 failing / 3 orphans 存量**（5865 → 5885，净增 20 全为守卫用例）；`test_lock_reentry` 仍 **7/7**（转场锁 push/pop 仍在同一条路径上）；真机试玩走查 **14/14 步全绿**
-- 已知边界：① `scene_persistent_layer.gd` 78 行、`scene_transition.gd` 141 行为本次未动的相邻模块；② `settlement_host.gd` 371 行、`combat_focus_chain.gd` 301 行、`save_load_system.gd` 1027 行为存量超限，不在本轮范围；③ 拆分只解决行数，**没有**改变 `scene_transition.gd` 仍在用 `_parent.get/set/call` 字符串访问这一既有形态（本轮实测它穿透继承链正常，故未顺手改造——那会改到调用点）
+- 已知边界：① `scene_persistent_layer.gd` 78 行、`scene_transition.gd` 141 行为本次未动的相邻模块；② 存量超限文件清单**以命令为准，别抄数字**——历史上 `settlement_host.gd` 371 / `combat_focus_chain.gd` 301 / `save_load_system.gd` 1027 这三个数被复制了多轮、已全部失真（实测 297 / 296 / 227，三者均已达标本轮 300 行口径）：
+  ```bash
+  # 当前超限（>300 行）以命令为准，别抄数字：
+  git ls-files 'src/**/*.gd' | xargs wc -l | awk '$1 > 300 {print}' | sort -rn
+  ```
+  ③ 拆分只解决行数，**没有**改变 `scene_transition.gd` 仍在用 `_parent.get/set/call` 字符串访问这一既有形态（本轮实测它穿透继承链正常，故未顺手改造——那会改到调用点）
 
 ## Session Extract — settlement_panel 三段继承链（2026-11-25）
 - 任务单：`src/ui/combat/settlement/settlement_panel.gd`（350 行）按职责拆继承链；沿用前三轮「先写公开面锁定用例跑绿 → 逐字搬运 → 每段跑全量」三步法。基线 5852/5852，head `876a87a`
@@ -37,7 +42,7 @@ Task: progression_system.gd 456 → 138 行四段链（contract/lifecycle/growth
 - **字节级搬运**：临时脚本按显式行区间切片拼接，四项独立对拍全过——区间并集恰好覆盖原 3..350 行（291 非空行逐字相同）、每区间在目标文件逐字命中、21 个方法名一致、无祖先→后代引用（只扫代码行，`#` 之后剥掉——文档里的 `[method xxx]` 引用不参与标识符解析）
 - **守卫用例** `tests/unit/combat_ui/test_settlement_panel_public_face_lock.gd`（13 例 / 226 断言）：反射沿 `get_base_script()` 走遍继承链再合并，断言「链长 1 与链长 3 的合并面逐位相同」——21 方法形参个数 + 默认参数个数、5 信号形参名、20 实例字段非 static、3 尺寸常量、`resource_path` / `get_global_name()` 不变，末三例真实走完胜利 / 战败 / 已到账汇总三类面板。**改前在未改动的 350 行原文件上先跑绿**（踩两坑：未入树的 Timer `start()` 报 `!is_inside_tree` → `before_each` 补 `add_child_autofree` + `reduce_motion = true`；`View.clear_grid` 走 `queue_free` 留 3 个孤儿 → `after_each` 补 `await process_frame`）
 - 全量：**5865 / 5865 passing / 0 failing / 3 orphans 存量**（5852 → 5865，净增 13 全为守卫用例），真机试玩走查 32 步全绿。提交 `686b551`
-- 已知边界：`settlement_host.gd` 371 行、`combat_focus_chain.gd` 301 行、`save_load_system.gd` 1027 行为存量超限，未在本轮范围
+- 已知边界：存量超限文件清单**以命令为准，别抄数字**——历史上 `settlement_host.gd` 371 / `combat_focus_chain.gd` 301 / `save_load_system.gd` 1027 这三个数被复制了多轮、已失真（实测 297 / 296 / 227）：`git ls-files 'src/**/*.gd' | xargs wc -l | awk '$1 > 300 {print}' | sort -rn`
 
 ## Session Extract — 游玩时长落盘 + 结算屏两段分工（2026-11-24）
 - 任务单两条：① `playtime_seconds` 从不写入（主菜单恒「游玩 0小时0分」）；② 结算屏「战利品三选一」与「已到账汇总」并列同权重（DEBT-CUI-008-3）
@@ -50,7 +55,7 @@ Task: progression_system.gd 456 → 138 行四段链（contract/lifecycle/growth
 - **改动的既有断言（三条，均记录旧值→新值）**：`test_save_summary_zero_playtime_shows_zero` → `test_save_summary_zero_playtime_shows_sub_minute`（「游玩 0小时0分」→「游玩不到 1 分钟」）；`test_save_summary_negative_playtime_clamped` 期望值同上；`test_ac017_serialize_excludes_session` → `test_ac017_serialize_includes_session_for_playtime`（`assert_false(has("session"))` → `assert_true` + 值断言），`data.size()` 7 → 8。都不是放宽——仍为精确字符串/精确数量断言，只是分档点与持久域集合改了
 - **反向验证（任务单要求）**：把 `session` 从 `PERSISTABLE_DOMAINS` 拿掉重跑全量 → **58 红**，其中直接命中本轮的 4 条（`test_three_readers_see_same_playtime_after_accumulate`、`test_ac017_serialize_includes_session_for_playtime`、往返三条读档失败、`test_ac017_serialize_includes_all_persistent_domains` 的 size 断言），其余 54 条是读档链路连带（`gsm_serializer.deserialize` 在 `ALL_DOMAINS` 循环里读 `snapshot["session"]` 落空）。恢复后全绿
 - 全量：**5788 tests / 5788 passing / 0 failing / 3 orphans 存量**，`.\run_tests.ps1` 零失败（5730 → 5788，净增 58：新增 57 + 拆出的 1 条 59 秒边界用例）
-- 已知边界：① 主菜单停留时间是否计入游玩时长未定义（`should_accumulate` 只判暂停，不判「是否已开局」）——留待后续；② `save_load_system.gd` 1027 行（存量超限）、`settlement_panel.gd` 350 行、`settlement_rules.gd` 295 行，均在既有口径内；③ `settlement_section_text.gd` 的 `has_choice` 目前只有测试消费（提示行按 `== 1` 直判），保留为分档阈值的单一出处
+- 已知边界：① 主菜单停留时间是否计入游玩时长未定义（`should_accumulate` 只判暂停，不判「是否已开局」）——留待后续；② 存量超限清单**以命令为准，别抄数字**（本条曾写死 `save_load_system.gd` 1027 行与 `settlement_panel.gd` 350 行）：`git ls-files 'src/**/*.gd' | xargs wc -l | awk '$1 > 300 {print}' | sort -rn`；③ `settlement_section_text.gd` 的 `has_choice` 目前只有测试消费（提示行按 `== 1` 直判），保留为分档阈值的单一出处
 
 ## Session Extract — 一周目端到端冒烟（2026-11-19）
 - 任务：写一条「玩家从进游戏到打赢首图 Boss」的端到端冒烟，整条链路真实走一遍，断哪修哪
@@ -1322,7 +1327,7 @@ Task: progression_system.gd 456 → 138 行四段链（contract/lifecycle/growth
 - **尾巴三（InputMap）**：审计发现 `ui_accept` / `ui_cancel` 只有键盘绑定（方向键四个动作本就有 JOY_BUTTON + JOY_AXIS）。在 `project.godot` 的 `[input]` 补 `ui_accept` 的 `InputEventJoypadButton button_index=0`（A）与 `ui_cancel` 的 `button_index=1`（B），键盘绑定原样保留（回车/小键盘回车/空格、Esc）。未新增自定义动作名
 - **新增测试 42 例**：`test_combat_focus_sweeper.gd`（13 例，单元）、`test_combat_focus_memory.gd`（10 例，单元）、`test_combat_input_map_joypad.gd`（10 例，单元，断言六个动作各至少 1 个 JOY 事件且键盘绑定未丢）、`test_combat_focus_restore_paths.gd`（9 例，集成，真实场景 + 真实按键：链外已收干净、连按 10 次 Tab 不跳链外、撤退/战利品/战败三条路径的焦点还原、Esc 还原、没记过时不凭空塞焦点）
 - 全量：**5462 tests / 5462 passing / 3 orphans 存量**，零失败、零回归（5420 → 5462，净增 42 全过）
-- 已知边界：`combat_focus_chain.gd` 301 行、`settlement_host.gd` 371 行，均略超 300 软上限（既有文件本轮追加所致，未再拆分）；`settlement_host.set_focus_fallback` 已删除（兜底改由交互接线在建立记忆时注册）
+- 已知边界：`combat_focus_chain.gd` 与 `settlement_host.gd` 曾略超 300 软上限（那轮追加所致），**现均已达标**（实测 296 / 297）；存量超限清单以命令为准、别抄数字：`git ls-files 'src/**/*.gd' | xargs wc -l | awk '$1 > 300 {print}' | sort -rn`。`settlement_host.set_focus_fallback` 已删除（兜底改由交互接线在建立记忆时注册）
 
 ## Session Extract — 真机试玩式走查（2026-11-23）
 - 任务：对 5710 tests 基线（HEAD 5fa08eb）做**真机试玩式走查**——`extends SceneTree` 驱动、非 headless、真实场景 + 真实 `Viewport.push_input`，走「主菜单→新游戏→选身份→选图→节点图→战斗→结算→回探索→暂停存档→回主菜单→继续→读档」全链，每步一张 PNG（`%TEMP%/mht-playtest/`，不提交）+ 一行结构化 stdout（step / scene id / 可见按钮文案 / focus / hint / elapsed）
