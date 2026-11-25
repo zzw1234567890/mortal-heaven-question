@@ -21,6 +21,8 @@ const LinesScript := preload("res://src/feature/tribulation/tribulation_reward_l
 const SettlementScript := preload("res://src/feature/tribulation/tribulation_settlement.gd")
 const CS_SCRIPT := preload("res://src/core/card_system/card_system.gd")
 const TemplateClass := preload("res://src/core/card_system/card_template.gd")
+## AISystem 全局名册的借用—归还守卫（见 [member _ai_roster_before]）。
+const AiRosterGuard := preload("res://tests/fixtures/ai_roster_guard.gd")
 
 ## 夹具金档模板（两张——「随机取一张」才有得可挑）。
 const GOLD_A: StringName = &"test_trib_gold_a"
@@ -53,6 +55,9 @@ var _player_before: Dictionary = {}
 var _collection_before: Dictionary = {}
 var _db_before: Dictionary = {}
 var _validation_before: bool = false
+## AISystem 全局名册的借用凭据——本夹具下的用例可能真的开一场渡劫战，
+## 而开战前置会把天劫雷灵写进那个跨套件共享的 Autoload（见 [AiRosterGuard]）。
+var _ai_roster_before: Array = []
 
 
 func before_each() -> void:
@@ -60,6 +65,7 @@ func before_each() -> void:
 	if gsm == null:
 		fail_test("GSM Autoload 未注册")
 		return
+	_ai_roster_before = AiRosterGuard.capture()
 	_player_before = (gsm.player as Dictionary).duplicate(true)
 	_collection_before = (gsm.collection as Dictionary).duplicate(true)
 	# GSM 的校验模板库只认第一次 enable_validation（跨套件共享）——别的套件可能已灌入
@@ -96,6 +102,8 @@ func after_each() -> void:
 	if cs != null:
 		cs.free()
 		cs = null
+	# 名册交回借用前那份——Autoload 跨套件共享，天劫雷灵留着会污染后续用例。
+	AiRosterGuard.restore(_ai_roster_before)
 	gsm.player = _player_before
 	gsm.collection = _collection_before
 	gsm.set("_card_template_database", _db_before)

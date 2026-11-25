@@ -16,6 +16,12 @@ const _STATE_IN_COMBAT: int = 3
 ## 金卡奖励发放单点（GDD §6——普通 1 张 / 越阶 2 张，从金档池随机取）。
 const RewardPoolScript := preload("res://src/feature/tribulation/tribulation_reward_pool.gd")
 
+## 天劫 Boss 名册表——[code]get_tribulation_boss_config[/code] 据它现读模板数值。[br]
+## [br][b]为什么这里也持有它[/b]：本模块是 Boss 配置的查询方，而「哪只雷灵在哪一档」
+## 与「那只雷灵多少血」是同一件事的两面——数值一律从该表指向的模板现读，
+## 不在这里写第二份（表在 [code]tribulation_boss_roster.gd[/code]，见 ADR-0032）。
+const BossRosterScript := preload("res://src/feature/tribulation/tribulation_boss_roster.gd")
+
 ## TribulationType 枚举值。
 const _TYPE_NORMAL: int = 0
 const _TYPE_CROSS_REALM: int = 1
@@ -227,16 +233,27 @@ func get_lightning_layers_per_turn(realm_level: int) -> int:
 	return 1
 
 
-## 查询天劫 Boss 配置——从 RealmSystem 查询或返回桩默认值。[br]
-## [br][param realm] 天劫 Boss 境界等级。[br]
-## [br][b]返回[/b]: [code]{realm, hp, atk}[/code] Dictionary。[br]
-## [br][b]桩阶段[/b]: 返回默认字典，后续接线 RealmSystem.get_realm_property。[br]
-## [br]来源: ADR-0021 §get_tribulation_boss_config + GDD §3 天劫Boss 雷灵。
+## 查询天劫 Boss 配置——模板现读 + 名册。[br]
+## [br][param realm] 天劫 Boss 境界等级（常规渡劫 = 玩家境界；越阶 = 玩家境界 + 1）。[br]
+## [br][b]返回[/b]: [code]{realm, hp, atk, enemy_roster}[/code] Dictionary。[br]
+## [br][b]数值出自哪里[/b]：[code]hp[/code] / [code]atk[/code] 一律现读雷灵模板
+## （[code]assets/enemies/tribulation/*.tres[/code]），本函数[b]不写死任何数字[/b]——
+## 数据驱动的取数口径见 [code]docs/decisions/ADR-0032-tribulation-boss-roster.md[/code]。[br]
+## [br][b]为什么不做难度缩放[/b]：雷灵模板的境界与它要打的那一劫一一对应
+## （第 L 档 = 境界 L），[code]difficulty_curve[/code] 的追赶轴在此 gap = 0、系数恒 1.0
+## ——调了等于没调，故不调（同 [code]tribulation_boss_roster.gd §build[/code] 的口径）。[br]
+## [br][b]enemy_roster 是模板 id 列表而非运行时对象[/b]：本函数是纯查询，不建实例、
+## 不碰 AISystem；真正可打的名册由 [code]TribulationBossRoster.build[/code]
+## 在开战路径上组装（见 [code]tribulation_combat.gd §build_tribulation_config[/code]）。[br]
+## [br][b]模板缺失时不臆造数值[/b]：hp/atk 给 0、enemy_roster 给空数组——
+## 调用方可据此判「这一劫没有 Boss 可打」，而不是拿一组编出来的数字开一场空仗。[br]
+## [br]来源: ADR-0021 §get_tribulation_boss_config + ADR-0032 + GDD §3 天劫Boss 雷灵。
 func get_tribulation_boss_config(realm: int) -> Dictionary:
-	# 桩阶段——返回默认 Boss 配置
-	# 后续接线：var boss_data = RealmSystem.get_realm_property(realm, &"tribulation_boss")
+	var tpl: Resource = BossRosterScript.template_for(realm)
+	var ids: Array = BossRosterScript.template_ids_for(realm)
 	return {
 		"realm": realm,
-		"hp": 1000 + (realm - 1) * 500,
-		"atk": 50 + (realm - 1) * 20,
+		"hp": int(tpl.get("base_hp")) if tpl != null else 0,
+		"atk": int(tpl.get("base_attack")) if tpl != null else 0,
+		"enemy_roster": ids,
 	}

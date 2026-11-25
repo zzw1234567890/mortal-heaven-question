@@ -406,6 +406,18 @@ func _get_realm_system() -> Node:
 	return tree.root.get_node_or_null("/root/RealmSystem")
 
 
+## 获取 AISystem 引用——优先使用 SceneTree Autoload 查找。[br]
+## [br][b]为什么这里补一个[/b]：渡劫战的名册由 [code]TribulationBossRoster.build[/code]
+## 经 AISystem 现建（模板 → [code]EnemyBattleState[/code]），取的就是这个入口——
+## 跨模块 `_autoload` 各写一份会让「找不到时怎么办」的口径散开。[br]
+## [br][b]返回[/b]: AISystem 节点或 [code]null[/code]（未注册时）。
+func _get_ai_system() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("/root/AISystem")
+
+
 ## 获取 CardSystem 引用——优先使用注入的覆盖引用，否则通过 SceneTree Autoload 查找。[br]
 ## [br][b]返回[/b]: CardSystem 节点或 [code]null[/code]（未注册时——金卡走「未发放」降级）。
 func _get_card_system() -> Node:

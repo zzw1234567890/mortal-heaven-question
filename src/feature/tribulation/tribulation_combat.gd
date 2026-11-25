@@ -19,6 +19,9 @@ const _TYPE_CROSS_REALM: int = 1
 ## 金卡报告载荷键的出处（不在此写字符串字面量）。
 const RewardPoolScript := preload("res://src/feature/tribulation/tribulation_reward_pool.gd")
 
+## 天劫 Boss 名册的组装件（模板表 + 运行时名册——见 ADR-0032）。
+const BossRosterScript := preload("res://src/feature/tribulation/tribulation_boss_roster.gd")
+
 ## [enum CombatSystem.CombatResult] 的出处——胜负判据的唯一真理来源。[br]
 ## [br][b]为什么不镜像枚举值[/b]：本模块此前按「胜利=0」判胜，而
 ## [code]combat_system.gd[/code] 的枚举是 [code]VICTORY = 1 / DEFEAT = 2 /
@@ -64,9 +67,20 @@ func start_tribulation_combat() -> void:
 	combat.battle_start(config)
 
 
-## 构建渡劫战斗配置——传入 is_tribulation: true 标志。[br]
-## [br][b]返回[/b]: [code]{is_tribulation: true, tribulation_data: {realm_level, is_cross_realm, boss_config}}[/code] Dictionary。[br]
-## [br]来源: ADR-0021 §_build_tribulation_config + §CombatSystem 扩展契约。
+## 构建渡劫战斗配置——传入 is_tribulation: true 标志 + 天劫 Boss 名册。[br]
+## [br][b]返回[/b]: [code]{is_tribulation: true, enemy_roster, tribulation_data: {realm_level, is_cross_realm, boss_config}}[/code] Dictionary。[br]
+## [br][b]为什么名册要放在顶层 [code]enemy_roster[/code][/b]：那是
+## [code]CombatSystem.battle_start[/code] 认的键（[code]combat_battle_wiring.gd
+## §capture_rosters[/code]）——放错层，胜负判定拿到空名册，
+## [code]CombatEndCheck._all_enemies_dead[/code] 对空名册返回 false，
+## 于是把敌人打光也判不出胜负（DEBT-TRB-001 的形态）。[br]
+## [br][b]名册是运行时对象而非 id[/b]：由 [code]TribulationBossRoster.build[/code]
+## 现建（模板 → [code]EnemyBattleState[/code] + 阵位 + 写回 AISystem），
+## 与探索侧 [code]combat_scene_battle_setup.gd §_resolve_roster[/code] 的产物形状一致。[br]
+## [br][b]不备名册的后果与降级[/b]：雷灵模板缺失时 [code]build[/code] 返回空数组，
+## 本函数照常开战（不阻断）——但名册为空即判不出胜负，故 [code]boss_config[/code] 里
+## 的 [code]enemy_roster[/code] 也为空，可据此诊断。[br]
+## [br]来源: ADR-0021 §_build_tribulation_config + §CombatSystem 扩展契约、ADR-0032。
 func build_tribulation_config() -> Dictionary:
 	var gsm: Node = _parent.call("_get_gsm")
 	if gsm == null:
@@ -76,8 +90,17 @@ func build_tribulation_config() -> Dictionary:
 	var boss_realm: int = realm_level + 1 if is_cross else realm_level
 	var boss_config: Dictionary = _parent.call("get_tribulation_boss_config", boss_realm)
 	var active_pills: Array = _parent.get("_active_pills")
+	# 天劫 Boss 运行时名册——现建并写回 AISystem（AI 决策读的就是它）。
+	# 取不到 AISystem 时为空数组：不阻断开战，但这一场判不出胜负（见方法文档）。
+	var ai: Node = _parent.call("_get_ai_system")
+	var roster: Array = BossRosterScript.build(ai, boss_realm)
+	if roster.is_empty():
+		push_warning("TribulationCombat: 天劫 Boss 名册为空（境界 %d）——"
+				+ "本场无法判定胜利，请检查 assets/enemies/tribulation/ 下的雷灵模板"
+				% boss_realm)
 	return {
 		"is_tribulation": true,
+		"enemy_roster": roster,
 		"tribulation_data": {
 			"realm_level": realm_level,
 			"is_cross_realm": is_cross,

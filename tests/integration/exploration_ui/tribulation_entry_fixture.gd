@@ -37,6 +37,8 @@ const TRIB_NODE: int = 401
 const CombatScript := preload("res://src/feature/combat_system.gd")
 const COMBAT_VICTORY: int = CombatScript.CombatResult.VICTORY
 const COMBAT_DEFEAT: int = CombatScript.CombatResult.DEFEAT
+## AISystem 全局名册的借用—归还守卫（见 [member _ai_roster_before]）。
+const AiRosterGuard := preload("res://tests/fixtures/ai_roster_guard.gd")
 
 
 ## 导航桩——记录转场请求，不真跳场景（[member accept] = false 时模拟并发守卫拒绝）。
@@ -70,10 +72,14 @@ var sm: SceneManagerStub = null
 var host: Control = null
 var screen: Control = null
 var _player_before: Dictionary = {}
+## AISystem 全局名册的借用凭据——本组用例走真实开战闸，开战前置会把天劫雷灵
+## 写进那个跨套件共享的 Autoload（见 [AiRosterGuard]）。
+var _ai_roster_before: Array = []
 
 
 func before_each() -> void:
 	_player_before = (GameStateManager.player as Dictionary).duplicate(true)
+	_ai_roster_before = AiRosterGuard.capture()
 	_reset_player(1)
 	sm = SceneManagerStub.new()
 	add_child_autofree(sm)
@@ -88,6 +94,7 @@ func after_each() -> void:
 	screen = null
 	# 全局 Autoload 上的注入点必须还原——留着会漏进下一个用例。
 	TribulationSystem.set("_combat_override", null)
+	AiRosterGuard.restore(_ai_roster_before)
 	GameStateManager.player = _player_before
 	sm = null
 

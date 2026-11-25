@@ -23,6 +23,8 @@ extends GutTest
 
 const TribulationScenePath: String = "res://src/feature/tribulation/tribulation_scene.tscn"
 const TS_SCRIPT := preload("res://src/feature/tribulation_system.gd")
+## AISystem 全局名册的借用—归还守卫（见 [member _ai_roster_snapshot]）。
+const AiRosterGuard := preload("res://tests/fixtures/ai_roster_guard.gd")
 
 ## 本局卡组（3 张——够发开局手牌，又小到一眼看得出是不是这一副）。
 const DECK_IDS: Array = [101, 102, 103]
@@ -102,12 +104,16 @@ var deployment: DeploymentStub = null
 var deck: DeckStub = null
 var gsm: Node = null
 var _player_snapshot: Dictionary = {}
+## AISystem 全局名册的借用凭据——本组用例走真实开战前置，天劫雷灵会被写进那个
+## 跨套件共享的 Autoload（见 [AiRosterGuard]）。
+var _ai_roster_snapshot: Array = []
 
 
 func before_each() -> void:
 	gsm = (Engine.get_main_loop() as SceneTree).root.get_node_or_null("/root/GameStateManager")
 	assert_not_null(gsm, "GSM Autoload 未注册")
 	_player_snapshot = (gsm.get("player") as Dictionary).duplicate(true)
+	_ai_roster_snapshot = AiRosterGuard.capture()
 	sm = SceneManagerStub.new()
 	add_child_autofree(sm)
 	combat = CombatOrderStub.new()
@@ -136,6 +142,7 @@ func after_each() -> void:
 		gsm.player.clear()
 		gsm.player.merge(_player_snapshot, true)
 	_gss().set("_combat_override", null)
+	AiRosterGuard.restore(_ai_roster_snapshot)
 	scene = null
 	sm = null
 	combat = null

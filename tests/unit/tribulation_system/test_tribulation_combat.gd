@@ -12,15 +12,25 @@ extends GutTest
 
 const TS_SCRIPT := preload("res://src/feature/tribulation_system.gd")
 const CS_SCRIPT := preload("res://src/feature/combat_system.gd")
+## AISystem 全局名册的借用—归还守卫（见 [member _ai_roster_before]）。
+const AiRosterGuard := preload("res://tests/fixtures/ai_roster_guard.gd")
 
 var ts: Node = null
 var cs: Node = null
 var gsm: Node = null
 var _battle_started_configs: Array = []
 var _battle_ended_results: Array = []
+## 本组用例真的走开战前置（[code]start_tribulation_combat[/code]），天劫雷灵会被写进
+## 那个跨套件共享的 Autoload——借来先记下，[code]after_each[/code] 原样交回。[br]
+## [br][b]不交回的后果[/b]（2026-11-25 实测）：雷灵名册留给后续用例，
+## [code]tests/unit/combat_system/test_resume_playable_count.gd[/code] 的
+## [code]test_snapshot_carries_no_enemy_intent_section[/code] 会让我方角色被雷灵打死，
+## 抓快照判「战斗记录不完整」而变红。
+var _ai_roster_before: Array = []
 
 
 func before_each() -> void:
+	_ai_roster_before = AiRosterGuard.capture()
 	ts = TS_SCRIPT.new()
 	cs = CS_SCRIPT.new()
 	cs.call("set_auto_advance", false)
@@ -55,6 +65,7 @@ func after_each() -> void:
 	if ts != null:
 		ts.free()
 		ts = null
+	AiRosterGuard.restore(_ai_roster_before)
 	if gsm != null:
 		gsm.player.cultivation = 0
 		gsm.player.max_cultivation = 1000

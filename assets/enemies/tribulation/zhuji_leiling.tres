@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://assets/enemies/enemy_template.gd" id="1_enemy_template"]
+[ext_resource type="Script" path="res://assets/enemies/behavior_profile.gd" id="2_behavior_profile"]
+[ext_resource type="Script" path="res://assets/enemies/skill_entry.gd" id="3_skill_entry"]
+[ext_resource type="Script" path="res://assets/enemies/reward_config.gd" id="4_reward_config"]
+[ext_resource type="Resource" path="res://assets/enemies/tribulation/rewards/tribulation_boss_reward.tres" id="5_reward_config"]
+
+[sub_resource type="Resource" id="Resource_behavior"]
+script = ExtResource("2_behavior_profile")
+aggression = 0.9
+focus_fire = 0.6
+front_priority = 0.5
+retreat_threshold = 0.0
+
+[sub_resource type="Resource" id="Resource_strike"]
+script = ExtResource("3_skill_entry")
+skill_id = &"basic_attack"
+display_name = "雷击"
+skill_type = 0
+base_weight = 40
+cost = 0
+cooldown = 0
+target_type = 0
+power_multiplier = 1.0
+
+[sub_resource type="Resource" id="Resource_thunder"]
+script = ExtResource("3_skill_entry")
+skill_id = &"thunder_bolt"
+display_name = "落雷"
+skill_type = 0
+base_weight = 60
+cost = 1
+cooldown = 1
+target_type = 0
+power_multiplier = 1.3
+
+[resource]
+script = ExtResource("1_enemy_template")
+template_id = &"tribulation_leiling_zhuji"
+display_name = "筑基雷灵"
+realm = 2
+is_elite = false
+is_boss = true
+base_hp = 57
+base_attack = 17
+base_defense = 3
+formation_limit = 2
+front_slot = true
+behavior_profile = SubResource("Resource_behavior")
+skill_pool = [SubResource("Resource_strike"), SubResource("Resource_thunder")]
+reward_config = ExtResource("5_reward_config")
