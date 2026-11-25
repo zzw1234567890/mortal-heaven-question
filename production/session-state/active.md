@@ -3,8 +3,19 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: 行数治理（超 300 行文件按职责拆继承链）
-Task: scene_manager.gd 430 → 133 行四段链（contract/access/pipeline/leaf）；Autoload 首次拆链，下一步 files 清单里剩余的 settle_host 系列
+Task: progression_system.gd 456 → 138 行四段链（contract/lifecycle/growth/leaf）；下一个待拆以大文件扫描命令输出为准
 <!-- /STATUS -->
+
+## Session Extract — progression_system 四段继承链（2026-11-25）
+- 任务单：`src/meta/progression_system.gd`（456 行，Autoload #12）按职责拆继承链；沿用前五轮「先写公开面锁定用例跑绿 → 逐字搬运 → 每段跑全量」三步法。基线 5885/5885，head `02920f4`
+- **拆不拆的判定（先判四项，逐项实测）**：① **是 Autoload**——`project.godot` 的 `[autoload]` 把 `ProgressionSystem` 绑在 `*res://src/meta/progression_system.gd`，**不带 `class_name`**（实测 `get_global_name()` 为空串，链尾 `get_instance_base_type()` 仍为 `Node`、`.new()` 正常）。② **无 static 成员**——全文 0 处 `static`，故没有「链尾脚本静态解析祖先段静态成员」这条形态（与前一轮 scene_manager 的差异点）。③ **有按名分派**——`progression/serializer.gd` 子模块用 `_parent.set("_achievements", …)` 写 6 个域、`_parent.get("_save_load_override")` 与 `_parent.call("_get_save_load_system")` 读依赖；`tests/integration/identity_selection_system/test_identity_start_flow.gd` 用 `ProgressionSystem.get("_talent_defs")` 按字符串取字段——继承链下 `get`/`set`/`call` 穿透全链，实测通过。④ **无 `@onready` / 无 `%节点路径`**——全文 0 处，拆段不动 `_ready` 时序（`_ready` 只读档填 6 域 + 发信号）。**结论：拆**。
+- **切 4 段**（首次按「域」而非「技术层」切）：`progression_system_contract.gd` 81 行（声明面：6 信号 / 14 实例字段 / 1 常量表 / 0 方法）、`progression_system_lifecycle.gd` 126 行（信号与生命周期面 13 方法：`_ready` / 2 信号 / 序列化 6 / 脏标志 2 / 内部辅助 2）、`progression_system_growth.gd` 206 行（成长面 17 方法：achievements 5 / talents 8 / 批量 2 + 2 信号）、`progression_system.gd` 138 行（链尾记录面 14 成员：endings 4 / gallery 3 / stats 3 / meta 3 + 2 信号）。**59 个成员一个不多一个不少**（38 方法 + 6 信号 + 14 字段 + 1 常量），文件名与 Autoload 注册串逐字不动
+- **链序不是自由选择（三条硬约束叠加）**：① **信号必须落链首**——基段声明的信号可在派生段 `emit`，反向（派生段声明、基段发射）解析期失败；`progression_updated` 有两个发射方（第 2 段 `_mark_dirty_and_emit`、第 3 段 `batch_update_end`），故 6 条信号全落首段。② **`_mark_dirty_and_emit` 必须落第 2 段**——第 3 段与链尾的**每一个**域写入方法都调它，「被调方必须在本段或祖先段」。③ **`_get_save_load_system` 同理落第 2 段**——链尾 `_ready` 与子模块都要用它（子模块走 `call` 按名，穿透无碍，但链尾裸调必须能解析）。
+- **字节级搬运 + 五项独立对拍**（临时脚本 `tools/split_ps.py` 按显式行区间切片，三阶段各跑一次全量，跑完即删）：① 59 个成员块**无缝覆盖原文 13..457 行**（块号恰好 0..58 各一次，且 `s == 前块 e + 1`）；② 非空行 **349 行多重集完全相同**；③ 代码体（去注释 / 去空行）**261 行多重集相同**，且各段是原文代码行的**子序列**（逐段 `iter` 子序列检查，段间保序）；④ 成员表 **59 项多重集相同**；⑤ **无祖先段裸标识符引用后代段成员**（只扫代码行，`#` 之后剥掉——文档里的 `[method xxx]` 引用不参与标识符解析）。
+- **守卫用例** `tests/unit/meta/test_progression_public_face_lock.gd`（18 例 / 319 断言）：反射沿 `get_base_script()` 合并全链，锁 38 方法形参个数 + 默认参数值 + 返回类型、6 信号形参名、14 实例字段类型且**非 static**（两实例互不影响）、`_META_KEYS` 白名单逐项、`resource_path` + 原生基类（`Node`）+ `get_global_name()` 为空 + `project.godot` Autoload 注册值。末六例真实跑六条域读写路径（成就达标自动解锁 / 天赋扣点与前置 / 批量按域去重 / 结局与图鉴与统计 / 序列化往返 / `_ready` 真读档）。**改前在未改动的 456 行原文件上先跑绿 18/18**（踩两坑：① `_get_save_load_system` 断言写成「等于 mock 变量」失败——mock 是我自己 `Node.new()` 建的，与实例上存的那个引用不是同一对象 identity，改用 `ps.get("_save_load_override")` 比对；② `_ready` 用例先 `add_child_autofree` 再手动 `_ready()`，入树又触发一次真实 `_ready`，读档计数 2≠1 → 去掉入树，只手动调）。
+- **反向验证（任务单要求的「锁得住吗」）**：① 把 `get_achievements(category := "")` 的默认值改成 `"combat"` → 守卫 1 红（`ARRAY(["combat"]) != ARRAY([""])`，方法默认参数值断言命中）；② 把 `_talent_defs` 改成 `static var` → 守卫 1 红（实例字段表 14 → 13，且「应存在」断言同时命中）。恢复后均回绿。
+- 全量：**5903 / 5903 passing / 0 failing / 3 orphans 存量**（5885 → 5903，净增 18 全为守卫用例）；三个中间阶段（stage 1 / 2 / 3）各跑一次全量，三次均 5903/5903 零失败零回归
+- 已知边界：① `progression/progression_serializer.gd`（128 行）为本次未动的相邻子模块，仍按名访问父节点字段（本轮实测穿透继承链正常，故未顺手改造——那会改到调用点）；② 本类**无 static 成员**，故「链尾脚本静态解析祖先段枚举/常量/静态方法」这条形态本轮**未覆盖**（上一轮 scene_manager 已覆盖）；③ 存量超限文件清单以命令为准、别抄数字：`git ls-files 'src/**/*.gd' | xargs wc -l | awk '$1 > 300 {print}' | sort -rn`
 
 ## Session Extract — scene_manager 四段继承链（2026-11-25）
 - 任务单：`src/foundation/scene_manager.gd`（430 行）按职责拆继承链；沿用前四轮「先写公开面锁定用例跑绿 → 逐字搬运 → 每段跑全量」三步法。基线 5865/5865，head `686b551`

@@ -1,4 +1,4 @@
-extends Node
+extends "res://src/meta/progression_system_growth.gd"
 ## ProgressionSystem (Autoload #12) —— 跨局元进度系统。
 ##
 ## 拥有所有跨局元进度运行时数据（achievements / talents / card_gallery /
@@ -9,305 +9,33 @@ extends Node
 ##
 ## [b]Story 7-1 范围[/b]：域存储 + initialize + serialize/deserialize + 脏标志。
 ##
+## [b]本层职责[/b]（链尾——记录面）：[b]结局 / 图鉴 / 统计 / 元信息[/b]四张「玩家战绩」域。
+## [method unlock_ending]（原子写入 + 递增 [code]total_completions[/code] + 发信号）/
+## [method get_unlocked_endings] / [method has_ending] / [method get_ending_detail]、
+## [method mark_card_discovered]（去重幂等）/ [method is_card_discovered] /
+## [method get_card_gallery_stats]（总数 222 固定口径）、[method increment_stat] /
+## [method set_stat]（只升不降）/ [method get_stat]、[method get_meta_value] /
+## [method set_meta_value]（受 [constant _META_KEYS] 白名单限制）。
+## [signal ending_unlocked_signal] / [signal card_discovered] 两条记录域信号由本段方法发射、
+## 在链首段声明（基段声明可在派生段 [code]emit[/code]）。
+##
+## [b]继承链[/b]（各段守 300 行内，成员名与访问路径逐字不变）：[br]
+## [code]  progression_system_contract.gd  [/code] ← 声明面：6 信号 / 14 字段 / 1 常量表 / 0 方法[br]
+## [code]  progression_system_lifecycle.gd [/code] ← 信号与生命周期面：_ready / 序列化 / 脏标志 / 内部辅助[br]
+## [code]  progression_system_growth.gd    [/code] ← 成长面：achievements / talents / 批量更新[br]
+## [code]  progression_system.gd           [/code] ← 本层：记录面（endings / gallery / stats / meta）[br]
+##
+## [b]链序不是自由选择[/b]：GDScript 解析期要求被调方在[b]本段或祖先段[/b]——祖先段用裸
+## 标识符引用后代段成员会直接报 [code]Function "xxx()" not found in base self[/code]。
+## 故 [method _mark_dirty_and_emit]（每个域写入都要调）落在第 2 段；[method _ready]（要调
+## 惰性获取器与全部域初始化）也必须在靠前的段，不能落链尾之后的任何位置。[br]
+## [b]路径即契约[/b]：[code]project.godot[/code] 的 [code][autoload][/code] 把
+## [code]ProgressionSystem[/code] 绑在 [code]res://src/meta/progression_system.gd[/code]
+## 这一串字符上，另有 5 个单元测试文件按同一路径 [code]preload[/code] 取类，故本文件名逐字不动
+## （本类[b]不声明[/b] [code]class_name[/code]）。[br]
+## 守卫用例：[code]tests/unit/meta/test_progression_public_face_lock.gd[/code]。
+##
 ## 来源: ADR-0012 §决策（架构图 + 关键接口 + 初始化策略 + 域存储声明）。
-
-
-# === 信号 ====================================================================
-
-## ProgressionSystem 初始化完成信号——_ready() 中数据填充后发射。[br]
-## 特征系统在此信号后可安全查询 ProgressionSystem。
-signal progression_initialized()
-
-## 跨局数据变更信号——任何写入后发射。[br]
-## SaveLoadSystem 监听此信号 → 被动持久化到 progression.dat。[br]
-## [param domain] 变更的领域（achievements/talents/gallery/endings/stats/meta）。
-signal progression_updated(domain: String)
-
-
-# === 域存储（运行时，内存中）=================================================
-
-## 成就域——Dict[String → Dictionary]。
-var _achievements: Dictionary = {}
-## 天赋域——Dict[String → Dictionary]。
-var _talents: Dictionary = {}
-## 卡牌图鉴域——Dict[String → bool]。
-var _card_gallery: Dictionary = {}
-## 结局域——Dict[String → Dictionary]。
-var _endings: Dictionary = {}
-## 统计域——Dict[String → int]。
-var _stats: Dictionary = {}
-## 元信息域——Dict[String → Variant]。
-var _meta: Dictionary = {}
-
-
-# === 内部标志 =================================================================
-
-## 自上次保存后是否有变更。
-var _dirty: bool = false
-## 批量更新嵌套计数器——>0 时暂缓 progression_updated 信号。
-var _batch_depth: int = 0
-## 批量更新期间累积的变更域集合——batch_update_end 时一次性发射。
-var _batch_pending_domains: Dictionary = {}
-## 初始化完成标志——特征系统查询前检查此标志。
-var _initialized_and_loaded: bool = false
-
-
-# === 生命周期 =================================================================
-
-## Autoload #12 _ready()——利用 Godot 顺序 _ready() 保证。[br]
-## SaveLoadSystem (#4) 已完成 _ready()，直接调用 load_progression()。
-func _ready() -> void:
-	_get_serializer().init_empty_stores()
-	var data: Dictionary = _get_serializer().load_progression_data()
-	_get_serializer().initialize(data)
-	_initialized_and_loaded = true
-	progression_initialized.emit()
-
-
-## 序列化子模块——惰性初始化（Sprint 9 Story 6 拆分）。
-var _serializer: RefCounted = null
-
-## 惰性获取序列化子模块。
-func _get_serializer() -> RefCounted:
-	if _serializer == null:
-		_serializer = load("res://src/meta/progression/progression_serializer.gd").new(self)
-	return _serializer
-
-
-## 初始化 6 个空领域存储——委托给子模块。
-func _init_empty_stores() -> void:
-	_get_serializer().init_empty_stores()
-
-
-## 从 SaveLoadSystem 加载 progression 数据——委托给子模块。
-func _load_progression_data() -> Dictionary:
-	return _get_serializer().load_progression_data()
-
-
-## 从 progression.dat 的已解析 JSON 填充全部 6 个域。[br]
-## 缺失字段 → 默认值填充（向前兼容）。
-func initialize(data: Dictionary) -> void:
-	_get_serializer().initialize(data)
-
-
-# === 序列化（供 SaveLoadSystem 使用）==========================================
-
-## 返回全量 progression 数据的 JSON 兼容 Dictionary。[br]
-## 不包含 _dirty / _batch_depth / _initialized_and_loaded 内部标志。
-func serialize() -> Dictionary:
-	return _get_serializer().serialize()
-
-
-## 从 progression.dat 的已解析 JSON 填充全部 6 个域。[br]
-## 缺失字段 → 默认值填充（向前兼容）。[br]
-## [b]返回[/b]: true 表示反序列化成功。
-func deserialize(data: Dictionary) -> bool:
-	return _get_serializer().deserialize(data)
-
-
-## 成就定义注册表——由 AchievementSystem 在运行时注册。
-var _achievement_defs: Dictionary = {}
-
-
-# === 脏标志 ===================================================================
-
-## 返回 _dirty 标志——SaveLoadSystem 用于确定是否需要写入。
-func has_unsaved_changes() -> bool:
-	return _dirty
-
-
-## SaveLoadSystem 在成功写入后调用——设置 _dirty = false。
-func mark_saved() -> void:
-	_dirty = false
-
-
-# === achievements 领域 API ====================================================
-
-## 成就解锁信号——UI 监听此信号展示解锁通知。
-signal achievement_unlocked(ach_id: String)
-
-## 注册成就定义——由 AchievementSystem 初始化时调用。
-func register_achievement(ach_id: String, definition: Dictionary) -> void:
-	_achievement_defs[ach_id] = definition
-	if not _achievements.has(ach_id):
-		var target: int = int(definition.get("target", 0))
-		_achievements[ach_id] = {
-			"id": ach_id,
-			"unlocked": false,
-			"unlocked_at": "",
-			"progress": {"current": 0, "target": target} if target > 0 else null,
-		}
-
-
-## 解锁成就——仅在未解锁时成功。写入 unlocked_at 时间戳 + 发射信号。
-func unlock_achievement(ach_id: String) -> Dictionary:
-	if not _achievement_defs.has(ach_id):
-		return {"success": false, "reason": "unknown_id"}
-	if not _achievements.has(ach_id):
-		register_achievement(ach_id, _achievement_defs[ach_id])
-	var ach: Dictionary = _achievements[ach_id]
-	if bool(ach.get("unlocked", false)):
-		return {"success": false, "reason": "already_unlocked"}
-	ach["unlocked"] = true
-	ach["unlocked_at"] = Time.get_datetime_string_from_system(false, true)
-	_achievements[ach_id] = ach
-	_mark_dirty_and_emit("achievements")
-	achievement_unlocked.emit(ach_id)
-	return {"success": true, "reason": ""}
-
-
-## 获取单个成就状态。
-func get_achievement(ach_id: String) -> Dictionary:
-	if not _achievements.has(ach_id):
-		return {"id": ach_id, "unlocked": false, "unlocked_at": "", "progress": null}
-	return _achievements[ach_id].duplicate(true)
-
-
-## 获取成就列表——按 category 过滤，已解锁按 unlocked_at DESC 排序。
-func get_achievements(category: String = "") -> Array:
-	var result: Array = []
-	for ach_id: String in _achievement_defs:
-		var ach: Dictionary = get_achievement(ach_id)
-		if category != "" and str(_achievement_defs[ach_id].get("category", "")) != category:
-			continue
-		result.append(ach)
-	# 排序——已解锁在前，按 unlocked_at DESC
-	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		var a_unlocked: bool = bool(a.get("unlocked", false))
-		var b_unlocked: bool = bool(b.get("unlocked", false))
-		if a_unlocked and not b_unlocked:
-			return true
-		if not a_unlocked and b_unlocked:
-			return false
-		if a_unlocked and b_unlocked:
-			return str(a.get("unlocked_at", "")) > str(b.get("unlocked_at", ""))
-		return false
-	)
-	return result
-
-
-## 递增成就进度（跨局累计）——达到 target 时自动解锁。
-func update_achievement_progress(ach_id: String, increment: int) -> void:
-	if not _achievement_defs.has(ach_id):
-		return
-	if not _achievements.has(ach_id):
-		register_achievement(ach_id, _achievement_defs[ach_id])
-	var ach: Dictionary = _achievements[ach_id]
-	var progress: Variant = ach.get("progress", null)
-	if progress == null:
-		return
-	var p: Dictionary = progress
-	p["current"] = int(p.get("current", 0)) + increment
-	ach["progress"] = p
-	_achievements[ach_id] = ach
-	_mark_dirty_and_emit("achievements")
-	# 达到 target 自动解锁
-	if int(p["current"]) >= int(p["target"]) and not bool(ach.get("unlocked", false)):
-		unlock_achievement(ach_id)
-
-
-# === talents 领域 API =========================================================
-
-## 天赋购买信号——UI 监听此信号刷新天赋树。
-signal talent_purchased(talent_id: String, points_remaining: int)
-
-## 天赋定义注册表——由 ReincarnationTalentSystem 初始化时调用。
-var _talent_defs: Dictionary = {}
-
-## 注册天赋定义。
-func register_talent(talent_id: String, definition: Dictionary) -> void:
-	_talent_defs[talent_id] = definition
-
-## 获取当前可用轮回点。
-func get_talent_points() -> int:
-	return int(_talents.get("points_available", 0))
-
-## 添加轮回点——轮回结算时调用。
-func add_talent_points(amount: int) -> void:
-	_talents["points_available"] = int(_talents.get("points_available", 0)) + amount
-	_talents["total_earned"] = int(_talents.get("total_earned", 0)) + amount
-	_mark_dirty_and_emit("talents")
-
-## 购买天赋——扣除轮回点 + 解锁 + 发射信号。
-func purchase_talent(talent_id: String) -> Dictionary:
-	if not _talent_defs.has(talent_id):
-		return {"success": false, "reason": "unknown_id"}
-	var unlocked: Array = _talents.get("unlocked", [])
-	if unlocked.has(talent_id):
-		return {"success": false, "reason": "already_unlocked"}
-	var cost: int = int(_talent_defs[talent_id].get("cost", 0))
-	var points: int = int(_talents.get("points_available", 0))
-	if points < cost:
-		return {"success": false, "reason": "insufficient_points"}
-	# 检查前置条件
-	var prereq: String = str(_talent_defs[talent_id].get("prerequisite", ""))
-	if not prereq.is_empty() and not unlocked.has(prereq):
-		return {"success": false, "reason": "prerequisite_locked"}
-	# 扣除点数 + 写入 unlocked
-	_talents["points_available"] = points - cost
-	unlocked.append(talent_id)
-	_talents["unlocked"] = unlocked
-	_mark_dirty_and_emit("talents")
-	talent_purchased.emit(talent_id, int(_talents["points_available"]))
-	return {"success": true, "reason": ""}
-
-## 直接授予天赋——不扣点，幂等。用于 EventSystem GAIN_TALENT 和特殊奖励。
-func grant_talent(talent_id: String) -> Dictionary:
-	if not _talent_defs.has(talent_id):
-		return {"success": false, "reason": "unknown_id"}
-	var unlocked: Array = _talents.get("unlocked", [])
-	if unlocked.has(talent_id):
-		return {"success": true, "reason": "already_unlocked"}
-	unlocked.append(talent_id)
-	_talents["unlocked"] = unlocked
-	_mark_dirty_and_emit("talents")
-	return {"success": true, "reason": ""}
-
-## 获取天赋树完整状态。
-func get_talent_tree_state() -> Dictionary:
-	return {
-		"unlocked": (_talents.get("unlocked", []) as Array).duplicate(),
-		"equipped": (_talents.get("equipped", []) as Array).duplicate(),
-		"points": int(_talents.get("points_available", 0)),
-		"slots": get_active_slot_count(),
-	}
-
-## 设置装备的天赋——校验槽位数。
-func set_equipped_talents(ids: Array) -> Dictionary:
-	var max_slots: int = get_active_slot_count()
-	if ids.size() > max_slots:
-		return {"success": false, "reason": "slot_exceeded"}
-	# 校验所有 ID 已解锁
-	var unlocked: Array = _talents.get("unlocked", [])
-	for id: String in ids:
-		if not unlocked.has(id):
-			return {"success": false, "reason": "not_unlocked"}
-	_talents["equipped"] = ids.duplicate()
-	_mark_dirty_and_emit("talents")
-	return {"success": true, "reason": ""}
-
-## 获取当前可用槽位数——N = 5 + floor(unlocked_count / 4)。
-func get_active_slot_count() -> int:
-	var unlocked_count: int = (_talents.get("unlocked", []) as Array).size()
-	return 5 + int(unlocked_count / 4)
-
-
-# === 批量更新 API ===========================================================
-
-## 暂缓 progression_updated 信号发射。嵌套调用增加计数器。
-func batch_update_begin() -> void:
-	_batch_depth += 1
-
-
-## 计数器归零时一次性发射所有累积域的 progression_updated 信号。
-func batch_update_end() -> void:
-	if _batch_depth > 0:
-		_batch_depth -= 1
-	if _batch_depth == 0 and _batch_pending_domains.size() > 0:
-		for domain: String in _batch_pending_domains:
-			progression_updated.emit(domain)
-		_batch_pending_domains.clear()
-
 
 # === endings 领域 API =========================================================
 
@@ -399,17 +127,6 @@ func set_stat(key: String, value: int) -> void:
 func get_stat(key: String) -> int:
 	return int(_stats.get(key, 0))
 
-
-# === meta 领域 API ===========================================================
-
-## 可写入的 meta key 白名单。
-const _META_KEYS: Array = [
-	"highest_realm_ever",
-	"total_reincarnations",
-	"total_playtime_seconds",
-	"total_completions",
-]
-
 ## 获取 meta 值。
 func get_meta_value(key: String) -> Variant:
 	return _meta.get(key, null)
@@ -419,38 +136,3 @@ func set_meta_value(key: String, value: Variant) -> void:
 	if key in _META_KEYS:
 		_meta[key] = value
 		_mark_dirty_and_emit("meta")
-
-
-# === 内部辅助 =================================================================
-
-## 标记数据为脏 + 发射 progression_updated 信号（受批量更新控制）。
-func _mark_dirty_and_emit(domain: String) -> void:
-	_dirty = true
-	if _batch_depth > 0:
-		_batch_pending_domains[domain] = true
-	else:
-		progression_updated.emit(domain)
-
-
-## SaveLoadSystem 引用——测试注入优先。
-var _save_load_override: Node = null
-
-
-## 获取 SaveLoadSystem 引用——注入优先，否则 Autoload #4。
-func _get_save_load_system() -> Node:
-	if _save_load_override != null:
-		return _save_load_override
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null:
-		return null
-	var root: Window = tree.root
-	if root == null:
-		return null
-	for i: int in range(root.get_child_count()):
-		var child: Node = root.get_child(i)
-		if child != null and child.name == &"SaveLoadSystem":
-			return child
-	return null
-
-
-# --- 序列化/初始化辅助（已提取到 progression_serializer.gd 子模块）---
