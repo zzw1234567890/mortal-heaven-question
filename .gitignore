@@ -147,3 +147,9 @@ $RECYCLE.BIN/
 run_out.txt
 run_gut.ps1
 run_tests.ps1
+# 探针与试玩驱动：一次性诊断产物，不入库
+tools/probe_*
+tools/playtest*
+tools/shot_*
+tools/ui_pass_shot*
+tools/*.uid
