@@ -3,8 +3,24 @@
 <!-- STATUS -->
 Epic: presentation-layer
 Feature: 行数治理（超 300 行文件按职责拆继承链）
-Task: progression_system.gd 456 → 138 行四段链（contract/lifecycle/growth/leaf）；下一个待拆以大文件扫描命令输出为准
+Task: tribulation_system.gd 429 → 106 行四段链（contract/access/flow/leaf）；下一个待拆以大文件扫描命令输出为准
 <!-- /STATUS -->
+
+## Session Extract — tribulation_system 四段继承链（2026-11-26）
+- 任务单：`src/feature/tribulation_system.gd`（429 行，Autoload #22）按职责拆继承链；沿用前六轮「先写公开面锁定用例跑绿 → 字节级搬运 → 每段跑全量」三步法。基线 **5947/5947**（head `abd45d9`），拆后 **5968/5968**（净增 21 全为守卫用例）
+- **拆不拆的判定（四项，逐项实测）**：① **是 Autoload 但不带 `class_name`**——`project.godot` 把 `TribulationSystem` 绑在 `*res://src/feature/tribulation_system.gd`；实测链尾 `get_global_name()` 为空串、`get_instance_base_type()` 仍为 `Node`、`.new()` 正常。② **无 static 成员**——全文 0 处，故没有「链尾静态解析祖先段静态成员」这条形态。③ **有按名分派（两个消费者）**——`tribulation_combat.gd` / `tribulation_settlement.gd` 两个 `RefCounted` 子模块持父引用，按字符串走 `_parent.call("_set_state", …)` / `_parent.get("_trib_type")` / `_parent.call("_get_card_system")`；集成测试直接 `TribulationSystem.set("_combat_override", …)` / `.call(&"_on_battle_ended", …)` / `.get("_trib_type")`——继承链下 `get`/`set`/`call` 穿透全链，实测通过。④ **无 `@onready` / 无 `%节点路径`**——全文 0 处，拆段不动 `_ready` 时序（`_ready` 只做一件事：把 `battle_ended` 接到 `_on_battle_ended`，幂等）。**结论：拆**。
+- **切 4 段**：`tribulation/tribulation_system_contract.gd` 134 行（声明面：2 枚举 / 3 标量常量 / 1 转换白名单 / 5 信号 / 7 实例字段 / 0 方法）、`tribulation/tribulation_system_access.gd` 111 行（接缝与访问面 8 方法：2 惰性获取器 + `_emit_safe` + `_get_gsm` + 四个 Autoload 获取器）、`tribulation/tribulation_system_flow.gd` 194 行（流程面 7 方法：触发 / 取消 / 状态转换 2 / 查询 / 渡劫丹）、`tribulation_system.gd` 106 行（链尾装配与出口面 10 方法：`_ready` + 战斗委托 3 + 结算 2 + 雷伤 2 + Boss 查询）。**顶层成员 42 个一个不多一个不少**（24 方法 + 7 字段 + 4 常量 + 5 信号 + 2 枚举）。文件名与 Autoload 注册串逐字不动
+- **链序由 GDScript 解析期硬约束定死**：① **信号必须整体落链首**——基段声明的信号可在派生段 `emit`，反向解析期失败；本链有**两个发射方**（流程段的 `trigger_tribulation` 与链尾结算转发，各自经 `_emit_safe`），故 5 条信号全落首段。② **`trigger_tribulation` 的默认参数值 `TribulationType.NORMAL` 是解析期求值**，只能引用本段或祖先段常量 → 枚举/常量必须随声明落链首，不能跟着用它的方法走（与上一轮 `SCENE_PATHS` 同一形态的硬约束）。③ **`_ready` 必须落链尾**——它要调 `_get_combat_system`，属「后代调祖先」；反过来放首段会构成「祖先调后代」直接报 `Function "xxx()" not found in base self`。④ 结算/战斗委托转发要调 `_get_settlement` / `_get_combat_delegation`，故接缝段必须排在流程段与链尾之前。
+- **字节级搬运 + 五项独立对拍**（临时脚本 `tools/split_tribulation.py` 按显式行区间切片，跑完即删；改动**先在内存里装配并对拍全过、最后才写盘**——上一轮踩过「对拍失败但文件已被覆盖」的坑）：① 8 个区间**无缝覆盖原文 14..429 行**（无重叠、无缺行）；② 非空行 **326 行多重集完全相同**；③ 代码体（去注释 / 去空行）**200 行多重集相同**；④ 成员表 **70 项多重集相同**；⑤ **无祖先段裸标识符引用后代段成员**（只扫代码行，`#` 之后剥掉）。
+- **守卫用例** `tests/unit/tribulation_system/test_tribulation_public_face_lock.gd`（21 例 / 243 断言）：反射沿 `get_base_script()` 合并全链，锁 24 方法形参个数 + **默认参数值** + 返回类型、5 信号形参名、7 实例字段类型且**非 static**（两实例互不影响）、2 枚举逐成员取值、3 标量常量值、`_VALID_TRANSITIONS` 逐键逐项、链上常量计数恰为 6、`resource_path` + 原生基类 `Node` + `get_global_name()` 为空 + `project.godot` Autoload 注册值。末 7 例真实跑通：触发→准备→取消、非法转换被白名单挡住、渡劫丹三条规定、雷伤纯函数与 Boss 配置四键、成功结算（境界 +1 / 信号载荷 / 状态回转）、失败结算（罚金 150 / 计数 +1 / 第 3 次发庇护）、`_ready` 幂等接线、两个惰性子模块复用 + 四个 Autoload 获取器注入优先与回退。**改前在未改动的 429 行原文件上先跑绿 21/21**（踩三坑：① `_settlement` 字段是 `RefCounted` 而我塞了 `Node.new()`，取回是 `Nil` → `free()` 报 `Nonexistent function 'free' in base 'Nil'`，改用 `RefCounted.new()`；② 断言「无注入时四个获取器返回 null」——测试态下四个 Autoload **都真实注册着**，改为断言「等于 `get_node_or_null("/root/XXX")`」；③ Boss 配置的键是 `realm/hp/atk/enemy_roster` 而非 `name/template_id`）。
+- **反向验证（「锁得住吗」）**：① 把 `trigger_tribulation` 默认值改成 `TribulationType.CROSS_REALM`（**改在链第 3 段**）→ 守卫 1 红（`ARRAY([1]) != ARRAY([0])`），证明默认参数值断言沿链生效；② 把 `_trib_type` 改成 `static var`（**改在链首段**）→ 守卫 5 条同时红（实例字段表 7 → 6、`应存在` 命中、两实例互不影响断言命中）。两处均恢复后回绿。
+- **全量**：**5968 / 5968 passing / 0 failing / 3 orphans 存量**（5947 → 5968，净增 21 全为守卫用例，且逐条出现在 GUT 的 `* test_...` 输出里）；连跑两次读数稳定（26091 / 26092 断言的 ±1 为既有 flaky 断言计数，测试数与通过数完全一致）
+- 已知边界：① `tribulation_combat.gd`（158 行）/ `tribulation_settlement.gd`（259 行）为本次未动的相邻子模块，仍按名访问父节点成员（本轮实测穿透继承链正常，故未顺手改造——那会改到调用点）；② 本次**新增三个 `.gd.uid`**（`tribulation_system_contract/access/flow.gd.uid`）；③ 存量超限文件清单**以命令为准，别抄数字**（历史上这些数字被复制多轮、全部失真，实测本轮仍有 43 个 >300 行）：
+  ```bash
+  # 当前超限（>300 行）以命令为准，别抄数字：
+  git ls-files 'src/**/*.gd' | xargs wc -l | awk '$1 > 300 {print}' | sort -rn
+  ```
+
 
 ## Session Extract — progression_system 四段继承链（2026-11-25）
 - 任务单：`src/meta/progression_system.gd`（456 行，Autoload #12）按职责拆继承链；沿用前五轮「先写公开面锁定用例跑绿 → 逐字搬运 → 每段跑全量」三步法。基线 5885/5885，head `02920f4`
