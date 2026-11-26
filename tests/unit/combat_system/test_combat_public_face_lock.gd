@@ -13,7 +13,7 @@ extends GutTest
 ## [b]锁什么[/b]：
 ##   · 46 个公开方法 + 98 个私有方法的[形参个数 / 默认参数个数 / 默认参数值]
 ##   · [enum CombatPhase] 7 项 + [enum CombatResult] 4 项的取值（产品代码按名直取）
-##   · 9 个 Cat 2b 信号的载荷参数个数
+##   · 10 个 Cat 2b 信号的载荷参数个数
 ##   · 4 个脚本常量仍可解析且指向同一路径（子模块 preload 与外部 [code]CombatScript[/code] 引用）
 ##   · 45 个实例字段存在且[b]未被 static 化[/b]（两个实例互不影响）
 ##   · 面内不得出现未登记的方法（新增/改名都要显式更新本快照）
@@ -95,6 +95,7 @@ const EXPECTED_SIGNALS: Dictionary = {
 	"phase_changed": 3, "battle_started": 1, "battle_ended": 2,
 	"attack_resolved": 1, "character_damaged": 1, "character_died": 3,
 	"retreat_requested": 0, "turn_started": 1, "enemy_action_resolved": 1,
+	"pile_changed": 2,
 }
 
 ## 脚本常量快照——值即契约（四个 preload 常量被子模块与外部按名引用）。
@@ -223,7 +224,7 @@ func test_combat_result_enum_locked() -> void:
 
 
 # ============================================================================
-# 3. 信号面：9 个 Cat 2b 信号，载荷个数逐位不变
+# 3. 信号面：10 个 Cat 2b 信号，载荷个数逐位不变
 # ============================================================================
 
 func test_signals_locked() -> void:

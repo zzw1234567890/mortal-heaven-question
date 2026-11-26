@@ -21,6 +21,8 @@ const ResultBridgeScript := preload("res://src/ui/combat/shared/combat_result_br
 const InteractionScript := preload("res://src/feature/combat/combat_scene_interaction.gd")
 ## 行囊装配（条目 → 结算 → 面板 + 入口按钮 + 出牌输入冻结）。
 const BagScript := preload("res://src/feature/combat/combat_scene_bag.gd")
+## 底部条牌库/弃牌计数订阅（pile_changed → DeckCounter；tech-debt DEBT-CUI-010）。
+const DeckWiringScript := preload("res://src/feature/combat/combat_deck_wiring.gd")
 
 ## 容器场景（[code]combat_scene.gd[/code]——只经公开成员与公开方法交互）。
 var _scene: Control = null
@@ -43,14 +45,15 @@ func _init(p_scene: Control, p_root: Control) -> void:
 ## [param p_deploy_back] 备战面板「返回」处理器。[br]
 ## [param p_retreat] 结算宿主「撤退确认」处理器。[br]
 ## [param p_defeat] 结算宿主「战败确认」处理器。[br]
-## [br][b]返回[/b]：[code]{result_bridge, interaction_wiring, bag_mount}[/code]——容器持有
-## 这三个句柄用于 [code]_exit_tree[/code] 退订（任一可空）。
+## [br][b]返回[/b]：[code]{result_bridge, interaction_wiring, bag_mount, deck_wiring}[/code]——容器持有
+## 这四个句柄用于 [code]_exit_tree[/code] 退订（任一可空）。
 ## [br][b]行囊最后挂[/b]：它的面板要盖住手牌区与出牌输入层（[method wire_interaction]
 ## 已经把输入层挂好了），顺序反了面板会被输入层压在下面——看得见点不着。
 func wire_all(p_deploy_confirmed: Callable, p_deploy_back: Callable,
 		p_retreat: Callable, p_defeat: Callable) -> Dictionary:
 	wire_audio()
 	wire_panels()
+	var deck_wiring: RefCounted = wire_deck_counts()
 	wire_deployment(p_deploy_confirmed, p_deploy_back, p_retreat, p_defeat)
 	wire_feedback()
 	var interaction: RefCounted = wire_interaction()
@@ -58,6 +61,7 @@ func wire_all(p_deploy_confirmed: Callable, p_deploy_back: Callable,
 		"result_bridge": wire_result_bridge(),
 		"interaction_wiring": interaction,
 		"bag_mount": wire_bag(interaction),
+		"deck_wiring": deck_wiring,
 	}
 	wire_focus_memory(interaction)
 	return wired
@@ -147,6 +151,34 @@ func wire_result_bridge() -> RefCounted:
 	var bridge: RefCounted = ResultBridgeScript.new()
 	bridge.call(&"bind", cs)
 	return bridge
+
+
+## 底部条牌库/弃牌计数订阅——[signal CombatSystem.pile_changed] → 计数组件
+## （实现见 [code]combat_deck_wiring.gd[/code]）。[br]
+## [br][b]为什么在 [method wire_panels] 之后单独一步[/b]：面板接线负责「组件建好并
+## 有信号源」，这一步是「把哪条系统信号接到哪个数字位」的映射——两件事分开后，
+## 断链的现场（本债：有组件、有 setter、没人调）一眼可查。[br]
+## [br][b]返回[/b]：订阅句柄（任一侧缺失时为 null——容器据此跳过退订）。
+func wire_deck_counts() -> RefCounted:
+	var cs: Node = _combat()
+	var counter: Variant = _deck_counter()
+	if cs == null or counter == null:
+		return null
+	var wiring: RefCounted = DeckWiringScript.new()
+	if not bool(wiring.call(&"bind", cs, counter)):
+		return null
+	return wiring
+
+
+## 底部条里的计数组件（战场根缺失 / 组件缺失时 null）。
+func _deck_counter() -> Control:
+	if _root == null:
+		return null
+	var bar: Variant = _root.get("combat_bottombar")
+	if bar == null:
+		return null
+	var counter: Variant = (bar as Object).get("deck_counter")
+	return counter if counter is Control else null
 
 
 ## 出牌交互层 + 手牌供给——装配与开关委托 [code]combat_scene_interaction.gd[/code]

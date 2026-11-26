@@ -29,6 +29,21 @@ func _init(parent: Node = null) -> void:
 
 # === 抽牌 ========================================================================
 
+## 牌堆张数广播——[signal CombatSystem.pile_changed] 的唯一发射点。[br]
+## [br][b]为什么散点收在这里[/b]：本模块是 [code]_deck[/code] /
+## [code]_discard_pile[/code] 两个数组的[b]唯一[/b]改动处（类文档「不持数组」段），
+## 故广播也就只有这一处——产品侧任何一条路径（抽牌 / 洗牌 / 弃牌 / 绑定卡洗回 /
+## 读档接管）改完数组都会经过它，不存在「漏发一处，UI 悄悄停在旧数字」的岔路。[br]
+## [br][b]在改动之后调[/b]：消费者拿到的信号即终态，没有「先通知后落地」的窗口。[br]
+## [br][b]父节点缺失或非 CombatSystem 时静默跳过[/b]：本模块的单元测试会传桩父节点。
+func _emit_pile_counts() -> void:
+	if _parent == null or not _parent.has_method("_emit_safe"):
+		return
+	var deck: Array = _parent.get("_deck")
+	var discard: Array = _parent.get("_discard_pile")
+	_parent.call("_emit_safe", &"pile_changed", [deck.size(), discard.size()])
+
+
 ## 从牌库抽 n 张牌到手牌——牌库抽空时从弃牌堆随机返还 1 张到牌库底部。[br]
 ## [br]来源: GDD §2 抽牌规则 / AC-013。
 func draw_cards(count: int) -> void:
@@ -36,21 +51,26 @@ func draw_cards(count: int) -> void:
 	var discard: Array = _parent.get("_discard_pile")
 	var hand: Array = _parent.get("_hand")
 	var rng: RandomNumberGenerator = _parent.get("_rng")
+	var deck_before: int = deck.size()
+	var discard_before: int = discard.size()
 	for i in range(count):
 		if deck.is_empty():
 			# AC-013：牌库抽空 + 弃牌堆非空 → 随机返还 1 张到牌库底部
 			if discard.is_empty():
 				# 牌库和弃牌堆均空 → 跳过抽牌，不报错
-				return
+				break
 			var idx: int = rng.randi_range(0, discard.size() - 1)
 			var card: Variant = discard[idx]
 			discard.remove_at(idx)
 			deck.append(card)
 		if deck.is_empty():
-			return
+			break
 		var drawn: Variant = deck[0]
 		deck.remove_at(0)
 		hand.append(drawn)
+	# 一张没动（两堆皆空）时不发——消费者据此把「收到信号」当作「数字可信」
+	if deck.size() != deck_before or discard.size() != discard_before:
+		_emit_pile_counts()
 
 
 ## 发开局手牌——GDD §2「开局手牌：先手 4 张，后手 5 张」。<br>
@@ -101,6 +121,7 @@ func init_deck(card_ids: Array) -> void:
 		deck[i] = deck[j]
 		deck[j] = tmp
 	_parent.set("_deck", deck)
+	_emit_pile_counts()
 
 
 ## 洗牌——将弃牌堆全部洗回牌库，弃牌堆清空。
@@ -108,11 +129,14 @@ func shuffle_discard_into_deck() -> void:
 	var deck: Array = _parent.get("_deck")
 	var discard: Array = _parent.get("_discard_pile")
 	var rng: RandomNumberGenerator = _parent.get("_rng")
+	if discard.is_empty():
+		return  # 弃牌堆本来就空——两堆都没动，不发「不变」的信号
 	while not discard.is_empty():
 		var idx: int = rng.randi_range(0, discard.size() - 1)
 		var card: Variant = discard[idx]
 		discard.remove_at(idx)
 		deck.append(card)
+	_emit_pile_counts()
 
 
 ## 弃牌——将手牌中的指定卡牌移到弃牌堆。[br]
@@ -131,6 +155,7 @@ func discard_card(card_instance_id: int) -> void:
 		if cid == card_instance_id:
 			hand.remove_at(i)
 			_parent.get("_discard_pile").append(card)
+			_emit_pile_counts()
 			return
 	push_warning("CombatSystem: discard_card card_instance_id=%d not found in hand" % card_instance_id)
 
@@ -138,11 +163,13 @@ func discard_card(card_instance_id: int) -> void:
 ## 添加卡牌到牌库底部（绑定卡阵亡洗回——BindingManager 回调）。
 func add_card_to_deck(card_instance_id: int) -> void:
 	_parent.get("_deck").append(card_instance_id)
+	_emit_pile_counts()
 
 
 ## 添加卡牌到弃牌堆（绑定卡覆盖进弃牌——BindingManager 回调）。
 func add_card_to_discard(card_instance_id: int) -> void:
 	_parent.get("_discard_pile").append(card_instance_id)
+	_emit_pile_counts()
 
 
 # === 整堆替换（注入与读档）======================================================
@@ -152,6 +179,7 @@ func set_deck_state(deck: Array, discard: Array, hand: Array) -> void:
 	_parent.set("_deck", deck.duplicate())
 	_parent.set("_discard_pile", discard.duplicate())
 	_parent.set("_hand", hand.duplicate())
+	_emit_pile_counts()
 
 
 ## 按存档快照原样恢复三堆牌——读档续战专用（顺序与内容都取存档值）。[br]
@@ -171,6 +199,7 @@ func restore_piles(p_hand: Array, p_draw_pile: Array, p_discard_pile: Array) -> 
 	_parent.set("_hand", p_hand.duplicate())
 	_parent.set("_deck", p_draw_pile.duplicate())
 	_parent.set("_discard_pile", p_discard_pile.duplicate())
+	_emit_pile_counts()
 
 
 # === 查询 ========================================================================

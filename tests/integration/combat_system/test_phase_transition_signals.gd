@@ -463,7 +463,10 @@ func test_ac010_only_cat2b_signals_declared() -> void:
 	# combat-ui-interaction 002：新增 turn_started（回合边界广播）与
 	# enemy_action_resolved（敌方单次行动结果）——两者都是事件通知，
 	# 均不带可被 UI 复制的权威状态（turn 是事件携带的时点值，HP 终值仍需现读）。
-	var expected: Array = ["phase_changed", "battle_started", "battle_ended", "attack_resolved", "character_died", "retreat_requested", "character_damaged", "turn_started", "enemy_action_resolved"]
+	# DEBT-CUI-010：新增 pile_changed（牌库/弃牌张数变化）——同样是事件通知：
+	# 它广播的是两个即时值，牌堆数组的权威副本仍在战斗侧，UI 只持渲染快照
+	# （计数位不参与任何战斗判定，判据侧一律现读 get_deck / get_discard_pile）。
+	var expected: Array = ["phase_changed", "battle_started", "battle_ended", "attack_resolved", "character_died", "retreat_requested", "character_damaged", "turn_started", "enemy_action_resolved", "pile_changed"]
 	var builtin: Array = ["tree_entered", "tree_exiting", "tree_exited", "child_entered_tree", "child_exiting_tree", "child_order_changed", "replacing_by", "editor_description_changed", "editor_state_changed", "script_changed", "property_list_changed", "ready", "renamed"]
 	var signals: Array = cs.get_signal_list()
 	for s in signals:
