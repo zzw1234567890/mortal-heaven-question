@@ -46,8 +46,14 @@ var template_dir: String = TEMPLATE_DIR
 ## Godot 4.6 GDScript 不支持。类型保证由 load 入口路径维护。
 var _template_registry: Dictionary = {}
 
-## 模板已加载标志。
+## 模板已加载标志——[b]仅在扫描成功后置 true[/b]（见 [method load_templates]）。[br]
+## 扫描失败时保持 false，调用方据此区分「加载完成」与「加载失败」。
 var _templates_loaded: bool = false
+
+## 最近一次 [method load_templates] 的错误说明——成功时清空，失败时为中文一句话。[br]
+## 与 [member _templates_loaded] 配合：失败时 loaded 保持 false + last_error 非空，
+## 调用方无需反射读日志即可分辨两种状态。
+var last_error: String = ""
 
 ## 独立 RNG 实例（ADR-0017 §RNG——确定性种子，支持回归测试）。
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -97,14 +103,21 @@ func _ready() -> void:
 ## 加载所有 EnemyTemplate Resource 到注册表。[br]
 ## 扫描 [code]res://assets/enemies/[/code] 目录下的所有 [code].tres[/code] 文件。[br]
 ## 空目录不崩溃；重复 template_id 记录 push_warning。[br]
+## [br][b]失败不破坏既有状态[/b]：扫描结果先落在局部容器，成功后才整体换入——
+## 目录打不开（路径错 / 导出后目录结构变化）时[b]保留原注册表[/b]，
+## 同时 [member last_error] 记一句话 + [code]push_error[/code]，
+## [member _templates_loaded] 保持 false 且[b]不发射[/b] [signal enemy_templates_loaded]，
+## 避免调用方把「加载失败」误当成「加载完成」而永不重试。[br]
 ## [br]来源: ADR-0017 §关键接口 load_templates / GDD ai-system.md §2。
 func load_templates() -> void:
-	_template_registry.clear()
 	var dir: DirAccess = DirAccess.open(template_dir)
 	if dir == null:
-		_templates_loaded = true
-		enemy_templates_loaded.emit()
-		return  # 目录不存在——空注册表
+		last_error = "AISystem.load_templates: 无法打开模板目录 '%s'，保留现有 %d 个模板" % [
+				template_dir, _template_registry.size()]
+		push_error(last_error)
+		return  # 目录不存在——保留原注册表，不置 loaded、不发信号
+	# 局部容器：扫描中途出错/为空也不会连累现网注册表。
+	var scanned: Dictionary = {}
 	dir.list_dir_begin()
 	var file_name: String = dir.get_next()
 	while file_name != "":
@@ -113,14 +126,17 @@ func load_templates() -> void:
 			var loaded: Resource = load(res_path)
 			if loaded != null and loaded is _EnemyTemplate:
 				var tid: StringName = loaded.template_id
-				if _template_registry.has(tid):
+				if scanned.has(tid):
 					push_warning("AISystem.load_templates: 重复 template_id '%s'（文件: %s）" % [tid, res_path])
 				# AC-009：Boss phase_transitions 上限 2（起始阶段 + 2 转换 = 3 阶段）
 				if loaded.is_boss and (loaded.phase_transitions as Array).size() > 2:
 					push_warning("AISystem.load_templates: Boss '%s' phase_transitions 超过 2 项上限（%d 项）" % [tid, (loaded.phase_transitions as Array).size()])
-				_template_registry[tid] = loaded
+				scanned[tid] = loaded
 		file_name = dir.get_next()
 	dir.list_dir_end()
+	# 扫描成功——整体换入并置位。
+	_template_registry = scanned
+	last_error = ""
 	_templates_loaded = true
 	enemy_templates_loaded.emit()
 
