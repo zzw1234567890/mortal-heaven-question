@@ -233,6 +233,14 @@ func _draw_hover_tooltip(node_id: int) -> void:
 	Painter.draw_hover_tooltip(self, node_id)
 
 
+## 拾取区域覆写——「画得出来就点得到」（可见性与可点性同源）。[br]
+## [br]不覆写时引擎按 [code]Rect2(Vector2.ZERO, size)[/code] 判定，而本控件由
+## [NodeGraphViewport] 缩放平移、节点又摆在局部负坐标——负 x 的节点画得出来却
+## 收不到事件（成因与真机取证见 [method NodeGraphLayout.pick_rect]）。
+func _has_point(point: Vector2) -> bool:
+	return Layout.pick_rect(size, _content_rect).has_point(point)
+
+
 ## 节点命中检测——[param point]（画布局部坐标）是否落在 [param node_id] 的
 ## 图标矩形内（AC-10 悬停触发判定；迷雾节点悬停也显示「?」故同样命中）。[br]
 ## [b]命中框与绘制同源[/b]（审查 M1）：矩形按 [method get_node_draw_scale]

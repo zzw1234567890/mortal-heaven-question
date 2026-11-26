@@ -53,6 +53,26 @@ static func compute_content_rect(p_positions: Dictionary) -> Rect2:
 	return bounds.grow(Style.NODE_SIZE)
 
 
+## 拾取区域——控件自身矩形 ∪ 内容包围盒（两者取并，只增不减）。[br]
+## [br][b]为什么必须有这一层[/b]：引擎 GUI 拾取对未覆写 [code]_has_point[/code] 的
+## Control 走 [code]Rect2(Vector2.ZERO, size)[/code]——矩形[b]永远从局部原点起[/b]。
+## 而 [method compute_positions] 把同层中点右侧的节点摆在[b]局部负 x[/b]，
+## [code]NodeGraphViewport[/code] 又把渲染器整个缩放平移（本机实测
+## [code]zoom = 1.5[/code] / [code]offset = (960, 316.5)[/code]）——渲染器自己的矩形
+## 只覆盖屏幕右半边，负 x 的节点 [code]_draw[/code] 画得出来（溢出不受矩形约束）
+## 却收不到事件，玩家看得见点不动。[br]
+## [br][b]为什么并上自身矩形而不是只留内容[/b]：既有拾取范围里没有任何一点应当
+## 变成不认领（收窄会把空画布上的边缘平移与悬停改道）；并集只增不减。[br]
+## [br][b]为什么内容包围盒必定覆盖全部节点中心[/b]：[method compute_content_rect]
+## 是各节点中心的并集再外扩一个节点尺寸，而节点命中框半宽最大只有
+## [code]NODE_SIZE * 1.1 / 2[/code]——故本区域恒为节点命中框的超集。
+static func pick_rect(p_size: Vector2, p_content: Rect2) -> Rect2:
+	var own := Rect2(Vector2.ZERO, p_size)
+	if p_content.size == Vector2.ZERO:
+		return own
+	return own.merge(p_content)
+
+
 ## 已揭示集合（legacy 口径）：已访问 + 当前节点 + 当前节点的邻接（前向 + 后向）。[br]
 ## [br][b]只是 legacy 近似[/b]：states 注入时迷雾以六态判定为准（见
 ## [method fogged_positions]），本集合只在未注入六态时被读。
