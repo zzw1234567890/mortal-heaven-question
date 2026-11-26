@@ -1,4 +1,4 @@
-## FormationSystem —— 阵法系统 Autoload（#23）。
+## FormationSystem —— 阵法系统 Autoload（#23）。[b]链尾：委托出口面 + 战斗结束清理[/b]。
 ##
 ## Feature 层 Autoload。采用内部条件状态机管理阵法位数据——
 ## 阵法位状态、激活/未激活判定、角色归属关系均在内部 Dictionary 中管理，
@@ -7,366 +7,44 @@
 ## [b]本 Story 范围[/b]（4-14）：SlotState/AuraScope 枚举 + 阵位数据模型 +
 ## deploy_formation / overwrite_formation / set_character_affilation /
 ## clear_character_affilation + 查询 API + 5 个 Cat 2b 信号。[br]
-## [b]不注册进 project.godot[/b]——待各系统实现完毕后统一注册（4-0b 终验）。[br]
+## [b]已注册进 project.godot[/b]——Autoload #23（FormationSystem）。[br]
 ## [b]后续 story[/b]：recheck_all_conditions 实时重判（4-15）、
 ## get_aura_bonus O(1) 查询（4-16）、serialize_all 快照（4-17）。
 ## [b]存根接口[/b]：条件判定走 FactionSystem.check_condition 或可注入
 ## condition_check_cb；效果引擎 register/remove 通过 Callable 承载——默认空操作。
 ##
+## [b]本层职责[/b]：四个委托出口面与战斗结束清理。[br]
+##   · 条件实时重判——[method recheck_all_conditions] 与 DeploymentSystem 信号处理器
+##     [method _on_field_changed]（实现体在 [code]formation_slot_ops.gd[/code]）；[br]
+##   · 光环查询——[method get_aura_bonus]（实现体在 [code]formation_aura.gd[/code]）；[br]
+##   · 序列化三出口——[method serialize_all] / [method deserialize_all] /
+##     [method write_snapshot_to_gsm]（实现体在 [code]formation_serializer.gd[/code]）；[br]
+##   · 清理——[method clear_all_formations]（战斗结束，按 ADR-0024 §验证标准保留
+##     [member _next_formation_id]）与测试辅助 [method _clear_all]（重置 ID，便于断言）。
+##
+## [b]继承链[/b]（各段守 300 行内，成员名与访问路径逐字不变）：[br]
+## [code]  formation_system_contract.gd [/code] ← 声明面：2 枚举 / 6 信号 / 1 标量常量 / 15 实例字段[br]
+## [code]  formation_system_access.gd   [/code] ← 接缝与访问面：默认状态构造 / 三个惰性子模块获取器 / 信号发射包装 / 两个 Autoload 获取器[br]
+## [code]  formation_system_flow.gd     [/code] ← 流程面：部署与覆盖 / 归属管理 / 查询 API / 内部原语[br]
+## [code]  formation_system.gd          [/code] ← 链尾：条件重判与光环委托 / 序列化三出口 / 战斗结束清理[br]
+##
+## [b]链序不是自由选择[/b]：GDScript 解析期要求被调方在[b]本段或祖先段[/b]——祖先段用裸
+## 标识符引用后代段成员会直接报 [code]Function "xxx()" not found in base self[/code]。
+## 故本层四个出口都要排在接缝段（惰性获取器与 [method _get_gsm]）与流程段（内部原语）之后；
+## 而两个枚举因为要供给 [method _make_empty_slot]（[code]SlotState.EMPTY[/code] /
+## [code]AuraScope.AFFILIATED_CHARACTERS[/code]）与 [method deploy_formation] 的默认参数值，
+## 只能随声明整体落链首。[br]
+## [b]路径即契约[/b]：[code]project.godot[/code] 的 [code][autoload][/code] 把
+## [code]FormationSystem[/code] 绑在 [code]res://src/feature/formation_system.gd[/code]
+## 这一串字符上，四个既有测试文件按同一路径 [code]preload[/code] 取类（读枚举、建实例），
+## 故本文件名逐字不动。[b]本类不声明[/b] [code]class_name[/code]——Autoload 全局单例，
+## 声明 class_name 会与全局名冲突，导致 [code]FS_SCRIPT.new()[/code] 测试实例无法解析；
+## 测试以 [code]var fs: Node[/code] 持有 + 动态分派访问（同 DeploymentSystem/BindingManager 先例）。
+## 守卫用例：[code]tests/unit/formation_system/test_formation_public_face_lock.gd[/code]。
+##
 ## 来源: ADR-0024 §决策 §对象模型 §阵法状态机 §关键接口 / GDD formation-system.md。
-extends Node
-# class_name FormationSystem —— 不声明：Autoload 全局单例，
-# 声明 class_name 会与全局名冲突，导致 FS_SCRIPT.new() 测试实例无法解析。
-# 测试以 var fs: Node 持有 + 动态分派访问（同 DeploymentSystem/BindingManager 先例）。
 
-
-# === 枚举 ======================================================================
-
-enum SlotState { EMPTY, DEPLOYED_UNACTIVE, ACTIVE, DISCARDED }
-enum AuraScope { GLOBAL, AFFILIATED_CHARACTERS, SAME_FACTION, FORMATION_TRIGGER }
-
-
-# === Cat 2b 信号（ADR-0024 §Cat 2b 信号，经 _emit_signal_safe 路由）===============
-
-## 阵法部署到阵法位（无论是否激活）。
-signal formation_deployed(formation_id: int, slot_index: int, template_id: StringName, deployed_turn: int)
-## 阵法条件满足→激活。
-signal formation_activated(formation_id: int, slot_index: int, template_id: StringName, trigger_reason: String)
-## 阵法条件不满足→失效。
-signal formation_deactivated(formation_id: int, slot_index: int, reason: String)
-## 覆盖完成（携带 old/new formation_id，UI 据此替换图标 + 过渡动画）。
-signal formation_overwritten(old_formation_id: int, new_formation_id: int, slot_index: int)
-## 玩家手动指定角色归属。
-signal character_affiliated(character_id: int, formation_id: int)
-## 条件重判完成批量通知（携带变更列表）。
-signal formation_condition_reevaluated(changes: Array)
-
-
-# === 常量 ======================================================================
-
-const MAX_SLOTS: int = 3
-
-
-# === 内部数据 ==================================================================
-
-## 阵法位——slot_index(0-2) → 阵法 Dictionary。[br]
-## [b]声明为无类型 Dictionary[/b]——Dictionary[int, Dictionary] 是嵌套类型化集合，
-## Godot 4.6 GDScript 不支持。值仍为 Dictionary，类型保证由构造路径维护。
-var _slots: Dictionary = {}
-
-## 角色归属——character_id → formation_id（每角色最多 1 个）。
-var _affiliations: Dictionary[int, int] = {}
-
-## 下一阵法 ID（单调递增）。
-var _next_formation_id: int = 1
-
-## 当前回合（由调用方设置，默认 0）。
-var _deploy_turn: int = 0
-
-## 延迟归属队列（ADR-0024 §风险——敌方回合时序安全）。[br]
-## 敌方回合条件重判中新阵法激活需归属选择时压入此队列，[br]
-## 己方回合 Phase 1 DRAW 由 CombatSystem 弹出（本 Story 仅实现数据结构 + 压入存根）。
-var _pending_affiliations: Array[Dictionary] = []
-
-
-# === 可注入存根（同 BindingManager 先例——默认空操作/安全回退）===================
-
-## 阵法激活条件判定存根——(requirement: Dictionary) -> bool。默认走 FactionSystem.check_condition。
-var condition_check_cb: Callable = Callable()
-
-## 效果引擎 register_persistent_effect 存根——(card_instance_id, template_id, scope_context)。默认空操作。
-var effect_register_cb: Callable = Callable()
-
-## 效果引擎 remove_effects_by_source 存根——(card_instance_id)。默认空操作。
-var effect_remove_cb: Callable = Callable()
-
-## 阵法覆盖时旧卡进弃牌堆存根——(card_instance_id)。默认空操作。
-var card_discard_cb: Callable = Callable()
-
-## 阵营人数查询存根——(tag_id: StringName) -> int。默认走 FactionSystem.count_on_field。
-var count_on_field_cb: Callable = Callable()
-
-## 固定属性加成查询存根——(formation_id: int, stat_name: String) -> float。[br]
-## 用于固定阵法（非梯度）的属性增益查询——默认从 slot.effect_config 读取。
-var fixed_bonus_cb: Callable = Callable()
-
-## 角色存在性验证存根——(character_id: int) -> bool。默认返回 true（假设存在）。
-var character_exists_cb: Callable = Callable()
-
-
-# === 初始化 ====================================================================
-
-func _init() -> void:
-	_reset_slots()
-
-
-func _reset_slots() -> void:
-	_slots.clear()
-	for i in range(MAX_SLOTS):
-		_slots[i] = _make_empty_slot()
-
-
-func _make_empty_slot() -> Dictionary:
-	return {
-		"formation_id": -1,
-		"card_instance_id": -1,
-		"template_id": &"",
-		"state": SlotState.EMPTY,
-		"deployed_turn": -1,
-		"requirement": {},
-		"aura_scope": AuraScope.AFFILIATED_CHARACTERS,
-		"effect_config": {},
-		"max_level": 0,
-		"base_value": 0.0,
-		"affiliated_chars": [],
-	}
-
-
-func set_deploy_turn(turn: int) -> void:
-	_deploy_turn = turn
-
-
-# === 子模块（Sprint 9 Story 3 拆分）=================================================
-
-## 序列化子模块——惰性初始化。
-var _serializer: RefCounted = null
-
-## 光环查询子模块——惰性初始化。
-var _aura: RefCounted = null
-
-## 部署/覆盖/条件重判子模块——惰性初始化（Sprint 12 Story 019 拆分）。
-var _slot_ops: RefCounted = null
-
-## 惰性获取序列化子模块。
-func _get_serializer() -> RefCounted:
-	if _serializer == null:
-		_serializer = load("res://src/feature/formation/formation_serializer.gd").new(self)
-	return _serializer
-
-## 惰性获取光环查询子模块。
-func _get_aura() -> RefCounted:
-	if _aura == null:
-		_aura = load("res://src/feature/formation/formation_aura.gd").new(self)
-	return _aura
-
-## 惰性获取部署/覆盖/条件重判子模块（Sprint 12 Story 019 拆分）。
-func _get_slot_ops() -> RefCounted:
-	if _slot_ops == null:
-		_slot_ops = load("res://src/feature/formation/formation_slot_ops.gd").new(self)
-	return _slot_ops
-
-
-# === 部署 API ==================================================================
-
-## 部署阵法卡到阵法区（AC-001~004）。[br]
-## slot_index=-1 时自动分配第一个空位（按 0→1→2 顺序）。[br]
-## 部署后立即判定条件——满足则 ACTIVE，否则 DEPLOYED_UNACTIVE。[br]
-## 阵法区满 3 个（含未激活）返回 [code]slots_full[/code]。[br]
-## [br][param card_instance_id] 阵法卡实例 ID。[br]
-## [br][param template_id] 阵法模板 ID。[br]
-## [br][param slot_index] 指定阵位（-1 自动分配）。[br]
-## [br][param requirement] 激活条件 [code]{tag_id, min_count}[/code]。[br]
-## [br][param aura_scope] 光环作用域。[br]
-## [br][b]返回[/b]: [code]{success, formation_id, slot_index, activated, reason}[/code]。
-func deploy_formation(card_instance_id: int, template_id: StringName, slot_index: int = -1,
-		requirement: Dictionary = {}, aura_scope: int = AuraScope.AFFILIATED_CHARACTERS,
-		effect_config: Dictionary = {}, max_level: int = 0, base_value: float = 0.0) -> Dictionary:
-	return _get_slot_ops().deploy_formation(card_instance_id, template_id, slot_index, requirement, aura_scope, effect_config, max_level, base_value)
-
-
-## 覆盖阵法位（AC-005）——严格顺序：旧阵 DISCARDED → 清除归属 → 移除旧效果 → 新阵部署 → 判定 → 注册新效果。[br]
-## [br][param target_slot] 被覆盖的阵位索引。[br]
-## [br][b]返回[/b]: [code]{success, formation_id, slot_index, activated, reason}[/code]。
-func overwrite_formation(card_instance_id: int, template_id: StringName, target_slot: int,
-		requirement: Dictionary = {}, aura_scope: int = AuraScope.AFFILIATED_CHARACTERS,
-		effect_config: Dictionary = {}, max_level: int = 0, base_value: float = 0.0) -> Dictionary:
-	return _get_slot_ops().overwrite_formation(card_instance_id, template_id, target_slot, requirement, aura_scope, effect_config, max_level, base_value)
-
-
-# === 归属管理 ==================================================================
-
-## 玩家手动指定角色归属阵法（AC-007）。[br]
-## 仅当角色当前无归属 + 阵法为 ACTIVE → 返回 true。[br]
-## 角色已有归属 → 返回 false（需先清除）；阵法非 ACTIVE → 返回 false。[br]
-## [b]延后[/b]：ADR-0024 §关键接口指定"角色满足条件"第三检查项——
-## 角色是否在场/阵营匹配依赖 DeploymentSystem/FactionSystem 集成，
-## 延后至 Story 002（recheck_all_conditions 订阅 deployment 信号时）或集成测试。
-func set_character_affilation(character_id: int, formation_id: int) -> bool:
-	if _affiliations.has(character_id):
-		return false
-	if not is_formation_active(formation_id):
-		return false
-	var slot: Dictionary = _get_slot_by_formation(formation_id)
-	if slot.is_empty():
-		return false
-	_affiliations[character_id] = formation_id
-	(slot["affiliated_chars"] as Array).append(character_id)
-	_emit_safe(&"character_affiliated", [character_id, formation_id])
-	return true
-
-
-## 清除角色归属（AC-008）——阵法失效/覆盖时自动调用。[br]
-## [br][param character_id] 角色 ID。
-func clear_character_affilation(character_id: int) -> void:
-	if not _affiliations.has(character_id):
-		return
-	var formation_id: int = _affiliations[character_id]
-	_affiliations.erase(character_id)
-	var slot: Dictionary = _get_slot_by_formation(formation_id)
-	if not slot.is_empty() and slot.has("affiliated_chars"):
-		(slot["affiliated_chars"] as Array).erase(character_id)
-
-
-# === 查询 API ==================================================================
-
-## O(1) 查询单阵法完整状态。[br]
-## [br][b]返回[/b]: [code]{slot_index, template_id, state, deployed_turn, requirement, affiliated_count, is_active}[/code]。
-func get_formation_state(formation_id: int) -> Dictionary:
-	var slot: Dictionary = _get_slot_by_formation(formation_id)
-	if slot.is_empty():
-		return {}
-	return {
-		"slot_index": _get_slot_index_by_formation(formation_id),
-		"template_id": slot.get("template_id", &""),
-		"state": slot.get("state", SlotState.EMPTY),
-		"deployed_turn": slot.get("deployed_turn", -1),
-		"requirement": slot.get("requirement", {}),
-		"affiliated_count": (slot.get("affiliated_chars", []) as Array).size(),
-		"is_active": slot.get("state", SlotState.EMPTY) == SlotState.ACTIVE,
-	}
-
-
-## 返回所有 ACTIVE 阵法摘要列表。
-func get_active_formations() -> Array:
-	var result: Array = []
-	for i in range(MAX_SLOTS):
-		var slot: Dictionary = _slots[i]
-		if slot.get("state", SlotState.EMPTY) == SlotState.ACTIVE:
-			result.append({
-				"formation_id": slot["formation_id"],
-				"slot_index": i,
-				"template_id": slot["template_id"],
-				"affiliated_count": (slot.get("affiliated_chars", []) as Array).size(),
-			})
-	return result
-
-
-## 返回 3 个阵法位完整状态。
-func get_slot_states() -> Array:
-	var result: Array = []
-	for i in range(MAX_SLOTS):
-		var slot: Dictionary = _slots[i]
-		result.append({
-			"slot_index": i,
-			"formation_id": slot.get("formation_id", -1),
-			"template_id": slot.get("template_id", &""),
-			"state": slot.get("state", SlotState.EMPTY),
-			"deployed_turn": slot.get("deployed_turn", -1),
-			"is_active": slot.get("state", SlotState.EMPTY) == SlotState.ACTIVE,
-			"affiliated_count": (slot.get("affiliated_chars", []) as Array).size(),
-		})
-	return result
-
-
-## O(1) 查询角色归属的阵法 ID——未归属返回 -1。
-func get_character_affilation(character_id: int) -> int:
-	return int(_affiliations.get(character_id, -1))
-
-
-## O(1) 查询阵法是否处于 ACTIVE 状态。
-func is_formation_active(formation_id: int) -> bool:
-	var slot: Dictionary = _get_slot_by_formation(formation_id)
-	if slot.is_empty():
-		return false
-	return slot.get("state", SlotState.EMPTY) == SlotState.ACTIVE
-
-
-## 阵法部署前检查。[br]
-## [br][b]返回[/b]: [code]{can_deploy, empty_slots, reason}[/code]。
-func can_deploy() -> Dictionary:
-	var empty: int = 0
-	for i in range(MAX_SLOTS):
-		if _slots[i].get("state", SlotState.EMPTY) == SlotState.EMPTY:
-			empty += 1
-	return {"can_deploy": empty > 0, "empty_slots": empty, "reason": "ok" if empty > 0 else "slots_full"}
-
-
-# === 内部方法 ==================================================================
-
-## 条件判定——优先 condition_check_cb，否则走 FactionSystem.check_condition。[br]
-## 无 requirement → 自动激活（无条件阵法）。[br]
-## FactionSystem 不可用 → 返回 false（安全回退）。
-func _check_condition(requirement: Dictionary) -> bool:
-	if requirement.is_empty():
-		return true
-	if condition_check_cb.is_valid():
-		return bool(condition_check_cb.call(requirement))
-	var fs: Node = _get_faction_system()
-	if fs != null and fs.has_method("check_condition"):
-		return bool(fs.call("check_condition", requirement))
-	return false
-
-
-## 清除指向指定阵法的全部归属记录 + 同步清理 slot.affiliated_chars 数组（lead-programmer C1）。
-func _clear_affiliations_by_formation(formation_id: int) -> void:
-	var to_remove: Array[int] = []
-	for char_id: int in _affiliations.keys():
-		if _affiliations[char_id] == formation_id:
-			to_remove.append(char_id)
-	for char_id: int in to_remove:
-		_affiliations.erase(char_id)
-	var slot: Dictionary = _get_slot_by_formation(formation_id)
-	if not slot.is_empty() and slot.has("affiliated_chars"):
-		(slot["affiliated_chars"] as Array).clear()
-
-
-## 按 formation_id 查找阵法位 Dictionary。
-func _get_slot_by_formation(formation_id: int) -> Dictionary:
-	for i in range(MAX_SLOTS):
-		var slot: Dictionary = _slots[i]
-		if slot.get("formation_id", -1) == formation_id:
-			return slot
-	return {}
-
-
-## 按 formation_id 查找阵位索引。
-func _get_slot_index_by_formation(formation_id: int) -> int:
-	for i in range(MAX_SLOTS):
-		if _slots[i].get("formation_id", -1) == formation_id:
-			return i
-	return -1
-
-
-## 查找第一个空位（按 0→1→2 顺序）。
-func _find_empty_slot() -> int:
-	for i in range(MAX_SLOTS):
-		if _slots[i].get("state", SlotState.EMPTY) == SlotState.EMPTY:
-			return i
-	return -1
-
-
-## 动态获取 FactionSystem Autoload 节点。
-func _get_faction_system() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/FactionSystem")
-
-
-## Cat 2b 信号安全发射——经 GSM._emit_signal_safe 路由（ADR-0007 信号链深度追踪）。
-func _emit_safe(signal_name: StringName, args: Array) -> void:
-	if GameStateManager != null and GameStateManager.get_script().has_method("_emit_signal_safe"):
-		GameStateManager.get_script()._emit_signal_safe(self, signal_name, args)
-	else:
-		var call_args: Array = [signal_name]
-		call_args.append_array(args)
-		callv("emit_signal", call_args)
-
-
-## 调用可注入存根——无效 Callable 静默跳过。
-func _invoke_cb(cb: Callable, args: Array) -> void:
-	if cb.is_valid():
-		cb.callv(args)
+extends "res://src/feature/formation/formation_system_flow.gd"
 
 
 ## 清空全部阵位和归属（测试辅助 + Story 004 clear_all_formations 基础）。[br]
@@ -415,14 +93,6 @@ func deserialize_all(data: Dictionary) -> void:
 ## 写阵法快照至 GSM battle.formation_snapshot——委托给 formation_serializer.gd 子模块。
 func write_snapshot_to_gsm() -> void:
 	_get_serializer().write_snapshot_to_gsm()
-
-
-## 动态获取 GSM Autoload 节点（同 DeploymentSystem 先例）。
-func _get_gsm() -> Node:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null or tree.root == null:
-		return null
-	return tree.root.get_node_or_null("/root/GameStateManager")
 
 
 ## 清空全部阵位和归属——战斗结束清理（AC-005）。[br]
