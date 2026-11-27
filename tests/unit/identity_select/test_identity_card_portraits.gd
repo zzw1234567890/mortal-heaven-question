@@ -22,12 +22,28 @@ const Templates := preload("res://src/feature/identity/identity_templates.gd")
 
 ## 有立绘的身份（assets/characters/portraits 下两张立绘都属于这一条）。
 const IDENTITY_WITH_PORTRAIT: StringName = &"azure_sword_disciple"
-## 没有立绘的身份（立绘带应走程序化占位）——取第二条默认解锁身份。
-const IDENTITY_WITHOUT_PORTRAIT: StringName = &"blood_sea_orphan"
+## 没有立绘的身份（立绘带应走程序化占位）。[br]
+## [br][b]为什么不再取真实身份[/b]：2026-11-27 起 6 个身份 × 2 名角色都有立绘了
+## （即梦生成的 12 张），任何真实身份都走不到占位分支。占位分支仍然存在且有
+## 意义——模板查无 / 数据缺失 / 新增身份还没出图时都靠它，故改用合成 id：
+## 模板查无 ⇒ card_id 为空 ⇒ 恒走程序化占位（见 Resolver 的文档注释）。
+const IDENTITY_WITHOUT_PORTRAIT: StringName = &"synthetic_identity_without_art"
 
 
 ## 造一条 get_available_identities() 形态的条目（只填 UI 读到的键）。
 func _entry(p_identity_id: StringName) -> Dictionary:
+	if not Templates.IDENTITY_TEMPLATES.has(p_identity_id):
+		# 合成身份：没有模板条目，只有显示名——正是「查无模板」那条回退路径。
+		return {
+			"identity_id": p_identity_id,
+			"name": "无名散修",
+			"style_tag": "灵活",
+			"initial_ling_shi": 10,
+			"character_display_names": ["无名甲", "无名乙"],
+			"is_unlocked": true,
+			"is_ready": true,
+			"block_reason": "",
+		}
 	var tmpl: Dictionary = Templates.IDENTITY_TEMPLATES[p_identity_id]
 	var names: Array[String] = []
 	for detail: Dictionary in tmpl["character_details"]:
@@ -135,8 +151,7 @@ func test_identity_without_portrait_gets_procedural_placeholder() -> void:
 
 func test_placeholder_palette_is_a_gradient_with_accent_seal() -> void:
 	# Arrange / Act：按 style_tag 取色板（数据里没有色值，走固定色板分支）
-	var palette: Dictionary = Resolver.palette_for(IDENTITY_WITHOUT_PORTRAIT,
-			str(Templates.IDENTITY_TEMPLATES[IDENTITY_WITHOUT_PORTRAIT]["style_tag"]))
+	var palette: Dictionary = Resolver.palette_for(IDENTITY_WITHOUT_PORTRAIT, "灵活")
 	# Assert：渐变两端不同色 → _draw 画出来是有深浅的底，不是一块纯色/空白
 	assert_ne(palette["top"], palette["bottom"], "渐变上下沿必须不同色（否则不成渐变）")
 	assert_ne(palette, Resolver.FALLBACK_PALETTE, "该身份有自己的派系色板，不该落到兜底")
@@ -145,8 +160,7 @@ func test_placeholder_palette_is_a_gradient_with_accent_seal() -> void:
 
 func test_distinct_identities_get_distinct_palettes() -> void:
 	# Arrange：两条不同 style_tag 的无立绘身份
-	var a: Dictionary = Resolver.palette_for(IDENTITY_WITHOUT_PORTRAIT,
-			str(Templates.IDENTITY_TEMPLATES[IDENTITY_WITHOUT_PORTRAIT]["style_tag"]))
+	var a: Dictionary = Resolver.palette_for(IDENTITY_WITHOUT_PORTRAIT, "灵活")
 	var b: Dictionary = Resolver.palette_for(&"frost_palace_disciple",
 			str(Templates.IDENTITY_TEMPLATES[&"frost_palace_disciple"]["style_tag"]))
 	# Assert：派系色板互异，玩家一眼能分出不同身份

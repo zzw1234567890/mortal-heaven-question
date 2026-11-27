@@ -92,13 +92,30 @@ func _attach_portrait() -> void:
 		return
 	var rect: TextureRect = TextureRect.new()
 	rect.name = PORTRAIT_NODE_NAME
-	rect.texture = portrait
+	rect.texture = _head_crop(portrait)
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(rect)
 
+
+## 立绘取「头肩」裁切——全身立绘（3:4）塞进横向小块时，居中裁切会把脸裁掉。[br]
+## [br][b]做法[/b]：用 [AtlasTexture] 只取原图上部 55% 高度、全宽的矩形，
+## 再交给 [code]STRETCH_KEEP_ASPECT_COVERED[/code] 填满小块——脸与上半身占满，
+## 不改资产、不新增贴图。原图比裁切框矮时退回原图。
+static func _head_crop(p_tex: Texture2D) -> Texture2D:
+	if p_tex == null:
+		return null
+	var w: float = float(p_tex.get_width())
+	var h: float = float(p_tex.get_height())
+	if w <= 0.0 or h <= 0.0:
+		return p_tex
+	var crop_h: float = minf(h, w * 0.78)
+	var atlas := AtlasTexture.new()
+	atlas.atlas = p_tex
+	atlas.region = Rect2(0.0, 0.0, w, crop_h)
+	return atlas
 
 ## 无立绘时的程序化占位：竖向渐变底 + 印章圆盘 + 双环 + 首字。[br]
 ## [br][b]为什么不用背景 [ColorRect][/b]：渐变要分带画，[method _draw] 一次画完

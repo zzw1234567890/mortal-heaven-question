@@ -25,12 +25,12 @@ const ALPHA_BLOCKED: float = 0.45
 ## 卡片最小尺寸（GridContainer 三列布局下与 .tscn 的 900px 网格宽度相称）。[br]
 ## [br][b]为什么从 150 抬高到 168[/b]：卡面上沿让出一整条立绘带（见
 ## [constant AVATAR_MIN_SIZE]），文字仍在图[b]下方[/b]独立成行——图不压字。
-const CARD_MIN_SIZE: Vector2 = Vector2(280, 168)
+const CARD_MIN_SIZE: Vector2 = Vector2(420, 330)
 ## 立绘带高度（px）——两名角色小块并排；其余高度留给文字行。
 ## [br][b]上限来源[/b]：.tscn 网格区 354px 高装两行 + 16px 间隔 → 单卡 169px。
-const AVATAR_MIN_SIZE: Vector2 = Vector2(104, 72)
+const AVATAR_MIN_SIZE: Vector2 = Vector2(150, 210)
 ## 立绘/占位小块的容器最小高度（= [constant AVATAR_MIN_SIZE] 的 y）。
-const AVATAR_ROW_HEIGHT: float = 72.0
+const AVATAR_ROW_HEIGHT: float = 210.0
 ## 立绘行内两块的横向间隔（px）。
 const AVATAR_SEP: int = 8
 
