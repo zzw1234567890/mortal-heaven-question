@@ -22,6 +22,13 @@ const EDGE_WIDTH: float = 2.0
 const DASH_LENGTH: float = 8.0
 ## 节点边框线宽（px）。
 const BORDER_WIDTH: float = 2.0
+## 强调态（当前/可达/已访问）的边框线宽（px）——比普通态粗一档，让
+## 「我在这 / 能去 / 走过」在三米外也分得出来。
+const EMPHASIS_BORDER_WIDTH: float = 3.0
+## 类型色底板相对图标的外扩量（px）——图标外一圈类型主色，暗底上更跳。
+const TYPE_BACKDROP_GROW: float = 4.0
+## 类型色底板的不透明度（低于 0.5——是衬底不是实心块，图标仍读得清）。
+const TYPE_BACKDROP_ALPHA: float = 0.32
 ## 节点文字标签字号（pt）。
 const LABEL_FONT_SIZE: int = 12
 ## 标签基线相对图标下沿的偏移（px）。

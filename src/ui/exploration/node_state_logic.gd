@@ -172,48 +172,52 @@ static func state_from_verdict(verdict: Dictionary) -> int:
 ##   [code]"gold"[/code]；[br]
 ##   [code]slash[/code]: bool——行动力不足红色斜线；[br]
 ##   [code]fogged[/code]: bool——迷雾（不显示类型）；[br]
+##   [code]emphasis[/code]: bool——强调态（当前/可达/已访问）用更粗的描边；[br]
 ##   [code]plate[/code]: Color——节点底衬（不透明色块，画在图标之下）。[br]
 ## [br][b]为什么要有底衬[/b]：已访问此前只靠「绿色边框 + ✓ + 压暗」区分，而压暗是
 ## 透明度手段、边框只有 2px——节点图标本身有类型主色（战斗红/精英红/商店绿…），
 ## 走过与没走过在缩放到 50% 时几乎同色。底衬是一块与类型色无关的[b]实色[/b]，
 ## 灰度模式下也能读出「这格走过了」。[br]
 ## [br][b]透明 = 不画[/b]（可达/不可达/行动力不足三种）：它们的类型色边框本身
-## 就是信息，压一层底衬只会把类型颜色糊掉。
+## 就是信息，压一层底衬只会把类型颜色糊掉。[br]
+## [br][b]emphasis 为什么是布尔而不是线宽[/b]：线宽是视觉规格（住
+## [code]node_graph_style.gd[/code]），这里是判定——给个「粗一档」的旗标，
+## 由绘制侧取 [code]Style.EMPHASIS_BORDER_WIDTH[/code]，尺寸改动不必回来改本文件。
 static func node_state_style(state: int) -> Dictionary:
 	match state:
 		NodeState.CURRENT:
 			return {"border": Color("#FFD700"), "border_is_type": false,
 					"marker": "player", "dim": false, "glow": "gold",
-					"slash": false, "fogged": false,
+					"slash": false, "fogged": false, "emphasis": true,
 					"plate": PLATE_CURRENT}
 		NodeState.REACHABLE:
 			return {"border": Color.TRANSPARENT, "border_is_type": true,
 					"marker": "", "dim": false, "glow": "pulse_blue",
-					"slash": false, "fogged": false,
+					"slash": false, "fogged": false, "emphasis": true,
 					"plate": Color.TRANSPARENT}
 		NodeState.VISITED:
 			return {"border": Color("#44CC66"), "border_is_type": false,
 					"marker": "check", "dim": true, "glow": "",
-					"slash": false, "fogged": false,
+					"slash": false, "fogged": false, "emphasis": true,
 					"plate": PLATE_VISITED}
 		NodeState.UNREACHABLE:
 			return {"border": Color(0.45, 0.45, 0.48), "border_is_type": false,
 					"marker": "lock", "dim": false, "glow": "",
-					"slash": false, "fogged": false,
+					"slash": false, "fogged": false, "emphasis": false,
 					"plate": Color.TRANSPARENT}
 		NodeState.AP_INSUFFICIENT:
 			return {"border": Color(0.45, 0.45, 0.48), "border_is_type": false,
 					"marker": "", "dim": false, "glow": "",
-					"slash": true, "fogged": false,
+					"slash": true, "fogged": false, "emphasis": false,
 					"plate": Color.TRANSPARENT}
 		NodeState.FOGGED:
 			return {"border": Color.TRANSPARENT, "border_is_type": false,
 					"marker": "question", "dim": false, "glow": "",
-					"slash": false, "fogged": true,
+					"slash": false, "fogged": true, "emphasis": false,
 					"plate": Color.TRANSPARENT}
 	return {"border": Color.TRANSPARENT, "border_is_type": false,
 			"marker": "", "dim": false, "glow": "", "slash": false, "fogged": false,
-			"plate": Color.TRANSPARENT}
+			"emphasis": false, "plate": Color.TRANSPARENT}
 
 
 ## 节点是否已揭示（迷雾判定）——纯函数。[br]

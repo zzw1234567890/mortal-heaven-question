@@ -43,6 +43,10 @@ static func draw_legacy(p_host: Control, p_node_id: int) -> void:
 	if fogged:
 		draw_fogged_glyph(p_host, rect, pos)
 	else:
+		# 类型色光晕（与六态分支同款——legacy 路径也要能从暗背景里跳出来）
+		var halo: Color = NodeIconAtlasScript.get_color(type_id)
+		p_host.draw_rect(rect.grow(Style.TYPE_BACKDROP_GROW),
+				Color(halo.r, halo.g, halo.b, Style.TYPE_BACKDROP_ALPHA))
 		blit_region(p_host, rect, NodeIconAtlasScript.get_region(type_id))
 
 	# 边框：当前 > 已访问 > 类型色暗化
@@ -83,11 +87,14 @@ static func draw_stated(p_host: Control, p_node_id: int) -> void:
 
 	draw_glow(p_host, style, type_id, pos, node_size, fogged)
 
-	# 边框：border_is_type 时用类型主色，否则用样式边框色
+	# 边框：border_is_type 时用类型主色，否则用样式边框色；
+	# 强调态（当前/可达/已访问）加粗一档——见 [NodeStateLogic.node_state_style] 的 emphasis
 	var border_color: Color = style.get("border", Style.NODE_DEFAULT_BORDER)
 	if bool(style.get("border_is_type", false)):
 		border_color = NodeIconAtlasScript.get_color(type_id)
-	p_host.draw_rect(rect, border_color, false, Style.BORDER_WIDTH)
+	var border_width: float = Style.EMPHASIS_BORDER_WIDTH \
+			if bool(style.get("emphasis", false)) else Style.BORDER_WIDTH
+	p_host.draw_rect(rect, border_color, false, border_width)
 
 	# 行动力不足红色斜线（AC-5）——渡劫台修为未满时跳过（灰斜线优先，避免
 	# 同对角线重叠；未满语义「可进入不可触发」强于「行动力不足」）
@@ -129,9 +136,17 @@ static func draw_fogged_glyph(p_host: Control, rect: Rect2, pos: Vector2) -> voi
 
 ## 类型图标 + 状态底衬 + 已访问暗化。[br]
 ## [br][b]底衬画在图标之下[/b]：图标是节点类型的信息，底衬是「这格有主了」的信息，
-## 底衬盖住图标就等于用状态把类型抹掉了。
+## 底衬盖住图标就等于用状态把类型抹掉了。[br]
+## [br][b]三层顺序[/b]（由下到上）：类型色光晕（外扩一圈，让图标从暗背景里跳出来）
+## → 状态底衬（实色块——走过/当前）→ 图标本体 → 已访问暗化叠加。[br]
+## [br][b]为什么先画类型色光晕[/b]：节点图标本身就是一块类型色的方片，在深色画布上
+## 边缘与背景对比弱；外扩一圈同色半透明带出一圈「光晕」，14 种类型在缩到 50%
+## 时也能靠色相区分，而不用凑近读字形。
 static func draw_type_icon(p_host: Control, rect: Rect2, style: Dictionary,
 		type_id: int) -> void:
+	var halo: Color = NodeIconAtlasScript.get_color(type_id)
+	p_host.draw_rect(rect.grow(Style.TYPE_BACKDROP_GROW),
+			Color(halo.r, halo.g, halo.b, Style.TYPE_BACKDROP_ALPHA))
 	var plate: Color = style.get("plate", Color.TRANSPARENT)
 	if plate.a > 0.0:
 		p_host.draw_rect(rect.grow(2.0), plate)
