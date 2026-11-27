@@ -71,18 +71,20 @@ func _on_scene_transition(_from: int, _to: int) -> void:
 # === 导航请求 ===================================================================
 
 ## 请求「新开局」的导航到探索——[b]身份选择确认后走这条[/b]。[br]
-## [br][b]与 [method request_exploration] 的差别只有一处[/b]：本方法先落一条
-## [constant ExplorationEntryIntent.EntryMode.FIRST_MAP] 意图，探索场景挂载时据此
-## [b]直接进入第一张图[/b]（青云剑宗，探明表首项）而不是停在选图界面。[br]
-## [br][b]为什么不直接写进 [method request_exploration][/b]：那条还服务「读档跳过」
-## 路径（身份已在存档里 → 跳过选择 UI）——那条路玩家手上有进行中的图，硬塞 FIRST_MAP
-## 会把他从上次那张图里拽回起点。[br]
-## [br][b]发起方不写探索状态[/b]（ADR-0031 §2 零状态所有权）：这里只留一份跨场景
-## 意图，地图生成与 GSM 写入仍归探索系统。[br]
-## [br]来源: ADR-0005（导航唯一入口）、ADR-0031 §2、design/gdd/main-menu-system.md、
-## design/gdd/exploration-system.md §1（探明表顺序 = 剧情顺序）。
+## [br][b]与旧口径的差别（2026-11-27 修）[/b]：此前本方法落一条
+## [constant ExplorationEntryIntent.EntryMode.FIRST_MAP] 意图，探索场景据此[b]直接进第一张图[/b]，
+## 玩家选完身份看不到选图界面——听风报为 bug，且与 GDD 不符（[code]design/ux/exploration-ui.md[/code]
+## §流程：选图 → 节点图半自动；[code]design/gdd/exploration-system.md[/code] §1 要求玩家自己选图）。
+## 现在改为[b]不落意图[/b]：探索场景按 [constant ExplorationEntryIntent.EntryMode.NONE] 停在选图界面。[br]
+## [br][b]为什么顺手 clear[/b]：上一局中途退出可能残留意图，不清就会把玩家直接拽进首图。[br]
+## [br][b]发起方不写探索状态[/b]（ADR-0031 §2 零状态所有权）：地图生成与 GSM 写入仍归探索系统。[br]
+## [br]来源: ADR-0005（导航唯一入口）、ADR-0031 §2、design/ux/exploration-ui.md、
+## design/gdd/exploration-system.md §1、design/gdd/main-menu-system.md。
 func request_new_run_exploration() -> void:
-	IntentScript.request_new_run()
+	# 新开局**不落 FIRST_MAP 意图**：探索场景挂载时按 EntryMode.NONE 停在选图界面，
+	# 由玩家自己点地图进图（design/gdd/exploration-ui.md §选图 → 节点图半自动）。
+	# 意图若残留（上一局中途退出），此处一并清掉，避免把玩家直接拽进首图。
+	IntentScript.clear()
 	request_exploration()
 
 

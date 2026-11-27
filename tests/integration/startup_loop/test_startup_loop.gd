@@ -29,11 +29,13 @@ const MAP: StringName = &"qing_yun_jian_zong"
 func test_new_run_to_map_to_boss_to_save_to_restart_to_continue() -> void:
 	# ── ① 新开局：身份选择确认 → 叙事跳过 → 请求进第一张图 ────────────────────
 	var mode: int = start_new_run()
-	assert_eq(mode, IntentScript.EntryMode.FIRST_MAP,
-			"新开局应留下「直接进第一张图」的意图（否则玩家落在选图界面）")
+	assert_eq(mode, IntentScript.EntryMode.NONE,
+			"新开局不应再落「直接进第一张图」的意图（2026-11-27 修）：确认身份后停在选图界面，由玩家自己点地图")
 	assert_eq(sm.change_calls.size(), 1, "新开局应请求一次转场")
 	assert_eq(int(sm.change_calls[0][1]), SM.SceneID.EXPLORATION,
 			"新开局的目标应为探索（不再是主菜单原地不动）")
+	# 玩家在选图界面点了第一张图（等价于点卡片），后面才走「进图 → Boss ⋯」主线。
+	enter_first_map_by_intent()
 
 	# ── ② 进图：薄容器消费意图，直接落到第一张图 ──────────────────────────────
 	var scene: Control = enter_exploration_scene()
@@ -104,6 +106,8 @@ func test_continue_returns_to_in_progress_map_with_progress_intact() -> void:
 	## 就是盯着这三样。
 	# ── Arrange：开局 → 进图 → 走一步 → 存档 ────────────────────────────────
 	start_new_run()
+	# 玩家在选图界面点了第一张图（2026-11-27 起新开局不再自动进图）。
+	enter_first_map_by_intent()
 	var scene: Control = enter_exploration_scene()
 	var stepped: int = walk_one_step()
 	assert_true(stepped > 0, "前置：应能走一步")

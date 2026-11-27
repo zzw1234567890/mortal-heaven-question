@@ -32,6 +32,8 @@ extends RefCounted
 ## SceneManager 脚本常量——SceneID / TransitionType 枚举真理来源（同宿主口径，
 ## 替换裸数字防枚举重排静默漂移——code-review H-1）。
 const SceneManagerScript := preload("res://src/foundation/scene_manager.gd")
+## 身份选择跨场景意图——新游戏强制走选择流程（见 identity_select_intent.gd）。
+const IdentityIntentScript := preload("res://src/ui/identity_select/identity_select_intent.gd")
 ## SaveLoadSystem 脚本常量——LoadResult 枚举真理来源（点击继续的返回值判定去魔数）。
 const SLScript := preload("res://src/foundation/save_load_system.gd")
 ## 存档判定内核（「继续游戏」要挑最新那一格；本件不另写一份挑选规则）。
@@ -51,6 +53,9 @@ static func new_game(p_host: Node) -> bool:
 	if sm == null or not sm.has_method(&"request_scene_change"):
 		push_error("MainMenu: SceneManager 不可用——新游戏导航中止")
 		return false
+	# 新游戏 = 重新选身份：落一次性意图，避免身份选择场景因「已选过」而整体跳过
+	# （听风 2026-11-27 报的 bug：退回主菜单再点新游戏直接跳到选地图）。
+	IdentityIntentScript.request_force_show()
 	sm.request_scene_change(resolve_from(sm),
 			SceneManagerScript.SceneID.IDENTITY_SELECT,
 			SceneManagerScript.TransitionType.MENU_TO_GAME)

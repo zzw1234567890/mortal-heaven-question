@@ -132,10 +132,19 @@ func start_new_run() -> int:
 	# 意图是一次性的：take 只为把生产路径留下的模式读出来供断言，读到便原样放回
 	# ——探索场景挂载时还要消费它一次（否则那条路会退化成「停在选图界面」）。
 	var mode: int = IntentScript.take_entry_mode()
-	if mode == IntentScript.EntryMode.FIRST_MAP:
-		IntentScript.request_new_run()
+	# 2026-11-27 起「新游戏」不再落 FIRST_MAP（听风报的 bug：选完身份直接进探索/
+	# 退回主菜单点新游戏直接跳选地图）——新开局停在选图界面，玩家自己点地图。
+	# 所以 mode 现在正常是 NONE；想继续走「进第一张图」的用例自己调
+	# enter_first_map_by_intent()（下面那个 helper，等于玩家点了第一张图）。
 	drop(screen)
 	return mode
+
+
+## 模拟「玩家在选图界面点了第一张图」——落 FIRST_MAP 意图，供后续步骤进图。[br]
+## [br]为什么不在 start_new_run() 里顺手落：那会把「新开局停在选图界面」这条
+## 断言变成自证（先落下再说它是 NONE），等于什么都没验。
+func enter_first_map_by_intent() -> void:
+	IntentScript.request_new_run()
 
 
 ## 挂载探索薄容器（= 转场落地；意图由 [code]_ready[/code] 消费）。[br]

@@ -76,25 +76,23 @@ func test_confirm_first_identity_writes_intent_and_navigates() -> void:
 			"确认并看完叙事（或跳过）后应导航到探索场景")
 
 
-func test_confirm_first_identity_leaves_first_map_intent() -> void:
+func test_confirm_first_identity_stays_on_map_select() -> void:
 	# Arrange
 	var identity_id: StringName = first_identity_id()
 	open_main_menu()
 	press_new_game()
 	var screen: Control = open_identity_select()
 
-	# Act——确认后走叙事；叙事一结束即请求「新开局」导航（意图在这一步落下）
+	# Act——确认后走叙事；叙事一结束即请求导航到探索
 	confirm_identity(screen, identity_id)
 	_skip_narrative(screen)
 
-	# Assert——意图是「直接进第一张图」而不是「停在选图界面」
-	assert_eq(IntentScript.take_entry_mode(), IntentScript.EntryMode.FIRST_MAP,
-			"新开局应留下 FIRST_MAP 意图（探索场景据此自动进首图）")
+	# Assert——不落任何入口意图 ⇒ 探索场景停在选图界面（玩家自己点地图，
+	# 见 design/ux/exploration-ui.md「选图 → 节点图半自动」）。
+	# 2026-11-27 改：此前这里断的是 FIRST_MAP（新开局直接进首图），听风报为 bug。
+	assert_eq(IntentScript.take_entry_mode(), IntentScript.EntryMode.NONE,
+			"新开局不应留下入口意图（探索场景应停在选图界面）")
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 3. 探索容器消费意图 → 首图
-# ═══════════════════════════════════════════════════════════════════════════════
 
 func test_exploration_consumes_intent_and_enters_first_map() -> void:
 	# Arrange——只留意图，探索容器挂载时消费（生产时序：先发意图再转场）

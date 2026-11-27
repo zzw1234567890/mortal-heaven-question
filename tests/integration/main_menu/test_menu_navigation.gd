@@ -288,6 +288,8 @@ func test_navigation_quit_calls_tree_quit() -> void:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ## 身份选择场景注册路径（SceneManager.SCENE_PATHS IDENTITY_SELECT 条目）。
+## 「新游戏强制显示选择页」的一次性意图（用例里要显式清掉，见读档跳过那条）。
+const IdentityIntentScript := preload("res://src/ui/identity_select/identity_select_intent.gd")
 const IDENTITY_SELECT_SCENE_PATH: String = \
 		"res://src/ui/identity_select/identity_select.tscn"
 
@@ -348,6 +350,9 @@ func test_navigation_load_path_bypasses_identity_select_to_exploration() -> void
 	## 导航会被 SceneManager 并发守卫拒绝——必须等 post_transition 后
 	## call_deferred 请求（godot-specialist 高风险修正）。
 	# Arrange —— selected=true 触发跳过分支
+	# 先清掉「新游戏强制显示选择页」的一次性意图：它是静态的、跨用例会残留，
+	# 而本用例模拟的是「读档 / 已选过身份」那条路（该路径不该被强制显示拦下）。
+	IdentityIntentScript.clear()
 	var skip_sm: LoadMockSceneManager = LoadMockSceneManager.new()
 	var skip_isys: LoadMockIdentitySystem = LoadMockIdentitySystem.new()
 	skip_isys.selected = true

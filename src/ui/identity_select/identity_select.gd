@@ -29,6 +29,8 @@ const Rules := preload("res://src/ui/identity_select/identity_select_rules.gd")
 const PresenterScript := preload("res://src/ui/identity_select/identity_select_presenter.gd")
 ## 导航/音频子模块。
 const NavScript := preload("res://src/ui/identity_select/identity_select_nav.gd")
+## 跨场景意图（新游戏强制走选择流程——见该模块类文档）。
+const IntentScript := preload("res://src/ui/identity_select/identity_select_intent.gd")
 ## InputManager 脚本常量——ActionType/DeviceType 枚举真理来源。
 const InputManagerScript := preload("res://src/foundation/input_manager.gd")
 
@@ -83,6 +85,12 @@ static func is_identity_unlocked(entry: Dictionary) -> bool:
 ## === 生命周期 ==================================================================
 
 func _ready() -> void:
+	# 新游戏意图优先：主菜单点「新游戏」时落一份一次性意图，强制走选择流程——
+	# 否则同一进程里已选过身份（或存档里有 identity_id）会被下面的跳过判定整体吞掉，
+	# 表现成「点新游戏直接跳到选地图」（听风 2026-11-27 报的 bug）。
+	if IntentScript.take_force_show():
+		_build_ui()
+		return
 	# 读档跳过：identity_id 非空 → 直接请求导航 EXPLORATION，不渲染选择 UI。
 	if _get_nav().is_skip_needed():
 		_get_nav().skip_to_exploration()

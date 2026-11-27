@@ -14,6 +14,8 @@ extends "res://tests/integration/exploration_ui/one_run_base_fixture.gd"
 
 const SceneScript := preload("res://src/feature/exploration/exploration_scene.gd")
 const MainMenuScene := preload("res://src/ui/main_menu/MainMenu.tscn")
+## 身份选择跨场景意图（用例里显式清掉「新游戏」强制意图，见 open_identity_select）。
+const IdentityIntentScript := preload("res://src/ui/identity_select/identity_select_intent.gd")
 const IdentityScene := preload("res://src/ui/identity_select/identity_select.tscn")
 
 var scene: Control = null
@@ -49,8 +51,12 @@ func last_nav_target() -> int:
 # 第 2 步：身份选择
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 挂载真实身份选择场景（注入桩；关动画）。
+## 挂载真实身份选择场景（注入桩；关动画）。[br]
+## [br][b]本 fixture 不代表「新游戏」[/b]：它模拟的是「身份已选过 ⇒ 跳过选择 UI」那条路
+## （读档续玩 / 用例直接摆好身份态），所以先把主菜单「新游戏」落的强制意图清掉；
+## 「新游戏必须走选择页」由 [code]test_new_game_forces_identity_select.gd[/code] 单独守。
 func open_identity_select() -> Control:
+	IdentityIntentScript.clear()
 	var screen: Control = IdentityScene.instantiate() as Control
 	screen.set(&"animate", false)
 	screen.set(&"scene_manager", mock_sm)
@@ -243,4 +249,8 @@ func start_new_run() -> void:
 	var screen: Control = open_identity_select()
 	confirm_identity(screen, first_identity_id())
 	skip_narrative(screen)
+	# 2026-11-27 起身份确认不再落 FIRST_MAP（听风报的 bug）——新开局停在选图界面。
+	# 这一层 fixture 的用途是「走完开局后落在首图节点图上」，所以由 fixture 自己补上
+	# 「玩家点了第一张图」那一跳；专门验「停在选图界面」的用例不走这里。
+	IntentScript.request_new_run()
 	open_exploration()
