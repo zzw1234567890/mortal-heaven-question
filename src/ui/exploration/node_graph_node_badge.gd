@@ -69,7 +69,8 @@ static func draw_type_icon(p_host: Control, rect: Rect2, style: Dictionary,
 	# 状态暗纱（AC-4——已访问稍暗；本轮扩展到六态，见上方注记）
 	var veil: float = float(style.get("veil", 0.0))
 	if veil > 0.0:
-		p_host.draw_rect(rect, Color(0.0, 0.0, 0.0, veil))
+		# 圆形暗纱——矩形会露出四个直角，读成「一个黑方块」（老板 2026-11-27 的反馈）。
+		p_host.draw_circle(center, half, Color(0.0, 0.0, 0.0, veil))
 
 
 ## 类型图标本体——优先水墨印章（[NodeIconArt]），缺图回退图集 glyph。[br]

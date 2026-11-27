@@ -52,27 +52,16 @@ static func draw_legacy(p_host: Control, p_node_id: int) -> void:
 	var fogged: bool = p_host.call(&"_is_fogged", p_node_id)
 
 	# 地标底盘（本轮地图化——投影 + 石台，画在图标[b]之下[/b]，见 [NodeGraphLandmark]）
-	Landmark.draw_plate(p_host, rect, pos)
+	# 老板 2026-11-27：「节点不需要圆点和方块」——石碑底盘与矩形边框都撤掉，
+	# 图标本体直接压在舆图上，状态改由光晕与印章色表达。
+	# Landmark.draw_plate(p_host, rect, pos)
 
 	# 图标：迷雾节点不显示类型——统一灰底（类型不暴露，GDD 界面规则）
-	if fogged:
-		Badge.draw_fogged_glyph(p_host, rect, pos)
-		# 迷雾个体暗纱——遮罩现在画在节点[b]之下[/b]，这一格得自己压暗，
-		# 「亮的=知道 / 暗的=还没走到」才读得出来（见 [method draw_fog]）。
-		p_host.draw_rect(rect, Style.FOG_NODE_VEIL_COLOR)
-	else:
-		# 类型图标（光晕 + 底衬 + 图标本体——与六态分支同一个入口，legacy 传空样式）
-		Badge.draw_type_icon(p_host, rect, {}, type_id)
+	# 未揭示节点也画图标（老板 2026-11-27：「每个节点要有图片」）——原先只画一个
+	# 空圆环，读起来就是个圆点。压暗改用圆形暗纱，不再用方块遮罩。
+	Badge.draw_type_icon(p_host, rect, {}, type_id)
 
-	# 边框：当前 > 已访问 > 类型色暗化
-	var border_color: Color = Style.NODE_DEFAULT_BORDER
-	if p_node_id == p_host.current_node:
-		border_color = Style.NODE_CURRENT_BORDER
-	elif p_host.visited.has(p_node_id):
-		border_color = Style.NODE_VISITED_BORDER
-	elif not fogged:
-		border_color = NodeIconAtlasScript.get_color(type_id).darkened(0.25)
-	p_host.draw_rect(rect, border_color, false, Style.BORDER_WIDTH)
+	# 边框已撤（2026-11-27）——矩形框就是老板说的「方块」，状态改由图标本身表达。
 
 	# 两行文字（缩放联动——50% 隐藏）：地名恒显，类型行迷雾时不画
 	if p_host.show_labels:
@@ -104,26 +93,17 @@ static func draw_stated(p_host: Control, p_node_id: int) -> void:
 	var fogged: bool = bool(style.get("fogged", false))
 
 	# 地标底盘（本轮地图化——投影 + 石台，画在图标[b]之下[/b]，见 [NodeGraphLandmark]）
-	Landmark.draw_plate(p_host, rect, pos)
+	# 老板 2026-11-27：「节点不需要圆点和方块」——石碑底盘与矩形边框都撤掉，
+	# 图标本体直接压在舆图上，状态改由光晕与印章色表达。
+	# Landmark.draw_plate(p_host, rect, pos)
 
-	if fogged:
-		Badge.draw_fogged_glyph(p_host, rect, pos)
-		# 迷雾个体暗纱——遮罩画在节点[b]之下[/b]（见 [method draw_fog]），
-		# 这一格得自己压暗，「亮的=知道 / 暗的=还不知道」才读得出来。
-		p_host.draw_rect(rect, Style.FOG_NODE_VEIL_COLOR)
-	else:
-		Badge.draw_type_icon(p_host, rect, style, type_id)
+	# 未揭示节点也画图标（老板 2026-11-27）——压暗改用圆形暗纱，不用方块遮罩。
+	Badge.draw_type_icon(p_host, rect, style, type_id)
 
 	Badge.draw_glow(p_host, style, type_id, pos, node_size, fogged)
 
-	# 边框：border_is_type 时用类型主色，否则用样式边框色；
-	# 强调态（当前/可达/已访问）加粗一档——见 [NodeStateLogic.node_state_style] 的 emphasis
-	var border_color: Color = style.get("border", Style.NODE_DEFAULT_BORDER)
-	if bool(style.get("border_is_type", false)):
-		border_color = NodeIconAtlasScript.get_color(type_id)
-	var border_width: float = Style.EMPHASIS_BORDER_WIDTH \
-			if bool(style.get("emphasis", false)) else Style.BORDER_WIDTH
-	p_host.draw_rect(rect, border_color, false, border_width)
+	# 边框已撤（2026-11-27）——矩形框就是老板说的「方块」；强调态由 draw_glow 的
+	# 外发光强弱表达（emphasis 已在样式表里驱动 glow），不再画框。
 
 	# 行动力不足红色斜线（AC-5）——渡劫台修为未满时跳过（灰斜线优先，避免
 	# 同对角线重叠；未满语义「可进入不可触发」强于「行动力不足」）
