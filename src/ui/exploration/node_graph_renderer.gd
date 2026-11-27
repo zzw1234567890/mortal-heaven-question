@@ -222,14 +222,35 @@ func hit_test_any(point: Vector2) -> int:
 
 
 ## 地面层绘制——整块地图插画 + 压暗 + 暗角 + 迷雾遮罩（见 [NodeGraphGroundLayer]）。[br]
-## [br][b]铺的矩形 = 内容包围盒外扩 [code]Style.FOG_MARGIN[/code][/b]：地形与遮罩
-## 同尺寸，遮罩[b]挖孔[/b]时孔里露出的才是地形；地形比遮罩小的话，雾外会露出一圈
-## 没被地图盖住的底色边。[br]
+## [br][b]铺的矩形 = 可视区域[/b]（[method visible_local_rect]），不是内容包围盒。[br]
+## [br][b]★ 两个矩形不同源 ★[/b]（第二轮地图化）：地形按[b]可视区域[/b]铺（地图铺满
+## 整块画布、左右不再有黑带），迷雾按[b]内容包围盒[/b]铺（雾只压还没走到的那片山域）。
+## 把迷雾也铺满视口会得到「除已揭示节点周围一小圈之外全屏皆雾」——开局只揭示 5 个
+## 节点，整幅图会压成一片近黑。两个矩形的分工与读数见
+## [constant NodeGraphStyle.FOG_MARGIN] 的注记。[br]
 ## [br][b]顺序语义[/b]：地面在连线[b]之下[/b]——遮罩压暗的是它盖住的连线，而孔里
 ## 露出的地形是亮的；节点再画在其上（见 [method _draw]）。
 func _draw_ground() -> void:
-	_ground.call(&"draw", self, _content_rect, map_id,
+	_ground.call(&"draw", self, visible_local_rect(), _content_rect, map_id,
 			_fogged_positions().is_empty(), _revealed_positions())
+
+
+## 当前[b]可视区域[/b]（渲染器局部坐标）——地形与迷雾的铺满矩形。[br]
+## [br][b]换算[/b]：屏幕坐标 = 局部坐标 × zoom + offset（见 [NodeGraphViewport] 的
+## 变换口径），故局部可视矩形 = [code](-offset / zoom, size / zoom)[/code]——
+## 渲染器由 [code]PRESET_FULL_RECT[/code] 铺满视口，[member size] 就是视口尺寸。[br]
+## [br][b]为什么由渲染器自己推[/b]：变换的两半（[code]zoom[/code]/[code]offset[/code]）
+## 分别住在视口上，[member scale] 与 [member position] 是它们的写入结果——从自己的
+## 变换反推可视区域，就不必给「谁把矩形传进来」再开一条跨模块的参数通道。[br]
+## [br][b]退化保护[/b]：缩放为 0（进树前 / 折叠视口）时返回 [Rect2]，调用方据此跳过
+## 绘制，免得除零炸出一片 NaN 顶点。[br]
+## [br][b]返回[/b]：可视区域（可能含负宽高之外的位置——位置本身可以为负，这正是
+## 「画布比视口大」的正常情形）。
+func visible_local_rect() -> Rect2:
+	if scale.x <= 0.0 or scale.y <= 0.0:
+		return Rect2()
+	return Rect2(-position.x / scale.x, -position.y / scale.y,
+			size.x / scale.x, size.y / scale.y)
 
 
 ## === 内部辅助 ===============================================================

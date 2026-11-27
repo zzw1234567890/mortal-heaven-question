@@ -46,7 +46,9 @@ func _run() -> void:
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph", 1.0, false)
 	await _shot_node_graph(OUT_W_720, OUT_H_720, "ui_shot_node_graph_720", 1.0, false)
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_closeup", CLOSEUP_ZOOM, true)
-	print("[ui-art] 完成，五张图在 " + ProjectSettings.globalize_path(OUT_DIR))
+	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_zoomed_out",
+			ZOOMED_OUT_ZOOM, false)
+	print("[ui-art] 完成，六张图在 " + ProjectSettings.globalize_path(OUT_DIR))
 	get_tree().quit()
 
 
@@ -97,6 +99,15 @@ func _report_cards(p_screen: Control) -> void:
 ## 节点图特写倍率——取视口缩放上限 [code]NodeGraphViewport.ZOOM_MAX[/code] 的同值，
 ## 让地名的字面在同一张图里大到能直接判读（正投影放大，不改变任何绘制比例）。
 const CLOSEUP_ZOOM: float = 1.5
+
+## 全图俯瞰倍率——比自动适配再缩一档，四边（尤其是左右）留出可见的地形边缘，
+## 用来验证「地形铺满视口、左右没有纯黑带」（任务书任务二取证）。[br]
+## [br][b]为什么是 0.6 而不是 0.5[/b]：0.5 正好是
+## [code]NodeGraphViewport.LABEL_HIDE_ZOOM[/code]——再低一档地名就整体隐藏了，
+## 而这张图要同时回答「有没有黑带」与「地名还读不读得出」。[br]
+## [br][b]低于自动适配时才生效[/b]：[method _focus_node_graph] 直接覆盖 zoom，
+## 与自动适配值的大小关系无关（本图自动适配触顶 1.5，0.6 一定更小）。
+const ZOOMED_OUT_ZOOM: float = 0.6
 
 
 ## 发「新开局」意图再挂探索容器——容器消费意图后直落第一张图并生成真实 DAG。[br]

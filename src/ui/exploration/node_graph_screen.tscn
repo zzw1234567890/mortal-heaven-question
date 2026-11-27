@@ -77,6 +77,7 @@ ok_button_text = "确认退出"
 cancel_button_text = "继续探索"
 
 [node name="NodeGraphViewport" type="Control" parent="."]
+clip_contents = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

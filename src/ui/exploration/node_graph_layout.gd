@@ -15,9 +15,23 @@ const NodeStateLogicScript := preload("res://src/ui/exploration/node_state_logic
 const Style := preload("res://src/ui/exploration/node_graph_style.gd")
 
 
-## 布局计算——layer 纵向、idx 横向居中。[br]
+## 布局计算——layer 纵向、idx 横向居中、[b]层间蛇形错开[/b]。[br]
 ## [br][param p_nodes] 节点详情 [code]{node_id: {layer, idx}}[/code]。[br]
-## [br][b]返回[/b]：[code]{node_id: Vector2}[/code]（节点中心坐标）；空输入返回空字典。
+## [br][b]返回[/b]：[code]{node_id: Vector2}[/code]（节点中心坐标）；空输入返回空字典。[br]
+## [br][b]第二轮地图化（横向铺开）[/b]：第一轮铺完实测内容包围盒 264×606、宽高比
+## 0.44——五层摞起来仍是一根竖条，节点像串珠而不像「散落在地图上的一串地标」。
+## 本轮把 [constant NodeGraphStyle.NODE_GAP] 拉到 200（横向）、
+## [constant NodeGraphStyle.LAYER_GAP] 收到 104（纵向），并给每层加一个
+## [method layer_stagger] 的水平错开——包围盒左右边界由不同层贡献，屏幕宽高比
+## 实测 1.51（1920×1080）/ 1.28（1280×720），进到 16:9 那一档。[br]
+## [br][b]零语义改动[/b]：本方法输出的是纯[b]视觉坐标[/b]——谁在谁的下一层（[code]layer[/code]）、
+## 同层第几格（[code]idx[/code]）、行动力消耗、可达判定与 Boss 位置规则分别住在
+## [code]exploration_dag_builder.gd[/code] / [code]node_state_logic.gd[/code] /
+## [code]exploration_system.gd[/code]，谁都没读这里的坐标值。改间距与错开量
+## 只改「画在哪、点在哪」，不改 DAG 本身。[br]
+## [br][b]错开的量取负号放在 idx 上而不是加在 y 上[/b]：层序由 y 唯一表达
+## （[code]layer * LAYER_GAP[/code]），错开只能动 x；动 y 会让两层挤到同一高度，
+## 「下一层在下面」这个唯一的层序读法就没了。
 static func compute_positions(p_nodes: Dictionary) -> Dictionary:
 	var positions: Dictionary = {}
 	if p_nodes.is_empty():
@@ -32,9 +46,26 @@ static func compute_positions(p_nodes: Dictionary) -> Dictionary:
 		var count: int = int(layer_counts.get(layer, 1))
 		var row_width: float = (float(count) - 1.0) * Style.NODE_GAP
 		positions[node_id] = Vector2(
-				(row_width * 0.5) - (float(idx) * Style.NODE_GAP),
+				(row_width * 0.5) - (float(idx) * Style.NODE_GAP)
+						+ layer_stagger(layer),
 				float(layer) * Style.LAYER_GAP)
 	return positions
+
+
+## 层间水平错开量（px）——第 [param p_layer] 层整体左右平移的幅度。[br]
+## [br][b]蛇形（左-右-左-右）而不是单调偏一侧[/b]：单调偏一侧会让整张图斜成一条
+## 对角线，包围盒还是一根斜条；蛇形让相邻层反向走位，左右边界交替被撑开，
+## 读起来也像「之字形往上爬的山路」而不是「被风吹歪的竖条」。[br]
+## [br][b]第 0、1 层错开量为 0[/b]（本条是硬约束，不是取整巧合）：
+## [code]test_node_graph_pick_region.gd[/code] 的几何前提是开局那两格以原点为轴
+## 一左一右（101 落在正 x、102 落在负 x）——那是 [code]_has_point[/code] 拾取缺陷
+## 的现场条件，两层任一被平移都可能把该前提抹平，让回归用例变成永远通过的空断言。
+## [br][br][b]返回[/b]：该层的水平偏移（px，右为正）。
+static func layer_stagger(p_layer: int) -> float:
+	if p_layer <= 1:
+		return 0.0
+	var direction: float = 1.0 if (p_layer % 2) == 0 else -1.0
+	return direction * Style.LAYER_STAGGER
 
 
 ## 内容包围盒——Viewport 整图适配的计算基准（各节点中心的并集外扩一个节点尺寸）。[br]
