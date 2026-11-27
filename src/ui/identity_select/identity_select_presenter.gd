@@ -16,6 +16,10 @@ const Rules := preload("res://src/ui/identity_select/identity_select_rules.gd")
 ## 卡片纯构建子模块。
 const Factory := preload("res://src/ui/identity_select/identity_card_factory.gd")
 
+## 确认弹窗最小宽度（px）——正文只有一两行短句时也留出呼吸感。[br]
+## 高度交给 [method Window.reset_size] 按内容算，这里只钉宽度。
+const CONFIRM_DIALOG_MIN_WIDTH: int = 360
+
 ## 未选中卡的常驻不透明度；选中卡 1.0；被拦卡恒 0.45（Factory.ALPHA_BLOCKED）。
 const ALPHA_IDLE: float = 0.85
 const ALPHA_SELECTED: float = 1.0
@@ -47,8 +51,7 @@ var detail_hint_label: Label = null
 ## 提示弹窗 + 确认弹窗节点组。
 var toast_dialog: AcceptDialog = null
 var confirm_dialog: ConfirmationDialog = null
-var confirm_dialog_name: Label = null
-var confirm_dialog_avatars: HBoxContainer = null
+
 
 ## 叙事层节点组。
 var narrative_overlay: Control = null
@@ -79,8 +82,6 @@ func attach(p_host: Node) -> void:
 	detail_hint_label = p_host.get_node_or_null(NodePath("LayoutAnchor/DetailPanel/HintLabel"))
 	toast_dialog = p_host.get_node_or_null(NodePath("LockedDialog"))
 	confirm_dialog = p_host.get_node_or_null(NodePath("ConfirmDialog"))
-	confirm_dialog_name = p_host.get_node_or_null(NodePath("ConfirmDialog/NameLabel"))
-	confirm_dialog_avatars = p_host.get_node_or_null(NodePath("ConfirmDialog/Avatars"))
 	narrative_overlay = p_host.get_node_or_null(NodePath("NarrativeOverlay"))
 	narrative_label = p_host.get_node_or_null(NodePath("NarrativeOverlay/TextLabel"))
 
@@ -153,13 +154,14 @@ func show_detail(p_preview: Dictionary) -> void:
 func populate_confirm_dialog(p_preview: Dictionary) -> void:
 	if confirm_dialog == null or p_preview.is_empty():
 		return
-	confirm_dialog_name.text = str(p_preview.get(&"name", ""))
-	confirm_dialog.dialog_text = Rules.TEXT_CONFIRM_PROMPT
-	for child: Node in confirm_dialog_avatars.get_children():
-		confirm_dialog_avatars.remove_child(child)
-		child.queue_free()
-	for display_name: String in Rules.character_names(p_preview):
-		confirm_dialog_avatars.add_child(Factory.make_avatar_button(display_name))
+	# 正文全部走 [member Dialog.dialog_text]（内置 Message 标签，自动换行+自动定尺寸）。
+	# 2026-11-27 修：此前用自建 NameLabel/Avatars 两个子节点画内容，AcceptDialog 会把
+	# 子节点重新铺到内容区（`_update_child_rects`），结果正文被印章块挤没、弹窗被撑到
+	# 726px 高、名字压在头像上。改成纯 dialog_text 后布局不会再打架。
+	# 最小宽度：纯 dialog_text 时会贴着文字收到 200px，读起来像挤在一起。
+	confirm_dialog.min_size = Vector2i(CONFIRM_DIALOG_MIN_WIDTH, 0)
+	confirm_dialog.dialog_text = Rules.confirm_text(p_preview)
+	confirm_dialog.reset_size()
 	confirm_dialog.popup_centered()
 
 

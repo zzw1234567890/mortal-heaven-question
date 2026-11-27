@@ -166,6 +166,24 @@ static func character_names(preview: Dictionary) -> Array[String]:
 	return names
 
 
+## 确认弹窗正文——身份名 / 初始角色 / 一句确认提示，三段用空行隔开。[br]
+## [br][b]为什么只有这一处能改它[/b]：AcceptDialog 会把自建子节点重新铺满内容区
+## （_update_child_rects），2026-11-27 之前用 NameLabel + Avatars 两个子节点画正文，
+## 结果名字被印章块压住、弹窗被撑到 726px 高。正文只走 `dialog_text`（内置 Message
+## 标签，自动换行、自动定尺寸）才不会和引擎的布局打架。
+static func confirm_text(preview: Dictionary) -> String:
+	var lines: PackedStringArray = []
+	var identity_name: String = str(preview.get(&"name", ""))
+	if not identity_name.is_empty():
+		lines.append(identity_name)
+	var names: Array[String] = character_names(preview)
+	if not names.is_empty():
+		lines.append(TEXT_CHARACTER_HEADER + "：" + " · ".join(names))
+	lines.append("")
+	lines.append(TEXT_CONFIRM_PROMPT)
+	return "\n".join(lines)
+
+
 # === 叙事文本（纯函数）=========================================================
 
 ## 叙事文本拆分——按句读拆行（。！？后断行，空行过滤）。
