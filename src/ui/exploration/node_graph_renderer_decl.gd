@@ -29,6 +29,8 @@ const GroundLayer := preload(
 ## 小径（连线）绘制（已走过 / 未走过 / 雾中——从本文件拆出，见类文档）。
 const EdgePainter := preload(
 		"res://src/ui/exploration/node_graph_edge_painter.gd")
+## 悬停 tooltip 绘制（与节点绘制分开一层——见该模块文档）。
+const Tooltip := preload("res://src/ui/exploration/node_graph_tooltip_painter.gd")
 ## 六态样式查询（判定与绘制共用同一套枚举）。
 const NodeStateLogicScript := preload("res://src/ui/exploration/node_state_logic.gd")
 ## 地名池（节点 → 地名——渲染快照里没有地名，绘制期按 map_id + node_id 取）。

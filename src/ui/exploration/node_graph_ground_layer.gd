@@ -27,16 +27,17 @@ const Style := preload("res://src/ui/exploration/node_graph_style.gd")
 const Layout := preload("res://src/ui/exploration/node_graph_layout.gd")
 ## 地形底图绘制（插画 + 压暗 + 暗角）。
 const Terrain := preload("res://src/ui/exploration/node_graph_terrain.gd")
-## 迷雾遮罩绘制（三角汤——凹多边形一次画完）。
-const Painter := preload("res://src/ui/exploration/node_graph_node_painter.gd")
+## 迷雾遮罩绘制（柔边分层——三角汤，凹多边形一次画完）。
+const Painter := preload("res://src/ui/exploration/node_graph_fog_painter.gd")
 
-## 迷雾覆盖区多边形缓存（[code]Array[PackedVector2Array][/code]）。[br]
-## [br][b]为什么必须缓存[/b]：[method NodeGraphLayout.fog_polygons] 要逐孔做
-## [method Geometry2D.clip_polygons]（实测 24 孔 × 20 边形 ≈ 1.2ms），每帧重算会
-## 吃掉 16.6ms 帧预算的十分之一；而它只在「已揭示集合 / 内容矩形变了」时才需重算
-## （第二轮起迷雾仍按[b]内容包围盒[/b]铺，不跟着视口平移——所以缓存不会因拖画布失效）。
-var _fog_polygons: Array = []
-## 上次算雾多边形时的输入指纹（见 [member _fog_polygons]）。
+## 迷雾[b]柔边分层[/b]缓存（[code]Array[Array[PackedVector2Array]][/code]，
+## 由外向内——最后一层最深）。[br]
+## [br][b]为什么必须缓存[/b]：[method NodeGraphLayout.fog_feather_layers] 要逐层做
+## [method Geometry2D.clip_polygons]（实测 24 孔 × 20 边形 ≈ 1.2ms，12 层即十余毫秒），
+## 每帧重算会吃掉整个帧预算；而它只在「已揭示集合 / 内容矩形变了」时才需重算
+## （迷雾按[b]内容包围盒[/b]铺，不跟着视口平移——所以拖动画布不会让缓存失效）。
+var _fog_layers: Array = []
+## 上次算雾分层时的输入指纹（见 [member _fog_layers]）。
 var _fog_key: String = ""
 
 
@@ -65,10 +66,10 @@ func draw(p_host: Control, p_visible_rect: Rect2, p_content_rect: Rect2,
 	if p_content_rect.size == Vector2.ZERO:
 		return
 	var fog_area: Rect2 = p_content_rect.grow(Style.FOG_MARGIN)
-	Painter.draw_fog(p_host, p_no_fog, polygons_for(fog_area, p_revealed))
+	Painter.draw_fog(p_host, p_no_fog, layers_for(fog_area, p_revealed))
 
 
-## 迷雾覆盖多边形（带缓存——见 [member _fog_polygons]）。[br]
+## 迷雾柔边分层（带缓存——见 [member _fog_layers]）。[br]
 ## [br][b]失效口径[/b]：与 [member _fog_key] 比对——键是「铺满矩形 + 已揭示位置
 ## 列表」的字符串指纹，两者都没变就直接复用。[br]
 ## [br][b]为什么用指纹而不是「在 set_states 里手动置脏」[/b]：揭示集合由六态、
@@ -81,11 +82,12 @@ func draw(p_host: Control, p_visible_rect: Rect2, p_content_rect: Rect2,
 ## 不进缓存（[method NodeGraphTerrain.draw] 每帧现算 cover 矩形，只是一次乘除）。[br]
 ## [br][b]公开[/b]：渲染器的 [code]fog_polygon_cache_size[/code] 转发本方法，
 ## 单测据此断言「同一份输入只算一次」。[br]
-## [br][b]返回[/b]：多边形数组（已揭示为空时是整块矩形本身）。
-func polygons_for(p_area: Rect2, p_revealed: Array) -> Array:
+## [br][b]返回[/b]：分层数组（层内是多边形数组；已揭示为空时每层都是整块矩形本身）。
+func layers_for(p_area: Rect2, p_revealed: Array) -> Array:
 	var key: String = "%s|%s" % [str(p_area), str(p_revealed)]
 	if key == _fog_key:
-		return _fog_polygons
+		return _fog_layers
 	_fog_key = key
-	_fog_polygons = Layout.fog_polygons(p_area, p_revealed, Style.FOG_HOLE_RADIUS)
-	return _fog_polygons
+	_fog_layers = Layout.fog_feather_layers(p_area, p_revealed, Style.FOG_HOLE_RADIUS,
+			Style.FOG_FEATHER_BAND, Style.FOG_FEATHER_STEPS)
+	return _fog_layers

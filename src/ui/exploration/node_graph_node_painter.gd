@@ -11,8 +11,10 @@ extends RefCounted
 ## [br]来源: ADR-0031 §5 合批、design/gdd/exploration-ui-system.md §2、
 ## exploration-ui Story 001 / 003。
 
-## 图集（节点图标 region 与类型主色——唯一纹理来源，禁止独立纹理）。
+## 图集（类型主色 / 类型短标签 / 迷雾❓占位——图集仍供着「色与字」）。
 const NodeIconAtlasScript := preload("res://src/ui/exploration/node_icon_atlas.gd")
+## 类型图标（14 张水墨线稿——「图」这一件事从图集 glyph 换成它，见模块文档）。
+const NodeIconArtScript := preload("res://src/ui/exploration/node_icon_art.gd")
 ## 六态样式查询（判定纯函数——绘制侧只消费）。
 const NodeStateLogicScript := preload("res://src/ui/exploration/node_state_logic.gd")
 ## 视觉规格（尺寸/配色常量）。
@@ -51,11 +53,8 @@ static func draw_legacy(p_host: Control, p_node_id: int) -> void:
 		# 「亮的=知道 / 暗的=还没走到」才读得出来（见 [method draw_fog]）。
 		p_host.draw_rect(rect, Style.FOG_NODE_VEIL_COLOR)
 	else:
-		# 类型色光晕（与六态分支同款——legacy 路径也要能从暗背景里跳出来）
-		var halo: Color = NodeIconAtlasScript.get_color(type_id)
-		p_host.draw_rect(rect.grow(Style.TYPE_BACKDROP_GROW),
-				Color(halo.r, halo.g, halo.b, Style.TYPE_BACKDROP_ALPHA))
-		blit_region(p_host, rect, NodeIconAtlasScript.get_region(type_id))
+		# 类型图标（光晕 + 底衬 + 图标本体——与六态分支同一个入口，legacy 传空样式）
+		draw_type_icon(p_host, rect, {}, type_id)
 
 	# 边框：当前 > 已访问 > 类型色暗化
 	var border_color: Color = Style.NODE_DEFAULT_BORDER
@@ -140,9 +139,14 @@ static func draw_stated(p_host: Control, p_node_id: int) -> void:
 				node_size, not fogged, type_id)
 
 
-## 迷雾节点图标——灰底方块 + ❓图集 region（类型不暴露）。
+## 迷雾节点图标——中性灰圆盘 + ❓图集 region（类型不暴露）。[br]
+## [br][b]为什么这里仍用图集 glyph 而不是线稿[/b]：迷雾语义就是「你还不知道这儿是什么」，
+## 给一张类型图标等于把类型泄露出去。14 张线稿里没有「未知」这一张，故❓继续走图集。[br]
+## [br][b]为什么是圆盘而不是方块[/b]：本轮起已揭示节点是「圆形印章」，迷雾节点若还是
+## 方块，同一张图上就并存两种形状语言；圆盘保持「每个节点都是一枚印」的统一读法，而
+## 中性灰 + ❓仍然只回答「这儿有个东西」，不回答「是什么」。
 static func draw_fogged_glyph(p_host: Control, rect: Rect2, pos: Vector2) -> void:
-	p_host.draw_rect(rect, Style.FOGGED_FILL_COLOR)
+	p_host.draw_circle(rect.get_center(), rect.size.x * 0.5, Style.FOGGED_FILL_COLOR)
 	var half: float = Style.FOG_GLYPH_SIZE * 0.5
 	var glyph_rect := Rect2(pos.x - half, pos.y - half,
 			Style.FOG_GLYPH_SIZE, Style.FOG_GLYPH_SIZE)
@@ -151,31 +155,60 @@ static func draw_fogged_glyph(p_host: Control, rect: Rect2, pos: Vector2) -> voi
 
 
 ## 类型图标 + 状态底衬 + 状态暗纱。[br]
-## [br][b]底衬画在图标之下[/b]：图标是节点类型的信息，底衬是「这格有主了」的信息，
-## 底衬盖住图标就等于用状态把类型抹掉了。[br]
-## [br][b]四层顺序[/b]（由下到上）：类型色光晕（外扩一圈，让图标从暗背景里跳出来）
-## → 状态底衬（实色块——走过/当前）→ 图标本体 → 状态暗纱（veil——按态压暗）。[br]
-## [br][b]为什么先画类型色光晕[/b]：节点图标本身就是一块类型色的方片，在深色画布上
-## 边缘与背景对比弱；外扩一圈同色半透明带出一圈「光晕」，14 种类型在缩到 50%
-## 时也能靠色相区分，而不用凑近读字形。[br]
+## [br][b]★ 合成顺序（由下到上，五层）★[/b]：[br]
+##   1. 类型色光晕（圆形，外扩一圈——让节点从暗背景里跳出来）；[br]
+##   2. 状态底衬（圆形——走过/当前的实色）；[br]
+##   3. 图标深色底盘（圆形——压住地图插画的花纹，给线稿一个稳定对比底）；[br]
+##   4. 图标本体（圆形水墨印章，不透明度 [constant Style.ICON_ALPHA]）；[br]
+##   5. 状态暗纱（veil——按态压暗）。[br]
+## [br][b]为什么「状态都在图标之下、暗纱在图标之上」[/b]：底衬与光晕回答的是「这格跟我
+## 什么关系」，它们盖住图标就等于用状态把类型抹掉（类型也要读）；而暗纱是「压暗」不是
+## 「覆盖」，它必须压在图标[b]之上[/b]才连图标一起压下去——否则已访问/不可达的节点
+## 图标仍是全亮的，亮度这条状态轴就废了。[br]
+## [br][b]为什么光晕与底衬是圆而不是方[/b]：方形光晕的四角会从圆盘后面露出来，「一枚
+## 圆印」立刻读回「一个方块 + 一个圆」（反馈原话：「不能用简单的方块/圆圈/线条」）。
+## 两者都是围绕节点的「一圈」，圆形才是它们本来的形状。[br]
 ## [br][b]暗纱压多少（veil）[/b]：由 [NodeStateLogic.node_state_style] 的
 ## [code]veil[/code] 键给出——当前/可达 0（全亮）、已访问 0.35、不可达 0.55、
 ## 行动力不足 0.70、迷雾 0.85。亮度本身是一层信息：三米外不用读图标就能分出
 ## 「跟我有关的亮着 / 跟我无关的暗下去」。已访问的 [code]dim[/code] 与 veil 同值
-## 同源（0.35），保留 dim 键只是为既有断言与 legacy 读法留路。
+## 同源（0.35），保留 dim 键只是为既有断言与 legacy 读法留路。[br]
+## [br][b]暗纱为什么仍是方形[/b]：它压的是[b]整个节点格[/b]（含边框与文字所在的方块），
+## 不是图标那一圈——按圆压会留下四角未压的亮块，反而更花。
 static func draw_type_icon(p_host: Control, rect: Rect2, style: Dictionary,
 		type_id: int) -> void:
+	var center: Vector2 = rect.get_center()
+	var half: float = rect.size.x * 0.5
 	var halo: Color = NodeIconAtlasScript.get_color(type_id)
-	p_host.draw_rect(rect.grow(Style.TYPE_BACKDROP_GROW),
+	p_host.draw_circle(center, half + Style.TYPE_BACKDROP_GROW,
 			Color(halo.r, halo.g, halo.b, Style.TYPE_BACKDROP_ALPHA))
 	var plate: Color = style.get("plate", Color.TRANSPARENT)
 	if plate.a > 0.0:
-		p_host.draw_rect(rect.grow(2.0), plate)
-	blit_region(p_host, rect, NodeIconAtlasScript.get_region(type_id))
+		p_host.draw_circle(center, half + 2.0, plate)
+	var edge: float = rect.size.x * Style.ICON_EDGE_RATIO
+	p_host.draw_circle(center, edge * 0.5 * Style.ICON_DISC_SCALE,
+			Style.ICON_DISC_COLOR)
+	blit_type_icon(p_host, Rect2(center - Vector2(edge, edge) * 0.5,
+			Vector2(edge, edge)), type_id)
 	# 状态暗纱（AC-4——已访问稍暗；本轮扩展到六态，见上方注记）
 	var veil: float = float(style.get("veil", 0.0))
 	if veil > 0.0:
 		p_host.draw_rect(rect, Color(0.0, 0.0, 0.0, veil))
+
+
+## 类型图标本体——优先水墨印章（[NodeIconArt]），缺图回退图集 glyph。[br]
+## [br][b]为什么要留回退[/b]：缺一张 PNG 在运行时不报错（只是画成旧样子），而「某个
+## 类型永远没图标」正是本轮要消灭的缺陷——回退让「暂时缺图」退化成「画得丑」而不是
+## 「画不出来」；真正的兜底是一条按映射表逐类查盘的单测。[br]
+## [br][b]回退仍按图集 region 裁切[/b]：图集是 32px 格子，直接铺进 [param rect] 会拉伸
+## 变形，故用 [method blit_region]（region 取样，等比铺满目标矩形）。
+static func blit_type_icon(p_host: Control, rect: Rect2, type_id: int) -> void:
+	var stamp: Texture2D = NodeIconArtScript.stamp_of(type_id)
+	if stamp != null:
+		p_host.draw_texture_rect(stamp, rect, false,
+				Color(1.0, 1.0, 1.0, Style.ICON_ALPHA))
+		return
+	blit_region(p_host, rect, NodeIconAtlasScript.get_region(type_id))
 
 
 ## 外发光——可达脉冲 / 当前节点金环 / 渡劫台类型恒常金脉冲（三者独立叠加）。
@@ -238,107 +271,7 @@ static func is_tribulation_unready(p_host: Control, detail: Dictionary) -> bool:
 	return NodeStateLogicScript.is_tribulation_not_ready(detail)
 
 
-## 悬停 tooltip（AC-10）——名称 + 描述 + 敌人详情；迷雾显示「?」。[br]
-## [br][b]内容源[/b]：[NodeStateLogic.tooltip_text] 纯函数（迷雾判定以六态 FOGGED
-## 为准——与渲染器的迷雾集合同源，不会出现「节点画成亮的、tooltip 说不知道」）。[br]
-## [br][b]空文案不画[/b]：没有可说的内容时连盒子都不建（免得悬停出一个空格子）。
-static func draw_hover_tooltip(p_host: Control, p_node_id: int) -> void:
-	var detail: Dictionary = p_host.nodes.get(p_node_id, {})
-	var fogged: bool = false
-	if p_host.states.has(p_node_id):
-		fogged = int(p_host.states[p_node_id]) == NodeStateLogicScript.NodeState.FOGGED
-	else:
-		fogged = p_host.call(&"_is_fogged", p_node_id)
-	var text: String = NodeStateLogicScript.tooltip_text(detail, fogged)
-	if text.is_empty():
-		return
-	var pos: Vector2 = p_host.call(&"get_node_position", p_node_id)
-	# tooltip 盒子锚定在节点上方（画布局部坐标——随 renderer.scale 缩放）
-	var anchor := Vector2(pos.x - Style.NODE_SIZE * 0.5,
-			pos.y - Style.NODE_SIZE * 0.5 - Style.TOOLTIP_ANCHOR_OFFSET)
-	var box: Rect2 = tooltip_rect(text, anchor)
-	p_host.draw_rect(box, Style.TOOLTIP_BG_COLOR)
-	p_host.draw_rect(box, Style.TOOLTIP_BORDER_COLOR, false, 1.0)
-	p_host.draw_string(label_font(p_host),
-			box.position + Vector2(Style.TOOLTIP_PADDING, Style.TOOLTIP_BASELINE),
-			text, HORIZONTAL_ALIGNMENT_LEFT, -1, Style.LABEL_FONT_SIZE)
-
-
-## tooltip 盒子尺寸估算——按文本字符数 × 字体宽度近似（stub；真实测量归
-## 字体资产管线）。[br][b]返回[/b]: 以 [param anchor] 为左上角的矩形。
-static func tooltip_rect(text: String, anchor: Vector2) -> Rect2:
-	var width: float = maxf(Style.TOOLTIP_MIN_WIDTH,
-			float(text.length()) * Style.TOOLTIP_CHAR_WIDTH
-			+ Style.TOOLTIP_PADDING * 2.0)
-	return Rect2(anchor, Vector2(width, Style.TOOLTIP_HEIGHT))
-
-
-## 迷雾整体覆盖层（AC-3 合批验证核心）。[br]
-## [br][b]一块遮罩 + 已揭示区域[b]真挖孔[/b][/b]（本轮地图化改写）：遮罩面本身是
-## [param p_polygons]（内容矩形被逐孔裁掉之后剩下的块），孔里露出的是下面的
-## [b]地图地形[/b]。[br]
-## [br][b]为什么不能再用「画一块矩形 + 用底色圆盖回去」[/b]：那套做法要求挖孔色
-## 等于画布底色——而画布现在是一张地图插画，底色圆会在插画上糊出一圈纯色补丁，
-## 1920×1080 取证图里每个已揭示节点都像贴了块膏药。真正的挖孔只能靠多边形裁剪
-## （[method NodeGraphLayout.fog_polygons]），孔不带色，孔里就是地形。[br]
-## [br][b]★ 为什么本方法必须画在连线之上、节点之下 ★[/b]：遮罩负责「雾里 / 雾外」
-## 的底色落差，压在[b]连线[/b]上结构才不泄露；节点浮在其上（亮），迷雾节点由
-## [method draw_fogged_glyph] 那条路自己叠个体暗纱（暗）——三件事各归各位。
-## 画在节点之上会把 14 种类型色全糊掉（那一版实测整幅平均亮度 10.75，几乎全黑）。[br]
-## [br][param p_host] 绘制宿主。[br]
-## [param p_no_fog] 是否「无迷雾」——true 时整块遮罩都不画。[br]
-## [param p_polygons] 遮罩多边形（已挖孔；空 = 全揭示，同样不画）。[br]
-## [br][b]为什么没有「铺满的矩形」参数[/b]：遮罩的范围由 [param p_polygons] 自身
-## 界定（[method NodeGraphLayout.fog_polygons] 是「矩形减去孔」的结果，矩形信息
-## 已在其中）；早先版本多收一个 [code]Rect2[/code] 却从未读它——多一个参数就多一处
-## 「两个调用方对同一个矩形各算一次」的分叉点，而那个矩形在
-## [NodeGraphGroundLayer] 里恰好是必须与地形逐像素一致的那个。
-static func draw_fog(p_host: Control, p_no_fog: bool,
-		p_polygons: Array) -> void:
-	if p_no_fog or p_polygons.is_empty():
-		return  # 无迷雾——不产生任何绘制
-	var points := PackedVector2Array()
-	var indices := PackedInt32Array()
-	for piece: PackedVector2Array in p_polygons:
-		append_triangles(points, indices, piece)
-	if indices.is_empty():
-		return
-	# [b]一次[/b]画完整块遮罩：顶点表 + 索引表直接交给底层三角数组。[br]
-	# [br][b]为什么不用 [method CanvasItem.draw_polygon][/b]：它内部按[b]三角扇[/b]
-	# 连点（0,1,2 / 0,2,3 / …），只对凸多边形成立——挖孔后的块是凹的，用它会连出
-	# 一大堆跨孔的三角形，遮罩直接烂掉。[code]draw_colored_polygon[/code] 同样是凸的。
-	# 三角化后的索引表只能走这一条路；Godot 自己的 [code]draw_polygon[/code] 走的也是它
-	# （同一 RID、同一变换，绘制顺序不变）。[br]
-	# [br][b]单色用长度 1 的色表[/b]：底层接受「1 个色」或「每顶点一个色」，前者省一份
-	# 与顶点等长的数组。
-	RenderingServer.canvas_item_add_triangle_array(p_host.get_canvas_item(),
-			indices, points, PackedColorArray([Style.FOG_COLOR]))
-
-
-## 把一块多边形三角化后[b]追加[/b]进顶点表 / 索引表（两个表都就地增长）。[br]
-## [br][b]为什么是索引表而不是逐三角各画一笔[/b]：一个 24 孔的遮罩三角化后约四百个
-## 三角，逐笔 [code]draw_colored_polygon[/code] 就是四百次绘制调用（预算 200 整帧，
-## 见 R-05 基准）——拼成一张索引表后是[b]一次[/b]（ADR-0031 §5 合批口径）。[br]
-## [br][b]退化块跳过[/b]：[method Geometry2D.triangulate_polygon] 对自交 / 共线多边形
-## 返回空表——空表不追加顶点（免得留下永远连不到的孤立点）。
-static func append_triangles(p_points: PackedVector2Array, p_indices: PackedInt32Array,
-		p_piece: PackedVector2Array) -> void:
-	var triangles: PackedInt32Array = Geometry2D.triangulate_polygon(p_piece)
-	if triangles.is_empty():
-		return
-	var base: int = p_points.size()
-	p_points.append_array(p_piece)
-	for i: int in triangles:
-		p_indices.append(base + i)
-
-
 ## 图集 region 绘制——统一走 [NodeIconAtlas] 单图集（同纹理合批，R-02 §3 分组方案）。
 static func blit_region(p_host: Control, rect: Rect2,
 		region: Rect2) -> void:
 	p_host.draw_texture_rect_region(NodeIconAtlasScript.get_atlas(), rect, region)
-
-
-## 文字字体——主题默认（真实字体归美术资产管线）。
-static func label_font(p_host: Control) -> Font:
-	var theme_font: Font = p_host.get_theme_default_font()
-	return theme_font if theme_font != null else ThemeDB.fallback_font

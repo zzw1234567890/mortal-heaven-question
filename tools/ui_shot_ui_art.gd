@@ -13,6 +13,9 @@ extends Node
 ## （1920×1080，节点图地图化总览）/ [code]tools/ui_shot_node_graph_720.png[/code]
 ## （1280×720，小屏可读性）/ [code]tools/ui_shot_node_graph_closeup.png[/code]
 ## （放大到 150% 的特写——节点地名的字面对比取证）。[br]
+## [br][b]本轮只跑节点图四张[/b]（图标 + 柔边迷雾两处改动的取证图）：身份页那两张与本轮
+## 改动无关，重拍只会把三张已提交的 PNG 重新编码一遍（无意义的 diff 噪声）。要全跑时把
+## [code]_shot_identity[/code] 两行放回 [method _run] 即可（方法原样保留）。[br]
 ## [br]来源: 本轮任务书任务三（地图化）/ 任务四（地名可读性取证）、先前先例
 ## [code]tools/ui_pass_shot.gd[/code]。
 
@@ -38,17 +41,17 @@ func _ready() -> void:
 	_run()
 
 
-## 取证主流程（协程——[method _ready] 不 await，让它在后台逐屏推进）。
+## 取证主流程（协程——[method _ready] 不 await，让它在后台逐屏推进）。[br]
+## [br][b]节点图先跑、身份页后跑[/b]：身份页那张要 [code]request_force_show[/code]
+## 意图，跑完不清会污染后续；节点图跑在先、身份页留在最后，中途不必担心意图串味。
 func _run() -> void:
 	await _settle(10)
-	await _shot_identity(OUT_W, OUT_H, "ui_shot_identity")
-	await _shot_identity(OUT_W_720, OUT_H_720, "ui_shot_identity_720")
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph", 1.0, false)
 	await _shot_node_graph(OUT_W_720, OUT_H_720, "ui_shot_node_graph_720", 1.0, false)
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_closeup", CLOSEUP_ZOOM, true)
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_zoomed_out",
 			ZOOMED_OUT_ZOOM, false)
-	print("[ui-art] 完成，六张图在 " + ProjectSettings.globalize_path(OUT_DIR))
+	print("[ui-art] 完成，四张图在 " + ProjectSettings.globalize_path(OUT_DIR))
 	get_tree().quit()
 
 

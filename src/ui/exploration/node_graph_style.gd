@@ -125,40 +125,26 @@ const LANDMARK_PLATE_EDGE_WIDTH: float = 1.5
 ## 远看是一块[b]地标石碑[/b]而不是 UI 色块。
 const LANDMARK_CORNER_CUT: float = 0.22
 
-## === 迷雾 ==================================================================
-
-## 迷雾底色——深色覆盖（GDD「迷雾节点：深色覆盖 + ❓标记」）。[br]
-## [br][b]第一轮起压在[b]地图地形[/b]之上[/b]：地形是暖色插画，遮罩若用原来的冷蓝黑
-## （0.04/0.05/0.07）会把雾区割成一块「贴上去的冷色补丁」。[br]
-## [br][b]第二轮 0.80 → 0.76、底色 0.055 → 0.085[/b]：遮罩盖住的是「还没走到的那片
-## 山域」，开局只有 5 个节点揭示，这片占画面大半——0.80 的近黑底把中段整块压到亮度
-## 20 上下。提到 0.085 暖灰后雾里仍明显比雾外暗（落差靠 α 而非绝对黑）。
-const FOG_COLOR: Color = Color(0.085, 0.078, 0.068, 0.76)
-## 迷雾挖孔半径——已揭示/已访问节点区域从遮罩中挖出（px）。[br]
-## [br][b]本轮地图化后由多边形裁剪实现真挖孔[/b]（见
-## [method NodeGraphLayout.fog_polygons]）：半径只决定「孔开多大」，不再需要
-## 用底色圆补——孔里露出的是地形本身。[br]
-## [br]本轮 60 → 74：节点放大到 56、下面又多了一行类型短标签，60 的孔盖不住
-## 两行文字，末行会落在雾里读不清。74 = 半个节点 + 两行文字 + 余量。
-const FOG_HOLE_RADIUS: float = 74.0
-## 迷雾节点个体暗纱色（叠在迷雾节点[b]之上[/b]——遮罩在节点之下，见
-## [method NodeGraphNodePainter.draw_fog]）。[br]
-## [br][b]为什么遮罩之下还要一层个体暗纱[/b]：遮罩在节点之下才能让已揭示节点
-## 保持原本的亮度；但迷雾节点因此也不再被「盖住」了。个体暗纱把这一格压暗，
-## 于是「亮的=我知道 / 暗的=还不知道」这层落差照样成立，而图不再是一片黑。[br]
-## [br][b]色相跟随 [constant FOG_COLOR][/b]（暖黑）——两层同族才不会在节点上
-## 叠出第三种颜色。
-const FOG_NODE_VEIL_COLOR: Color = Color(0.055, 0.050, 0.045, 0.45)
-## 迷雾节点图标底衬色（类型不暴露——统一灰底）。[br]
-## [br][b]这是「迷雾里有个东西」的唯一实体[/b]：遮罩已经压暗了背景，这块灰底
-## 再给出一块比周围亮的方块——❓就画在它上面。[br]
-## [br]本轮 0.30 → 0.42：遮罩现在压在[b]地图插画[/b]上而不是纯黑底上，插画本身
-## 有亮部；灰底不提亮，迷雾节点在插画亮处会彻底看不出来。
-const FOGGED_FILL_COLOR: Color = Color(0.42, 0.40, 0.36)
-## 迷雾问号占位方框边长（px）与相对节点中心的半宽。
-const FOG_GLYPH_SIZE: float = 24.0
-## 迷雾节点图集 region——❓占位（stub：暗灰底白环，类型不暴露）。
-const FOG_GLYPH_REGION_COL: int = 4
+## === 迷雾（常量已拆到 node_graph_style_fog.gd——此处逐条转出）===============
+## [br][b]为什么拆[/b]：本表已贴 300 行软上限，而迷雾那一组数只被「画雾」的两处读
+## （[code]node_graph_fog_painter.gd[/code] 与迷雾节点分支），与尺寸/连线/配色不相交。[br]
+## [br][b]为什么转出而不是让调用方改名字[/b]：全项目写的是 [code]Style.FOG_COLOR[/code]
+## （含既有断言），转出后一个引用点都不用动；单一出处仍在 [NodeGraphStyleFog]。
+const FogStyle := preload("res://src/ui/exploration/node_graph_style_fog.gd")
+## 雾心浓度（柔边把它从边界处的 0 渐升到本值——见 [constant FogStyle.FOG_FEATHER_BAND]）。
+const FOG_COLOR: Color = FogStyle.FOG_COLOR
+## 挖孔半径（px）——决定「已揭示区域露出多大一块地形」。
+const FOG_HOLE_RADIUS: float = FogStyle.FOG_HOLE_RADIUS
+## 迷雾节点个体暗纱色（遮罩在节点之下，故这一格得自己压暗）。
+const FOG_NODE_VEIL_COLOR: Color = FogStyle.FOG_NODE_VEIL_COLOR
+## 迷雾节点图标底衬色（类型不暴露——统一灰底）。
+const FOGGED_FILL_COLOR: Color = FogStyle.FOGGED_FILL_COLOR
+## 迷雾问号占位方框边长（px）与图集 region 列。
+const FOG_GLYPH_SIZE: float = FogStyle.FOG_GLYPH_SIZE
+const FOG_GLYPH_REGION_COL: int = FogStyle.FOG_GLYPH_REGION_COL
+## 柔边羽化带宽（局部 px）与档数（本轮硬边改渐变的两个主旋钮）。
+const FOG_FEATHER_BAND: float = FogStyle.FOG_FEATHER_BAND
+const FOG_FEATHER_STEPS: int = FogStyle.FOG_FEATHER_STEPS
 
 ## === 地形底图（本轮新增——节点图改成「地图」）=============================
 
@@ -203,6 +189,19 @@ const VIGNETTE_ALPHA: float = 0.34
 const VIGNETTE_BAND_RATIO: float = 0.18
 ## 暗角圈数（3 = 看得出过渡，再多只是加绘制调用）。
 const VIGNETTE_STEPS: int = 3
+
+## === 节点图标（常量已拆到 node_graph_style_icon.gd——此处逐条转出）===========
+## [br][b]为什么拆[/b]：本表已贴 300 行软上限，而图标那一组数只被「画一个类型图标」
+## 的那一处读。转出后调用方照旧写 [code]Style.ICON_ALPHA[/code]，单一出处见
+## [NodeGraphStyleIcon]。
+const IconStyle := preload("res://src/ui/exploration/node_graph_style_icon.gd")
+## 图标边长相对节点边长的倍率（随节点尺寸缩放——悬停放大时图标一起长）。
+const ICON_EDGE_RATIO: float = IconStyle.ICON_EDGE_RATIO
+## 图标深色圆盘色（线稿的对比底）与它相对图标的放大倍率。
+const ICON_DISC_COLOR: Color = IconStyle.ICON_DISC_COLOR
+const ICON_DISC_SCALE: float = IconStyle.ICON_DISC_SCALE
+## 图标本体不透明度。
+const ICON_ALPHA: float = IconStyle.ICON_ALPHA
 
 ## === 节点配色 ==============================================================
 

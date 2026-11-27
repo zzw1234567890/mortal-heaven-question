@@ -14,7 +14,7 @@ extends RefCounted
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：纹理只读、矩形只算不存；调用方（渲染器）
 ## 每次 [code]_draw[/code] 传当前内容矩形进来。[br]
 ##
-## [br][b]不新增美术资源[/b]：插画来自 [code]MapCardArt[/code] 已有 17 张
+## [br][b]只用已有美术资源[/b]：底图来自 [code]MapTerrainArt[/code]（舆图 17 张 / 风景插画兜底）
 ## （[code]assets/environments/maps/[/code]），本模块只负责「铺多大、压多暗、边缘多黑」。[br]
 ##
 ## 来源: 本轮任务书任务三（背景铺图 + 四边 vignette）、ADR-0031 §2/§5、
@@ -22,8 +22,8 @@ extends RefCounted
 
 ## 视觉规格（常量唯一来源——与节点/连线共用同一份）。
 const Style := preload("res://src/ui/exploration/node_graph_style.gd")
-## 地图插画来源（[code]path_of[/code] / [code]texture_of[/code]，已有 17 张）。
-const MapCardArtScript := preload("res://src/ui/exploration/map_card_art.gd")
+## 地形底图来源（舆图优先、风景插画兜底；按 [code]map_<地图 ID>.png[/code] 约定找图）。
+const MapTerrainArtScript := preload("res://src/ui/exploration/map_terrain_art.gd")
 
 
 ## 画整块地形：底色 → 插画（cover 铺满）→ 压暗叠层 → 四边 vignette。[br]
@@ -52,7 +52,7 @@ static func draw(p_host: Control, p_rect: Rect2, p_map_id: StringName) -> void:
 	if p_rect.size.x <= 0.0 or p_rect.size.y <= 0.0:
 		return
 	p_host.draw_rect(p_rect, Style.TERRAIN_BASE_COLOR)
-	var texture: Texture2D = MapCardArtScript.texture_of(p_map_id)
+	var texture: Texture2D = MapTerrainArtScript.texture_of(p_map_id)
 	if texture != null:
 		p_host.draw_texture_rect(texture, cover_rect(p_rect, texture.get_size()), false,
 				Color(1.0, 1.0, 1.0, Style.TERRAIN_IMAGE_ALPHA))

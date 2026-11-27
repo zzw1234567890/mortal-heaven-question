@@ -182,10 +182,11 @@ func _draw_edges() -> void:
 	EdgePainter.draw_edges(self, _fogged_positions())
 
 
-## 悬停 tooltip 绘制（AC-10）——内容组装与盒子绘制委托 [NodeGraphNodePainter]
-## （与节点绘制同一处，两者共用 [NodeStateLogic.tooltip_text] 的口径）。
+## 悬停 tooltip 绘制（AC-10）——内容组装与盒子绘制委托 [NodeGraphTooltipPainter]
+## （与节点绘制分开一层：两者共用 [NodeStateLogic.tooltip_text] 的口径，但一个每帧画满
+## 整图、一个只在鼠标停住时画一次）。
 func _draw_hover_tooltip(node_id: int) -> void:
-	Painter.draw_hover_tooltip(self, node_id)
+	Tooltip.draw_hover_tooltip(self, node_id)
 
 
 ## 拾取区域覆写——「画得出来就点得到」（可见性与可点性同源）。[br]

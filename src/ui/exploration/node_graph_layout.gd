@@ -193,7 +193,7 @@ static func is_layer_revealed(p_nodes: Dictionary, p_reveal_max_layer: int,
 ## 靠多边形裁剪：遮罩面本身不带孔，孔里露出的就是下面的地形。[br]
 ## [br][b]为什么放纯函数模块[/b]：这是一次几何换算（同 [method compute_positions]），
 ## 输入矩形 + 圆心列表、输出顶点表，不持状态；渲染器负责缓存与失效（见
-## [code]NodeGraphRenderer._fog_polygons[/code]）。[br]
+## [code]NodeGraphGroundLayer._fog_layers[/code]）。[br]
 ## [br][b]为什么缓存是必需的[/b]：[method Geometry2D.clip_polygons] 是 O(孔数 × 块数)
 ## 的逐孔裁剪（实测 24 孔 × 20 边形 ≈ 1.2ms），每帧重算会吃掉帧预算的十分之一；
 ## 而它只在「已揭示集合变了」时才需要重算。[br]
@@ -217,6 +217,43 @@ static func fog_polygons(p_rect: Rect2, p_revealed: Array, p_radius: float,
 		if pieces.is_empty():
 			break  # 整张图都揭开了——后面没有可裁的东西
 	return pieces
+
+
+## 迷雾[b]柔边分层[/b]——同一块遮罩按「向内缩进」切成若干层，由外向内逐层叠加，
+## 叠出来的就是一条从 0 渐升到满浓度的羽化带（本轮：矩形硬边改柔边）。[br]
+## [br][b]★ 为什么是「逐层内缩」而不是给顶点刷渐变色 ★[/b]：[code]canvas_item_add_triangle_array[/code]
+## 确实接受每顶点一个颜色，但渐变的[b]方向[/b]得逐顶点算出「离边界多远」——而遮罩是
+## 「矩形减 24 个圆孔」裁剪出来的，同一块多边形上同时挨着矩形边和孔边，顶点法线方向
+## 不一致，刷出来会在孔边出现折角。逐层内缩把这个问题交给几何本身：每层都是同一种
+## 「矩形减孔 + 缩进」，孔边与矩形边[b]自动同一条带[/b]。[br]
+## [br][b]第 i 层（i = 1..steps）[/b]：矩形四边各内缩 [code]带 / steps × i[/code]、每个
+## 孔的半径[b]外扩[/b]同量。于是最外一层（i=1）是一条镶在边界内侧的窄框，最深一层
+## （i=steps）只在「离边界 ≥ 整条带」的地方还有面。某点被覆盖的层数 = 它到最近边界的
+## 深度，浓度随深度单调上升。[br]
+## [br][b]孔边为什么也一起羽化[/b]：孔边同样是硬边（「已揭示区域」与雾的交界）。任务书
+## 只点了矩形四条边，但同一条带顺手把孔边也磨掉——两处硬边同源，分两套做法迟早分叉。[br]
+## [br][b]矩形边与孔边会互相干扰吗[/b]：不会。窄图（矩形边之间的距离小于两条带）上两
+## 侧的带子在中间相遇，那只意味着「这张图大部分在雾里」——正是该有的读法。[br]
+## [br][param p_band] 羽化带宽（局部 px）——由调用方按观感常量传入，本函数只做几何。[br]
+## [param p_steps] 层数（≥ 1；0 或负按 1 处理，即退回单层满浓度）。[br]
+## [br][b]返回[/b]：层数组，[b]由外向内[/b]排列（第 0 层最靠外、浓度最浅）；每层是
+## 多边形数组（可能为空——该层被孔啃光了）。整块都揭开时返回空数组。
+static func fog_feather_layers(p_rect: Rect2, p_revealed: Array, p_radius: float,
+		p_band: float, p_steps: int, p_segments: int = 20) -> Array:
+	var steps: int = maxi(p_steps, 1)
+	# 带子不能比图还宽——否则雾永远升不到满浓度（等于把雾取消了）。
+	var room: float = minf(p_rect.size.x, p_rect.size.y) * 0.25
+	var band: float = maxf(minf(p_band, room), 0.0)
+	var layers: Array = []
+	for i: int in range(1, steps + 1):
+		var inset: float = band * float(i) / float(steps)
+		var inner: Rect2 = p_rect.grow(-inset)
+		if inner.size.x <= 0.0 or inner.size.y <= 0.0:
+			break  # 再往里缩就没有面了——后面的层自然也是空的
+		# 孔半径随缩进同步外扩：孔边与矩形边处在同一条羽化带上（见函数注记）。
+		layers.append(fog_polygons(inner, p_revealed, p_radius + inset, p_segments))
+	return layers
+
 
 
 ## 矩形的多边形顶点（顺时针，4 点）。
