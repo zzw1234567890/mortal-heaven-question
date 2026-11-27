@@ -26,9 +26,17 @@ const Painter := preload("res://src/ui/exploration/node_graph_node_painter.gd")
 ## 地形底图 + 迷雾遮罩（含多边形挖孔缓存）——本轮地图化的「地面层」。
 const GroundLayer := preload(
 		"res://src/ui/exploration/node_graph_ground_layer.gd")
-## 小径（连线）绘制（已走过 / 未走过 / 雾中——从本文件拆出，见类文档）。
-const EdgePainter := preload(
-		"res://src/ui/exploration/node_graph_edge_painter.gd")
+## 小径（连线）绘制——[b]本轮已整个删除[/b]（老板 2026-11-27：「节点之间不需要线
+## 连接」）。[code]node_graph_edge_painter.gd[/code] 及其 preload 一并移除：全连通
+## 之后「谁和谁相邻」不再有游戏含义，画出来的线在宣告一条已经不存在的规则。[br]
+## [br][b]数据层的边表原样保留[/b]（[code]exploration_dag_graph.gd[/code] 未动，
+## 邻接图单测一条未改）——「走过 / 未走过」的判定
+## （[code]NodeStateLogic.edge_is_walked[/code]）也保留：它是数据层契约，只是本轮起
+## 没有绘制消费者了（[method _is_edge_visited] 仍转发它）。[br]
+## [br][b]为什么连模块一起删而不是留着不调[/b]：留着一个没人调用的绘制模块，下一轮
+## 想「顺手接回来」的成本几乎为零，而这条线本轮是[b]明确要求不画[/b]的——
+## [code]test_node_graph_render.gd[/code] 用「有没有 [code]_draw_edges[/code] 方法」
+## 把这条钉在解析期。
 ## 悬停 tooltip 绘制（与节点绘制分开一层——见该模块文档）。
 const Tooltip := preload("res://src/ui/exploration/node_graph_tooltip_painter.gd")
 ## 六态样式查询（判定与绘制共用同一套枚举）。
@@ -39,6 +47,16 @@ const HoverTextScript := preload(
 ## 地名池（节点 → 地名——渲染快照里没有地名，绘制期按 map_id + node_id 取）。
 const PlaceCatalogScript := preload(
 		"res://src/feature/exploration/exploration_place_catalog.gd")
+## 地区层绘制（底渍 + 墨边 + 地名纸条——见该模块文档）。[br]
+## [br][b]本轮新增[/b]（老板 2026-11-27：「我想要一个节点一块地区，鼠标移上去都能高亮
+## 有交互的那种」）：节点不再只是一枚 56px 的圆印，每个节点拥有一整片 Voronoi 势力范围。[br]
+## [br][b]为什么在链首 preload 而不是在绘制处[/b]：链尾的方法面读它，而 preload 是
+## 解析期常量——放在声明面才有「依赖一眼看全」的效果（同其余五个绘制模块）。
+const RegionPainter := preload(
+		"res://src/ui/exploration/node_graph_region_painter.gd")
+## 地区层共享读写口（可见集合 / 六态视觉 / 分块表）。
+const RegionCommon := preload(
+		"res://src/ui/exploration/node_graph_region_common.gd")
 
 ## === Visual 常量（转发 [NodeGraphStyle]——外部既有引用点不变）==================
 ## [br][b]为什么留一层转发[/b]：这些常量被测试与相邻 UI 直接读
@@ -51,18 +69,11 @@ const NODE_SIZE: float = Style.NODE_SIZE
 const LAYER_GAP: float = Style.LAYER_GAP
 ## 同层节点间距（px）——横向分量。
 const NODE_GAP: float = Style.NODE_GAP
-## 节点连线线宽（px）——GDD「节点连线线宽 2px」的下限之上（本轮起为「小径」宽度）。
-const EDGE_WIDTH: float = Style.EDGE_WIDTH
-## 已走过小径的线宽（px）——踩实的路更宽（第二根独立的轴，色觉障碍下也读得出）。
-const EDGE_WALKED_WIDTH: float = Style.EDGE_WALKED_WIDTH
-## 虚线段长（未访问路径——GDD「暗色虚线」）。
+## 虚线段长（px）——[b]地区墨边[/b]在「不可达」态下用虚线（GDD「暗色虚线」的落点）。[br]
+## [br][b]本轮归属变了[/b]：同一个常量此前是节点连线的段长，连线整个删除之后它是
+## [code]node_graph_region_edge_painter.gd[/code] 的唯一读者——段长本身没变，
+## 「谁在用」变了。
 const DASH_LENGTH: float = Style.DASH_LENGTH
-## 已访问路径连线色——金色实线（GDD 连线规则）。
-const EDGE_VISITED_COLOR: Color = Style.EDGE_VISITED_COLOR
-## 未访问路径连线色——亮灰（GDD 连线规则）。
-const EDGE_UNVISITED_COLOR: Color = Style.EDGE_UNVISITED_COLOR
-## 雾中路径连线色——两端未揭示的连线（压在遮罩语义下，见 [method _draw]）。
-const EDGE_FOGGED_COLOR: Color = Style.EDGE_FOGGED_COLOR
 ## 已访问节点边框色——绿色（GDD 界面规则「已访问：绿色边框 + ✓」）。
 const NODE_VISITED_BORDER: Color = Style.NODE_VISITED_BORDER
 ## 当前节点边框色——金色（GDD「当前节点：金色边框」）。
@@ -121,6 +132,14 @@ var place_overrides: Dictionary = {}
 ## 地图配置快照（[method set_ap_cost_hint] 注入）——[method hover_text_for] 的
 ## 行动力消耗短语按它算。空字典 = 按 GDD 默认开销（与配置缺失时的扣费行为一致）。
 var _map_config: Dictionary = {}
+## 剩余行动力快照——[method hover_text_for] 判「这一跳够不够」用。[br]
+## [br][b]为什么渲染器要存它[/b]：悬停提示的第三段本轮起是「消耗 N 行动力」或
+## 「行动力不足（需 N）」，两支的选择取决于玩家此刻还剩多少——而这个数字在渲染快照里
+## （[code]map_data.ap_remaining[/code]），不在渲染器手上。[br]
+## [br][b]默认 -1 而不是 0[/b]：-1 = 「快照没给」，文案退回只说消耗量；0 是一个真实的
+## 行动力值（走投无路），会被误读成「确定不足」。区分「不知道」与「是 0」在这里有实际
+## 差别——渲染器在 stub 路径与单测里都可能拿不到这个字段。
+var ap_remaining: int = -1
 
 ## === 内部 ===================================================================
 
@@ -128,5 +147,14 @@ var _map_config: Dictionary = {}
 var _positions: Dictionary = {}
 ## 内容包围盒——Viewport 整图适配基准（复位/初始 fit 用）。
 var _content_rect: Rect2 = Rect2()
+## 地区分块表（[code]{node_id: PackedVector2Array}[/code]）——布局时算一次。[br]
+## [br][b]为什么渲染器持有它[/b]：同一份分块被[b]三处[/b]读——绘制地区、命中检测
+## （点到哪块地）、地区包围盒。三处各算一次就是三次 O(n²) 半平面裁剪，且三份结果
+## 一旦因为输入微差而不同，立刻出现「画在这块地、点那块地」的错位。[br]
+## [br][b]为什么缓存在这里而不是绘图层[/b]：命中检测与绘制都要它，而绘制层每次
+## [code]_draw()[/code] 才被调用——放在绘制侧等于命中检测要间接催一次绘制。[br]
+## [br][b]为什么是公开字段（无下划线）[/b]：地区绘制三笔经 [method Object.get] 读宿主
+## 快照（零状态所有权——绘制模块不持引用），字段名即那条读取协议的一部分。
+var cells: Dictionary = {}
 ## 地面层（地形 + 迷雾挖孔缓存）——持有实例以跨帧复用挖孔结果（见该模块文档）。
 var _ground: RefCounted = GroundLayer.new()

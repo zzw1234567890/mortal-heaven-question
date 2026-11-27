@@ -423,30 +423,42 @@ func test_mouse_exited_noop_when_no_hover() -> void:
 	assert_eq(hover_events.size(), 0, "无悬停时离开不应发射信号")
 
 
-func test_hit_test_node_grows_with_hover_scale() -> void:
-	# 审查 M1：悬停放大的可达节点命中框同步放大（避免边缘高频振荡）
-	# [b]边界按 Style.NODE_SIZE 推导[/b]：命中框半径 = 节点边长 / 2（悬停时 × 倍率）。
-	# 原先这四个数是照着 48px 写死的，节点尺寸一改（本轮 48 → 56）就全都落到了框内，
-	# 断言失败但测的其实是「常量没同步」而不是「命中框没跟着放大」——改成推导，
-	# 这条测的就永远是它该测的那件事。
-	var half: float = Style.NODE_SIZE * 0.5
+## ★ 改前红：旧版断言「悬停放大后命中框同步放大（矩形按 NODE_SIZE 推导）」★[br]
+## [br][b]老板 2026-11-27：「我想要一个节点一块地区，鼠标移上去都能高亮有交互的
+## 那种」[/b]——命中判据从「点中那枚 56px（悬停 61.6px）的圆印」改成
+## [code]point-in-region[/code]（[method NodeGraphRegionCommon.node_at]）之后，
+## 这个用例的两条 [code]assert_false[/code] 必然红：图标半径外的点现在落在[b]同一块
+## 地区[/b]里，本就该命中。[br]
+## [br][b]改写方式（不是删断言，也不是把数值改大到能过）[/b]：旧版守的是「命中框
+## 与绘制同源，边缘不抖」（审查 M1）。新口径下「同源」的含义变了——地区由[b]节点
+## 位置[/b]决定，与悬停态无关，所以正确的同源断言是
+## [b]「悬停不改变任何一点的归属」[/b]：这既钉住了旧版要防的抖动（鼠标移上去不会
+## 让命中范围跳变），又钉住了新口径下真正的风险（悬停高亮若顺手改了分块，鼠标一进
+## 一出就会在两个节点之间来回夺权）。[br]
+## [br][b]地区覆盖范围本身由 [code]test_node_graph_pick_region.gd[/code] 断言[/b]
+## （区域内点命中 / 边界外不命中 / 交界取最近种子）——本文件只管交互接线，
+## 不重复那边的事。
+func test_hit_test_is_stable_across_hover_states() -> void:
 	var center: Vector2 = renderer.get_node_position(101)
-	# 基准：未悬停时框内、框外各取一点
-	assert_true(renderer.hit_test_node(101, center + Vector2(half - 1.0, 0.0)),
-			"未悬停：%.1fpx 半径内应命中" % half)
-	var outside_unhovered: Vector2 = center + Vector2(half + 2.0, 0.0)
-	assert_false(renderer.hit_test_node(101, outside_unhovered),
-			"未悬停：%.1fpx 处（>%.1fpx 半径）不应命中" % [half + 2.0, half])
-	# When: 悬停可达节点（110% → 半径 × 1.1）
+	var half: float = Style.NODE_SIZE * 0.5
+	# 三个样本点：图标正中心 / 图标半径外一截（地区内）/ 更远处（地区内更靠边）
+	var samples: Array[Vector2] = [
+		center,
+		center + Vector2(half + 2.0, 0.0),
+		center + Vector2(0.0, -half * 2.0),
+	]
+	var before: Array[int] = []
+	for point: Vector2 in samples:
+		before.append(renderer.hit_test_any(point))
+	# When: 悬停 101（旧版正是在这一步改变命中框）
 	renderer.hovered_node = 101
-	var scaled_half: float = half * renderer.HOVER_SCALE_RATIO
-	# Then: 原先框外的那个点现在命中（命中框与绘制同源）
-	assert_true(renderer.hit_test_node(101, outside_unhovered),
-			"悬停放大后命中框应同步放大（%.1fpx 处应命中）" % outside_unhovered.distance_to(center))
-	# 边界：放大后仍不无限扩张
-	assert_false(renderer.hit_test_node(101, center + Vector2(scaled_half + 1.5, 0.0)),
-			"悬停放大后 %.1fpx 处（>%.1fpx）仍不应命中"
-			% [scaled_half + 1.5, scaled_half])
+	# Then: 每一点的归属与悬停前逐一相同——悬停只改绘制，不改分块
+	for i: int in samples.size():
+		assert_eq(renderer.hit_test_any(samples[i]), before[i],
+				"悬停不得改变第 %d 个采样点的归属（地区由节点位置决定）" % i)
+	# 且图标外那一截确实算 101 的地（新旧口径的差别正在这里）
+	assert_eq(renderer.hit_test_any(center + Vector2(half + 2.0, 0.0)), 101,
+			"图标半径外、地区之内 → 仍命中 101（本轮新口径）")
 
 
 func test_set_focused_node_updates_and_is_idempotent() -> void:

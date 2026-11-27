@@ -8,10 +8,25 @@ extends GutTest
 ##   - 直接操作 _node_graph / _node_details 测试验证链路
 ##   - 通过 GSM Autoload 测试导航状态写入
 ##
-## 设计文档来源：ADR-0014 §关键接口 + §决策 3 信号委托 + GDD §4
+## [br][b]★ 本轮语义变更（有意改动，报告单列）★[/b]：AC-002 与 AC-003 两条的前提
+## 被老板 2026-11-27 18:40 的追加规则作废——「每个节点之间都可达，只是消耗的行动力
+## 不一样」：[br]
+##   · AC-002「非邻接节点拒绝」→ 邻接不再是门槛，[b]非邻接同样可达[/b]；
+##     「不可达」收窄为[b]目标节点不存在[/b]（越界 ID / 存档脏数据）；
+##   · AC-003「已访问节点拒绝」→ [b]已访问可重入[/b]（消耗照算，奖励不重复发由各子
+##     系统的既有幂等逻辑负责）。[br]
+## 两条都改写为正向断言（「应当成功」）而不是删掉——旧口径的拒绝理由正是本轮要消灭的
+## 东西，删掉断言等于把「它真的不拒了」这件事交给运气。[br]
+## [b]数据层的边表与邻接图测试一条未动[/b]（任务书硬约束）。
+##
+## 设计文档来源：ADR-0014 §关键接口 + §决策 3 信号委托 + GDD §4、
+## 本轮任务书追加规则。
 ## Story 来源：production/epics/exploration-system/story-003-move-resolve-node.md
 
 const ES_SCRIPT := preload("res://src/feature/exploration_system.gd")
+## 布局几何——让夹具里那一跳恰好值 [param p_cost] 点的单位距离由它算（见
+## [method _unit_for_cost]）。
+const GEOMETRY := preload("res://src/feature/exploration/exploration_node_geometry.gd")
 
 var es: Node = null
 var gsm: Node = null
@@ -106,11 +121,12 @@ func _on_interaction_triggered(nid: int, itype: StringName, payload: Dictionary)
 # === 辅助 ================================================================
 
 ## 设置一个简单的线性 DAG 用于测试：0→100→200→300→400
-## 注：为测试已访问回退，100→0 边也被加入（仅测试用途，真实 DAG 无回退边）
+## [br][b]边表本轮起只是「谁挨着谁」的记录[/b]，不再挡移动——保留它是因为
+## 「从一个节点出发有多少条边」仍是地图生成的一部分，且旧存档的图快照靠它重建。
 func _setup_linear_dag() -> void:
 	es.set("_node_graph", {
 		0: [100],
-		100: [200, 0],  # 含回退边 100→0 用于测试已访问拒绝
+		100: [200, 0],
 		200: [300],
 		300: [400],
 		400: [],
@@ -128,6 +144,19 @@ func _setup_linear_dag() -> void:
 		gsm.exploration.visited_nodes = [0]
 		gsm.exploration.node_position = {"layer": 0, "idx": 0}
 	es.set("_dag_ready", true)
+
+
+## 「从 0 走到 [param p_node_id] 恰好值 [param p_cost] 点」所需的单位距离。[br]
+## [br][b]为什么现算[/b]：本轮起开销 = [code]clamp(round(距离 / 单位), 1, 上限)[/code]，
+## 而距离由布局标定（层间距 104 / 同层间距 200）决定。写死一个单位距离，标定一调
+## 夹具的价钱就变了，断言会以「莫名其妙」的方式红。取 [code]距离 / 目标价[/code]
+## 让比值恰为整数，落在取整的不动点上。
+## [br][b]必须先 [_setup_linear_dag][/b]——它读 [code]_node_details[/code]。
+func _unit_for_cost(p_node_id: int, p_cost: int) -> float:
+	var details: Dictionary = es.get("_node_details")
+	var counts: Dictionary = GEOMETRY.layer_counts(details)
+	return GEOMETRY.distance_between(details[0], details[p_node_id], counts) \
+			/ float(p_cost)
 
 
 ## 设置带豁免节点的 DAG
@@ -188,34 +217,63 @@ func test_ac001_move_to_node_returns_valid_structure() -> void:
 
 
 # ============================================================================
-# AC-002：可达性验证——非邻接节点拒绝
+# AC-002：可达性验证——[b]本轮起邻接不再是门槛[/b]（有意改动，报告单列）
 # ============================================================================
 
-func test_ac002_unreachable_rejected() -> void:
+## ★ 改前红：旧版断言「0→200 无边 → 拒绝」★[br]
+## 全连通之后（老板 2026-11-27 18:40），非邻接节点[b]同样可达[/b]，只是消耗按距离算。
+## 这条从「应当拒绝」改成「应当成功」——旧口径的拒绝理由正是本轮要消灭的东西，
+## 删掉断言等于把「它真的不拒了」交给运气。
+func test_ac002_non_adjacent_node_is_now_reachable() -> void:
 	_setup_linear_dag()
-	var result: Dictionary = es.call("move_to_node", 0, 200)  # 0→200 无边
-	assert_eq(result["success"], false, "不可达节点拒绝")
-	assert_true(result["reason"].find("不可达") >= 0, "reason 含 '不可达'")
+	# Act——0→200 在图里没有边
+	var result: Dictionary = es.call("move_to_node", 0, 200)
+	# Assert
+	assert_eq(result["success"], true, "非邻接节点同样可达（取消路径限制）")
+	assert_eq(result["reason"], "", "成功时无拒绝理由")
+	# 消耗按「0 → 200」的距离算：跨两层，比相邻一层贵
+	var one_layer: int = es.call("ap_cost_between", 0, 100)
+	var two_layers: int = int(es.call("ap_cost_between", 0, 200))
+	assert_true(two_layers >= one_layer,
+			"跨两层不该比相邻一层便宜：%d → %d" % [one_layer, two_layers])
 
 
-func test_ac002_nonexistent_from_rejected() -> void:
+## ★ 改前红：旧版用的是「from 不存在」★[br]
+## 拓扑门槛废除后，「不可达」只剩一个真实含义——[b]目标这一格根本不存在[/b]。
+## 判定必须落在 [code]to_node[/code] 上（对不存在的 from 无从算距离，那按距离 0 处理、
+## 消耗取下限 1，是刻意的宽容——存档里 from 脏了不该让玩家卡死）。
+func test_ac002_nonexistent_target_rejected() -> void:
 	_setup_linear_dag()
-	var result: Dictionary = es.call("move_to_node", 999, 100)
-	assert_eq(result["success"], false, "不存在的 from 节点拒绝")
+	# Act——999 不在本图的节点详情里
+	var result: Dictionary = es.call("move_to_node", 0, 999)
+	# Assert
+	assert_eq(result["success"], false, "目标节点不存在 → 拒绝")
+	assert_true(result["reason"].find("不可达") >= 0,
+			"reason 含 '不可达'（这是拓扑门槛废除后唯一的不可达）")
 
 
 # ============================================================================
-# AC-003：已访问节点拒绝（不可回退）
+# AC-003：已访问节点[b]可重入[/b]（本轮有意改动，报告单列）
 # ============================================================================
 
-func test_ac003_visited_rejected() -> void:
+## ★ 改前红：旧版断言「已访问 → 拒绝，reason 含『已访问』」★[br]
+## 老板 2026-11-27 18:40：「已访问节点可以重入，消耗照算，奖励不重复发」。
+## 奖励不重复发由各子系统的幂等逻辑负责（[method mark_node_visited] 返回
+## [code]is_new[/code]），移动这一层不再挡。
+func test_ac003_visited_node_can_be_reentered() -> void:
 	_setup_linear_dag()
-	# 先移动到 100
+	# Arrange——先走到 100，再回退到已访问的 0
 	es.call("move_to_node", 0, 100)
-	# 尝试从 100 回退到 0（已访问）
+	var ap_before: int = int(gsm.exploration.action_points)
+	# Act
 	var result: Dictionary = es.call("move_to_node", 100, 0)
-	assert_eq(result["success"], false, "已访问节点拒绝")
-	assert_true(result["reason"].find("已访问") >= 0, "reason 含 '已访问'")
+	# Assert——可重入，且消耗照算（不是白走）
+	assert_eq(result["success"], true, "已访问节点可重入")
+	assert_eq(result["reason"], "", "重入不再被拒")
+	assert_lt(int(result["ap_remaining"]), ap_before,
+			"重入照常消耗行动力（不是白走）")
+	assert_true(_node_moved_signals.size() >= 2,
+			"重入同样发射 node_moved（UI 要跟着动）")
 
 
 # ============================================================================
@@ -313,18 +371,23 @@ func test_ac008_can_move_to_readonly() -> void:
 	assert_eq(gsm.exploration["visited_nodes"].size(), visited_before, "visited_nodes 未变化")
 
 
-func test_ac008_can_move_to_unreachable() -> void:
+## ★ 改前红：旧版断言「0→200 无边 → false」★[br]
+## 邻接不再是门槛，同一条调用现在应为 [b]true[/b]（只要 AP 够）——本用例守的是
+## 「判定与扣费同口径」，而不是「图里有边」。
+func test_ac008_can_move_to_non_adjacent_when_ap_allows() -> void:
 	_setup_linear_dag()
-	var result: bool = es.call("can_move_to", 0, 200)  # 无边
-	assert_eq(result, false, "不可达 false")
+	var result: bool = es.call("can_move_to", 0, 200)  # 无边，但 AP 够
+	assert_eq(result, true, "非邻接节点在 AP 充足时应判定为可达")
 
 
-func test_ac008_can_move_to_visited() -> void:
+## ★ 改前红：旧版断言「已访问 → false」★[br]
+## 已访问可重入，判定应看行动力而不是访问记录。
+func test_ac008_can_move_to_visited_node() -> void:
 	_setup_linear_dag()
 	if gsm != null:
 		gsm.exploration.visited_nodes = [0, 100]
 	var result: bool = es.call("can_move_to", 100, 0)  # 0 已访问
-	assert_eq(result, false, "已访问 false")
+	assert_eq(result, true, "已访问节点可重入 → 判定为可达（不再看 visited）")
 
 
 func test_ac008_can_move_to_ap_insufficient() -> void:

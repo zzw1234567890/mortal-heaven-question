@@ -3,8 +3,8 @@ extends RefCounted
 ##
 ## [b]为什么从 [code]node_graph_style.gd[/code] 拆出来[/b]：那份总表已贴 300 行软上限
 ## （coding-standards），而本轮迷雾要加「柔边羽化」两个新常量。拆的判据是[b]内聚[/b]：
-## 下面这八个数只被「画雾」的两处读（[code]node_graph_fog_painter.gd[/code] /
-## [code]node_graph_node_painter.gd[/code] 的迷雾节点分支），与尺寸、连线、配色都不相交。[br]
+## 下面这几个数只被「画雾」的两处读（[code]node_graph_fog_region.gd[/code] 的
+## 并集羽化 / [code]node_graph_node_painter.gd[/code] 的迷雾节点分支），与尺寸、配色都不相交。[br]
 ##
 ## [br][b]仍然只有一个对外名字[/b]：[code]node_graph_style.gd[/code] 把本模块的常量
 ## 逐条转出（[code]const FOG_COLOR = FogStyle.FOG_COLOR[/code]），调用方照旧写
@@ -24,14 +24,15 @@ extends RefCounted
 ## 边界处的实际浓度从 0 渐升到本值，故本值同时是「离边界够远处的雾有多浓」。
 const FOG_COLOR: Color = Color(0.085, 0.078, 0.068, 0.76)
 ## 迷雾挖孔半径——已揭示/已访问节点区域从遮罩中挖出（px）。[br]
-## [br][b]本轮地图化后由多边形裁剪实现真挖孔[/b]（见
-## [method NodeGraphLayout.fog_polygons]）：半径只决定「孔开多大」，不再需要
-## 用底色圆补——孔里露出的是地形本身。[br]
+## [br][b]★ 本轮起这个数[b]没有读者[/b]了（保留待决策）★[/b]：迷雾改走「地区并集
+## 向内羽化」（见 [NodeGraphFogRegion]）之后不再有「挖孔」这一步——雾只铺在真正未探明的
+## 地区上，探明的孔连同整套「矩形减圆孔」做法一并退场。本常量与
+## [constant NodeGraphStyle.FOG_MARGIN] 是那套做法的遗物。[br]
 ## [br]本轮 60 → 74：节点放大到 56、下面又多了一行类型短标签，60 的孔盖不住
 ## 两行文字，末行会落在雾里读不清。74 = 半个节点 + 两行文字 + 余量。
 const FOG_HOLE_RADIUS: float = 74.0
 ## 迷雾节点个体暗纱色（叠在迷雾节点[b]之上[/b]——遮罩在节点之下，见
-## [method NodeGraphFogPainter.draw_fog]）。[br]
+## [method NodeGraphFogRegion.draw_fog_union]）。[br]
 ## [br][b]为什么遮罩之下还要一层个体暗纱[/b]：遮罩在节点之下才能让已揭示节点
 ## 保持原本的亮度；但迷雾节点因此也不再被「盖住」了。个体暗纱把这一格压暗，
 ## 于是「亮的=我知道 / 暗的=还不知道」这层落差照样成立，而图不再是一片黑。[br]
@@ -59,9 +60,9 @@ const FOG_GLYPH_REGION_COL: int = 4
 ## 相当于一条 30 级亮度的台阶，读起来就是「贴了一张卡纸」。[br]
 ## [br][b]怎么消掉[/b]：不藏边（不是拿半透明矩形盖住整屏——那是绕过问题不是解决问题），
 ## 而是把「到边界的距离」变成浓度：边界处 α=0，向内 [constant FOG_FEATHER_BAND] 像素
-## 处 α=[constant FOG_COLOR].a。做法见 [method NodeGraphLayout.fog_feather_rings]：
-## 按 [constant FOG_FEATHER_STEPS] 档把多边形逐档向内偏移，每档叠一层很小的浓度，
-## 叠出来的就是连续渐变。[br]
+## 处 α=[constant FOG_COLOR].a。做法见 [method NodeGraphFogRegion.feather_rings]：
+## 按 [constant FOG_FEATHER_STEPS] 档把[b]并集[/b]逐档向内偏移，每档叠一层浓度，
+## 每两档之间恰好上升 α/N——叠出来的就是连续渐变。[br]
 ## [br][b]为什么 ≥ 120px[/b]：任务书的验收底线（1920 宽下）。雾是[b]局部坐标[/b]里的
 ## 东西（与节点、地名一起被视口缩放），故本值取局部像素——1920 取证图的自动适配缩放
 ## 约 1.3~1.7×，本值到屏幕上只多不少。[br]
@@ -72,13 +73,18 @@ const FOG_GLYPH_REGION_COL: int = 4
 ## ≈ 130 屏幕像素，留在验收线之上。
 const FOG_FEATHER_BAND: float = 140.0
 ## 羽化档数——把 [constant FOG_FEATHER_BAND] 分成几层叠出来。[br]
-## [br][b]每档的浓度不是 α/档数[/b]：叠 N 层同色做 [code]over[/code] 合成，累计浓度是
-## [code]1-(1-a)^N[/code]（不是 N·a）——要让最深处的累计正好等于
-## [constant FOG_COLOR].a，每档得取 [code]a = 1-(1-α)^(1/N)[/code]（推导见
-## [method NodeGraphFogPainter.feather_alphas]）。[br]
-## [br][b]12 档下的数[/b]：a = 1 − 0.24^(1/12) ≈ 0.112。雾内/雾外亮度约 20 / 40，
-## 故每档在画面上掀起 ≈ 0.112 × 20 ≈ 2.2 级亮度、跨度 140/12 ≈ 11.7px——相邻像素的
-## 落差从硬边时代的 30.79 掉到个位数（本轮取证读数见任务报告）。[br]
-## [br][b]为什么不再多[/b]：每档要多做一次多边形向内偏移（缓存期）与一次合批绘制
-## （每帧 12 次，预算 200 次）；档数只影响平滑度，不影响带宽。
-const FOG_FEATHER_STEPS: int = 12
+## [br][b]★ 本轮口径修正：档数由「相邻像素差」反推，不再拍脑袋 ★[/b]：每一档是一次
+## [b]常量 alpha[/b] 填充，故栅格化后相邻像素的 alpha 差在档边界处正好等于阶高 α/N
+## （档内为 0）。验收线是「羽化带内扫描线相邻像素 alpha 差 ≤1/255」，于是
+## [code]N ≥ α × 255 = 0.76 × 255 ≈ 194[/code]。旧值 12 档的阶高是 0.76/12 ≈ 16.15/255
+## ——差了近二十倍，这正是反馈里「成片亮暗补丁」的来源（那 12 档是[b]肉眼可见的色带[/b]，
+## 不是渐变）。[br]
+## [br][b]为什么取 256 而不是刚够的 194[/b]：留一档余量（阶高 0.757/255，验收线 1/255，
+## 而不是贴着线过的 0.999/255——浮点与栅格化的边界不该靠运气）；256 又是 2 的幂，
+## 逐档内缩的步长 140/256 = 0.55px 不会出现两档落在同一像素上（那会让某一档白画）。[br]
+## [br][b]为什么不再多[/b]：每档要多做一次多边形向内偏移——[b]但只在缓存期[/b]
+## （环表随指纹缓存，见 [NodeGraphGroundLayer.layers_for]），实测 12 块并集 × 256 档
+## 是 7ms 一次；绘制侧所有环合成[b]一次[/b]合批（见
+## [method NodeGraphFogRegion.draw_fog_union]），每帧的绘制次数不随档数增长。再往上
+## 收益只是 0.757/255 → 0.5/255，与缓存期的毫秒数不成比例。
+const FOG_FEATHER_STEPS: int = 256

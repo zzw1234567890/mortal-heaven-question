@@ -4,27 +4,29 @@ extends "res://src/ui/exploration/node_graph_renderer_ground.gd"
 ## [code]node_graph_renderer_decl.gd[/code]，地面层见
 ## [code]node_graph_renderer_ground.gd[/code]）。
 ##
-## [b]职责[/b]：接收 DAG 数据（[code]setup(graph, nodes)[/code]），渲染地形 + 小径 +
+## [b]职责[/b]：接收 DAG 数据（[code]setup(graph, nodes)[/code]），渲染地形 + 地区 +
 ## 节点 + 迷雾，作为缩放平移容器 [NodeGraphViewport] 的内容宿主。[br]
 ## [br][b]S16-3 状态接入[/b]：[method set_states]——六态样式经 [NodeStateLogic] 纯函数
 ## 判定后由宿主（NodeGraphScreen）注入。注入后节点绘制走六态分支（边框/标记/暗化/
 ## 斜线/发光）；未注入时保留 Story 001 legacy 分支（[code]_is_fogged[/code]/
 ## visited/current 直判）——两者绘制路径互斥。[br]
-## [br][b]绘制内容已分四块[/b]（本文件守 300 行软上限）：[br]
+## [b]绘制内容已分五块[/b]（本文件守 300 行软上限）：[br]
 ##   - 视觉常量 + 信号 + 渲染输入字段 → [code]node_graph_renderer_decl.gd[/code]（链首）；[br]
 ##   - 几何换算（坐标 / 包围盒 / 迷雾集合）→ [code]node_graph_layout.gd[/code]；[br]
+##   - 地区层（底渍 / 墨边 / 地名纸条）→ [code]node_graph_region_painter.gd[/code] 一族；[br]
 ##   - 单节点绘制（地标 + 两行文字）→ [code]node_graph_node_painter.gd[/code]；[br]
-##   - 地形 + 迷雾挖孔 → [code]node_graph_ground_layer.gd[/code]；[br]
-##   - 小径 → [code]node_graph_edge_painter.gd[/code]。[br]
+##   - 地形 + 迷雾挖孔 → [code]node_graph_ground_layer.gd[/code]。[br]
 ## 本文件剩下的是「什么时候画什么」——绘制编排、输入驱动、命中检测与外部契约。[br]
+## [br][b]★ 本轮起不画任何连线 ★[/b]（老板 2026-11-27 18:40「节点之间不需要线连接」）：
+## 连线绘制模块与它的 preload 一并删除，理由与「数据层边表为何保留」见
+## [method _draw] 的顺序表注记。[br]
 ## [br][b]绘制策略[/b]（ADR-0031 §5 合批）：[br]
+##   - **地区**：三笔分批——底渍同色合批（[code]canvas_item_add_triangle_array[/code]）、
+##     墨边逐块描（每块一条 polyline）、纸条逐张（含文字，合不了批）[br]
 ##   - **节点**：单一自绘 [code]_draw()[/code]——每节点 3-4 笔（图集 region + 边框 +
-##     文字 + 标记）；图标统一走 [NodeIconAtlas] 图集[br]
-##   - **小径**：同一次 [code]_draw()[/code] 内自绘（已走过金色实线 / 未走过淡土灰
-##     虚线 / 雾中暗土灰虚线）[br]
-##   - **迷雾**：整块遮罩（多边形挖孔，压在[b]小径之上、节点之下[/b]）+ 迷雾节点
-##     个体暗纱 + ❓标记——ADR-0031「迷雾遮罩等大面积重复元素合批渲染」的直接验证
-##     （分层顺序的理由见 [method _draw]）[br]
+##     文字 + 标记）；图标统一走 [NodeIconArt] 线稿 + [NodeIconAtlas] 图集回退[br]
+##   - **迷雾**：整块遮罩（多边形并集 + 羽化）+ 迷雾节点个体暗纱 + ❓标记——ADR-0031
+##     「迷雾遮罩等大面积重复元素合批渲染」的直接验证（分层顺序见 [method _draw]）[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不缓存游戏状态——数据为渲染输入快照；
 ## [code]states[/code] 为纯函数判定结果（渲染参数非游戏状态）。[br]
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——纯 [code]_draw()[/code] 响应
@@ -37,37 +39,23 @@ extends "res://src/ui/exploration/node_graph_renderer_ground.gd"
 ## [param graph]: 邻接表。[br][param nodes]: 节点详情（含 layer/idx）。[br]
 ## [param visited]: 已访问节点 ID 列表。[br][param current_node]: 当前节点 ID。[br]
 ## [param p_map_id]: 地图 ID（地形插画与节点地名用；缺省空 = 不覆盖已有值）。
+## [br][param p_ap_remaining]: 剩余行动力（悬停提示判「这一跳够不够」用；缺省 -1 =
+## 不覆盖已有值——见 [member ap_remaining] 的「不知道 vs 是 0」注记）。
 ## [br][b]空值不覆盖[/b]：[method NodeGraphScreen._on_node_moved] 重下发快照时
 ## 不一定带 map_id，把地形抹成空白等于「走一步地图就没了」。
 func setup(graph: Dictionary, nodes: Dictionary, visited: Array = [],
-		current_node: int = -1, p_map_id: StringName = &"") -> void:
+		current_node: int = -1, p_map_id: StringName = &"",
+		p_ap_remaining: int = -1) -> void:
 	self.graph = graph
 	self.nodes = nodes
 	self.visited = visited
 	self.current_node = current_node
+	if p_ap_remaining >= 0:
+		self.ap_remaining = p_ap_remaining
 	if not str(p_map_id).is_empty():
 		self.map_id = p_map_id
 	_layout()
 	queue_redraw()
-
-
-## 注入地名覆盖表（[code]{node_id: 地名}[/code]）——空字典回到地名池。[br]
-## [br][b]为什么留这个口子[/b]：截图脚本与单测需要[b]确定性[/b]的地名（不随节点
-## 排布变化），而真实地图的地名由池 + 节点 ID 决定（见
-## [code]ExplorationPlaceCatalog.place_for[/code]）。覆盖表只影响绘制，不写任何状态。
-func set_place_overrides(overrides: Dictionary) -> void:
-	place_overrides = overrides
-	queue_redraw()
-
-
-## 节点地名（覆盖表优先，否则走地名池）——[b]绘制与断言共用的唯一入口[/b]。[br]
-## [br][b]返回[/b]：地名（未登记地图为「无名之地 %d」）。
-func place_name_of(node_id: int) -> String:
-	if place_overrides.has(node_id):
-		return str(place_overrides[node_id])
-	var detail: Dictionary = nodes.get(node_id, {})
-	return PlaceCatalogScript.place_for(map_id, node_id,
-			int(detail.get("place_seed", 0)))
 
 
 ## 注入六态样式映射（S16-3）——宿主经 [NodeStateLogic] 判定后传入。[br]
@@ -173,20 +161,26 @@ func _is_tribulation_unready(detail: Dictionary) -> bool:
 func _draw() -> void:
 	if nodes.is_empty():
 		return
-	# ★ 顺序即语义 ★（本轮地图化后为五层，由下到上）：[br]
+	# ★ 顺序即语义 ★（本轮地区化后为五层，由下到上）：[br]
 	#   1. 地形底图（插画 + 压暗 + 暗角）——「这是一张地图」的底；[br]
-	#   2. 迷雾遮罩（挖掉已揭示区域）——压暗[b]连线[/b]，本轮起改为多边形挖孔（见
-	#      [code]NodeGraphLayout.fog_polygons[/code]），孔里露出的是地形而不是补丁；[br]
-	#   3. 连线（小径）——走在雾[b]上[/b]，于是雾里的路被遮罩压暗、雾外的路是亮的；[br]
-	#   4. 节点（地标）——浮在一切之上；[br]
+	#   2. 迷雾遮罩——盖住尚未探明的那片山域（多边形并集 + 羽化，见
+	#      [code]NodeGraphGroundLayer.draw_fog[/code]）；[br]
+	#   3. 地区层（底渍 → 墨边 → 地名纸条）——底渍本身极淡，压在雾上读成「这片山域
+	#      还没探明」；雾中地区另外叠 [code]VEIL_FOGGED[/code] 那层暗纱（见
+	#      [code]node_graph_style_region.gd[/code] 的六态映射）；[br]
+	#   4. 节点（印章）——浮在地区之上；[br]
 	#   5. 悬停 tooltip——最上。[br]
 	# [br][b]为什么不能把迷雾画在最后[/b]（更早一轮修的 bug）：原先 [code]_draw_fog()[/code]
 	# 排在节点循环之后，而挖孔用的是近黑底色——1920×1080 取证图里每个已揭示节点都被
 	# 那层近黑圆盘重涂了一遍，14 种类型色一个不剩，整幅平均亮度 10.75（几乎全黑）。
-	# [br][b]为什么迷雾仍必须在连线之上[/b]：遮罩负责「雾里 / 雾外」的底色落差，压在
-	# 连线上才能让结构不泄露；节点浮在其上（亮）、迷雾节点自己叠个体暗纱（暗）。
-	_draw_ground()
-	_draw_edges()
+	# [br][b]为什么迷雾必须在地区之下[/b]：遮罩负责的是「地形层」的雾里 / 雾外落差
+	#（压暗的是山，不是疆域）；地区那三笔各有自己的六态压暗口径，被遮罩盖住就会
+	# 一律变黑，「这块地是什么态」当场读不出来。
+	# [br][b]为什么[b]没有[/b]连线这一层[/b]：老板 2026-11-27 18:40「节点之间不需要线
+	# 连接」——见类文档。数据层的边表未动，只是不画。
+	_draw_terrain()
+	_draw_fog_mask()
+	RegionPainter.draw_regions(self)
 	for node_id: int in nodes.keys():
 		if not Layout.is_layer_revealed(nodes, reveal_max_layer, node_id):
 			continue  # 逐层展开浮现（AC-1）——未显现的层不绘制
@@ -221,16 +215,6 @@ func _on_mouse_exited() -> void:
 		hover_changed.emit(-1)
 
 
-## 绘制全部连线（小径）——转引 [NodeGraphEdgePainter]。[br]
-## [br][b]为什么留一层转发[/b]：宿主（本类）才是持有渲染输入快照的那一个，绘制
-## 模块只读不写；转发方法让「谁画线」可以继续演进而不牵动调用方。[br]
-## [br][b]迷雾位置列表在调用点现取[/b]（不缓存）：它的口径与挖孔同源
-## （[method NodeGraphLayout.fogged_positions] 用的是同一份六态），缓存出第二份
-## 就会分叉——那种分叉的表现是「线比雾亮一格」，肉眼几乎看不出来。
-func _draw_edges() -> void:
-	EdgePainter.draw_edges(self, _fogged_positions())
-
-
 ## 悬停 tooltip 绘制（AC-10）——内容组装与盒子绘制委托 [NodeGraphTooltipPainter]
 ## （与节点绘制分开一层：两者共用 [NodeStateLogic.tooltip_text] 的口径，但一个每帧画满
 ## 整图、一个只在鼠标停住时画一次）。
@@ -241,48 +225,65 @@ func _draw_hover_tooltip(node_id: int) -> void:
 ## 拾取区域覆写——「画得出来就点得到」（可见性与可点性同源）。[br]
 ## [br]不覆写时引擎按 [code]Rect2(Vector2.ZERO, size)[/code] 判定，而本控件由
 ## [NodeGraphViewport] 缩放平移、节点又摆在局部负坐标——负 x 的节点画得出来却
-## 收不到事件（成因与真机取证见 [method NodeGraphLayout.pick_rect]）。
+## 收不到事件（成因与真机取证见 [method NodeGraphLayout.pick_rect]）。[br]
+## [br][b]★ 本轮口径未变，但含义变窄了（迁移注记）★[/b]：本方法管的仍是「这个控件
+## 要不要认领这个事件」，判据仍是[b]矩形[/b]——画布留白处必须继续能吃事件，否则空地上
+## 拖不动画布。而「这一点属于哪个节点」本轮改由 [method hit_test_any] 走
+## [code]point-in-region[/code]（见 [method NodeGraphRegionCommon.node_at]）。
+## 两件事分开之后：「地区铺到哪」可以随视觉规格调整，而「控件认领到哪」不受牵连。
 func _has_point(point: Vector2) -> bool:
 	return Layout.pick_rect(size, _content_rect).has_point(point)
 
 
 ## 节点命中检测——[param point]（画布局部坐标）是否落在 [param node_id] 的
-## 图标矩形内（AC-10 悬停触发判定；迷雾节点悬停也显示「?」故同样命中）。[br]
-## [b]命中框与绘制同源[/b]（审查 M1）：矩形按 [method get_node_draw_scale]
-## 缩放——悬停放大的可达节点命中框同步放大，避免「看得见但悬停不到」的边缘
-## 高频振荡。[br][b]返回[/b]: true 命中。
+## [b]地区[/b]（Voronoi 单元）内。[br]
+## [br][b]★ 本轮语义变更：点矩形 → 点地区 ★[/b]（老板 2026-11-27：「鼠标移上去都能高亮
+## 有交互的那种」）：旧口径要求精确点中那 56px（悬停时 61.6px）的圆印——地图化的画面上
+## 节点只是小小一枚印，「移上去」的手感极差。新口径下鼠标移到这块地的[b]任何一处[/b]
+## 都算命中该节点。[br]
+## [br][b]为什么不用 [code]Geometry2D.is_point_in_polygon[/code] 逐块判[/b]：分块在
+## 垂直平分线上「两边都含」（裁剪保留边界点，不留缝），逐块判会撞出两个命中。改走
+## 「最近种子」——与分块算法同源，天然唯一（见 [method NodeGraphRegionCommon.node_at]）。[br]
+## [br][b]判定仍是精确的[/b]：没有任何容差或模糊——同一点在两次调用之间永远给同一个
+## 答案（距离比较，平局取较小 ID）。[br][b]返回[/b]: true 命中。[br]
+## [br][param point] 画布局部坐标。[br]
+## [br][b]为什么还要传 [param node_id] 而不是只问「点在哪块地」[/b]：调用方
+## （[code]NodeMoveInteractor[/code]）拿的是「我想问这个节点」而不是「这点属于谁」；
+## 且签名被既有集成测试直接调用，改签名会牵动一圈调用点。
 func hit_test_node(node_id: int, point: Vector2) -> bool:
-	var pos: Vector2 = get_node_position(node_id)
-	var size_px: float = NODE_SIZE * get_node_draw_scale(node_id)
-	var rect := Rect2(pos.x - size_px * 0.5, pos.y - size_px * 0.5, size_px, size_px)
-	return rect.has_point(point)
+	return hit_test_any(point) == node_id
 
 
-## 命中检测遍历——返回 [param point] 命中的节点 ID（无命中返回 -1）。
+## 命中检测遍历——返回 [param point] 命中的节点 ID（无命中返回 -1）。[br]
 ## 逐层展开未显现的层（[member reveal_max_layer]）跳过（未绘制不悬停）。[br]
 ## [b]公开入口[/b]：交互层点击命中复用本方法（点中即提交）——单份实现避免
-## 「未绘制仍可点」的可见性不一致（click/hover 同源过滤）。
+## 「未绘制仍可点」的可见性不一致（click/hover 同源过滤）。[br]
+## [br][b]★ 逐层过滤在地区口径下怎么落地 ★[/b]：地区分块是[b]整张图一起算[/b]的
+## （包括还没浮现的层）——只按可见层过滤[b]结果[/b]，未浮现层因此「画不出来也点不到」，
+## 而它仍参与分块（否则浮现时整张图的疆域会重排，玩家会看到地图在动画中「跳」）。[br]
+## [br][b]返回[/b]：节点 ID；点在地区之外 / 落在未浮现层返回 -1。
 func hit_test_any(point: Vector2) -> int:
-	for node_id: int in nodes.keys():
-		if not Layout.is_layer_revealed(nodes, reveal_max_layer, node_id):
-			continue
-		if hit_test_node(node_id, point):
-			return node_id
-	return -1
-
-
-## 地面层绘制——整块地图插画 + 压暗 + 暗角 + 迷雾遮罩（见 [NodeGraphGroundLayer]）。[br]
-## 实现体在链中段 [code]node_graph_renderer_ground.gd[/code]（本轮从中拆出）。
+	var node_id: int = RegionCommon.node_at(_positions, point,
+			RegionCommon.bounds_for(_content_rect))
+	if node_id < 0:
+		return -1
+	if not Layout.is_layer_revealed(nodes, reveal_max_layer, node_id):
+		return -1
+	return node_id
 
 
 ## === 内部辅助 ===============================================================
 
 ## 布局计算——layer 纵向 / idx 横向居中；同步内容包围盒（换算委托
 ## [NodeGraphLayout]，本类只持有结果——零轮询：不每帧重算）。[br]
-## [br][b]为什么留在链尾而不是跟着地面那段走[/b]：[method setup] 调用它、
+## [br][b]为什么留在链尾而不是跟着地面那段走[/b]：[method setup] 调用它，
 ## [method get_node_position] / [method get_content_rect] / [method hit_test_node]
 ## 读它的结果——它是本类[b]所有[/b]几何读法的写入点，不属于「地面」那一件事。
 func _layout() -> void:
 	_positions = Layout.compute_positions(nodes)
 	_content_rect = Layout.compute_content_rect(_positions)
+	# 地区分块随布局一起算（同一份输入、同一时机）——分块表被绘制与命中检测共用，
+	# 见 [member cells] 与 [method NodeGraphRegionCommon.node_at]。
+	cells = RegionPainter.cells_of_nodes(_positions,
+			RegionCommon.bounds_for(_content_rect))
 

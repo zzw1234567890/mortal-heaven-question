@@ -17,13 +17,25 @@ extends RefCounted
 ## [br][b]命中框同步[/b]：[method NodeGraphRenderer.hit_test_node] 按本值算矩形——
 ## 「画得出来就点得到」不受影响。
 const NODE_SIZE: float = 56.0
+## 布局几何唯一来源（Feature 层纯数学模块——见 [member GeometryRules]）。[br]
+## [br][b]★ 为什么间距常量搬到了 Feature 层 ★[/b]：本轮起移动消耗按「两节点在布局
+## 坐标里的距离」定价，于是「节点画在哪」被 UI（画/命中）与系统（扣费）[b]两处[/b]读。
+## 两处各写一套间距常量，改一次 [constant NODE_GAP] 就会出现「走过去花了 2 点、
+## 看起来只有一格远」——玩家看得出来、单测抓不到（两套公式都自洽）。[br]
+## [br][b]为什么是转发而不是让调用方改名字[/b]：全项目写的是
+## [code]Style.LAYER_GAP[/code] 一族（含既有断言与 [code]node_graph_layout.gd[/code]），
+## 转发后一个引用点都不用动；单一出处见 [ExplorationNodeGeometry]。
+const GeometryRules := preload(
+		"res://src/feature/exploration/exploration_node_geometry.gd")
+
 ## 层间距（px）——GDD「节点间距（最小）80px」的纵向分量。[br]
-## [br][b]第二轮地图化 110 → 104[/b]：包围盒要往横向长，纵向就得省。104 是下限——
-## 地名行基线在图标下沿 +[constant LABEL_BASELINE_OFFSET]、类型行再
+## [br][b]标定推导（第二轮 110 → 104）[/b]：包围盒要往横向长，纵向就得省。104 是
+## 下限——地名行基线在图标下沿 +[constant LABEL_BASELINE_OFFSET]、类型行再
 ## +[constant TYPE_LABEL_EXTRA_OFFSET]，字身下缘距节点中心约 66px；下一层节点上沿
 ## 距其中心 [constant NODE_SIZE]/2 = 28px，故 104 − 28 = 76 > 66。[br]
-## [br][b]不能再大[/b]：纵向越长越接近方形，节点退回「串珠」（第一轮 110 实测 0.44）。
-const LAYER_GAP: float = 104.0
+## [br][b]不能再大[/b]：纵向越长越接近方形，节点退回「串珠」（第一轮 110 实测 0.44）。[br]
+## [br][b]数值本体在 [ExplorationNodeGeometry.LAYER_GAP][/b]——扣费读的是同一个数。
+const LAYER_GAP: float = GeometryRules.LAYER_GAP
 ## 同层节点间距（px）——横向分量。[br]
 ## [br][b]第二轮地图化 104 → 200[/b]：第一轮铺完后节点簇仍是一根竖条（实测内容
 ## 包围盒 264×606、宽高比 0.44），像串珠而不像「散落在地图上的一串地标」。拉到 200
@@ -31,29 +43,25 @@ const LAYER_GAP: float = 104.0
 ## × [constant NODE_SIZE] = 134px）且中间还有 66px 空档。[br]
 ## [br][b]不能再大[/b]：层间连线会趋近水平线，而「下一层在下面」是这张 DAG 唯一的
 ## 读法。另有一条硬边界：内容包围盒左边界 x 必须 > −344（见
-## [code]test_node_graph_pick_region.gd[/code] 的 [code]OUTSIDE_POINT[/code]）。
-const NODE_GAP: float = 200.0
-## 层间水平错开量（px）——第 [param layer] 层整体左右平移的幅度（蛇形：见
-## [method NodeGraphLayout.layer_stagger]）。[br]
-## [br][b]为什么需要它[/b]：只靠 [constant NODE_GAP] 加宽，各层仍上下对齐成规整网格——
-## 「一串地标散在地图上」的观感来自各层走位不同。[br]
+## [code]test_node_graph_pick_region.gd[/code] 的 [code]OUTSIDE_POINT[/code]）。[br]
+## [br][b]数值本体在 [ExplorationNodeGeometry.NODE_GAP][/b]——扣费读的是同一个数。
+const NODE_GAP: float = GeometryRules.NODE_GAP
+## 层间水平错开量（px）——蛇形（见 [method NodeGraphLayout.layer_stagger]）。[br]
+## [br][b]为什么需要它[/b]：只靠 [constant NODE_GAP] 加宽，各层仍上下对齐成规整网格
+## ——「一串地标散在地图上」的观感来自各层走位不同。[br]
 ## [br][b]为什么是 70[/b]：与 [constant NODE_GAP] 同量级时相邻层节点横向擦肩（读成斜着
 ## 往下的路，正合地图意图）；再大会把左边界推过 −344 红线。[br]
-## [br][b]第 0、1 层不错开[/b]（硬约束）：见 [method NodeGraphLayout.layer_stagger]——
-## 开局那两格必须一左一右夹住原点，这是 [code]test_node_graph_pick_region.gd[/code]
-## 的几何前提。
-const LAYER_STAGGER: float = 70.0
-## 节点连线线宽（px）——GDD「节点连线线宽 2px」的下限之上。[br]
-## [br][b]本轮 3 → 6[/b]：连线从「中性虚线」改成「踩出来的小径」，小径要靠[b]体量[/b]
-## 才读得出是被踩宽的土路，而不是一条细线。6px 在 50% 缩放下仍有 3px。
-const EDGE_WIDTH: float = 6.0
-## 已走过小径的线宽（px）——比未走过的再宽一档（踩实的路更宽）。[br]
-## [br][b]为什么「走过的」不只靠亮度区分[/b]：金色与土色在色觉障碍下可能同亮度，
-## 宽度是第二根独立的轴（色盲模式下仍读得出走过/没走过）。
-const EDGE_WALKED_WIDTH: float = 9.0
-## 虚线段长（未访问路径——GDD「暗色虚线」）。[br]
-## [br][b]本轮 10 → 14[/b]：线宽翻倍后段长不跟着涨，虚线会读成一条毛边实线
-## （段长必须明显大于线宽才有「断」的观感）。
+## [br][b]第 0、1 层不错开[/b]（硬约束）：见 [method NodeGraphLayout.layer_stagger]。
+const LAYER_STAGGER: float = GeometryRules.LAYER_STAGGER
+## 虚线段长（px）——[b]地区墨边[/b]在「不可达」态下的段长。[br]
+## [br][b]★ 本轮归属变了（连线的四个常量已删）★[/b]：它此前是节点连线的虚线参数；
+## 连线整个删除之后（老板 2026-11-27 18:40「节点之间不需要线连接」），它是
+## [code]node_graph_region_edge_painter.gd[/code] 的唯一读者。[br]
+## [br][b]不跟着连线的其余常量一起删[/b]：地区墨边的「不可达=虚线」是六态视觉的一部分
+## （地形贴图上的手描线用虚线读得出「此路不通」），与连线无关。[br]
+## [br][b]14 这个数是怎么来的[/b]（历史，保留以免下一轮又调回去）：线宽翻倍到 6px 后
+## 段长不跟着涨，虚线会读成一条毛边实线——段长必须明显大于线宽才有「断」的观感。
+## 地区墨边本身只有 2.5px（[code]RegionStyle.EDGE_WIDTH[/code]），14 对它是宽裕的。
 const DASH_LENGTH: float = 14.0
 ## 节点边框线宽（px）——非强调态基线。
 const BORDER_WIDTH: float = 2.5
@@ -127,13 +135,13 @@ const LANDMARK_CORNER_CUT: float = 0.22
 
 ## === 迷雾（常量已拆到 node_graph_style_fog.gd——此处逐条转出）===============
 ## [br][b]为什么拆[/b]：本表已贴 300 行软上限，而迷雾那一组数只被「画雾」的两处读
-## （[code]node_graph_fog_painter.gd[/code] 与迷雾节点分支），与尺寸/连线/配色不相交。[br]
+## （[code]node_graph_fog_region.gd[/code] 与迷雾节点分支），与尺寸/配色不相交。[br]
 ## [br][b]为什么转出而不是让调用方改名字[/b]：全项目写的是 [code]Style.FOG_COLOR[/code]
 ## （含既有断言），转出后一个引用点都不用动；单一出处仍在 [NodeGraphStyleFog]。
 const FogStyle := preload("res://src/ui/exploration/node_graph_style_fog.gd")
 ## 雾心浓度（柔边把它从边界处的 0 渐升到本值——见 [constant FogStyle.FOG_FEATHER_BAND]）。
 const FOG_COLOR: Color = FogStyle.FOG_COLOR
-## 挖孔半径（px）——决定「已揭示区域露出多大一块地形」。
+## 挖孔半径（px）——[b]本轮起没有读者[/b]（迷雾改走地区并集内羽化，不再挖孔）。
 const FOG_HOLE_RADIUS: float = FogStyle.FOG_HOLE_RADIUS
 ## 迷雾节点个体暗纱色（遮罩在节点之下，故这一格得自己压暗）。
 const FOG_NODE_VEIL_COLOR: Color = FogStyle.FOG_NODE_VEIL_COLOR
@@ -184,20 +192,6 @@ const ICON_ALPHA: float = IconStyle.ICON_ALPHA
 
 ## === 节点配色 ==============================================================
 
-## 已走过小径的色——踩实的[b]土黄[/b]（GDD 连线规则「金色实线」的落地改写）。[br]
-## [br][b]本轮 #E8C86A → #E0B45C[/b]：金色是中性的「高亮」，而地图上「走过的路」
-## 该是踩出来的土色。亮度基本保持（仍是全图最亮的一条线），色相往土黄挪，
-## 与地形底色同族——一眼看去像踩出来的路而不是画的装饰线。
-const EDGE_VISITED_COLOR: Color = Color("#E0B45C")
-## 未走过小径的色——淡土灰（GDD 连线规则「暗色虚线」）。[br]
-## [br][b]本轮 0.52 亮灰 → 土灰[/b]：原来那档是中性灰，摆到土黄地图上是「另一套
-## 系统的线条」；换成同族土灰、再把亮度压到 0.46，读成「还没踩过的路」。
-const EDGE_UNVISITED_COLOR: Color = Color(0.46, 0.43, 0.37, 0.85)
-## 雾中路径连线色——两端都还没揭示的连线（迷雾语义：图的结构不该被读出来）。[br]
-## [br][b]为什么需要一档「雾中线色[/b]」：迷雾遮罩画在连线[b]之下[/b]
-## （见 [method NodeGraphNodePainter.draw_fog]），连线不再被遮罩压暗——雾里雾外
-## 的线就一样亮了，整张图的结构一眼看穿。这一档把雾中线单独压回去。
-const EDGE_FOGGED_COLOR: Color = Color(0.18, 0.17, 0.15, 0.55)
 ## 已访问节点边框色——绿色（GDD 界面规则「已访问：绿色边框 + ✓」）。[br]
 ## 本轮提亮到 #5AE07A：绿边框要在一堆类型色（战斗红/商店绿/事件蓝）里跳出来。
 const NODE_VISITED_BORDER: Color = Color("#5AE07A")
@@ -283,7 +277,8 @@ const TOOLTIP_BASELINE: float = 16.0
 ## 而内容图很窄——1920×1080 取证图里地形只占中间约 33% 宽，左右各 640px 是画布底色
 ## （左右各 200px 竖带实测「亮度>60 占比」0.00%，即两条纯黑带）。
 const GROUND_MARGIN: float = TerrainStyle.GROUND_MARGIN
-## 迷雾遮罩相对[b]内容包围盒[/b]的外扩量（px）——与地形[b]不同源[/b]，这是刻意的。[br]
+## 迷雾遮罩相对内容包围盒的外扩量（px）——[b]本轮起没有读者[/b]（同上：不再挖孔、
+## 不再按矩形铺）。以下注记记录的是那套做法的取舍，留待决策是否删除。[br]
 ## [br][b]为什么迷雾不跟着地形铺满视口[/b]：遮罩的形状是「矩形减去已揭示圆孔」，铺满
 ## 视口就等于「除已揭示节点周围一小圈之外全屏皆雾」——开局只有 5 个节点揭示，整幅图
 ## 压成一片近黑（实测平均亮度 14.4、左右竖带亮度>60 占比 0.00%）。任务书要的是

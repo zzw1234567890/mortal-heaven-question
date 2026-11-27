@@ -9,9 +9,9 @@ extends RefCounted
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：只 new 节点与 StyleBox，不持有任何引用
 ## （[method build] 把引用交回面板）。[br]
 ## [br][b]金色边框是首通行的专属标记[/b]（GDD exploration-ui-system.md §7「首次通关
-## 额外奖励高亮展示（金色边框）」）：色值取节点图既有的 [code]#C8A84E[/code]
-## （[code]node_graph_renderer.EDGE_VISITED_COLOR[/code]，美术圣经「墨骨丹青」的
-## 金色档），不新造一个金色。[br]
+## 额外奖励高亮展示（金色边框）」）：色值 [code]#C8A84E[/code] 是美术圣经「墨骨丹青」
+## 的金色档，探索 UI 里统一用它（[code]map_card.gd[/code] 的推荐边框同值），
+## 不新造一个金色。[br]
 ## [br][b]文字即标记[/b]：首通行除了边框，段标题本身就写着「⭐ 首次通关奖励」——
 ## 色盲玩家不靠颜色也能分辨这一段。[br]
 ##

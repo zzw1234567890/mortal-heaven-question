@@ -11,11 +11,11 @@ extends Control
 ## 判定 → 样式经 [NodeStateLogic.node_state_style] 渲染。[br]
 ## [br][b]数据源优先级[/b]（[method trigger_map_load]）：1. 真实探索系统可用且声明
 ## [code]map_generated[/code] → 调 [code]enter_map[/code] 命令（生成/写入/广播都在系统侧），
-## 本界面不写任何游戏状态；2. 否则挂 [MapGeneratedStub] 降级发射器渲染 story-003 样本
-## （判据是[b]信号是否声明[/b]而非 Autoload 是否存在——B-1 回归）。[br]
-## [br][b]零状态所有权[/b]（ADR-0031 §2）：[code]_current_snapshot[/code] 为渲染输入快照
-## （瞬态交互状态，不进存档）。[b]零轮询[/b]：无 [code]_process()[/code]——展开/迷雾皆由信号驱动 Tween。[br]
-## 来源: story-003-node-graph-data-states.md、ADR-0031 §2/§3、ADR-0014 §决策 3。
+## 本界面不写任何游戏状态；2. 否则挂 [MapGeneratedStub] 降级发射器渲染 story-003
+## 样本（判据是[b]信号是否声明[/b]而非 Autoload 是否存在——B-1 回归）。[br]
+## [br][b]零状态所有权/零轮询[/b]（ADR-0031 §2/§3）：[code]_current_snapshot[/code] 为渲染
+## 输入快照（瞬态交互状态，不进存档）；无 [code]_process()[/code]，展开/迷雾皆由信号驱动
+## Tween。来源: ADR-0031 §2/§3、ADR-0014 §决策 3。
 
 ## === 依赖（测试可替换）======================================================
 
@@ -33,23 +33,22 @@ const NodeGraphLoadSourceScript := preload("res://src/ui/exploration/node_graph_
 ## 子组件装配编排（交互组件 + 事件弹出通道）——挂载细节在装配器，屏幕只持引用。
 const ComponentAssemblyScript := preload(
 		"res://src/ui/exploration/node_graph_component_assembly.gd")
-## 六态重算 + 逐层展开动画；顶栏状态区（行动力显示 / 走投无路提示 / 退出探索）。
+## 六态重算 + 逐层展开动画（顶栏状态区见 [NodeGraphStatusBar]）。
 const NodeGraphRevealAnimatorScript := preload(
 		"res://src/ui/exploration/node_graph_reveal_animator.gd")
 const StatusBarScript := preload("res://src/ui/exploration/node_graph_status_bar.gd")
 
 ## === 信号 ==================================================================
 
-## 返回地图选择意图——顶栏「退出探索」确认后发出。[br]
-## [b]一条信号两件事[/b]：「退出探索」的结果就是回到地图选择界面（GDD
-## exploration-system.md §AC），故不另立一个语义重复的信号；结算由薄容器接住。
+## 返回地图选择意图——顶栏「退出探索」确认后发出。一条信号两件事：「退出探索」的结果就是
+## 回到地图选择界面（GDD exploration-system.md §AC）；结算由薄容器接住。
 signal back_to_map_select_requested
 
 ## === 到达通知转发（审查 H3——006/007 消费入口：组件信号经屏幕再暴露一层，后续 story 不必依赖节点路径）==
 signal combat_arrival_forwarded(enemy_roster: Array, combat_type: StringName)
 signal boss_arrival_forwarded(boss_data: Dictionary)
 signal node_interaction_forwarded(node_id: int, interaction_type: StringName, payload: Dictionary)
-## 移动失败 toast 文案（审查 H1——HUD 通知区域 [method Hud.request_notification] 接线后由 006 接入）。
+## 移动失败 toast 文案（H1——接线后由 006 消费 [method Hud.request_notification]）。
 signal move_feedback_forwarded(toast_text: String, node_id: int)
 
 ## === 节点引用 ==============================================================
@@ -58,20 +57,18 @@ signal move_feedback_forwarded(toast_text: String, node_id: int)
 
 ## === 瞬态渲染状态（ADR-0031 §2.1 瞬态交互状态）============================
 
-## 当前渲染快照（graph/nodes/visited/current_node/ap_remaining）——node_moved
-## 后重算六态用；不进存档。
+## 当前渲染快照（graph/nodes/visited/current_node/ap_remaining）——node_moved 后重算六态用。
 var _current_snapshot: Dictionary = {}
 ## 数据源选择、加载编排与信号连接（见 [NodeGraphLoadSource]）。
 var _load_source: RefCounted = null
-## 待加载地图 ID——[method trigger_map_load] 在进树前被调用时记下，[method _ready]
-## 补触发一次（场景编排先 add_child 后调 trigger_map_load 是既有顺序）。
+## 待加载地图 ID——[method trigger_map_load] 在进树前被调用时记下，[method _ready] 补触发一次
+## （场景编排先 add_child 后调 trigger_map_load 是既有顺序）。
 var _pending_map_id: StringName = &""
 ## 待加载是否走读档续玩——与 [member _pending_map_id] 同进同出（同一个请求的两半）。
 var _pending_resume: bool = false
-## 装配结果——[code]{interaction_mount, event_presenter, shop_presenter,
-## teleport_presenter, harvest_presenter, craft_presenter, meditation_presenter}[/code]
-## （见 [NodeGraphComponentAssembly]）。[b]为什么整块存字典[/b]：屏幕只负责
-## 「持引用防提前释放」+ 对外访问器，逐个声明等于把返回契约写两处。
+## 装配结果——[code]{interaction_mount, event_presenter, shop_presenter, teleport_presenter,
+## harvest_presenter, craft_presenter, meditation_presenter}[/code]（见 [NodeGraphComponentAssembly]）。
+## [b]为什么整块存字典[/b]：屏幕只负责「持引用防提前释放」+ 对外访问器，逐个声明等于把返回契约写两处。
 var _components: Dictionary = {}
 ## 六态重算 + 逐层展开动画（见 [NodeGraphRevealAnimator]）。
 var _reveal_animator: RefCounted = null
@@ -80,14 +77,12 @@ var _status_bar: RefCounted = null
 
 
 func _ready() -> void:
-	# 数据源选择与信号连接都在子模块——判定依据是[b]信号是否声明[/b]而非
-	# Autoload 是否存在（B-1 回归见子模块文档）。
+	# 数据源选择与信号连接都在子模块——判据是[b]信号是否声明[/b]而非 Autoload 是否存在。
 	var es: Node = _get_exploration_system()
 	_ensure_load_source()
 	_mount_status_bar()
 	_mount_components(es)
-	# 宿主先 add_child 再调 trigger_map_load 时，本次 _ready 已消费该请求；
-	# 反之（先赋值再 add_child）留待宿主调用。
+	# 宿主先 add_child 再调 trigger_map_load 时本次已消费；反之留待宿主调用。
 	if _pending_map_id != &"":
 		var pending: StringName = _pending_map_id
 		var pending_resume: bool = _pending_resume
@@ -100,29 +95,27 @@ func _exit_tree() -> void:
 	if _reveal_animator != null:
 		_reveal_animator.call(&"kill")
 	if _load_source != null:
-		# 断开探索系统信号——理由见 [method NodeGraphLoadSource.unbind]（旧界面在
-		# queue_free 生效前仍连着，同帧重进地图会把广播打到已脱树的界面上）。
+		# 断开探索系统信号——理由见 [method NodeGraphLoadSource.unbind]（旧界面在 queue_free
+		# 生效前仍连着，同帧重进地图会把广播打到已脱树的界面上）。
 		_load_source.call(&"unbind")
 
 
-## 当前数据源是否为 stub 降级（只读标记——集成测试据此区分真实数据与 stub）。[br]
-## 未进树时为 false——此时还没有数据源可选。
+## 当前数据源是否为 stub 降级（只读标记——集成测试据此区分真实数据与 stub）。
 func is_using_stub_source() -> bool:
 	return _load_source != null and bool(_load_source.get(&"using_stub"))
 
 
 ## 是否已拿到渲染快照（[param p_resume] 路径的失败判据）。[br]
-## [br][b]为什么薄容器需要它[/b]：读档续玩时该图若在存档里没有 graph/nodes 快照，
-## 加载会如实失败、本屏幕保持空白——容器据此拆掉它退回选图界面。
+## [br][b]为什么薄容器需要它[/b]：读档续玩时该图若在存档里没有 graph/nodes 快照，加载会
+## 如实失败、本屏幕保持空白——容器据此拆掉它退回选图界面。
 func has_snapshot() -> bool:
 	return not _current_snapshot.is_empty()
 
 
 ## 商店/回复接线组件（见 [ShopNodePresenter]）——未挂载时为 null。[br]
-## [br][b]以下五个 presenter 访问器同口径[/b]：公开入口，集成测试与后续 story 经此
-## 断言/驱动各类 overlay，不依赖私有成员名。依次为——商店/回复、传送选层、采集、
-## 炼丹台+炼器台（共用一份，靠 kind 区分）、打坐/洞府（突破冲关 overlay）。
-## 都是纯转发，故紧凑排列（不改访问器名）。
+## [br][b]以下六个访问器同口径[/b]：公开入口，集成测试与后续 story 经此断言/驱动各类
+## overlay，不依赖私有成员名。次序：商店/回复、传送、采集、炼制（kind 区分）、打坐/洞府、
+## 顶栏状态区。全是纯转发。
 func shop_presenter() -> Variant:
 	return _components.get("shop_presenter")
 
@@ -144,9 +137,9 @@ func status_bar() -> Variant:
 
 
 ## 触发地图加载。[br]
-## [br][b]真实源[/b]：调用 [code]ExplorationSystem.enter_map[/code] 命令——
-## 地图生成、GSM 写入、[signal ExplorationSystem.map_generated] 广播都在系统侧，
-## 本界面只是监听者（零状态所有权，ADR-0031 §2）。[br]
+## [br][b]真实源[/b]：调用 [code]ExplorationSystem.enter_map[/code] 命令——地图生成、GSM
+## 写入、[signal ExplorationSystem.map_generated] 广播都在系统侧，本界面只是监听者
+## （零状态所有权，ADR-0031 §2）。[br]
 ## [b]stub 源[/b]：发射 stub 快照驱动同一渲染路径（降级，见 [method is_using_stub_source]）。[br]
 ## [br][param p_map_id] 目标地图 ID（默认青云剑宗——编辑器/预览路径用）。[br]
 ## [param p_resume] [code]true[/code] = [b]读档续玩[/b]（从存档快照重建，不重生成）。
@@ -162,8 +155,8 @@ func trigger_map_load(p_map_id: StringName = &"qing_yun_jian_zong",
 	_load_source.call(&"load_map", p_map_id, p_resume)
 
 
-## 挂载全部子组件——挂载与接线细节在 [NodeGraphComponentAssembly]（交互三组件 +
-## 事件弹出通道 + 商店/回复/传送/采集/炼制/打坐接线 + 转发回调表），屏幕只持引用。
+## 挂载全部子组件——挂载与接线细节在 [NodeGraphComponentAssembly]（交互三组件 + 事件弹出
+## 通道 + 商店/回复/传送/采集/炼制/打坐接线 + 转发回调表），屏幕只持引用。
 func _mount_components(es: Node) -> void:
 	_components = ComponentAssemblyScript.assemble(self, renderer(),
 			viewport, es, reduce_motion_override)
@@ -174,9 +167,9 @@ func _on_keyboard_focus_changed(node_id: int) -> void:
 	renderer().set_focused_node(node_id)
 
 
-## 移动失败反馈转发——先向后续 story 暴露公开信号 [signal move_feedback_forwarded]，
-## 再由 HUD 通知区域消费（[b]审查 H1 延后接线[/b]：HUD 尚未挂载、
-## [method Hud.request_notification] 全库无调用方；义务记入 story Test Evidence）。
+## 移动失败反馈转发——先向后续 story 暴露公开信号 [signal move_feedback_forwarded]，再由
+## HUD 通知区域消费（[b]审查 H1 延后接线[/b]：HUD 尚未挂载、[method Hud.request_notification]
+## 全库无调用方；义务记入 story Test Evidence）。
 func _on_move_feedback(toast_text: String, node_id: int) -> void:
 	move_feedback_forwarded.emit(toast_text, node_id)
 	push_warning("NodeGraphScreen: 移动反馈 toast（%s）——通知区域接线归 HUD story" % toast_text)
@@ -191,14 +184,15 @@ func _on_move_feedback(toast_text: String, node_id: int) -> void:
 ## [param map_data] 渲染快照（graph/nodes/visited/current_node/ap_remaining）。
 func _on_map_generated(_map_id: StringName, map_data: Dictionary) -> void:
 	_current_snapshot = map_data
-	# map_id 取自[b]快照[/b]而非信号参数：信号参数在 stub 降级路径下与快照可能不同源，
-	# 而地形插画与节点地名都按快照渲染（渲染只有一份输入）。
+	# map_id 取自[b]快照[/b]而非信号参数：stub 降级路径下两者可能不同源，而地形插画
+	# 与节点地名都按快照渲染（渲染只有一份输入）。
 	renderer().setup(
 			map_data.get("graph", {}),
 			map_data.get("nodes", {}),
 			map_data.get("visited", []),
 			int(map_data.get("current_node", -1)),
-			StringName(str(map_data.get("map_id", _map_id))))
+			StringName(str(map_data.get("map_id", _map_id))),
+			int(map_data.get("ap_remaining", -1)))
 	_refresh_ap_label(map_data)
 	_reveal().call(&"recompute_states", renderer(), map_data)
 	var nodes: Dictionary = map_data.get("nodes", {})
@@ -209,17 +203,16 @@ func _on_map_generated(_map_id: StringName, map_data: Dictionary) -> void:
 	# S17-005：快照注入交互侧组件 + 教程首次进入入口（键名归装配器，见 push_snapshot）
 	ComponentAssemblyScript.push_snapshot(_components, map_data)
 	ComponentAssemblyScript.notify_map_entered(_components)
-	# 整图适配：_on_map_generated 直接喂 renderer，绕过了 NodeGraphViewport.setup()，
-	# 不补这一句 zoom/offset 就停在上一次的值（首进 1.0/0），节点会挤在左上角
-	# 且大部分被裁掉。延后一帧等布局定好尺寸再适配。
+	# 整图适配：_on_map_generated 直接喂 renderer，绕过了 NodeGraphViewport.setup()，不补
+	# 这一句 zoom/offset 就停在上一次的值（首进 1.0/0），节点会挤在左上角且大部分被裁掉。
 	viewport.call_deferred(&"fit_to_content", true)
 	# 新地图不保留上一张的键盘焦点（审查 L5）
 	renderer().set_focused_node(-1)
 
 
 ## node_moved 信号处理——迷雾消散（0.3s）+ 状态翻转重算（AC-2/AC-6）。[br]
-## [b]早退与交互一致[/b]（审查 H6）：快照未注入时无六态可重算，但交互组件
-## 也不应播出「只有标记在飞」的动画——由 interactor 判断快照为空即直跳终位。
+## [b]早退与交互一致[/b]（审查 H6）：快照未注入时无六态可重算，但交互组件也不应播出
+## 「只有标记在飞」的动画——由 interactor 判断快照为空即直跳终位。
 func _on_node_moved(_from_node: int, to_node: int, ap_remaining: int) -> void:
 	if _current_snapshot.is_empty():
 		return
@@ -234,13 +227,13 @@ func _on_node_moved(_from_node: int, to_node: int, ap_remaining: int) -> void:
 			_current_snapshot.get("nodes", {}),
 			visited,
 			to_node,
-			StringName(str(_current_snapshot.get("map_id", ""))))
+			StringName(str(_current_snapshot.get("map_id", ""))),
+			ap_remaining)
 	_refresh_ap_label(_current_snapshot)
 	_reveal().call(&"recompute_states", renderer(), _current_snapshot)
 	# S17-006：快照随移动重下发（理由见 [method NodeGraphComponentAssembly.push_snapshot]）。
 	ComponentAssemblyScript.push_snapshot(_components, _current_snapshot)
-	# S17-005：移动动画由交互组件自绑 node_moved 信号驱动（宿主不转发，
-	# 避免双重动画 + 缓冲队列双重消费）。
+	# S17-005：移动动画由交互组件自绑 node_moved 信号驱动（宿主不转发，避免双重动画）。
 
 
 ## === 内部辅助 ==============================================================
@@ -251,9 +244,8 @@ func renderer() -> NodeGraphRenderer:
 
 
 ## 刷新顶栏（行动力显示 + 走投无路提示；数据源 = 快照 + 系统的只读查询）。[br]
-## [br][b]两者同一轮刷新[/b]：提示要读本图 [code]ap_cost[/code] 与豁免规则，由系统
-## 作答（见 [NodeGraphStatusBar.can_reach_boss]）——对屏幕来说「AP 显示」与
-## 「还能不能到 Boss」是同一份快照的两个读数。
+## [br][b]两者同一轮刷新[/b]：提示要读本图的移动开销（距离定价）与豁免规则，由系统作答
+## （见 [NodeGraphStatusBar.can_reach_boss]）——它们是同一份快照的两个读数。
 func _refresh_ap_label(snapshot: Dictionary) -> void:
 	if _status_bar == null:
 		return
@@ -262,8 +254,8 @@ func _refresh_ap_label(snapshot: Dictionary) -> void:
 
 
 ## 挂载顶栏状态区——行动力标签 / 走投无路提示 / 退出探索按钮（见 [NodeGraphStatusBar]）。[br]
-## [br][b]退出路径[/b]：按钮 → 确认弹窗 → [signal back_to_map_select_requested]，
-## 由薄容器接住并走既有结算。本屏幕[b]不结算[/b]——零状态所有权（ADR-0031 §2）。
+## [br][b]退出路径[/b]：按钮 → 确认弹窗 → [signal back_to_map_select_requested]，由薄容器
+## 接住并走既有结算。本屏幕[b]不结算[/b]——零状态所有权（ADR-0031 §2）。
 func _mount_status_bar() -> void:
 	_status_bar = StatusBarScript.mount(self, Callable(self, &"_on_exit_confirmed"))
 
@@ -290,10 +282,10 @@ func _from_system() -> bool:
 
 ## 六态重算 + 展开动画子模块（惰性初始化）。[br]
 ## [br][b]可达性判定交给系统[/b]：[code]can_move_to_detail[/code]（本轮拆出的
-## [code]{ok, reason}[/code]）与本界面六态同词表——由它作答，画出来的可达性就是
-## 玩家点下去会得到的结果（含本图 [code]ap_cost[/code]）。[br]
-## [br][b]只在快照真的出自系统时才接[/b]（见 [method _from_system]）——否则会被系统
-## 缓存里那张无关的 DAG 判成一片不可达。每轮重算前刷新（系统与数据源均可注入）。
+## [code]{ok, reason}[/code]）与本界面六态同词表——由它作答，画出来的可达性就是玩家点
+## 下去会得到的结果（含本图的距离定价）。[br]
+## [br][b]只在快照真的出自系统时才接[/b]（见 [method _from_system]）——否则会被系统缓存里
+## 那张无关的 DAG 判成一片不可达。每轮重算前刷新（系统与数据源均可注入）。
 func _reveal() -> RefCounted:
 	if _reveal_animator == null:
 		_reveal_animator = NodeGraphRevealAnimatorScript.new()

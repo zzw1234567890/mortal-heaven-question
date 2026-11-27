@@ -15,6 +15,9 @@ extends "res://src/feature/exploration/exploration_system_helpers.gd"
 ## [br]来源: ADR-0014 §决策 3 信号表 + §决策 5 探索结束结算 + §GSM 写入契约、
 ## GDD exploration-system.md §信号定义。
 
+## 拒绝原因词表（纯数据——见该模块文档）。逐条转发，读法不变。
+const Reasons := preload("res://src/feature/exploration/exploration_reasons.gd")
+
 ## Cat 2b 信号——探索结束（ADR-0014 §决策 5）。
 signal exploration_ended(reason: int, summary: Dictionary)
 
@@ -58,56 +61,58 @@ signal node_marked_visited(node_id: int, is_new: bool)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ## [method move_to_node] / [method can_move_to_detail] 的失败原因。[br]
-## [br][b]为什么提成常量[/b]：判定（[code]can_move_to_detail[/code]）与命令
-## （[code]move_to_node[/code]）说的是同一件事，而 UI 的
-## [code]NodeMoveInteractor.REASON_TEXTS[/code] 拿这些字符串当查表的键——字面量散在
-## 三处时，改一处文案就会让 UI 悄悄落进兜底提示（玩家看到「无法移动」而不是
-## 「行动力不足」）。常量集中后，「系统说得出」与「UI 认得」是同一份词表。[br]
-## [br][b]UI 侧另有一份字面量副本[/b]（[code]NodeStateLogic.REASON_*[/code]——
-## headless 下不加载 Feature 层），由单测锁定两者同源（同 [constant AP_EXEMPT_TYPES]
-## 的处置）。[br]
-## [br]来源: ADR-0014 §关键接口、GDD action-point-system.md §公式 2/3、本轮任务书第 3 条。
-const REASON_NOT_READY: String = "DAG 缓存未就绪"
-const REASON_UNREACHABLE: String = "不可达"
-const REASON_NO_GSM: String = "GSM 不可用"
-const REASON_VISITED: String = "已访问"
-const REASON_AP_SHORT: String = "行动力不足"
+## [br][b]★ 本轮搬了家 ★[/b]：字面量移到 [code]exploration_reasons.gd[/code]
+## （纯数据，与本层的查询/命令没有交集），本处逐条转发——[b]读法一个字没改[/b]：
+## [code]ES_SCRIPT.REASON_AP_SHORT[/code] 在继承链上照旧解析，各条理由的用途与
+## 「本轮起产出面收窄」的注记见那份文件。
+const REASON_NOT_READY: String = Reasons.NOT_READY
+const REASON_UNREACHABLE: String = Reasons.UNREACHABLE
+const REASON_NO_GSM: String = Reasons.NO_GSM
+const REASON_VISITED: String = Reasons.VISITED
+const REASON_AP_SHORT: String = Reasons.AP_SHORT
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 只读查询（不修改任何状态）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 可判别版移动判定——[b]把混叠的三态拆开[/b]。[br]
-## [br][b]为什么需要它[/b]：[method can_move_to] 的布尔把三件不同的事压成同一个
-## [code]false[/code]——「走不到」（拓扑）、「走过了」（进度）、「走不起」（资源）。
-## 界面要画的是三种不同的东西（灰色锁标记 / 绿色勾 / 红色斜线），拿布尔去还原
-## 只能靠重新推导一遍判定规则（[code]NodeStateLogic[/code] 此前正是如此），
-## 而两处各推导一遍必然漂移。[br]
+## 可判别版移动判定——[b]把混叠的两态拆开[/b]。[br]
+## [br][b]为什么需要它[/b]：[method can_move_to] 的布尔把两件不同的事压成同一个
+## [code]false[/code]——「这格不存在」（脏数据 / 越界 ID）与「走不起」（资源）。
+## 界面要画的是两种不同的东西（灰色锁标记 / 红色斜线），拿布尔去还原只能靠重新
+## 推导一遍判定规则（[code]NodeStateLogic[/code] 此前正是如此），而两处各推导一遍
+## 必然漂移。[br]
+## [br][b]★ 本轮起判据只剩「AP 够不够」★[/b]（老板 2026-11-27 18:40：「每个节点
+## 之间都可达，只是消耗的行动力不一样」）：[br]
+##   · 取消[b]邻接门槛[/b]——不再要求「从当前节点沿边一步」，任一节点到任一节点
+##     都可达；[br]
+##   · 取消[b]已访问拒绝[/b]——已访问节点仍可重复进入（消耗照算，奖励不重复发，
+##     见 [method ExplorationSystem.move_to_node]）；[br]
+##   · 剩下的真实拒绝只有两种：目标节点不在本图（[constant REASON_UNREACHABLE]）
+##     与行动力不足（[constant REASON_AP_SHORT]）——各条理由的完整交代见
+##     [ExplorationReasons]。[br]
 ## [br][b]返回[/b]：[code]{ok: bool, reason: String}[/code]——[code]ok[/code] 为真时
-## [code]reason[/code] 为空串；为假时 [code]reason[/code] 取自上面的
-## [constant REASON_NOT_READY] 一族，与 [method move_to_node] 的 [code]reason[/code]
-## [b]逐字一致[/b]（同一个玩家动作不该因为走的是查询还是命令而看到两套说法）。[br]
-## [br][b]不改任何状态[/b]：与 [method move_to_node] 分离（查询 vs 命令，ADR-0014
-## §关键接口）。[br]
-## [br][b]与扣费同一口径[/b]：AP 判定读 [method ap_cost_to]（按地图配置解析，
-## 豁免类型为 0）——判定与扣费若各写一套，会出现「查询说能走、移动扣不起」。[br]
-## [br]来源: 本轮任务书第 3 条（三态混叠）、ADR-0014 §关键接口。
+## [code]reason[/code] 为空串；为假时取自 [constant REASON_NOT_READY] 一族，与
+## [method move_to_node] 的 [code]reason[/code] [b]逐字一致[/b]（同一个玩家动作
+## 不该因为走的是查询还是命令而看到两套说法）。[br]
+## [br][b]不改任何状态[/b]（查询 vs 命令，ADR-0014 §关键接口）；[b]与扣费同一口径
+## [/b]——AP 判定读 [method ap_cost_between]（按两节点布局距离定价，豁免类型为 0），
+## 两处各写一套会出现「查询说能走、移动扣不起」。[br]
+## [br]来源: 本轮任务书第 3 条（三态混叠）+ 追加规则（全连通 + 距离定价）、
+## ADR-0014 §关键接口。
 func can_move_to_detail(from_node: int, to_node: int) -> Dictionary:
 	# _dag_ready 守卫（ADR-0014 R7）
 	if not _dag_ready:
 		return {"ok": false, "reason": REASON_NOT_READY}
-	if not _is_reachable(from_node, to_node):
+	# 目标不存在 = 本图没有这一格（唯一的真实「不可达」）
+	if not _node_exists(to_node):
 		return {"ok": false, "reason": REASON_UNREACHABLE}
 	var gsm: Node = _get_gsm()
 	if gsm == null:
 		return {"ok": false, "reason": REASON_NO_GSM}
-	var visited: Array = gsm.exploration.get("visited_nodes", [])
-	if visited.has(to_node):
-		return {"ok": false, "reason": REASON_VISITED}
 	# 越界存档值（负数）按 0 处理——与 move_to_node 的夹取一致
 	var ap: int = maxi(int(gsm.exploration.get("action_points", 0)), 0)
-	if ap < ap_cost_to(to_node):
+	if ap < ap_cost_between(from_node, to_node):
 		return {"ok": false, "reason": REASON_AP_SHORT}
 	return {"ok": true, "reason": ""}
 
@@ -117,12 +122,12 @@ func can_move_to_detail(from_node: int, to_node: int) -> Dictionary:
 ## [br][b]本方法只是 [method can_move_to_detail] 的布尔投影[/b]：旧调用点（既有测试与
 ## 键盘导航）继续用它，但判定规则只有一条——两处各写一遍必然出现
 ## 「查询说不能走、移动却走得了」。[br]
-## [br][b]要区分为什么不能走[/b]（不可达 / 已访问 / 行动力不足）请用
-## [method can_move_to_detail]——布尔把三态压成一个 [code]false[/code]。[br]
-## [br][param from_node] 起始节点 ID。[br]
-## [br][param to_node] 目标节点 ID。[br]
-## [br][b]返回[/b]: [code]true[/code] 可移动，[code]false[/code] 不可移动。[br]
-## [br]来源: ADR-0014 §关键接口 can_move_to、GDD action-point-system.md §公式 2 可移动判定。
+## [br][b]要区分为什么不能走[/b]（目标不存在 / 行动力不足）请用
+## [method can_move_to_detail]——布尔把两态压成一个 [code]false[/code]。[br]
+## [br][b]★ 本轮起拒绝理由只剩两条 ★[/b]（老板 2026-11-27 18:40）：「不相邻」与
+## 「已访问」都不再是拒绝理由——任何节点都可达，只是消耗按距离不同；已访问可重入，
+## 消耗照算。[br]
+## [br]来源: ADR-0014 §关键接口、GDD action-point-system.md §公式 2 可移动判定。
 func can_move_to(from_node: int, to_node: int) -> bool:
 	return bool(can_move_to_detail(from_node, to_node)["ok"])
 

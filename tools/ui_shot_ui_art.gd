@@ -15,9 +15,10 @@ extends Node
 ## （放大到 150% 的特写——节点地名的字面对比取证）/
 ## [code]tools/ui_shot_node_graph_zoomed_out.png[/code]（俯瞰——地形铺满视口）/
 ## [code]tools/ui_shot_node_hover.png[/code]（悬停高亮——真实鼠标事件驱动，见
-## [method _shot_node_hover]）。[br]
-## [br][b]本轮只跑节点图五张[/b]（背景清晰化 + 悬停高亮两处改动的取证图）：身份页那两张
-## 与本轮改动无关，重拍只会把三张已提交的 PNG 重新编码一遍（无意义的 diff 噪声）。要全跑时
+## [method _shot_node_hover]）/ [code]tools/ui_shot_node_fog_closeup.png[/code]
+## （未揭示地区特写——羽化连续性的肉眼旁证，见 [method _shot_fog_closeup]）。[br]
+## [br][b]本轮只跑节点图六张[/b]（地区化 + 悬停 + 迷雾三处改动的取证图）：身份页那两张
+## 与本轮改动无关，重拍只会把已提交的 PNG 重新编码一遍（无意义的 diff 噪声）。要全跑时
 ## 把 [code]_shot_identity[/code] 两行放回 [method _run] 即可（方法原样保留）。[br]
 ## [br]来源: 本轮任务书任务三（地图化）/ 任务四（地名可读性取证）、先前先例
 ## [code]tools/ui_pass_shot.gd[/code]。
@@ -33,6 +34,11 @@ const ExplorationScene := preload("res://src/feature/exploration/exploration_sce
 
 const IntentScript := preload("res://src/ui/identity_select/identity_select_intent.gd")
 const ExplorationIntentScript := preload("res://src/feature/exploration/exploration_entry_intent.gd")
+
+## 迷雾取景要读羽化的规格与「哪几块在雾里」——与绘制侧[b]同一份[/b]纯函数口径
+## （见 [method _shot_fog_closeup] 的注记：不在这里重复实现第二份）。
+const FogRegion := preload("res://src/ui/exploration/node_graph_fog_region.gd")
+const Style := preload("res://src/ui/exploration/node_graph_style.gd")
 
 var _holder: Control = null
 
@@ -55,7 +61,8 @@ func _run() -> void:
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_zoomed_out",
 			ZOOMED_OUT_ZOOM, false)
 	await _shot_node_hover()
-	print("[ui-art] 完成，五张图在 " + ProjectSettings.globalize_path(OUT_DIR))
+	await _shot_fog_closeup()
+	print("[ui-art] 完成，六张图在 " + ProjectSettings.globalize_path(OUT_DIR))
 	get_tree().quit()
 
 
@@ -224,7 +231,112 @@ func _shot_node_hover() -> void:
 	_force_window_size(OUT_W, OUT_H)
 
 
-## 关掉首次进入的教程覆盖层——[method _shot_node_hover] 的前置条件。[br]
+## 未揭示地区特写（本轮任务 C 取证）——[b]迷雾羽化连续性[/b]的肉眼旁证。[br]
+## [br][b]取景怎么定[/b]：雾是「所有未揭示地区的并集向内羽化」（见
+## [NodeGraphFogRegion]），要看见羽化带就得让[b]雾区与已探明区的交界[/b]落在画面中间
+## ——故取「雾中地区」与「离它最近的已探明地区」两个质心的中点作镜头中心，按
+## [constant CLOSEUP_ZOOM] 放大：交界横穿画面，肉眼一眼可判「是渐变还是一条硬边」。[br]
+## [br][b]为什么量化读数不在这里做[/b]：绘制侧与验收侧共用 [NodeGraphFogRegion] 的
+## 纯函数口径，这张图只作肉眼旁证；「羽化带内扫描线相邻像素差」由离线探针读这张 PNG
+## 得出（探针用完即删，不进库）——不在这里重复实现第二份口径。
+func _shot_fog_closeup() -> void:
+	await _clear_holder()
+	IntentScript.clear()
+	ExplorationIntentScript.clear()
+	_force_window_size(OUT_W, OUT_H)
+	ExplorationIntentScript.request_new_run()
+	var scene: Control = ExplorationScene.instantiate() as Control
+	_mount(scene)
+	await _settle(150)
+	var screen: Variant = scene.get(&"node_graph_screen")
+	if screen == null:
+		print("[ui-art] 迷雾取证：节点图屏幕未挂载")
+		return
+	var graph_viewport: Variant = screen.get(&"viewport")
+	var r: Variant = screen.call(&"renderer")
+	_dismiss_tutorial()
+	await _settle(3)
+	var cells: Dictionary = r.get(&"cells") as Dictionary
+	var states: Dictionary = r.get(&"states") as Dictionary
+	var fogged: Array = FogRegion.fogged_ids(cells, states)
+	print("[ui-art] 迷雾取证：地区 %d 块，其中雾中 %d 块" % [cells.size(), fogged.size()])
+	if fogged.is_empty():
+		print("[ui-art] 迷雾取证：无雾中地区（雾已散尽）——按内容中心取景")
+		await _capture("ui_shot_node_fog_closeup")
+		_force_window_size(OUT_W, OUT_H)
+		return
+	var content: Rect2 = r.call(&"get_content_rect")
+	var center: Vector2 = content.position + content.size * 0.5
+	var target: int = _nearest_id(cells, fogged, center)
+	var peer: int = -1
+	var best: float = INF
+	for node_id: int in _revealed_ids(cells, fogged):
+		if not cells.has(node_id):
+			continue
+		var d: float = _centroid_of(cells, node_id).distance_to(_centroid_of(cells, target))
+		if d < best:
+			best = d
+			peer = node_id
+	# 交界中点——两侧质心连线的中点，作为镜头中心（放大后交界横穿画面）。
+	var mid: Vector2 = _centroid_of(cells, target)
+	if peer >= 0:
+		mid = (mid + _centroid_of(cells, peer)) * 0.5
+	var zoom: float = CLOSEUP_ZOOM
+	var offset: Vector2 = (graph_viewport as Control).size * 0.5 - mid * zoom
+	graph_viewport.call(&"fit_to_content", true)
+	await _settle(2)
+	graph_viewport.call(&"_apply_transform", zoom, offset, 0.0)
+	await _settle(3)
+	print("[ui-art] 迷雾取景：雾中地 %d ↔ 最近已探明 %d，中点 %s，zoom %.2f，偏移 %s"
+			% [target, peer, str(mid), zoom, str(offset)])
+	print("[ui-art] 羽化规格：带宽 %.1fpx（屏幕上 %.1fpx）｜档数 %d｜阶高 %.4f/255｜平台段 %.2fpx"
+			% [Style.FOG_FEATHER_BAND, Style.FOG_FEATHER_BAND * zoom,
+			Style.FOG_FEATHER_STEPS, FogRegion.staircase_step(Style.FOG_COLOR.a,
+			Style.FOG_FEATHER_STEPS) * 255.0,
+			FogRegion.plateau_length(Style.FOG_FEATHER_BAND, Style.FOG_FEATHER_STEPS) / zoom])
+	await _capture("ui_shot_node_fog_closeup")
+	_force_window_size(OUT_W, OUT_H)
+
+
+## 多边形顶点的算术平均（取景用——凸多边形的质心；不作几何判定）。
+func _centroid_of(p_cells: Dictionary, p_id: int) -> Vector2:
+	var poly: PackedVector2Array = p_cells.get(p_id, PackedVector2Array())
+	if poly.is_empty():
+		return Vector2.ZERO
+	var acc := Vector2.ZERO
+	for p: Vector2 in poly:
+		acc += p
+	return acc / float(poly.size())
+
+
+## 候选集中离 [param p_from] 最近的地区 ID（取景用）。
+func _nearest_id(p_cells: Dictionary, p_ids: Array, p_from: Vector2) -> int:
+	var found: int = -1
+	var best: float = INF
+	for node_id: int in p_ids:
+		var d: float = _centroid_of(p_cells, node_id).distance_to(p_from)
+		if d < best:
+			best = d
+			found = node_id
+	return found
+
+
+## 已探明的地区 ID（分块表里有、且不在雾中那份里——与 [NodeGraphFogRegion.fogged_ids]
+## 的定义互补，避免在这里自造第二套「什么算探明」的口径）。
+func _revealed_ids(p_cells: Dictionary, p_fogged: Array) -> Array:
+	var fog: Dictionary = {}
+	for node_id: int in p_fogged:
+		fog[node_id] = true
+	var out: Array = []
+	for node_id: int in p_cells.keys():
+		if not fog.has(node_id):
+			out.append(node_id)
+	out.sort()
+	return out
+
+
+## 关掉首次进入的教程覆盖层——[method _shot_node_hover] 与 [method _shot_fog_closeup]
+## 的前置条件。[br]
 ## [br][b]为什么必须关[/b]：[code]NodeTutorialOverlay[/code] 是整屏
 ## [code]MOUSE_FILTER_STOP[/code] 的 Control，铺在节点图之上，只对左键与回车有反应
 ## ——真实鼠标移动被它吃掉，[code]NodeGraphRenderer._gui_input[/code] 永远收不到
@@ -260,10 +372,10 @@ func _pick_hover_target(p_r: Variant) -> int:
 
 
 ## 派发一次真实鼠标移动事件到根视口（见 [method _shot_node_hover]）。[br]
-## [br][b]为什么要 warp + parse 两下[/b]：只做 [code]push_input[/code] 时引擎的 GUI
-## 悬停分发不认（[code]gui_get_hovered_control[/code] 仍为空）——取证图会拍到一张
-## 没有高亮的图，而那种「跑通了但什么都没发生」是最难发现的一类失败。故先把系统光标
-## 真的挪过去（引擎随即产出一次真实 motion），再补一次显式投递兜底。
+## [br][b]为什么要 warp + push 两下[/b]：只做 [code]push_input[/code] 时引擎的 GUI 悬停
+## 分发不认（[code]gui_get_hovered_control[/code] 仍为空）——取证图会拍到一张没有高亮的
+## 图，而那种「跑通了但什么都没发生」是最难发现的一类失败。故先把系统光标真的挪过去
+## （引擎随即产出一次真实 motion），再补一次显式投递兜底。
 func _mouse_move_to(p_at: Vector2) -> void:
 	var event := InputEventMouseMotion.new()
 	event.position = p_at

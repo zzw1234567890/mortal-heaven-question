@@ -130,29 +130,32 @@ static func classify_with_verdict(node_id: int, graph: Dictionary, visited: Arra
 
 ## 可判别版移动判定——[b]与 [code]ExplorationSystem.can_move_to_detail[/code] 同形状、
 ## 同词表[/b]的 UI 纯函数副本。[br]
-## [br][b]为什么需要它[/b]：布尔把「走不到」（拓扑）/「走过了」（进度）/「走不起」
-## （资源）压成同一个 [code]false[/code]，而界面要画的是三种不同的东西（锁标记 /
-## 绿色勾 / 红色斜线）。分类器此前直接推导这三种情况，与系统侧的判定规则是两份
-## 实现——系统改口径（如 AP 开销配置化）而 UI 没跟着改，只有玩家能发现。[br]
-## [br][b]判定顺序与系统逐条对齐[/b]：邻接 → 已访问 → 行动力（豁免类型不判）。
-## 顺序不是风格问题——「已访问且邻接」在系统里报「已访问」，UI 若先判 AP，同一个
-## 节点就会在两处得到不同说法。[br]
-## [br][b]与系统的已知口径差[/b]：本函数只看 [param ap_remaining] 是否 ≥ 1（渲染
-## 快照里没有地图配置，算不出 [code]ap_cost[/code]），系统则按本图配置判。出厂
-## 配置 ([code]ap_cost[/code] = 1) 下两者一致；某张图把开销调到 2 时，UI 可能在 AP=1 时
-## 画成可达而点击被系统拒——[b]这一条在拆分前就存在[/b]（原分类器同样只看
-## [code]< 1[/code]），此处记录而非新引入。[br]
-## [br][b]参数[/b]: [param from_node] 出发节点（渲染快照的 [code]current_node[/code]）；
-## [param to_node] 目标节点；其余同 [method classify_node_state]。[br]
+## [br][b]为什么需要它[/b]：布尔把「这格不存在」与「走不起」压成同一个 [code]false[/code]，
+## 而界面要画的是两种不同的东西（灰色锁标记 / 红色斜线）。分类器此前直接推导这两种
+## 情况，与系统侧的判定规则是两份实现——系统改口径而 UI 没跟着改，只有玩家能发现。[br]
+## [br][b]★ 本轮起判据与系统逐条对齐（只剩两条）★[/b]：目标存在 → 行动力足够。
+## 邻接门槛与「已访问不可重入」两条本轮作废（全连通 + 距离定价），UI 不得再拿
+## [param graph] / [param visited] 去挡移动——那会让「画成不可达」与「系统允许点」
+## 分家，而这类分家只有玩家能发现。[br]
+## [br][b]与系统的已知口径差[/b]（保留并记录）：本函数算不出本图的 [code]ap_distance_unit[/code]
+## / [code]ap_move_max[/code]（渲染快照里没有地图配置），故它只看
+## [param ap_remaining] 是否 ≥ 1。出厂配置下「隔一层」正是 1 点，两者一致；某张图把
+## 单位距离调小、或玩家要跨很远时，UI 可能在 AP=1 时画成可达而点击被系统拒——[b]这一条
+## 在拆分前就存在[/b]（原分类器同样只看 [code]< 1[/code]），此处记录而非新引入。
+## 真实渲染路径已经把判定交给系统（[code]NodeGraphRevealAnimator[/code] 注入
+## [code]verdict_provider[/code]），本函数是「系统不在场」时的兜底。[br]
+## [br][b]参数[/b]：[param from_node] 出发节点（保留入参以便与系统签名同形——
+## 距离定价下它本会影响消耗，而 UI 快照算不出距离，故此处未用）；
+## [param graph] / [param visited] 同样保留签名，见上「不再参与判定」。
+## [param to_node] 目标节点；[param ap_remaining] 剩余行动力；
+## [param node_details] 节点详情。[br]
 ## [br][b]返回[/b]：[code]{ok: bool, reason: String}[/code]——[code]ok[/code] 为真时
 ## [code]reason[/code] 为空串，为假时取自 [constant REASON_NOT_READY] 一族。[br]
 ## [br][b]不改任何状态[/b]：纯函数（ADR-0031 §2 零状态所有权）。
 static func verdict_for(from_node: int, to_node: int, graph: Dictionary, visited: Array,
 		ap_remaining: int, node_details: Dictionary) -> Dictionary:
-	if not _is_reachable(to_node, graph, from_node):
+	if not node_details.has(to_node):
 		return {"ok": false, "reason": REASON_UNREACHABLE}
-	if visited.has(to_node):
-		return {"ok": false, "reason": REASON_VISITED}
 	var type_id: int = int(node_details.get(to_node, {}).get("type", 1))
 	if ap_remaining < 1 and not AP_EXEMPT_TYPES.has(type_id):
 		return {"ok": false, "reason": REASON_AP_SHORT}

@@ -55,31 +55,30 @@ func rebuild_cache_from_storage(p_map_id: StringName) -> Dictionary:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ## 从当前节点走到 Boss 的最少行动力花费。[br]
-## [br][b]为什么需要它[/b]：系统里此前没有任何地方回答得了「还走不走得到 Boss」
-## ——[method can_move_to_detail] 只判一步邻接，[method end_exploration] 只看入参。
-## 于是行动力见底时玩家无从知道自己还能不能通关，UI 也讲不清「此刻离开会丢掉
-## 什么」（GDD §5「行动力归零且无法到达Boss → 立即结算」、§8 退出按钮）。[br]
-## [br][b]为什么是花费而不是步数[/b]：出厂每次移动 1 点两者等价，但地图可把
-## [code]ap_cost[/code] 调成 2，且豁免节点（Boss/传送/灵泉 0 消耗）让「步数少但
-## 花费多」成为常态。边权与 [method move_to_node] 的扣费共用
-## [ExplorationApRules.cost_for]（同一份解析）。[br]
-## [br][b]已访问节点算障碍[/b]：与 [method move_to_node] 的验证 2 同口径——
-## 把走过的格子算进路径等于承诺一条玩家点不动的路线。已在 Boss 节点时为 0。[br]
+## [br][b]为什么需要它[/b]：系统里必须有个地方回答得了「还走不走得到 Boss」——
+## [method end_exploration] 只看入参。于是行动力见底时玩家无从知道自己还能不能
+## 通关，UI 也讲不清「此刻离开会丢掉什么」（GDD §5「行动力归零且无法到达Boss
+## → 立即结算」、§8 退出按钮）。[br]
+## [br][b]★ 本轮起算的是「直达花费」而不是「沿边最短路」★[/b]（全连通 + 距离定价，
+## 老板 2026-11-27 18:40）：既然任一节点到任一节点都能一步走到（只是价钱按距离
+## 不同），最短路退化成「所有 Boss 节点里最近的那一个」——绕路不再可能更便宜，
+## 因为不存在「必须绕路」这回事。口径与 [method move_to_node] 的扣费共用
+## [ExplorationApRules.cost_for_move]。[br]
+## [br][b]已访问节点不再是障碍[/b]：本轮起已访问节点可以重入（消耗照算），把走过的
+## 格子算成墙会给出一个玩家其实做得到的假拒绝。已在 Boss 节点时为 0。[br]
 ## [br][b]只读[/b]：不修改任何状态（ADR-0014 §关键接口）。[br]
 ## [br][b]返回[/b]：最少花费（≥0）；[constant ExplorationReachability.UNREACHABLE]
-## （-1）表示走不到——也用于 DAG 未就绪 / GSM 不可用（无法作答时不给假答案）。
-## [member _map_config] 由生成期写入，[method rebuild_dag_cache] 读档重建时置空
-## → 那时按 GDD 默认开销 1 解析（拆分前就存在，见 [method ap_cost_to]）。[br]
-## [br]来源: GDD exploration-system.md §4/§5/§8、action-point-system.md §公式 2/3。
+## （-1）表示图里没有 Boss——也用于 DAG 未就绪 / GSM 不可用（无法作答时不给假答案）。[br]
+## [br]来源: GDD exploration-system.md §4/§5/§8、action-point-system.md §公式 2/3、
+## 本轮任务书追加规则（全连通 + 距离定价）。
 func min_ap_to_boss() -> int:
 	if not _dag_ready:
 		return Reachability.UNREACHABLE
 	var gsm: Node = _get_gsm()
 	if gsm == null:
 		return Reachability.UNREACHABLE
-	var visited: Array = gsm.exploration.get("visited_nodes", [])
 	return Reachability.min_ap_to_any(_node_graph, _node_details, _map_config,
-			_current_node_id(gsm), visited, [NodeType.BOSS])
+			_current_node_id(gsm), [NodeType.BOSS])
 
 
 ## 以剩余行动力是否还走得到 Boss。[br]

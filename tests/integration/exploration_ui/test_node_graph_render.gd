@@ -22,8 +22,12 @@ const NODE_LOGIC := preload("res://src/ui/exploration/node_state_logic.gd")
 const DATA_STUB := preload("res://src/ui/exploration/node_graph_data_stub.gd")
 const ATLAS := preload("res://src/ui/exploration/node_icon_atlas.gd")
 const MapGeneratedStubScript := preload("res://src/ui/exploration/map_generated_stub.gd")
+## 地区铺满矩形的口径（命中判据的边界——与渲染器内部同源）。
+const RegionCommon := preload("res://src/ui/exploration/node_graph_region_common.gd")
 
-## 命中检测「远离」判定偏移量（px）——大于节点图标半径，确保落在图标外。
+## 图标之外、地区之内的采样偏移量（px）——大于节点图标半径，用于断言地区化。[br]
+## [br][b]为什么不是「远离」而只是「离开图标」[/b]：本轮命中判据改成地区之后，
+## 凡是「离图标多远」的偏移量都落在某块地里，再也当不了「空处」用。
 const NODE_SIZE_CLEARANCE: float = 80.0
 
 var screen: Control = null
@@ -206,12 +210,38 @@ func test_hit_test_node_returns_node_id_on_icon() -> void:
 	assert_eq(r.hit_test_node(0, entry_pos), true, "入口图标中心应命中入口节点")
 
 
+## AC-10 Edge：[b]地区之外[/b]的坐标不命中。[br]
+## [br][b]★ 本轮语义变更（有意改动，报告单列）★[/b]：旧版把判据写成「离节点中心
+## [constant NODE_SIZE_CLEARANCE] 之外」，因为那时命中的是那 56px 的图标矩形。本轮起
+## 鼠标移到节点的[b]整块地区[/b]（Voronoi 单元）内都算命中——同一个偏移量仍在某块地里，
+## 旧写法会从「绿」变成「红」而原因是语义变了，不是回归。[br]
+## [br][b]改法（不是放宽）[/b]：判据跟到地区铺满矩形为止——矩形[b]外[/b]不命中；
+## 而「图标之外仍在自家地区内」改成[b]正面断言[/b]（本轮地区化的核心行为）。[br]
+## [br][b]采样方向为什么朝[b]上[/b][/b]：入口（0 层 0 号）是全图唯一在 y=0 的节点，
+## 其余节点都在它[b]下方[/b]——朝下取点会落到与邻层的垂直平分线之外、被最近种子判给
+## 邻层（那条边界正是「两区交界取最近种子」在 [code]test_node_graph_pick_region.gd[/code]
+## 里锁的东西）。朝上方向没有竞争者，这一点必然属于入口自己的地区。
 func test_hit_test_node_misses_empty_space() -> void:
-	# AC-10 Edge：远离节点图标的坐标 → 不命中
+	# Arrange
 	var r: NodeGraphRenderer = renderer()
 	var entry_pos: Vector2 = r.get_node_position(0)
-	var far: Vector2 = entry_pos + Vector2(NODE_SIZE_CLEARANCE, NODE_SIZE_CLEARANCE)
-	assert_eq(r.hit_test_node(0, far), false, "远离图标的坐标不应命中")
+	var bounds: Rect2 = RegionCommon.bounds_for(r.get_content_rect())
+	var outside: Vector2 = bounds.position - Vector2.ONE * 40.0
+	assert_false(bounds.has_point(outside),
+			"前置：%s 应在地区矩形 %s 之外（否则本用例是空断言）" % [outside, bounds])
+	# Assert 1：地区之外不给节点
+	assert_eq(r.hit_test_node(0, outside), false,
+			"地区矩形之外的坐标不应命中（旧口径是「离图标 80px」）")
+	# Assert 2——语义变更的正面断言：图标之外、但仍在自家地区内，[b]应当命中[/b]
+	var inside: Vector2 = entry_pos + Vector2(0.0, -NODE_SIZE_CLEARANCE)
+	assert_true(bounds.has_point(inside),
+			"前置：本采样点应仍在地区之内（它是「地区化」这件事的证据）")
+	assert_eq(r.hit_test_any(inside), 0,
+			"离图标 %0.fpx（向上）仍落在入口自己的地区里 → 归属入口"
+			% NODE_SIZE_CLEARANCE)
+	assert_eq(r.hit_test_node(0, inside), true,
+			"离图标 %0.fpx 但仍在地区内的点应命中该节点（本轮地区化的核心）"
+			% NODE_SIZE_CLEARANCE)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -228,23 +258,41 @@ func test_renderer_tribulation_unready_detection() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AC-9：节点连线已走过金色实线 / 未走过暗色虚线（_is_edge_visited 判定分支）
+# AC-9：[b]本轮起不画任何连线[/b]——判定仍在数据层，只是不再有绘制消费者
 # ═══════════════════════════════════════════════════════════════════════════════
+## [br][b]★ 本轮语义变更（有意改动，报告单列）★[/b]：老板 2026-11-27 18:40
+## 「节点之间不需要线连接」——[code]node_graph_edge_painter.gd[/code] 已从绘制路径
+## 摘除（[method NodeGraphRenderer._draw] 不再调它）。故旧断言的措辞「金色实线 /
+## 暗色虚线」整体作废：那是在描述一条已经不画的线。[br]
+## [br][b]判定本身一条没删[/b]：[code]_is_edge_visited[/code] 是数据层契约
+## （[NodeStateLogic.edge_is_walked] 的转发口），旧存档与邻接图测试仍读它——
+## 下面两条断言的值[b]一字未改[/b]，只把「所以画成金色/暗色」的描述换成
+## 「所以判定为走过/未走过」。
 
 func test_is_edge_visited_returns_true_when_both_ends_visited() -> void:
-	# AC-9：连线两端均在 visited → 已走过（金色实线判定）
+	# 数据层判定：两端均在 visited → 走过（本轮起无绘制消费者，判定保留）
 	var r: NodeGraphRenderer = renderer()
 	r.visited = [0, 101]
 	assert_true(r._is_edge_visited(0, 101),
-			"两端均已访问的边应为已走过（金色实线）")
+			"两端均已访问的边应判定为走过")
 
 
 func test_is_edge_visited_returns_false_when_end_unvisited() -> void:
-	# AC-9 Edge：连线任一端未访问 → 未走过（暗色虚线判定）
+	# 数据层判定：任一端未访问 → 未走过
 	var r: NodeGraphRenderer = renderer()
 	r.visited = [0]
 	assert_false(r._is_edge_visited(0, 101),
-			"一端未访问的边应为未走过（暗色虚线）")
+			"一端未访问的边应判定为未走过")
+
+
+## 绘制路径上[b]没有[/b]连线这一笔——本轮的验收点。[br]
+## [br][b]为什么用「有没有这个方法」来断言[/b]：连线绘制的入口是
+## [code]_draw_edges()[/code]；它被重新接回 [method _draw] 的最可能方式就是有人
+## 顺手加一句调用。方法整个删掉之后，任何「加回去」的尝试都会在解析期就红。
+func test_renderer_has_no_edge_drawing_entry_point() -> void:
+	var r: NodeGraphRenderer = renderer()
+	assert_false(r.has_method(&"_draw_edges"),
+			"渲染器不应再有连线绘制入口（本轮起不画任何连线）")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

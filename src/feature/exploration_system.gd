@@ -41,17 +41,26 @@ func generate_map(map_id: StringName, player_realm: int = 1, entry_count: int = 
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ## 节点导航——从 from_node 移动到 to_node。[br]
-## [br][b]验证链路[/b]（短路求值）：可达性 → 已访问 → 行动力。[br]
-## [br][b]AP 开销按地图配置[/b]：目标节点类型的开销经 [ExplorationApRules.cost_for]
-## 解析（[code]ap_cost[/code] / [code]ap_costs[/code] 配置键，缺键为 GDD 默认 1）；
-## 豁免类型（传送/灵泉/Boss）恒为 0，且 AP=0 时仍可移动。[br]
+## [br][b]验证链路[/b]（短路求值）：DAG 就绪 → 目标存在 → GSM 可用 → 行动力。[br]
+## [br][b]★ 本轮起「任一节点 → 任一节点」都可达 ★[/b]（老板 2026-11-27 18:40：
+## 「每个节点之间都可达，只是消耗的行动力不一样」）：[br]
+## [br]   · [b]取消邻接门槛[/b]——不再要求「从当前节点沿边一步」。DAG 的边表仍在
+##     （节点生成、Boss 最短路、旧存档的图快照都靠它），但它[b]不再决定可达性[/b]；
+##     判定只剩一条：AP 够不够这一次的消耗。[br]
+##   · [b]取消已访问拒绝[/b]——已访问节点仍可重复进入，消耗照算。奖励不重复发由
+##     各子系统的既有幂等逻辑负责（[method mark_node_visited] 返回 [code]is_new[/code]，
+##     采集点/事件等的「已领过」判定各自持有），本方法不再额外挡一道。[br]
+##   · [b]距离定价[/b]：[code]cost = clamp(round(distance / UNIT), 1, MAX)[/code]
+##     ——距离由 [code]exploration_node_geometry.gd[/code] 算（与 UI 画出来的位置
+##     同源），UNIT/MAX 是 [code]exploration_ap_rules.gd[/code] 里的可配常量。[br]
 ## [br][b]拒绝不扣费[/b]：AP 不足时直接返回，[b]不写任何导航状态[/b]——
 ## reason 为「行动力不足」，UI 据此给中文提示（不静默失败）。[br]
 ## [br][b]成功后[/b]：更新 GSM 导航状态 → 消耗 AP → 发射 node_moved → 调用 resolve_node。[br]
-## [br][param from_node] 起始节点 ID。[br]
+## [br][param from_node] 起始节点 ID（只用于算距离；它是不是「当前节点」不影响判定）。[br]
 ## [br][param to_node] 目标节点 ID。[br]
 ## [br][b]返回[/b]: [code]{success: bool, reason: String, ap_remaining: int}[/code] Dictionary。[br]
-## [br]来源: ADR-0014 §关键接口 + GDD §4 节点导航、GDD action-point-system.md §公式 3。
+## [br]来源: ADR-0014 §关键接口 + GDD §4 节点导航、GDD action-point-system.md §公式 3、
+## 本轮任务书追加规则（全连通 + 距离定价 + 已访问可重入）。
 func move_to_node(from_node: int, to_node: int) -> Dictionary:
 	var result: Dictionary = {"success": false, "reason": "", "ap_remaining": 0}
 
@@ -60,25 +69,21 @@ func move_to_node(from_node: int, to_node: int) -> Dictionary:
 		result["reason"] = REASON_NOT_READY
 		return result
 
-	# 验证 1：可达性——graph[from] 包含 to
-	if not _is_reachable(from_node, to_node):
+	# 验证 1：目标存在——本图确实有这一格（拓扑门槛废除后唯一的「不可达」）
+	if not _node_exists(to_node):
 		result["reason"] = REASON_UNREACHABLE
 		return result
 
-	# 验证 2：已访问——不可回退到已访问节点
+	# 验证 2：GSM 可用（导航状态与行动力都从它读写）
 	var gsm: Node = _get_gsm()
 	if gsm == null:
 		result["reason"] = REASON_NO_GSM
 		return result
-	var visited: Array = gsm.exploration.get("visited_nodes", [])
-	if visited.has(to_node):
-		result["reason"] = REASON_VISITED
-		return result
 
-	# 验证 3：行动力——按地图配置算开销，不足时拒绝（不写任何状态、不扣费）
+	# 验证 3：行动力——按两节点距离算开销，不足时拒绝（不写任何状态、不扣费）
 	# 越界存档值（负数）先夹到 0：豁免节点仍可移入，且 AP 永不落负。
 	var ap: int = maxi(int(gsm.exploration.get("action_points", 0)), 0)
-	var ap_cost: int = ap_cost_to(to_node)
+	var ap_cost: int = ap_cost_between(from_node, to_node)
 	if ap < ap_cost:
 		result["reason"] = REASON_AP_SHORT
 		return result

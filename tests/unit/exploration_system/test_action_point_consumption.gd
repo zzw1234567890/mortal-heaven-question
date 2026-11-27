@@ -1,7 +1,18 @@
 extends GutTest
 ## 探索行动力（AP）消耗闭环——单元/集成测试。[br]
+## [br][b]★ 本轮语义变更（有意改动，报告单列）★[/b]：移动开销从「按格定价」
+## （[code]ap_cost[/code] / [code]ap_costs[/code]）改成「按两节点在布局坐标里的距离
+## 定价」（老板 2026-11-27 18:40：「每个节点之间都可达，只是消耗的行动力不一样」）。[br]
+## [br]旧断言里有四条是在钉「配置键怎么读」——那两个键本轮起[b]不再参与扣费[/b]
+## （保留只为旧存档/旧地图表不报错）。断言留着会变成「测一个已经被忽略的键」：绿着，
+## 但什么都没守住。四条改法如下（[b]都是改语义，不是放宽[/b]）：[br]
+##   · 「按图配置扣」→ 改为「调小单位距离 = 整图涨价」（同一个用途的新旋钮）；[br]
+##   · 「按类型覆盖表扣」→ 改为「遗留键不再改变扣费」（保留键的兼容性断言）；[br]
+##   · 「免费地图不扣」→ 改为「没有免费地图：开销下限是 1」（[code]ap_cost: 0[/code]
+##     不再能让一张图白走——那正是距离定价要堵的洞）；[br]
+##   · 「判定的开销阈值」由配置的 2 改为配置单位算出来的 2（数值不变，来源换了）。[br]
 ## [br][b]覆盖[/b]（本轮任务点名三组）：[br]
-##   1. [b]正常扣减[/b]——按地图配置的开销扣、写入 GSM、[code]node_moved[/code]
+##   1. [b]正常扣减[/b]——按距离算出的开销扣、写入 GSM、[code]node_moved[/code]
 ##      载荷的 [code]ap_remaining[/code] 与 GSM 实际值一致；[br]
 ##   2. [b]不足拒绝且不扣[/b]——[code]move_to_node[/code] 返回 reason「行动力不足」
 ##      （中文文案，UI 据此弹提示，不静默失败），且[b]零状态写入[/b]：
@@ -15,11 +26,14 @@ extends GutTest
 ## 先例）；探索系统用 [code]ES_SCRIPT.new()[/code] 构造，不进 Autoload。[br]
 ##
 ## 来源: design/gdd/action-point-system.md §公式 2/3 + §边界 + §调优参数、
-## design/gdd/exploration-system.md §4 节点导航 / §节点类型一览、ADR-0014 §关键接口。
+## design/gdd/exploration-system.md §4 节点导航 / §节点类型一览、ADR-0014 §关键接口、
+## 本轮任务书追加规则（全连通 + 距离定价）。
 
 const ES_SCRIPT := preload("res://src/feature/exploration_system.gd")
 ## UI 侧文案映射表——锁定「系统 reason → 中文 toast」这一跨层契约。
 const MoveInteractor := preload("res://src/ui/exploration/node_move_interactor.gd")
+## 布局几何——夹具里那个「让这一跳恰好值 2 点」的单位距离由它算，不写死数。
+const GEOMETRY := preload("res://src/feature/exploration/exploration_node_geometry.gd")
 
 ## 节点 ID（编码 layer * 100 + idx）。
 const ENTRY: int = 0
@@ -76,8 +90,10 @@ func _on_node_moved(from_node: int, to_node: int, ap_remaining: int) -> void:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ## 固定 DAG：0 →（100 战斗 | 110 传送）→ 200 事件 → 300 Boss。[br]
-## [br][param p_map_config] 本图配置快照——[code]ap_cost[/code] / [code]ap_costs[/code]
-## 由 [ExplorationDAGBuilder] 在生成期写入 [code]_map_config[/code]，此处直填。
+## [br][param p_map_config] 本图配置快照——[code]ap_distance_unit[/code] /
+## [code]ap_move_max[/code] 由 [ExplorationDAGBuilder] 在生成期写入
+## [code]_map_config[/code]，此处直填（[code]ap_cost[/code] / [code]ap_costs[/code]
+## 是本轮的遗留键，填了也不影响扣费）。
 func _setup_dag(p_map_config: Dictionary = {}) -> void:
 	es.set("_node_graph", {
 		ENTRY: [COMBAT_NODE, TELEPORT_NODE],
@@ -97,6 +113,19 @@ func _setup_dag(p_map_config: Dictionary = {}) -> void:
 	es.set("_dag_ready", true)
 
 
+## 「从入口走到 [param p_node_id] 恰好值 [param p_cost] 点」所需的单位距离。[br]
+## [br][b]为什么现算而不是写一个数[/b]：布局标定（层间距 / 同层间距 / 错开量）可调，
+## 写死的单位距离会在标定变化后让这一跳的价钱变成 1 或 3，用例随之失真。[br]
+## [br][b]为什么取 [code]distance / cost[/code] 而不是别的[/b]：公式是
+## [code]clamp(round(distance / unit), 1, MAX)[/code]，令比值恰为整数 [param p_cost]
+## 就落在取整的不动点上——不会因为 0.5 的舍入规则变化而漂移。
+func _unit_for_cost(p_node_id: int, p_cost: int) -> float:
+	var counts: Dictionary = GEOMETRY.layer_counts(es.get("_node_details"))
+	var distance: float = GEOMETRY.distance_between(
+			es.get("_node_details")[ENTRY], es.get("_node_details")[p_node_id], counts)
+	return distance / float(p_cost)
+
+
 func _set_ap(p_current: int, p_max: int) -> void:
 	gsm.exploration.action_points = p_current
 	gsm.exploration.max_action_points = p_max
@@ -111,50 +140,63 @@ func _ap() -> int:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 func test_move_deducts_default_cost_and_writes_gsm() -> void:
-	# Arrange——无配置键 → GDD 默认 1
+	# Arrange——无配置键 → 出厂单位距离 120px；入口到第 1 层（104px）→ 1 点
 	_set_ap(5, 5)
 	# Act
 	var result: Dictionary = es.call("move_to_node", ENTRY, COMBAT_NODE)
 	# Assert
 	assert_true(result["success"], "移动成功")
-	assert_eq(result["ap_remaining"], 4, "返回值 AP 从 5 减为 4")
+	assert_eq(result["ap_remaining"], 4, "返回值 AP 从 5 减为 4（相邻一层的距离恰是 1 点档）")
 	assert_eq(_ap(), 4, "GSM 实际值同步为 4")
 	assert_eq(_node_moved.size(), 1, "node_moved 发射一次")
 	assert_eq(_node_moved[0]["ap"], 4, "信号载荷的 ap_remaining 与 GSM 同口径")
 
 
-func test_move_deducts_map_configured_cost() -> void:
-	# Arrange——本图 ap_cost = 2（「按地图配置扣」）
-	_setup_dag({"ap_cost": 2})
+func test_move_deducts_more_when_the_unit_distance_is_smaller() -> void:
+	## 「按地图配置扣」的新旋钮：单位距离减半 = 同一条路更贵。[br]
+	## [b]改前红[/b]：旧版填的是 [code]{"ap_cost": 2}[/code]——那个键本轮起被忽略。
+	# Arrange——让这一跳恰好值 2 点
+	var unit: float = _unit_for_cost(COMBAT_NODE, 2)
+	assert_gt(unit, 0.0, "前置：单位距离应为正")
+	_setup_dag({"ap_distance_unit": unit})
 	_set_ap(5, 5)
 	# Act
 	var result: Dictionary = es.call("move_to_node", ENTRY, COMBAT_NODE)
 	# Assert
 	assert_eq(result["ap_remaining"], 3, "5 - 2 = 3")
-	assert_eq(_ap(), 3, "GSM 按配置开销扣减")
+	assert_eq(_ap(), 3, "GSM 按配置的距离单位扣减")
 
 
-func test_move_deducts_per_type_override() -> void:
-	# Arrange——默认 1，战斗节点覆盖为 3
-	_setup_dag({"ap_cost": 1, "ap_costs": {1: 3}})
+func test_legacy_ap_costs_key_no_longer_changes_the_deduction() -> void:
+	## ★ 有意改动：按类型的覆盖表 [code]ap_costs[/code] 不再参与扣费 ★[br]
+	## [b]改前红[/b]：旧版断言「覆盖表命中 → 扣 3（不是 1）」。那个键保留只为旧存档
+	## 与旧地图表不报错——「读它不改变任何行为」这件事必须有断言守着，否则将来有人
+	## 顺手把它接回扣费，就会出现「同一张图两套定价」而没有任何测试会红。
+	# Arrange——覆盖表写着战斗节点扣 3
+	_setup_dag({"ap_distance_unit": _unit_for_cost(COMBAT_NODE, 1),
+			"ap_cost": 1, "ap_costs": {1: 3}})
 	_set_ap(5, 5)
 	# Act
 	var result: Dictionary = es.call("move_to_node", ENTRY, COMBAT_NODE)
-	# Assert
-	assert_eq(result["ap_remaining"], 2, "覆盖表命中 → 扣 3（不是 1）")
-	assert_eq(_ap(), 2, "GSM 同步")
+	# Assert——扣的是距离定价的 1，不是覆盖表的 3
+	assert_eq(result["ap_remaining"], 4, "覆盖表被忽略 → 扣距离定价的 1（不是 3）")
+	assert_eq(_ap(), 4, "GSM 同上")
 
 
-func test_move_to_zero_cost_map_keeps_ap() -> void:
-	# Arrange——免费地图（ap_cost = 0）
-	_setup_dag({"ap_cost": 0})
+func test_there_is_no_free_map_the_floor_is_one() -> void:
+	## ★ 有意改动：没有「免费地图」了 ★[br]
+	## [b]改前红[/b]：旧版填 [code]{"ap_cost": 0}[/code] 断言「开销 0 → AP 不变」。
+	## 距离定价的下限是 1——0 消耗意味着白走，玩家会找 0 消耗的落点反复横跳刷访问状态。
+	## 那张「免费地图」现在由 [code]ap_distance_unit[/code] 调到很大来近似（仍然至少 1 点）。
+	# Arrange——单位距离大到比值趋近 0
+	_setup_dag({"ap_cost": 0, "ap_distance_unit": 100000.0})
 	_set_ap(3, 5)
 	# Act
 	var result: Dictionary = es.call("move_to_node", ENTRY, COMBAT_NODE)
-	# Assert
-	assert_eq(result["success"], true, "免费地图可移动")
-	assert_eq(result["ap_remaining"], 3, "开销 0 → AP 不变")
-	assert_eq(_ap(), 3, "GSM 不变")
+	# Assert——仍扣 1 点下限
+	assert_eq(result["success"], true, "仍可移动")
+	assert_eq(result["ap_remaining"], 2, "开销下限为 1（ap_cost: 0 不再能白走）")
+	assert_eq(_ap(), 2, "GSM 同步")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -189,8 +231,8 @@ func test_insufficient_ap_returns_ap_remaining_zero_not_negative() -> void:
 
 
 func test_can_move_to_shares_deduction_rule() -> void:
-	# Arrange——恰好够 1 点
-	_setup_dag({"ap_cost": 2})
+	# Arrange——让这一跳恰好值 2 点（判定与扣费读的是同一份距离定价）
+	_setup_dag({"ap_distance_unit": _unit_for_cost(COMBAT_NODE, 2)})
 	_set_ap(2, 5)
 	# Assert——判定说能走
 	assert_eq(es.call("can_move_to", ENTRY, COMBAT_NODE), true, "2 点够走 2 点开销")
@@ -201,7 +243,7 @@ func test_can_move_to_shares_deduction_rule() -> void:
 
 
 func test_can_move_to_false_when_short_by_one() -> void:
-	_setup_dag({"ap_cost": 2})
+	_setup_dag({"ap_distance_unit": _unit_for_cost(COMBAT_NODE, 2)})
 	_set_ap(1, 5)
 	assert_eq(es.call("can_move_to", ENTRY, COMBAT_NODE), false,
 			"差 1 点 → 判定 false（不是「有 AP 就 true」）")

@@ -12,8 +12,25 @@ extends GutTest
 ## [b]纯函数直调[/b]：static 函数以 [code]NODE_LOGIC.func(...)[/code] 直接调用
 ## （GUT 直调模式——S16-1/2 先例）。stub 载荷来自 [NodeGraphDataStub]。
 ##
+## [br][b]★ 本轮语义变更（有意改动，报告单列）★[/b]：老板 2026-11-27 18:40
+## 「每个节点之间都可达，只是消耗的行动力不一样」+「已访问节点可以重入」之后，
+## [method NodeStateLogic.verdict_for] 的判据只剩两条（目标存在 → 行动力足够），
+## 本文件三条用例的前提随之作废：[br]
+##   · [code]test_classify_unreachable_node_returns_unreachable[/code]——「已揭示
+##     但非当前邻接」不再等于不可达（改成「已揭示但本图没有这一格」）；[br]
+##   · [code]test_verdict_distinguishes_the_three_refusals[/code]——可发生的拒绝
+##     从三条降到两条（邻接 / 已访问两条不再拒绝），改名收窄为两条 + 另立守卫态
+##     对照用例；[br]
+##   · [code]test_verdict_checks_visited_before_ap[/code]——「已访问」退出判定，
+##     顺序断言换成[b]存在性先于行动力[/b]（新口径下仍要求顺序、且错序会误伤玩家
+##     的那一条），另立一例钉「visited 不改变判定」。[br]
+## 三条[c]都不是删断言[/c]：判别力等价，只是判别集合随口径变小。词表常量一条没删
+## （[constant NodeStateLogic.REASON_VISITED] 仍是跨层契约，[method state_from_verdict]
+## 仍认它）。[br]
+##
 ## 来源: story-003-node-graph-data-states.md QA Test Cases AC-1/AC-2、
-## ADR-0031 §2、design/gdd/exploration-ui-system.md §2 界面规则表。
+## ADR-0031 §2、design/gdd/exploration-ui-system.md §2 界面规则表、
+## 本轮任务书追加规则（全连通 + 已访问可重入）。
 
 const NODE_LOGIC := preload("res://src/ui/exploration/node_state_logic.gd")
 const DATA_STUB := preload("res://src/ui/exploration/node_graph_data_stub.gd")
@@ -88,15 +105,27 @@ func test_classify_ap_exempt_reachable_when_ap_zero() -> void:
 
 
 func test_classify_unreachable_node_returns_unreachable() -> void:
-	## AC-5: 已揭示但非当前邻接、未访问 → UNREACHABLE。[br]
-	## 构造：当前=201、visited=[0,101,201] 时，102 已在揭示集合（visited 前向
-	## 邻接可达）但非 201 的邻接 → 不可达（与迷雾/可达区分）。
+	## AC-5: 已揭示但[b]本图没有这一格[/b] → UNREACHABLE。[br]
+	## [br][b]★ 改前红：旧版拿「已揭示但非当前邻接」当不可达的样本（102，
+	## 当前=201）★[/b] 老板 2026-11-27 18:40「每个节点之间都可达，只是消耗的行动力
+	## 不一样」之后，邻接不再是门槛——102 在详情里存在，就会被判可达，旧断言必然红。[br]
+	## [br][b]改写方式（不是删断言，也不是换一个「比较好过」的样本）[/b]：新口径下
+	## 「不可达」只剩一个真实来源——目标节点根本不在本图（越界 ID / 存档脏数据）。
+	## 构造仍然走「已揭示」这条路：给当前节点的前向邻接表里塞一个只存在于边表、
+	## 不在节点详情里的 103——它会被揭示（[method is_revealed] 只看边表），
+	## 但判定问不出这一格是什么，于是落在 UNREACHABLE。[br]
+	## [br][b]为什么必须仍然「已揭示」[/b]：不揭示就会先落 FOGGED，测到的是迷雾
+	## 而不是不可达——六态之间那条边界正是本用例要钉的东西。
 	var snap: Dictionary = DATA_STUB.stub_snapshot()
 	snap["current_node"] = 201
 	snap["visited"] = [0, 101, 201]
-	assert_eq(NODE_LOGIC.classify_node_state(102, snap["graph"], snap["visited"],
+	var graph: Dictionary = (snap["graph"] as Dictionary).duplicate(true)
+	graph[201] = [301, 103]  # 103 只在边表里——详情里没有它（脏数据 / 越界 ID）
+	assert_false((snap["nodes"] as Dictionary).has(103),
+			"前置：103 必须在节点详情里缺席，否则测的是可达而不是不可达")
+	assert_eq(NODE_LOGIC.classify_node_state(103, graph, snap["visited"],
 			201, snap["ap_remaining"], snap["nodes"]),
-			NODE_LOGIC.NodeState.UNREACHABLE, "已揭示但非当前邻接应为不可达")
+			NODE_LOGIC.NodeState.UNREACHABLE, "已揭示但本图没有这一格 → 不可达")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -223,29 +252,43 @@ func test_verdict_reachable_is_ok_without_reason() -> void:
 	assert_eq(str(verdict["reason"]), "", "通过时 reason 为空串")
 
 
-func test_verdict_distinguishes_the_three_refusals() -> void:
-	## 病根是「都返回 false」——三条拒绝路径必须给出三个不同的 reason。
-	## 图里给 101 加一条回退边到 0：stub 的邻接表没有它（真实 DAG 无回退边），
-	## 不加则「已访问」那一格会被拓扑判定先拦下，测不到进度原因。
+func test_verdict_distinguishes_the_two_refusals() -> void:
+	## 病根是「都返回 false」——[b]本轮起可发生的拒绝只剩两条[/b]（老板
+	## 2026-11-27 18:40），它们必须给出两个不同的 reason。[br]
+	## [br][b]★ 改前红：旧版是「三条拒绝路径给三个不同 reason」，其中两条分别用
+	## 「不相邻」与「已访问」当样本 ★[/b] 新口径下这两条[b]都通过[/b]——邻接不再是
+	## 门槛、已访问可重入，旧断言拿到的会是空串。[br]
+	## [br][b]改写方式（判别力一条没减）[/b]：判别集合随口径收窄为两条，但
+	## 「不许都返回同一个 reason」这条病根仍然被钉住，且[b]多加了守卫态的第三项
+	## 对照[/b]——守卫态（DAG 未就绪）与两条拒绝态三者两两不同。[br]
+	## [br][b]词表本身没删[/b]：[constant NODE_LOGIC.REASON_VISITED] 仍是跨层契约
+	## 常量（[method state_from_verdict] 还认它），见本文件末段的映射穷尽断言。
 	var snap: Dictionary = DATA_STUB.stub_snapshot()
-	var graph: Dictionary = (snap["graph"] as Dictionary).duplicate(true)
-	graph[101] = [201, 202, 0]
 	var nodes: Dictionary = snap["nodes"]
-	# 不可达：0 与远处 Boss 不相邻
-	var unreachable: String = str(NODE_LOGIC.verdict_for(0, 500, graph,
+	# 不可达：0 → 999，本图没有这一格
+	var unreachable: String = str(NODE_LOGIC.verdict_for(0, 999, snap["graph"],
 			[0], 3, nodes)["reason"])
-	# 已访问：0 已在 visited（且 101→0 邻接）
-	var visited: String = str(NODE_LOGIC.verdict_for(101, 0, graph,
-			[0, 101], 3, nodes)["reason"])
-	# 行动力不足：101 战斗节点可达但 AP=0
-	var ap_short: String = str(NODE_LOGIC.verdict_for(0, 101, graph,
+	# 行动力不足：101 战斗节点（非豁免）在 AP=0 时
+	var ap_short: String = str(NODE_LOGIC.verdict_for(0, 101, snap["graph"],
 			[0], 0, nodes)["reason"])
-	assert_eq(unreachable, NODE_LOGIC.REASON_UNREACHABLE, "走不到 → 拓扑原因")
-	assert_eq(visited, NODE_LOGIC.REASON_VISITED, "走过了 → 进度原因")
+	assert_eq(unreachable, NODE_LOGIC.REASON_UNREACHABLE, "本图没有这一格 → 存在性原因")
 	assert_eq(ap_short, NODE_LOGIC.REASON_AP_SHORT, "走不起 → 资源原因")
-	assert_ne(unreachable, visited, "不可达与已访问必须不同")
 	assert_ne(unreachable, ap_short, "不可达与行动力不足必须不同")
-	assert_ne(visited, ap_short, "已访问与行动力不足必须不同")
+
+
+func test_verdict_distinguishes_the_guard_state_from_both_refusals() -> void:
+	## 守卫态（DAG 未就绪 / GSM 不可用）是第三类 —— 它不在 [method verdict_for]
+	## 的产出里（纯函数不碰 DAG 缓存与 GSM，由系统侧产出），但 UI 拿系统的返回值
+	## 来问同一件事时必须能分开。此处直接拿词表常量做判别力断言。
+	var refusals: Array[String] = [
+		NODE_LOGIC.REASON_UNREACHABLE, NODE_LOGIC.REASON_AP_SHORT,
+	]
+	for guard: String in [NODE_LOGIC.REASON_NOT_READY, NODE_LOGIC.REASON_NO_GSM]:
+		for refusal: String in refusals:
+			assert_ne(guard, refusal,
+					"守卫态「%s」必须与拒绝态「%s」不同" % [guard, refusal])
+	assert_ne(NODE_LOGIC.REASON_NOT_READY, NODE_LOGIC.REASON_NO_GSM,
+			"两条守卫态彼此也不同（UI 的 toast 映射表拿它们当键）")
 
 
 func test_verdict_exempt_type_passes_at_zero_ap() -> void:
@@ -256,16 +299,43 @@ func test_verdict_exempt_type_passes_at_zero_ap() -> void:
 	assert_true(bool(verdict["ok"]), "Boss 豁免类型 AP=0 仍可达")
 
 
-func test_verdict_checks_visited_before_ap() -> void:
-	## 顺序不是风格问题：已访问且邻接的节点在系统里报「已访问」，UI 若先判 AP
-	## 就会对同一个节点给出另一种说法。
+func test_verdict_checks_existence_before_ap() -> void:
+	## 顺序不是风格问题：[b]本图没有的那一格，无论 AP 多少都只能报「不可达」[/b]。
+	## 若先判 AP，AP=0 时它会被报成「行动力不足」——玩家会把行动力补满再来点，
+	## 而那一格永远点不动。[br]
+	## [br][b]★ 改前红：旧版断言的是「已访问先于 AP」（AP=0 且已访问 → 报『已访问』）★[/b]
+	## 「已访问」整条已退出移动判定（老板 2026-11-27 18:40「已访问节点可以重入」），
+	## 那条顺序断言的前提随之消失。[br]
+	## [br][b]改写方式[/b]：不删「顺序」这个断言形状，而是换成[b]新口径下仍然存在、
+	## 且同样要求特定顺序[/b]的那一条——存在性检查必须挡在 AP 检查之前。判别力与
+	## 旧版等价（旧版守「先判进度再判资源」，本版守「先判存在再判资源」），
+	## 而且本版守的是真的会误伤玩家的那种错序。
 	var snap: Dictionary = DATA_STUB.stub_snapshot()
-	var graph: Dictionary = (snap["graph"] as Dictionary).duplicate(true)
-	graph[101] = [201, 202, 0]
-	var verdict: Dictionary = NODE_LOGIC.verdict_for(101, 0, graph,
-			[0, 101], 0, snap["nodes"])
-	assert_eq(str(verdict["reason"]), NODE_LOGIC.REASON_VISITED,
-			"AP=0 且已访问时，先判出的应是「已访问」")
+	var nodes: Dictionary = snap["nodes"]
+	var verdict: Dictionary = NODE_LOGIC.verdict_for(0, 999, snap["graph"],
+			[0], 0, nodes)
+	assert_eq(str(verdict["reason"]), NODE_LOGIC.REASON_UNREACHABLE,
+			"AP=0 且目标不存在时，先判出的应是「不可达」而不是「行动力不足」")
+	assert_false(bool(verdict["ok"]), "该路径必须是拒绝")
+
+
+func test_verdict_ignores_visited_so_visited_nodes_can_be_reentered() -> void:
+	## 老板 2026-11-27 18:40：「已访问节点可以重入，消耗照算，奖励不重复发」。
+	## 同一对节点，visited 里有与没有必须给出同一个判定——UI 若拿 visited 去挡，
+	## 就会画出「系统允许点、界面画成不可达」的分家。[br]
+	## [br][b]★ 改前红：旧版此处是「已访问 → reason『已访问』」★[/b] 本条把旧口径的
+	## 拒绝理由翻成正向期望（照样断言，不是删断言）。
+	var snap: Dictionary = DATA_STUB.stub_snapshot()
+	var nodes: Dictionary = snap["nodes"]
+	var without: Dictionary = NODE_LOGIC.verdict_for(101, 0, snap["graph"],
+			[0], 3, nodes)
+	var with_visited: Dictionary = NODE_LOGIC.verdict_for(101, 0, snap["graph"],
+			[0, 101], 3, nodes)
+	assert_true(bool(without["ok"]), "前置：该目标在 AP 够时可达")
+	assert_eq(with_visited, without,
+			"visited 里有没有这个节点不改变判定（已访问可重入）")
+	assert_ne(str(with_visited["reason"]), NODE_LOGIC.REASON_VISITED,
+			"reason 不得再是「已访问」（该理由已退出移动判定）")
 
 
 func test_state_from_verdict_maps_to_six_states() -> void:

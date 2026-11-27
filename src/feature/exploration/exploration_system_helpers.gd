@@ -16,63 +16,27 @@ extends "res://src/feature/exploration/exploration_system_base.gd"
 ## 行动力开销规则（Feature 层规范副本——扣费与判定共用同一份解析）。
 const ApRules := preload("res://src/feature/exploration/exploration_ap_rules.gd")
 
+## 布局几何（[b]距离定价的距离来源[/b]——与 UI 画节点的坐标公式同源）。[br]
+## [br][b]为什么扣费侧要读 UI 的几何[/b]：移动消耗现在按「两节点在布局坐标里的距离」
+## 定价，而「节点画在哪」是玩家唯一看得见的距离——两处各写一套间距常量，改一次间距
+## 就会出现「花 2 点走了一格」这种玩家看得出来、单测抓不到的漂移。Feature 层是来源，
+## UI 的 [code]node_graph_style.gd[/code] / [code]node_graph_layout.gd[/code] 逐条转发。
+const GeometryRules := preload(
+		"res://src/feature/exploration/exploration_node_geometry.gd")
+
+## 难度档位表（纯数据——见该模块文档）。本处只转发，读法不变。
+const DifficultyTable := preload(
+		"res://src/feature/exploration/exploration_difficulty_configs.gd")
+
 ## 默认地图难度配置表——按 MapDifficulty 枚举索引。[br]
-## [br][code]enemy_realm[/code] 是节点敌人强度的定档基准（GDD「回旧地图」§7：
-## 敌人强度按地图本身境界设定，不随玩家境界上涨）。缺键的地图配置会回退玩家
-## 境界并警告一次——生产配置由 [code]exploration_map_catalog.gd[/code] 提供，
-## 本表只是难度档位的通用兜底。[br]
-## [br][b]权重表两处同源[/b]：[code]exploration_map_catalog.gd[/code] 的
-## [code]_difficulty_defaults[/code] 必须与本表一致；新增键会改变
-## [code]_weighted_random[/code] 的 [code]total[/code] 从而重排所有种子的 DAG
-## 结果（确定性仍在，只是每张图长得不一样）。[br]
-## [br][b]alchemy / forge 为本轮新增[/b]：炼丹台与炼器台的权重各 8——与采集点
-## （10）同一量级，「探索路上偶遇一座丹炉」是偶发事件而非每图必得。[br]
-## [br][b]action_spring（灵泉）为本轮新增[/b]：权重同 8——同上口径，「探索路上
-## 遇见一眼灵泉」是偶发事件；真正的稀缺由「每图限次」保证
-## （[code]action_spring_count[/code]，见下），不是由权重保证。[br]
-## [br][b]ap_cost[/b]：本档每次移动的行动力开销（GDD action-point-system.md
-## §调优参数「每格消耗 1，安全范围 1-2」）——出厂全档为 1，与
-## [code]exploration_map_catalog.gd[/code] 的 [code]DIFFICULTY_DEFAULTS[/code]
-## 同源；解析见 [code]exploration_ap_rules.gd[/code]。[br]
-## [br][b]action_spring_count[/b]：本档灵泉的每图限次（GDD action-point-system.md
-## §调优参数「行动力泉每图限次 1次（范围 1-2）」）——同样是「按地图配置读」而不是
-## 硬编码常量，单独的地图可覆盖它；读取侧见
-## [code]exploration_action_spring.gd[/code] 的 [code]limit_of[/code]，
-## 生成侧与结算侧共用那一份判据。
-const DIFFICULTY_CONFIGS: Array = [
-	{  # LOW
-		"layers": 4, "min_nodes": 2, "max_nodes": 3,
-		"elite_count": 1, "shop_count": 1, "event_count": 2, "enemy_realm": 1,
-		"ap_cost": 1, "action_spring_count": 1,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
-				"elite": 5, "action_spring": 8},
-	},
-	{  # MEDIUM
-		"layers": 5, "min_nodes": 2, "max_nodes": 4,
-		"elite_count": 2, "shop_count": 1, "event_count": 3, "enemy_realm": 2,
-		"ap_cost": 1, "action_spring_count": 1,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
-				"elite": 5, "action_spring": 8},
-	},
-	{  # HIGH
-		"layers": 5, "min_nodes": 3, "max_nodes": 4,
-		"elite_count": 2, "shop_count": 2, "event_count": 3, "enemy_realm": 3,
-		"ap_cost": 1, "action_spring_count": 1,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
-				"elite": 5, "action_spring": 8},
-	},
-	{  # VERY_HIGH
-		"layers": 6, "min_nodes": 3, "max_nodes": 4,
-		"elite_count": 3, "shop_count": 2, "event_count": 4, "enemy_realm": 4,
-		"ap_cost": 1, "action_spring_count": 1,
-		"weights": {"combat": 40, "event": 30, "shop": 15, "rest": 10,
-				"harvest": 10, "alchemy": 8, "forge": 8, "meditation": 6,
-				"elite": 5, "action_spring": 8},
-	},
-]
+## [br][b]★ 本轮搬了家 ★[/b]：表本体移到 [code]exploration_difficulty_configs.gd[/code]
+## （纯数据，与本层的助手函数没有交集），本处只做转发——[b]读法一个字没改[/b]：
+## [code]es.get("DIFFICULTY_CONFIGS")[/code] / [code]ES_SCRIPT.DIFFICULTY_CONFIGS[/code]
+## 在继承链上照旧解析，字段口径与逐条理由见那份文件的表头。[br]
+## [br][b]为什么现在才搬[/b]：本轮给本文件加了 [code]GeometryRules[/code] 与
+## [code]ap_cost_between[/code]，抵到 300 行软上限（.claude/docs/coding-standards.md）。
+## 搬家挑的是最无争议的一块——常量表既无行为也无依赖，整块搬走不牵动任何调用方。
+const DIFFICULTY_CONFIGS: Array = DifficultyTable.TABLE
 
 ## 入口节点 ID——DAG 编码 [code]layer * 100 + idx[/code]，第 0 层 0 号。
 const ENTRY_NODE_ID: int = 0
@@ -190,11 +154,23 @@ func _get_entry_count(map_id: StringName) -> int:
 	return int(state.get("entry_count", 0))
 
 
-## 检查 from→to 是否邻接（graph[from] 包含 to）。
+## 检查 from→to 是否[b]拓扑邻接[/b]（graph[from] 包含 to）。[br]
+## [br][b]★ 本轮起它不再决定移动可达性 ★[/b]：移动门槛只剩行动力（见
+## [code]move_to_node[/code]），本方法退居为[b]邻接查询[/b]——DAG 结构仍是地图
+## 生成的一部分，边表也仍要留着（旧存档的图快照靠它重建），只是不再挡移动。
+## 留着它当门槛会出现两套可达性：「图说不可达、距离定价说走得动」。
 func _is_reachable(from_node: int, to_node: int) -> bool:
 	if not _node_graph.has(from_node):
 		return false
 	return _node_graph[from_node].has(to_node)
+
+
+## 节点 [param node_id] 是否在本图里（详情表有记录）。[br]
+## [br][b]为什么需要它[/b]：取消邻接门槛后，「不可达」只剩一个真实含义——
+## [b]这一格根本不存在[/b]（越界 ID / 上一张图的残留 / 存档脏数据）。判定与扣费都先
+## 过这一关，免得对着不存在的节点算距离。
+func _node_exists(node_id: int) -> bool:
+	return _node_details.has(node_id)
 
 
 ## 获取节点类型——从 _node_details 读取。
@@ -203,17 +179,30 @@ func _get_node_type(node_id: int) -> int:
 	return int(detail.get("type", NodeType.COMBAT))
 
 
-## 移动到 [param node_id] 的 AP 开销——按当前地图配置解析。[br]
-## [br][b]单一来源[/b]：[method move_to_node]（扣费）与 [method can_move_to]
-## （判定）都走本方法转发到 [ExplorationApRules.cost_for]——两处各解析一遍配置
-## 必然漂移（判定说能走、扣费扣不起）。[br]
-## [br][b]配置从哪来[/b]：[member _map_config] 是 [ExplorationDAGBuilder] 生成期
-## 写入的本图配置快照（[method ExplorationSystem.rebuild_dag_cache] 读档重建时
-## 为空 → 按 GDD 默认 1 处理，不臆造）。[br]
+## 从本图入口走到 [param node_id] 的 AP 开销（旧公开面的保留签名）。[br]
+## [br][b]★ 本轮起价钱取决于「从哪来」★[/b]：同一格从不同地方去价钱不同，这正是
+## 距离定价的目的。本签名被既有调用点（悬停文案 / 冒烟装置）直接用着，不能加参数
+## ——它按[本图入口节点]当起点作答，是一个[b]确定的默认答案[/b]；扣费与判定走
+## [method ap_cost_between]。[br]
 ## [br][param node_id] 目标节点 ID。[br]
 ## [br][b]返回[/b]：非负整数开销（豁免类型恒为 0）。
 func ap_cost_to(node_id: int) -> int:
-	return ApRules.cost_for(_map_config, _get_node_type(node_id))
+	return ap_cost_between(ENTRY_NODE_ID, node_id)
+
+
+## 两节点之间的移动开销——[b]按布局坐标里的距离定价[/b]。[br]
+## [br][b]单一来源[/b]：[method move_to_node]（扣费）与 [method can_move_to_detail]
+## （判定）都转发到 [ExplorationApRules.cost_for_move]，两处各算一遍必然漂移。[br]
+## [br][b]距离从哪来[/b]：[code]exploration_node_geometry.gd[/code] 的坐标公式——
+## 与 UI 画节点用的是同一份（「画出来的距离就是扣费的距离」）。每次现算层计数是
+## O(n)（图 ≤ 24 节点），不值得为它多一份要失效的缓存。[br]
+## [br][param from_node] 出发节点 ID（详情缺失时距离按 0 处理——消耗只会取下限 1）。[br]
+## [param node_id] 目标节点 ID。[br]
+## [br][b]返回[/b]：非负整数开销（豁免类型恒为 0）。
+func ap_cost_between(from_node: int, node_id: int) -> int:
+	var counts: Dictionary = GeometryRules.layer_counts(_node_details)
+	return ApRules.cost_for_move(_map_config,
+			_node_details.get(from_node, {}), _node_details.get(node_id, {}), counts)
 
 
 # === 子模块获取（惰性初始化）===================================================
