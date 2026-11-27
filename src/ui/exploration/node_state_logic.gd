@@ -72,6 +72,23 @@ const PLATE_VISITED: Color = Color(0.10, 0.24, 0.16, 0.85)
 ## 当前节点底衬色（暗金——与 [constant PLATE_VISITED] 同一条「压暗描边色」逻辑）。
 const PLATE_CURRENT: Color = Color(0.28, 0.22, 0.06, 0.85)
 
+## 六态「亮度档」——图标之上叠加的暗纱浓度（0 = 最亮，1 = 全黑）。[br]
+## [br][b]为什么单独立一个键而不是复用 [code]dim[/code][/b]：[code]dim[/code] 是布尔，
+## 只能表达「压暗 / 不压暗」两档，而六态里「与我有关」的三态（当前/可达/已访问）
+## 本身还需要彼此拉开；一个连续档位让「亮度也是一层信息」这句话在数据里成立，
+## 绘制侧直接取来当 alpha 用，不必再写 [code]if[/code] 分支。[br]
+## [br][b]取值口径[/b]：当前/可达 = 0（全亮，玩家现在该看的就是这两格）；
+## 已访问 = 0.35（走过——暗一档，与 [constant VISITED_DIM_ALPHA] 同值同源）；
+## 不可达 = 0.55（灰下去，比已访问更暗：它连「走过」都不是）；
+## 行动力不足 = 0.70（比不可达再暗一档——前面还压着一道红斜线）；
+## 迷雾 = 0.85（几乎只有个灰底轮廓）。
+const VEIL_CURRENT: float = 0.0
+const VEIL_REACHABLE: float = 0.0
+const VEIL_VISITED: float = 0.35
+const VEIL_UNREACHABLE: float = 0.55
+const VEIL_AP_INSUFFICIENT: float = 0.70
+const VEIL_FOGGED: float = 0.85
+
 
 ## 六态分类器（AC-1/AC-2/AC-5 自动化断言目标）。[br]
 ## [br][b]判定顺序[/b]（短路）：迷雾 → 当前 → 已访问 → 依 [method verdict_for] 的结果
@@ -182,42 +199,46 @@ static func state_from_verdict(verdict: Dictionary) -> int:
 ## 就是信息，压一层底衬只会把类型颜色糊掉。[br]
 ## [br][b]emphasis 为什么是布尔而不是线宽[/b]：线宽是视觉规格（住
 ## [code]node_graph_style.gd[/code]），这里是判定——给个「粗一档」的旗标，
-## 由绘制侧取 [code]Style.EMPHASIS_BORDER_WIDTH[/code]，尺寸改动不必回来改本文件。
+## 由绘制侧取 [code]Style.EMPHASIS_BORDER_WIDTH[/code]，尺寸改动不必回来改本文件。[br]
+## [br][b]veil 为什么与 plate 并存[/b]：plate 是「这格有主了」的实色块（只两态有），
+## veil 是覆盖在图标之上的暗纱浓度（六态都有）。前者回答「走没走过」，
+## 后者回答「该不该看它」——两个问题，两个键。四态（当前/可达/已访问/不可达）
+## 一眼分得开靠的正是 veil 给的亮度差 + emphasis 给的描边粗细差 + glow 给的发光差。
 static func node_state_style(state: int) -> Dictionary:
 	match state:
 		NodeState.CURRENT:
 			return {"border": Color("#FFD700"), "border_is_type": false,
 					"marker": "player", "dim": false, "glow": "gold",
 					"slash": false, "fogged": false, "emphasis": true,
-					"plate": PLATE_CURRENT}
+					"plate": PLATE_CURRENT, "veil": VEIL_CURRENT}
 		NodeState.REACHABLE:
 			return {"border": Color.TRANSPARENT, "border_is_type": true,
 					"marker": "", "dim": false, "glow": "pulse_blue",
 					"slash": false, "fogged": false, "emphasis": true,
-					"plate": Color.TRANSPARENT}
+					"plate": Color.TRANSPARENT, "veil": VEIL_REACHABLE}
 		NodeState.VISITED:
-			return {"border": Color("#44CC66"), "border_is_type": false,
+			return {"border": Color("#5AE07A"), "border_is_type": false,
 					"marker": "check", "dim": true, "glow": "",
 					"slash": false, "fogged": false, "emphasis": true,
-					"plate": PLATE_VISITED}
+					"plate": PLATE_VISITED, "veil": VEIL_VISITED}
 		NodeState.UNREACHABLE:
-			return {"border": Color(0.45, 0.45, 0.48), "border_is_type": false,
+			return {"border": Color(0.58, 0.58, 0.62), "border_is_type": false,
 					"marker": "lock", "dim": false, "glow": "",
 					"slash": false, "fogged": false, "emphasis": false,
-					"plate": Color.TRANSPARENT}
+					"plate": Color.TRANSPARENT, "veil": VEIL_UNREACHABLE}
 		NodeState.AP_INSUFFICIENT:
-			return {"border": Color(0.45, 0.45, 0.48), "border_is_type": false,
+			return {"border": Color(0.58, 0.58, 0.62), "border_is_type": false,
 					"marker": "", "dim": false, "glow": "",
 					"slash": true, "fogged": false, "emphasis": false,
-					"plate": Color.TRANSPARENT}
+					"plate": Color.TRANSPARENT, "veil": VEIL_AP_INSUFFICIENT}
 		NodeState.FOGGED:
 			return {"border": Color.TRANSPARENT, "border_is_type": false,
 					"marker": "question", "dim": false, "glow": "",
 					"slash": false, "fogged": true, "emphasis": false,
-					"plate": Color.TRANSPARENT}
+					"plate": Color.TRANSPARENT, "veil": VEIL_FOGGED}
 	return {"border": Color.TRANSPARENT, "border_is_type": false,
 			"marker": "", "dim": false, "glow": "", "slash": false, "fogged": false,
-			"emphasis": false, "plate": Color.TRANSPARENT}
+			"emphasis": false, "plate": Color.TRANSPARENT, "veil": VEIL_FOGGED}
 
 
 ## 节点是否已揭示（迷雾判定）——纯函数。[br]

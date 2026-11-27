@@ -42,6 +42,9 @@ static func draw_legacy(p_host: Control, p_node_id: int) -> void:
 	# 图标：迷雾节点不显示类型——统一灰底（类型不暴露，GDD 界面规则）
 	if fogged:
 		draw_fogged_glyph(p_host, rect, pos)
+		# 迷雾个体暗纱——遮罩现在画在节点[b]之下[/b]，这一格得自己压暗，
+		# 「亮的=知道 / 暗的=还没走到」才读得出来（见 [method draw_fog]）。
+		p_host.draw_rect(rect, Style.FOG_NODE_VEIL_COLOR)
 	else:
 		# 类型色光晕（与六态分支同款——legacy 路径也要能从暗背景里跳出来）
 		var halo: Color = NodeIconAtlasScript.get_color(type_id)
@@ -82,6 +85,9 @@ static func draw_stated(p_host: Control, p_node_id: int) -> void:
 
 	if fogged:
 		draw_fogged_glyph(p_host, rect, pos)
+		# 迷雾个体暗纱——遮罩画在节点[b]之下[/b]（见 [method draw_fog]），
+		# 这一格得自己压暗，「亮的=知道 / 暗的=还不知道」才读得出来。
+		p_host.draw_rect(rect, Style.FOG_NODE_VEIL_COLOR)
 	else:
 		draw_type_icon(p_host, rect, style, type_id)
 
@@ -134,14 +140,19 @@ static func draw_fogged_glyph(p_host: Control, rect: Rect2, pos: Vector2) -> voi
 			NodeIconAtlasScript.get_region(Style.FOG_GLYPH_REGION_COL))
 
 
-## 类型图标 + 状态底衬 + 已访问暗化。[br]
+## 类型图标 + 状态底衬 + 状态暗纱。[br]
 ## [br][b]底衬画在图标之下[/b]：图标是节点类型的信息，底衬是「这格有主了」的信息，
 ## 底衬盖住图标就等于用状态把类型抹掉了。[br]
-## [br][b]三层顺序[/b]（由下到上）：类型色光晕（外扩一圈，让图标从暗背景里跳出来）
-## → 状态底衬（实色块——走过/当前）→ 图标本体 → 已访问暗化叠加。[br]
+## [br][b]四层顺序[/b]（由下到上）：类型色光晕（外扩一圈，让图标从暗背景里跳出来）
+## → 状态底衬（实色块——走过/当前）→ 图标本体 → 状态暗纱（veil——按态压暗）。[br]
 ## [br][b]为什么先画类型色光晕[/b]：节点图标本身就是一块类型色的方片，在深色画布上
 ## 边缘与背景对比弱；外扩一圈同色半透明带出一圈「光晕」，14 种类型在缩到 50%
-## 时也能靠色相区分，而不用凑近读字形。
+## 时也能靠色相区分，而不用凑近读字形。[br]
+## [br][b]暗纱压多少（veil）[/b]：由 [NodeStateLogic.node_state_style] 的
+## [code]veil[/code] 键给出——当前/可达 0（全亮）、已访问 0.35、不可达 0.55、
+## 行动力不足 0.70、迷雾 0.85。亮度本身是一层信息：三米外不用读图标就能分出
+## 「跟我有关的亮着 / 跟我无关的暗下去」。已访问的 [code]dim[/code] 与 veil 同值
+## 同源（0.35），保留 dim 键只是为既有断言与 legacy 读法留路。
 static func draw_type_icon(p_host: Control, rect: Rect2, style: Dictionary,
 		type_id: int) -> void:
 	var halo: Color = NodeIconAtlasScript.get_color(type_id)
@@ -151,9 +162,10 @@ static func draw_type_icon(p_host: Control, rect: Rect2, style: Dictionary,
 	if plate.a > 0.0:
 		p_host.draw_rect(rect.grow(2.0), plate)
 	blit_region(p_host, rect, NodeIconAtlasScript.get_region(type_id))
-	# 已访问稍暗（AC-4）——半透黑叠加（draw_texture_rect_region 无 modulate）
-	if bool(style.get("dim", false)):
-		p_host.draw_rect(rect, Color(0.0, 0.0, 0.0, Style.VISITED_DIM_ALPHA))
+	# 状态暗纱（AC-4——已访问稍暗；本轮扩展到六态，见上方注记）
+	var veil: float = float(style.get("veil", 0.0))
+	if veil > 0.0:
+		p_host.draw_rect(rect, Color(0.0, 0.0, 0.0, veil))
 
 
 ## 外发光——可达脉冲 / 当前节点金环 / 渡劫台类型恒常金脉冲（三者独立叠加）。
@@ -198,15 +210,25 @@ static func draw_state_marker(p_host: Control, marker: String, pos: Vector2,
 			pass
 
 
-## 节点文字标签——锚点跟随悬停缩放（放大时仍贴合图标下沿）。
+## 节点文字标签——类型短标签（入口/战斗/事件/商店/营地/入口/Boss…），
+## 居中排在图标[b]正下方[/b]，锚点跟随悬停缩放（放大时仍贴合图标下沿）。[br]
+## [br][b]为什么带描边[/b]：标签一半压在图标下沿、一半落在深色画布上，两侧底色
+## 一深一亮，纯前景色在任一侧都会糊。先画一圈深色描边再画暖白字，两种底上都读得清。[br]
+## [br][b]为什么居中不左对齐[/b]：左对齐的标签从图标左沿起笔，两字标签（战斗）
+## 与三字标签（渡劫台）视觉重心各偏一边——居中让每个标签都以节点为轴。
 static func draw_node_label(p_host: Control, p_node_id: int, detail: Dictionary,
 		type_id: int, pos: Vector2, node_size: float) -> void:
 	var label: String = str(detail.get("label",
 			NodeIconAtlasScript.get_label(type_id)))
-	var anchor := Vector2(pos.x - node_size * 0.5,
+	var box_width: float = node_size * Style.LABEL_BOX_RATIO
+	var anchor := Vector2(pos.x - box_width * 0.5,
 			pos.y + node_size * 0.5 + Style.LABEL_BASELINE_OFFSET)
-	p_host.draw_string(label_font(p_host), anchor, label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, Style.LABEL_FONT_SIZE)
+	var font: Font = label_font(p_host)
+	p_host.draw_string_outline(font, anchor, label, HORIZONTAL_ALIGNMENT_CENTER,
+			box_width, Style.LABEL_FONT_SIZE, Style.LABEL_OUTLINE_SIZE,
+			Style.LABEL_OUTLINE_COLOR)
+	p_host.draw_string(font, anchor, label, HORIZONTAL_ALIGNMENT_CENTER,
+			box_width, Style.LABEL_FONT_SIZE, Style.LABEL_COLOR)
 
 
 ## 渡劫台「修为尚未圆满」判定（AC-8）——委托 [NodeStateLogic] 纯函数
@@ -251,8 +273,18 @@ static func tooltip_rect(text: String, anchor: Vector2) -> Rect2:
 
 
 ## 迷雾整体覆盖层——单节点绘制（AC-3 合批验证核心）。[br]
-## 一块全画布遮罩 + 已访问/相邻区域挖孔（[code]draw_rect[/code] 覆盖 +
-## 挖孔以背景色圆近似——stub 实现；真实揭雾渐变动画归后续 story）。
+## [br][b]一块全画布遮罩 + 已揭示区域挖孔[/b]（[code]draw_rect[/code] 覆盖 +
+## 挖孔以画布底色圆近似——stub 实现；真实揭雾渐变动画归后续 story）。[br]
+## [br][b]★ 为什么本方法必须画在节点之下 ★[/b]（[method NodeGraphRenderer._draw]
+## 的调用顺序是本轮修的 bug 本体）：遮罩画在节点[b]之上[/b]时，挖孔用的是近黑
+## 底色 [code]Color(0.08,0.09,0.12)[/code]——每个已揭示节点都被这层近黑圆盘
+## 重涂了一遍，14 种类型色一个不剩。1920×1080 取证图里整幅只剩 1388 个金色
+## 边缘像素，平均亮度 10.75（几乎全黑），底就是这里打下的。[br]
+## [br]现在遮罩在节点之下：遮罩给出「雾里 / 雾外」的底色落差，节点画在其上，
+## 已揭示的节点保持自己的亮度，迷雾节点由 [method draw_fogged_glyph] 那条路
+## 自己叠一层个体暗纱（[constant Style.FOG_NODE_VEIL_COLOR]）。[br]
+## [br][b]挖孔仍然要挖[/b]：遮罩压在[b]连线[/b]上，不挖孔的话已揭示区域的连线
+## 会跟迷雾区域一样暗——走过的金色路径是玩家最该一眼看到的东西。
 static func draw_fog(p_host: Control, p_content_rect: Rect2,
 		p_fogged: Array, p_revealed: Array) -> void:
 	if p_fogged.is_empty():
@@ -260,7 +292,7 @@ static func draw_fog(p_host: Control, p_content_rect: Rect2,
 	var margin: Vector2 = Vector2(Style.FOG_MARGIN, Style.FOG_MARGIN)
 	p_host.draw_rect(Rect2(p_content_rect.position - margin,
 			p_content_rect.size + margin * 2.0), Style.FOG_COLOR)
-	# 挖孔：已访问 + 当前节点的可见区域以背景色圆近似「揭开的洞」
+	# 挖孔：已揭示区域以画布底色圆盖回遮罩——「把雾拿掉」，不是「再盖一层近黑」
 	for hole_pos: Vector2 in p_revealed:
 		p_host.draw_circle(hole_pos, Style.FOG_HOLE_RADIUS, Style.FOG_HOLE_COLOR)
 

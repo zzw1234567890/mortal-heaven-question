@@ -17,9 +17,11 @@ extends Control
 ## [br][b]绘制策略[/b]（ADR-0031 §5 合批）：[br]
 ##   - **节点**：单一自绘 [code]_draw()[/code]——每节点 3-4 笔（图集 region + 边框 +
 ## 文字 + 标记）；图标统一走 [NodeIconAtlas] 图集[br]
-##   - **连线**：同节点自绘 [code]draw_line[/code]（已访问金色实线 / 未访问暗色虚线）[br]
-##   - **迷雾**：整体覆盖层（一块全画布半透遮罩，已访问节点区域挖孔）+ 迷雾节点
-## 个体 ❓ 标记——ADR-0031「迷雾遮罩等大面积重复元素合批渲染」的直接验证[br]
+##   - **连线**：同节点自绘 [code]draw_line[/code]（已访问金色实线 / 未访问亮灰虚线 /
+##     雾中暗灰虚线）[br]
+##   - **迷雾**：整体覆盖层（一块半透遮罩压在[b]连线之上、节点之下[/b]，
+## 已揭示区域挖孔）+ 迷雾节点个体暗纱 + ❓标记——ADR-0031「迷雾遮罩等大面积
+## 重复元素合批渲染」的直接验证（分层顺序的理由见 [method _draw]）[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不缓存游戏状态——数据为渲染输入快照；
 ## [code]states[/code] 为纯函数判定结果（渲染参数非游戏状态）。[br]
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——纯 [code]_draw()[/code] 响应
@@ -54,8 +56,10 @@ const EDGE_WIDTH: float = Style.EDGE_WIDTH
 const DASH_LENGTH: float = Style.DASH_LENGTH
 ## 已访问路径连线色——金色实线（GDD 连线规则）。
 const EDGE_VISITED_COLOR: Color = Style.EDGE_VISITED_COLOR
-## 未访问路径连线色——暗灰（GDD 连线规则）。
+## 未访问路径连线色——亮灰（GDD 连线规则）。
 const EDGE_UNVISITED_COLOR: Color = Style.EDGE_UNVISITED_COLOR
+## 雾中路径连线色——两端未揭示的连线（压在遮罩语义下，见 [method _draw]）。
+const EDGE_FOGGED_COLOR: Color = Style.EDGE_FOGGED_COLOR
 ## 已访问节点边框色——绿色（GDD 界面规则「已访问：绿色边框 + ✓」）。
 const NODE_VISITED_BORDER: Color = Style.NODE_VISITED_BORDER
 ## 当前节点边框色——金色（GDD「当前节点：金色边框」）。
@@ -179,12 +183,19 @@ func _is_tribulation_unready(detail: Dictionary) -> bool:
 func _draw() -> void:
 	if nodes.is_empty():
 		return
+	# ★ 顺序即语义 ★：迷雾遮罩画在[b]连线之上、节点之下[/b]。[br]
+	# [br][b]为什么不能画在最后[/b]（本轮修的 bug）：原先 [code]_draw_fog()[/code] 排
+	# 在节点循环之后，而挖孔用的是近黑底色——1920×1080 取证图里每个已揭示节点都被
+	# 那层近黑圆盘重涂了一遍，14 种类型色一个不剩，整幅平均亮度 10.75（几乎全黑）。
+	# [br][b]为什么也不能干脆不画[/b]：遮罩负责「雾里 / 雾外」的底色落差，且压在
+	# 连线上——本图的结构必须靠它挡住。分层后：遮罩压暗[b]连线[/b]（结构不泄露）、
+	# 节点浮在其上（亮）、迷雾节点自己叠个体暗纱（暗）——三件事各归各位。
+	_draw_fog()
 	_draw_edges()
 	for node_id: int in nodes.keys():
 		if not Layout.is_layer_revealed(nodes, reveal_max_layer, node_id):
 			continue  # 逐层展开浮现（AC-1）——未显现的层不绘制
 		Painter.draw_node(self, node_id)
-	_draw_fog()
 	if hovered_node >= 0:
 		_draw_hover_tooltip(hovered_node)
 
@@ -215,16 +226,32 @@ func _on_mouse_exited() -> void:
 		hover_changed.emit(-1)
 
 
-## 绘制全部连线（已访问金色实线 / 未访问暗色虚线）。
+## 绘制全部连线（已访问金色实线 / 未访问亮灰虚线 / 雾中暗灰虚线）。[br]
+## [br][b]为什么连线自己判一次「两端是否都在雾里」[/b]：迷雾遮罩画在连线之下
+## （见 [method _draw] 的顺序注记），连线不再被遮罩压暗——不补这一档，雾里雾外
+## 的线一样亮，整张图的拓扑一眼看穿。判定与迷雾集合同源
+## （[method NodeGraphLayout.fogged_positions] 用的是同一份六态）。
 func _draw_edges() -> void:
+	var fogged: Array = _fogged_positions()
 	for from_id: int in graph.keys():
 		var from_pos: Vector2 = get_node_position(from_id)
 		for to_id: int in graph[from_id]:
 			var to_pos: Vector2 = get_node_position(to_id)
 			if _is_edge_visited(from_id, to_id):
 				draw_line(from_pos, to_pos, EDGE_VISITED_COLOR, EDGE_WIDTH)
+			elif _is_edge_in_fog(fogged, from_id, to_id):
+				_draw_dashed_line(from_pos, to_pos, EDGE_FOGGED_COLOR)
 			else:
 				_draw_dashed_line(from_pos, to_pos, EDGE_UNVISITED_COLOR)
+
+
+## 一条连线是否整个埋在雾里——两端位置都在迷雾集合内。[br]
+## [br][b]按位置判而不是按 ID[/b]：迷雾集合由 [NodeGraphLayout] 以坐标列表给出
+## （它已经是渲染层的口径），渲染层再按 ID 重判一次等于把判定写两处。
+func _is_edge_in_fog(p_fogged: Array, p_from: int, p_to: int) -> bool:
+	var from_pos: Vector2 = get_node_position(p_from)
+	var to_pos: Vector2 = get_node_position(p_to)
+	return p_fogged.has(from_pos) and p_fogged.has(to_pos)
 
 
 ## 悬停 tooltip 绘制（AC-10）——内容组装与盒子绘制委托 [NodeGraphNodePainter]
