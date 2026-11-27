@@ -71,6 +71,9 @@ static func draw_legacy(p_host: Control, p_node_id: int) -> void:
 		Landmark.draw_labels(p_host, _place_of(p_host, p_node_id), detail, pos,
 				Style.NODE_SIZE, not fogged, type_id)
 
+	# 悬停 / 键盘焦点统一高亮——legacy 路径同样有悬停（[method draw_highlight]）。
+	draw_highlight(p_host, p_node_id, pos, Style.NODE_SIZE)
+
 
 ## 六态分支——样式经 [NodeStateLogic.node_state_style] 查询后逐项渲染。[br]
 ## [b]悬停放大[/b]（AC-5）：悬停的可达节点按 [constant Style.HOVER_SCALE_RATIO] 放大
@@ -127,10 +130,9 @@ static func draw_stated(p_host: Control, p_node_id: int) -> void:
 	# 状态标记（玩家/✓/锁/❓——AC-1 逐项一致断言目标）
 	draw_state_marker(p_host, str(style.get("marker", "")), pos, rect, node_size)
 
-	# 键盘焦点环（A3——松石青外环；鼠标悬停优先显示——ADR-0031 §4）
-	if p_node_id == p_host.focused_node and p_node_id != p_host.hovered_node:
-		p_host.draw_arc(pos, node_size * 0.5 + Style.FOCUS_RING_MARGIN, 0.0, TAU,
-				Style.FOCUS_RING_SEGMENTS, Style.FOCUS_RING_COLOR, Style.BORDER_WIDTH)
+	# 悬停 / 键盘焦点统一高亮（A3 + AC-10——见 [NodeGraphRenderer.is_node_highlighted]）。
+	# 鼠标与键盘走同一条通道，故两者画出来是同一套视觉（双输入对等）。
+	draw_highlight(p_host, p_node_id, pos, node_size)
 
 	# 两行文字（缩放联动——50% 隐藏）：地名恒显，类型行迷雾时不画
 	# 锚点跟随悬停缩放（终审 LOW）——放大时标签仍贴合图标下沿，不出现错位
@@ -166,13 +168,10 @@ static func draw_fogged_glyph(p_host: Control, rect: Rect2, pos: Vector2) -> voi
 ## 「覆盖」，它必须压在图标[b]之上[/b]才连图标一起压下去——否则已访问/不可达的节点
 ## 图标仍是全亮的，亮度这条状态轴就废了。[br]
 ## [br][b]为什么光晕与底衬是圆而不是方[/b]：方形光晕的四角会从圆盘后面露出来，「一枚
-## 圆印」立刻读回「一个方块 + 一个圆」（反馈原话：「不能用简单的方块/圆圈/线条」）。
-## 两者都是围绕节点的「一圈」，圆形才是它们本来的形状。[br]
+## 圆印」立刻读回「一个方块 + 一个圆」（反馈原话：「不能用简单的方块/圆圈/线条」）。[br]
 ## [br][b]暗纱压多少（veil）[/b]：由 [NodeStateLogic.node_state_style] 的
-## [code]veil[/code] 键给出——当前/可达 0（全亮）、已访问 0.35、不可达 0.55、
-## 行动力不足 0.70、迷雾 0.85。亮度本身是一层信息：三米外不用读图标就能分出
-## 「跟我有关的亮着 / 跟我无关的暗下去」。已访问的 [code]dim[/code] 与 veil 同值
-## 同源（0.35），保留 dim 键只是为既有断言与 legacy 读法留路。[br]
+## [code]veil[/code] 键给出（逐态数值的唯一出处是那张表，此处不重复）。亮度本身是
+## 一层信息：三米外不用读图标就能分出「跟我有关的亮着 / 跟我无关的暗下去」。[br]
 ## [br][b]暗纱为什么仍是方形[/b]：它压的是[b]整个节点格[/b]（含边框与文字所在的方块），
 ## 不是图标那一圈——按圆压会留下四角未压的亮块，反而更花。
 static func draw_type_icon(p_host: Control, rect: Rect2, style: Dictionary,
@@ -223,6 +222,30 @@ static func draw_glow(p_host: Control, style: Dictionary, type_id: int,
 	# 精英红边框已由 border_is_type 类型主色覆盖）
 	if type_id == Style.TRIBULATION_TYPE and not fogged:
 		p_host.draw_circle(pos, node_size * 0.5 + 5.0, Style.TRIBULATION_GLOW_COLOR)
+
+
+## 悬停 / 键盘焦点统一高亮——[b]外发光 + 外环[/b]，画在节点[b]之外[/b]。[br]
+## [br][b]★ 两层顺序（由下到上）★[/b]：外发光（半透明青色面）→ 高亮环（松石青细环）。[br]
+## [br][b]为什么画在节点之外[/b]（任务书硬约束「高亮不得破坏六态区分」）：六态的画法在
+## [method draw_type_icon] / [method draw_glow] / 边框那几笔里，改动任何一笔都会与
+## 「亮度 / 描边粗细 / 是否发光」三根状态轴纠缠。把高亮推到节点以外，三根轴一个像素
+## 没动——高亮是「包围盒」而不是「重涂」。环色取松石青（六态配色表里没有的色相），
+## 线宽取 3.5（边框表只有 2.5 / 4.5 两档）——两个值都不与任何状态撞，见
+## [constant Style.HIGHLIGHT_RING_WIDTH] 的注记。[br]
+## [br][b]为什么还要一层发光[/b]：环只有 3.5px，自动适配缩放下落到屏幕不足 3px；
+## 发光是一块面，把节点周围的局部亮度整体抬起来，「鼠标移上去节点要亮」才兑现得了。[br]
+## [br][param p_host] 绘制宿主。[br][param p_node_id] 节点 ID（高亮判定按它问宿主）。[br]
+## [param p_pos] 节点中心。[br][param p_node_size] 节点边长（已含可达态的悬停放大）。
+static func draw_highlight(p_host: Control, p_node_id: int, p_pos: Vector2,
+		p_node_size: float) -> void:
+	if not bool(p_host.call(&"is_node_highlighted", p_node_id)):
+		return
+	var half: float = p_node_size * 0.5
+	p_host.draw_circle(p_pos, half + Style.HIGHLIGHT_GLOW_GROW,
+			Style.HIGHLIGHT_GLOW_COLOR)
+	p_host.draw_arc(p_pos, half + Style.FOCUS_RING_MARGIN, 0.0, TAU,
+			Style.FOCUS_RING_SEGMENTS, Style.FOCUS_RING_COLOR,
+			Style.HIGHLIGHT_RING_WIDTH)
 
 
 ## 状态标记绘制——[code]player[/code]（人形）/ [code]check[/code]（✓）/

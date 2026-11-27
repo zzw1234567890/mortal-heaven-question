@@ -33,6 +33,9 @@ const EdgePainter := preload(
 const Tooltip := preload("res://src/ui/exploration/node_graph_tooltip_painter.gd")
 ## 六态样式查询（判定与绘制共用同一套枚举）。
 const NodeStateLogicScript := preload("res://src/ui/exploration/node_state_logic.gd")
+## 悬停提示文案组装（纯函数——see [NodeGraphHoverText]）。
+const HoverTextScript := preload(
+		"res://src/ui/exploration/node_graph_hover_text.gd")
 ## 地名池（节点 → 地名——渲染快照里没有地名，绘制期按 map_id + node_id 取）。
 const PlaceCatalogScript := preload(
 		"res://src/feature/exploration/exploration_place_catalog.gd")
@@ -115,6 +118,9 @@ var map_id: StringName = &""
 ## 地名覆盖（[code]{node_id: 地名}[/code]）——测试与截图脚本注入确定性文案用；
 ## 空字典时走 [code]ExplorationPlaceCatalog.place_for[/code]（正常路径）。
 var place_overrides: Dictionary = {}
+## 地图配置快照（[method set_ap_cost_hint] 注入）——[method hover_text_for] 的
+## 行动力消耗短语按它算。空字典 = 按 GDD 默认开销（与配置缺失时的扣费行为一致）。
+var _map_config: Dictionary = {}
 
 ## === 内部 ===================================================================
 

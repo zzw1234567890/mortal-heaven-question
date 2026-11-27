@@ -1,7 +1,8 @@
 class_name NodeGraphRenderer
-extends "res://src/ui/exploration/node_graph_renderer_decl.gd"
+extends "res://src/ui/exploration/node_graph_renderer_ground.gd"
 ## NodeGraphRenderer —— 节点图渲染基座[b]方法面[/b]（继承链尾段——声明面见
-## [code]node_graph_renderer_decl.gd[/code]）。
+## [code]node_graph_renderer_decl.gd[/code]，地面层见
+## [code]node_graph_renderer_ground.gd[/code]）。
 ##
 ## [b]职责[/b]：接收 DAG 数据（[code]setup(graph, nodes)[/code]），渲染地形 + 小径 +
 ## 节点 + 迷雾，作为缩放平移容器 [NodeGraphViewport] 的内容宿主。[br]
@@ -93,12 +94,60 @@ func get_node_position(node_id: int) -> Vector2:
 
 ## 节点绘制缩放倍率——悬停的可达节点按 [constant HOVER_SCALE_RATIO] 放大，
 ## 其余（含已访问/不可达/未悬停）为 1.0。[br]
-## [b]单一来源[/b]：绘制路径与命中检测共用同一判定，悬停指标可被测试直接断言。
+## [b]单一来源[/b]：绘制路径与命中检测共用同一判定，悬停指标可被测试直接断言。[br]
+## [br][b]为什么只放大可达态[/b]：放大是「这一步能走」的承诺，六态全覆盖的悬停
+## 反馈走 [method is_node_highlighted] 那条通道（见 [constant
+## NodeGraphStyle.HIGHLIGHT_RING_WIDTH] 的注记）。
 func get_node_draw_scale(node_id: int) -> float:
 	if node_id == hovered_node and states.has(node_id) \
 			and int(states[node_id]) == NodeStateLogicScript.NodeState.REACHABLE:
 		return HOVER_SCALE_RATIO
 	return 1.0
+
+
+## 节点是否处于[b]高亮[/b]（鼠标悬停 或 键盘/手柄焦点）——六态全覆盖。[br]
+## [br][b]★ 为什么单开一条通道而不是扩 [method get_node_draw_scale] ★[/b]：
+## 放大倍率被既有集成断言钉死了语义（[code]test_node_move_interaction.gd[/code]
+## 的 [code]test_hover_visited_node_no_scale_vs_reachable_scale[/code] /
+## [code]test_hover_unreachable_node_no_scale[/code] 明确要求非可达态悬停时
+## 返回 1.0）——那条断言守的是「放大=可操作承诺」这条 UX 规则，不该为了让六态都有
+## 反馈而放宽。于是高亮做成[b]独立的布尔通道[/b]：不改倍率、不改六态样式表，
+## 只由绘制侧在节点之外多画一圈环 + 一层发光。[br]
+## [br][b]双输入对等[/b]（.claude/rules/ui-code.md「所有交互元素必须同时支持
+## 键盘/鼠标和手柄」）：鼠标悬停与键盘/手柄焦点走[b]同一个[/b]布尔，因此两者
+## 画出来的是同一套视觉（同色同宽），不是「两套长得像的视觉」。[br]
+## [br][b]优先级[/b]（ADR-0031 §4 双焦点双视觉）：鼠标悬停优先——两者同时存在时
+## 焦点环不额外叠加，避免一圈套一圈。[br]
+## [br][param node_id] 待判节点。[br]
+## [br][b]返回[/b]：true = 该节点应画高亮环。
+func is_node_highlighted(node_id: int) -> bool:
+	return node_id >= 0 and (node_id == hovered_node or node_id == focused_node)
+
+
+## 悬停文案（AC-10）——[b]地名 + 类型与描述 + 行动力消耗[/b]三段拼装。[br]
+## [br][b]为什么单开一个纯函数[/b]：任务书要求「仅预留接口：能拿到悬停节点 + 一个
+## [code]hover_text_for(node)[/code]」——它不读 GSM、不写状态、不构建任何 UI，
+## 输入是渲染快照 + 一个节点 ID，输出是字符串，故可被单测逐字断言
+## （ADR-0031 §2 零状态所有权）。[br]
+## [br][b]组装体在 [NodeGraphHoverText][/b]（三段各自的取数与理由见该模块文档）；
+## 本方法是转发 + 持有快照的那个入口。[br]
+## [br][b]本轮不构建浮动提示[/b]：接口先行，UI 归后续 story——待办登记见
+## [code]docs/tech-debt-register.md[/code] 的 DEBT-EUI-008-1。[br]
+## [br][param node_id] 节点 ID（越界/未知节点返回空串——调用方据此不显示）。[br]
+## [br][b]返回[/b]：一行文案（节点不存在时为空串）。
+func hover_text_for(node_id: int) -> String:
+	return HoverTextScript.text_for(self, node_id)
+
+
+## 注入地图配置快照——[method hover_text_for] 的行动力消耗短语按它算。[br]
+## [br][b]为什么不做成 [method setup] 的第七个参数[/b]：[code]setup[/code] 的签名被
+## 多处调用点（含测试）直接使用，加参数会牵动一圈；配置只影响悬停文案这一件事，
+## 单独一个注入点更小、也更容易在换图时重置。[br]
+## [br][param p_map_config] 地图配置字典（可空——空字典按 GDD 默认开销处理，
+## 与「配置缺失时的扣费行为」一致）。
+func set_ap_cost_hint(p_map_config: Dictionary) -> void:
+	_map_config = p_map_config
+	queue_redraw()
 
 
 ## 内容包围盒（节点 + 边距）——Viewport 整图适配的计算基准。
@@ -223,71 +272,17 @@ func hit_test_any(point: Vector2) -> int:
 
 
 ## 地面层绘制——整块地图插画 + 压暗 + 暗角 + 迷雾遮罩（见 [NodeGraphGroundLayer]）。[br]
-## [br][b]铺的矩形 = 可视区域[/b]（[method visible_local_rect]），不是内容包围盒。[br]
-## [br][b]★ 两个矩形不同源 ★[/b]（第二轮地图化）：地形按[b]可视区域[/b]铺（地图铺满
-## 整块画布、左右不再有黑带），迷雾按[b]内容包围盒[/b]铺（雾只压还没走到的那片山域）。
-## 把迷雾也铺满视口会得到「除已揭示节点周围一小圈之外全屏皆雾」——开局只揭示 5 个
-## 节点，整幅图会压成一片近黑。两个矩形的分工与读数见
-## [constant NodeGraphStyle.FOG_MARGIN] 的注记。[br]
-## [br][b]顺序语义[/b]：地面在连线[b]之下[/b]——遮罩压暗的是它盖住的连线，而孔里
-## 露出的地形是亮的；节点再画在其上（见 [method _draw]）。
-func _draw_ground() -> void:
-	_ground.call(&"draw", self, visible_local_rect(), _content_rect, map_id,
-			_fogged_positions().is_empty(), _revealed_positions())
-
-
-## 当前[b]可视区域[/b]（渲染器局部坐标）——地形与迷雾的铺满矩形。[br]
-## [br][b]换算[/b]：屏幕坐标 = 局部坐标 × zoom + offset（见 [NodeGraphViewport] 的
-## 变换口径），故局部可视矩形 = [code](-offset / zoom, size / zoom)[/code]——
-## 渲染器由 [code]PRESET_FULL_RECT[/code] 铺满视口，[member size] 就是视口尺寸。[br]
-## [br][b]为什么由渲染器自己推[/b]：变换的两半（[code]zoom[/code]/[code]offset[/code]）
-## 分别住在视口上，[member scale] 与 [member position] 是它们的写入结果——从自己的
-## 变换反推可视区域，就不必给「谁把矩形传进来」再开一条跨模块的参数通道。[br]
-## [br][b]退化保护[/b]：缩放为 0（进树前 / 折叠视口）时返回 [Rect2]，调用方据此跳过
-## 绘制，免得除零炸出一片 NaN 顶点。[br]
-## [br][b]返回[/b]：可视区域（可能含负宽高之外的位置——位置本身可以为负，这正是
-## 「画布比视口大」的正常情形）。
-func visible_local_rect() -> Rect2:
-	if scale.x <= 0.0 or scale.y <= 0.0:
-		return Rect2()
-	return Rect2(-position.x / scale.x, -position.y / scale.y,
-			size.x / scale.x, size.y / scale.y)
+## 实现体在链中段 [code]node_graph_renderer_ground.gd[/code]（本轮从中拆出）。
 
 
 ## === 内部辅助 ===============================================================
 
 ## 布局计算——layer 纵向 / idx 横向居中；同步内容包围盒（换算委托
-## [NodeGraphLayout]，本类只持有结果——零轮询：不每帧重算）。
+## [NodeGraphLayout]，本类只持有结果——零轮询：不每帧重算）。[br]
+## [br][b]为什么留在链尾而不是跟着地面那段走[/b]：[method setup] 调用它、
+## [method get_node_position] / [method get_content_rect] / [method hit_test_node]
+## 读它的结果——它是本类[b]所有[/b]几何读法的写入点，不属于「地面」那一件事。
 func _layout() -> void:
 	_positions = Layout.compute_positions(nodes)
 	_content_rect = Layout.compute_content_rect(_positions)
 
-
-## 节点是否迷雾覆盖（legacy 近似——六态注入时不走这里）。
-func _is_fogged(node_id: int) -> bool:
-	return Layout.is_fogged(graph, visited, current_node, node_id)
-
-
-## 已揭示集合（legacy）：已访问 + 当前节点 + 当前节点的邻接（前向 + 后向）。
-func _revealed_set() -> Array:
-	return Layout.revealed_set(graph, visited, current_node)
-
-
-## 迷雾覆盖的节点位置列表（AC-3 采样用——迷雾节点计数）。
-func _fogged_positions() -> Array:
-	return Layout.fogged_positions(graph, nodes, _positions, states, visited,
-			current_node)
-
-
-## 已揭示节点位置列表（迷雾挖孔位置）。
-func _revealed_positions() -> Array:
-	return Layout.revealed_positions(graph, nodes, _positions, states, visited,
-			current_node)
-
-
-## 迷雾覆盖多边形（带缓存——见 [member NodeGraphGroundLayer._fog_polygons]）。[br]
-## [br][b]为什么把这个口子留在渲染器上[/b]：单测要按「同一份输入只算一次」断言缓存
-## 生效（见 [code]test_fog_polygon_cache.gd[/code]）；实现体在 [NodeGraphGroundLayer]，
-## 本方法是纯转发。
-func fog_polygon_cache_size(p_area: Rect2) -> int:
-	return (_ground.call(&"polygons_for", p_area, _revealed_positions()) as Array).size()

@@ -146,49 +146,28 @@ const FOG_GLYPH_REGION_COL: int = FogStyle.FOG_GLYPH_REGION_COL
 const FOG_FEATHER_BAND: float = FogStyle.FOG_FEATHER_BAND
 const FOG_FEATHER_STEPS: int = FogStyle.FOG_FEATHER_STEPS
 
-## === 地形底图（本轮新增——节点图改成「地图」）=============================
-
-## 地形底色（插画之下的兜底）——比 [code]AppBackdrop[/code] 的 #0E0F16 略暖，
-## 压在地图插画下当「土黄纸底」，插画缺失（[code]MapCardArt.texture_of[/code] 返回
-## null）时也不是一块露底的冷黑。
-const TERRAIN_BASE_COLOR: Color = Color(0.075, 0.070, 0.058)
-## 地图插画不透明度——盖在底色之上。[br]
-## [br][b]为什么不是铺满[/b]：这张图是[b]画布[/b]不是主视觉，节点图标、地名与连线才是
-## 要读的东西；插画太实会把 14 种类型色压成一堆花纹。单靠这里的 α 会让亮部整体偏亮、
-## 暗部糊掉，故先铺一层保留细节，再由 [constant TERRAIN_DARKEN_COLOR] 统一拉到暗底。[br]
-## [br][b]第二轮 0.34 → 0.50（提亮）[/b]：第一轮取证整幅平均亮度 14.6，任务书要求
-## 30–45。地形现在铺满整块画布（见 [constant GROUND_MARGIN]），是画面占比最大的一层，
-## 插画透明度是提亮的第一杠杆；剩下的亮度缺口交给压暗层与暗角去补。
-const TERRAIN_IMAGE_ALPHA: float = 0.50
-## 插画之上的压暗叠层（暖黑——与 [constant TERRAIN_BASE_COLOR] 同族）。[br]
-## [br][b]为什么必须单独一层[/b]：见 [constant TERRAIN_IMAGE_ALPHA] 的注记——
-## 压暗要在「插画已经铺过」之后发生，透明度与亮度才能分开调。[br]
-## [br][b]第二轮 0.55 → 0.40（提亮）[/b]：插画之上的第二杠杆，0.55 在新版插画透明度
-## 下压过头了。[br]
-## [br][b]为什么不能压到 0.3 以下[/b]：插画亮部（均值 200）会一路顶到 90+，地名对比度
-## 被吃掉（任务书红线：不得低于 100）。提亮的上限由这条红线定，不是由亮度目标定。
-const TERRAIN_DARKEN_COLOR: Color = Color(0.055, 0.050, 0.045, 0.40)
-## vignette 暗角色与最外圈浓度、圈数。[br]
-## [br][b]为什么用同心框带而不是叠实心矩形[/b]：实心矩形层层叠在中心上，
-## alpha 累加会把整块画布压黑（[method NodeGraphTerrain.draw_vignette] 有详述）。
-## 框带互不重叠，浓度就是本表的值。
-const VIGNETTE_COLOR: Color = Color(0.02, 0.018, 0.016)
-## 最外圈的浓度（内圈按 1/(i+1) 衰减）。[br]
-## [br][b]第二轮 0.55 → 0.34（提亮）[/b]：暗角是画面四边的第三杠杆。0.55 之下
-## 左右两侧（地形已铺满）仍被压到亮度 20 上下、「亮度>60 占比」恒为 0.00%，
-## 「左右有没有黑带」这条验收读出来仍是个含糊的结果——地形在，但读不到。
-## 降到 0.34 后四边地形可见、左右竖带内出现真正的亮部，而四角仍然收暗、
-## 视线留在中央。[br]
-## [br][b]为什么不能取消暗角[/b]：插画铺满整块画布之后，边角处的地图花纹与中央
-## 同样亮，节点簇就没有「画布中心」的视觉落点；暗角是让视线留在节点上的那一层。
-const VIGNETTE_ALPHA: float = 0.34
-## 暗角带总宽相对地形短边的比例（三条带各自 = 总宽 / 圈数）。[br]
-## [br][b]第二轮 0.22 → 0.18（收窄）[/b]：地形铺满后这条带子按短边算足有 150+ 局部
-## 像素（1.5× 下 227 屏幕像素），左右 200px 的采样带整条落在最外圈里——暗角不再是
-## 「四角收边」而成了「半张画面」。收窄到 0.18 后暗角回到边缘装饰的位置。
-const VIGNETTE_BAND_RATIO: float = 0.18
-## 暗角圈数（3 = 看得出过渡，再多只是加绘制调用）。
-const VIGNETTE_STEPS: int = 3
+## === 地形底图（常量已拆到 node_graph_style_terrain.gd——此处逐条转出）=========
+## [br][b]为什么拆[/b]：本表已贴 300 行软上限，而本轮要给地形这一组数[b]重新标定[/b]
+## （背景清晰化），要写的注记比原来更长。那一组数只被 [code]node_graph_terrain.gd[/code]
+## 一个文件读，与尺寸/连线/配色/迷雾不相交。[br]
+## [br][b]为什么转出而不是让调用方改名字[/b]：全项目写的是
+## [code]Style.TERRAIN_IMAGE_ALPHA[/code] 一族（含既有断言），转出后一个引用点都不用动；
+## 单一出处仍在 [NodeGraphStyleTerrain]。[br]
+## [br][b]★ 本轮标定：背景不许「虚」★[/b]：插画从半透明铺法改成[b]实铺[/b]
+## （α 0.50 → 1.0），压暗量按「地名对比度 ≥ 100」的红线重算（0.40 → 0.42），
+## 暗角再收一档（0.34 → 0.24）——推导与红线算术见被转出模块的注记。
+const TerrainStyle := preload("res://src/ui/exploration/node_graph_style_terrain.gd")
+## 地形底色（插画之下的兜底——插画缺失时不露冷黑底）。
+const TERRAIN_BASE_COLOR: Color = TerrainStyle.TERRAIN_BASE_COLOR
+## 地图插画不透明度（本轮 1.0——实铺，见 [NodeGraphStyleTerrain] 的推导）。
+const TERRAIN_IMAGE_ALPHA: float = TerrainStyle.TERRAIN_IMAGE_ALPHA
+## 插画之上的压暗叠层（本轮 0.42——由地名对比度红线算出）。
+const TERRAIN_DARKEN_COLOR: Color = TerrainStyle.TERRAIN_DARKEN_COLOR
+## vignette 暗角色 / 最外圈浓度 / 带比 / 圈数（本轮再收一档，退回「边缘收边」）。
+const VIGNETTE_COLOR: Color = TerrainStyle.VIGNETTE_COLOR
+const VIGNETTE_ALPHA: float = TerrainStyle.VIGNETTE_ALPHA
+const VIGNETTE_BAND_RATIO: float = TerrainStyle.VIGNETTE_BAND_RATIO
+const VIGNETTE_STEPS: int = TerrainStyle.VIGNETTE_STEPS
 
 ## === 节点图标（常量已拆到 node_graph_style_icon.gd——此处逐条转出）===========
 ## [br][b]为什么拆[/b]：本表已贴 300 行软上限，而图标那一组数只被「画一个类型图标」
@@ -256,13 +235,37 @@ const MARKER_GRAY: Color = Color(0.78, 0.78, 0.80)
 
 ## 悬停可达节点放大倍率（story-005 AC-5——UX 规格 110%）。[br]
 ## [b]单一视觉来源[/b]：悬停放大归渲染层（渲染器消费 hovered_node），
-## 交互组件不再叠加放大环（避免两套视觉来源——ADR-0031 §4）。
+## 交互组件不再叠加放大环（避免两套视觉来源——ADR-0031 §4）。[br]
+## [br][b]为什么只给可达态[/b]：放大是「这一步能走」的承诺，而不可达/AP 不足/
+## 已访问的悬停不该暗示可操作。该口径由既有集成断言锁定
+## （[code]test_node_move_interaction.gd[/code] 的两条 hover 倍率断言），
+## 故六态全覆盖的悬停反馈走 [constant HIGHLIGHT_RING_COLOR] 那条通道而不是改本值。
 const HOVER_SCALE_RATIO: float = 1.1
-## 键盘焦点环色——松石青（ADR-0031 §4「键盘/手柄焦点：松石青 2px 外部光环」）。
+## 键盘焦点环色——松石青（ADR-0031 §4「键盘/手柄焦点：松石青 2px 外部光环」）。[br]
+## [br][b]本轮起它也是鼠标悬停环的色[/b]：两种输入走同一条高亮通道（见
+## [constant HIGHLIGHT_RING_WIDTH]），双输入对等的落点就是「同一套视觉」，
+## 而不是「两套长得像的视觉」。
 const FOCUS_RING_COLOR: Color = Color("#40E0D0")
 ## 焦点环半径相对节点半宽的余量（px）与分段数。
 const FOCUS_RING_MARGIN: float = 6.0
 const FOCUS_RING_SEGMENTS: int = 32
+## 悬停 / 键盘焦点统一高亮的环线宽（px）。[br]
+## [br][b]为什么比 [constant BORDER_WIDTH] 粗 1.4 倍[/b]：任务书要求悬停「更粗的轮廓」，
+## 而节点边框本身已有 2.5 / 4.5 两档（六态强调态用后者）——高亮环若取 2.5 会与普通态
+## 边框同宽、取 4.5 会与强调态边框同宽，两种都读成「这格的状态变了」而不是「鼠标在这儿」。
+## 3.5 是一个[b]边框宽度表里不存在[/b]的值：它在任何六态下都不与状态混淆。[br]
+## [br][b]为什么不破坏六态区分[/b]：环画在节点[b]之外[/b]（半径 = 半宽 +
+## [constant FOCUS_RING_MARGIN]），六态的边框/底衬/暗纱/标记一个都没动；环还统一是
+## 松石青——一个六态配色表里没有的色相，不会被误读成某一种状态。
+const HIGHLIGHT_RING_WIDTH: float = 3.5
+## 高亮外发光色与它相对节点半宽的外扩量（px）。[br]
+## [br][b]为什么还要一层发光[/b]：环只有 3.5px，在 1920 取证图的自动适配缩放下
+## （约 0.9×）落到屏幕上不足 3px——「鼠标移上去节点要亮」这句反馈靠一条细环单独兑现
+## 不了。发光是一块[b]面[/b]，它让整个节点周围的局部亮度抬起来，缩放下也读得出。[br]
+## [br][b]为什么是半透明青而不是白[/b]：白光晕会把节点压成灰白（盖住类型色）；
+## 青色与状态色（金/绿/灰）都不同族，且 α 0.30 只抬亮度不改色相。
+const HIGHLIGHT_GLOW_COLOR: Color = Color(0.25, 0.88, 0.82, 0.30)
+const HIGHLIGHT_GLOW_GROW: float = 10.0
 
 ## === 悬停 tooltip ==========================================================
 
@@ -274,14 +277,12 @@ const TOOLTIP_HEIGHT: float = 24.0
 const TOOLTIP_PADDING: float = 8.0
 ## tooltip 文字基线相对盒子左上角的下移量（px）。
 const TOOLTIP_BASELINE: float = 16.0
-## 地形（插画 + 压暗 + 暗角）相对[b]可视矩形[/b]的外扩量（px）。[br]
+## 地形（插画 + 压暗 + 暗角）相对[b]可视矩形[/b]的外扩量（px）——单点出处见
+## [NodeGraphStyleTerrain.GROUND_MARGIN]。[br]
 ## [br][b]第二轮：地形矩形从「内容包围盒」改成「可视矩形」[/b]。此前地形跟着内容走，
 ## 而内容图很窄——1920×1080 取证图里地形只占中间约 33% 宽，左右各 640px 是画布底色
-## （左右各 200px 竖带实测「亮度>60 占比」0.00%，即两条纯黑带）。[br]
-## [br][b]为什么还要外扩[/b]：可视矩形是「刚好铺满」的边界，浮点取整与缩放过渡的中间帧
-## 上可能差零点几像素，露出的就是底色细缝。8px 在 1.5× 下只有 5px；溢出部分由
-## [code]NodeGraphViewport.clip_contents[/code] 裁掉，不会涂到顶栏上。
-const GROUND_MARGIN: float = 8.0
+## （左右各 200px 竖带实测「亮度>60 占比」0.00%，即两条纯黑带）。
+const GROUND_MARGIN: float = TerrainStyle.GROUND_MARGIN
 ## 迷雾遮罩相对[b]内容包围盒[/b]的外扩量（px）——与地形[b]不同源[/b]，这是刻意的。[br]
 ## [br][b]为什么迷雾不跟着地形铺满视口[/b]：遮罩的形状是「矩形减去已揭示圆孔」，铺满
 ## 视口就等于「除已揭示节点周围一小圈之外全屏皆雾」——开局只有 5 个节点揭示，整幅图

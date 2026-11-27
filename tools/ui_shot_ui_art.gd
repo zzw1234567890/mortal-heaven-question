@@ -12,10 +12,13 @@ extends Node
 ## [code]tools/ui_shot_identity_720.png[/code] / [code]tools/ui_shot_node_graph.png[/code]
 ## （1920×1080，节点图地图化总览）/ [code]tools/ui_shot_node_graph_720.png[/code]
 ## （1280×720，小屏可读性）/ [code]tools/ui_shot_node_graph_closeup.png[/code]
-## （放大到 150% 的特写——节点地名的字面对比取证）。[br]
-## [br][b]本轮只跑节点图四张[/b]（图标 + 柔边迷雾两处改动的取证图）：身份页那两张与本轮
-## 改动无关，重拍只会把三张已提交的 PNG 重新编码一遍（无意义的 diff 噪声）。要全跑时把
-## [code]_shot_identity[/code] 两行放回 [method _run] 即可（方法原样保留）。[br]
+## （放大到 150% 的特写——节点地名的字面对比取证）/
+## [code]tools/ui_shot_node_graph_zoomed_out.png[/code]（俯瞰——地形铺满视口）/
+## [code]tools/ui_shot_node_hover.png[/code]（悬停高亮——真实鼠标事件驱动，见
+## [method _shot_node_hover]）。[br]
+## [br][b]本轮只跑节点图五张[/b]（背景清晰化 + 悬停高亮两处改动的取证图）：身份页那两张
+## 与本轮改动无关，重拍只会把三张已提交的 PNG 重新编码一遍（无意义的 diff 噪声）。要全跑时
+## 把 [code]_shot_identity[/code] 两行放回 [method _run] 即可（方法原样保留）。[br]
 ## [br]来源: 本轮任务书任务三（地图化）/ 任务四（地名可读性取证）、先前先例
 ## [code]tools/ui_pass_shot.gd[/code]。
 
@@ -51,7 +54,8 @@ func _run() -> void:
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_closeup", CLOSEUP_ZOOM, true)
 	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_zoomed_out",
 			ZOOMED_OUT_ZOOM, false)
-	print("[ui-art] 完成，四张图在 " + ProjectSettings.globalize_path(OUT_DIR))
+	await _shot_node_hover()
+	print("[ui-art] 完成，五张图在 " + ProjectSettings.globalize_path(OUT_DIR))
 	get_tree().quit()
 
 
@@ -171,6 +175,102 @@ func _report_places(p_screen: Variant) -> void:
 				str(r.call(&"place_name_of", node_id)),
 				int((detail[node_id] as Dictionary).get("type", -1)),
 				int(states.get(node_id, -1))])
+
+
+## 悬停高亮取证（本轮任务 D）——[b]真实鼠标事件驱动[/b]，不直接写 [code]hovered_node[/code]：
+## 悬停这条路只有走 [code]NodeGraphRenderer._gui_input[/code] 的 [code]mouse_motion[/code]
+## 分支才算验证过，直接赋值只能证明「画得出来」。[br]
+## [br][b]落点怎么算[/b]：屏幕坐标 = 局部坐标 × zoom + offset（[NodeGraphViewport] 的
+## 变换口径），故把节点中心换算到视口坐标再 [code]push_input[/code]。[br]
+## [br][b]为什么优先选可达节点[/b]：可达态还有 110% 放大，取证图信息量最大；迷雾节点
+## 的文案是「?」，看不出地名那一行。
+func _shot_node_hover() -> void:
+	await _clear_holder()
+	IntentScript.clear()
+	ExplorationIntentScript.clear()
+	_force_window_size(OUT_W, OUT_H)
+	ExplorationIntentScript.request_new_run()
+	var scene: Control = ExplorationScene.instantiate() as Control
+	_mount(scene)
+	await _settle(150)
+	var screen: Variant = scene.get(&"node_graph_screen")
+	if screen == null:
+		print("[ui-art] 悬停取证：节点图屏幕未挂载")
+		return
+	var graph_viewport: Variant = screen.get(&"viewport")
+	var r: Variant = screen.call(&"renderer")
+	await _settle(3)
+	# 教程覆盖层带着 MOUSE_FILTER_STOP 铺在节点图上（首次进入必然出现），
+	# 不关掉它真实的鼠标事件会被它吃掉、永远走不到渲染器的悬停分支。
+	_dismiss_tutorial()
+	await _settle(3)
+	var target: int = _pick_hover_target(r)
+	var local: Vector2 = r.call(&"get_node_position", target)
+	var at: Vector2 = (graph_viewport as Control).global_position \
+			+ local * float(graph_viewport.get(&"zoom")) \
+			+ (graph_viewport.get(&"offset") as Vector2)
+	_mouse_move_to(at)
+	await _settle(5)
+	print("[ui-art] 悬停目标 %d 落点 %s → hovered=%d 高亮=%s"
+			% [target, str(at), int(r.get(&"hovered_node")),
+			str(r.call(&"is_node_highlighted", target))])
+	print("[ui-art] 悬停文案: %s" % str(r.call(&"hover_text_for", target)))
+	print("[ui-art] 调试 rect=%s scale=%s pos=%s viewport=%s/%s 命中=%s"
+			% [str((r as Control).get_global_rect()), str((r as Control).scale),
+			str((r as Control).position), str((graph_viewport as Control).global_position),
+			str((graph_viewport as Control).size),
+			str(r.call(&"_has_point", local))])
+	await _capture("ui_shot_node_hover")
+	_force_window_size(OUT_W, OUT_H)
+
+
+## 关掉首次进入的教程覆盖层——[method _shot_node_hover] 的前置条件。[br]
+## [br][b]为什么必须关[/b]：[code]NodeTutorialOverlay[/code] 是整屏
+## [code]MOUSE_FILTER_STOP[/code] 的 Control，铺在节点图之上，只对左键与回车有反应
+## ——真实鼠标移动被它吃掉，[code]NodeGraphRenderer._gui_input[/code] 永远收不到
+## [code]mouse_motion[/code]，取证图会拍成「跑通了但什么都没发生」。[br]
+## [br][b]为什么走它自己的 [code]skip(3)[/code] 而不是直接 [code]visible = false[/code][/b]：
+## 那条公开出口会停表、释放焦点、写完成标记并发 [code]tutorial_skipped[/code]——
+## 与玩家点一下跳过是同一条路，取证状态与真机一致。
+func _dismiss_tutorial() -> void:
+	if _holder == null:
+		return
+	var overlay: Node = _holder.find_child("NodeTutorialOverlay", true, false)
+	if overlay == null:
+		print("[ui-art] 悬停取证：未见教程覆盖层（很可能已完成过）")
+		return
+	overlay.call(&"skip", 3)
+	print("[ui-art] 悬停取证：教程覆盖层已跳过 visible=%s"
+			% str((overlay as Control).visible))
+
+
+## 悬停目标——优先可达态（=1），否则取第一个已揭示节点（六态 0-4）。
+func _pick_hover_target(p_r: Variant) -> int:
+	var states: Dictionary = p_r.get(&"states") as Dictionary
+	var ids: Array = (p_r.get(&"nodes") as Dictionary).keys()
+	ids.sort()
+	var fallback: int = int(ids[0]) if not ids.is_empty() else -1
+	for node_id: int in ids:
+		var state: int = int(states.get(node_id, -1))
+		if state == 1:
+			return node_id
+		if fallback == int(ids[0]) and state >= 0 and state <= 4:
+			fallback = node_id
+	return fallback
+
+
+## 派发一次真实鼠标移动事件到根视口（见 [method _shot_node_hover]）。[br]
+## [br][b]为什么要 warp + parse 两下[/b]：只做 [code]push_input[/code] 时引擎的 GUI
+## 悬停分发不认（[code]gui_get_hovered_control[/code] 仍为空）——取证图会拍到一张
+## 没有高亮的图，而那种「跑通了但什么都没发生」是最难发现的一类失败。故先把系统光标
+## 真的挪过去（引擎随即产出一次真实 motion），再补一次显式投递兜底。
+func _mouse_move_to(p_at: Vector2) -> void:
+	var event := InputEventMouseMotion.new()
+	event.position = p_at
+	event.global_position = p_at
+	Input.warp_mouse(p_at)
+	get_viewport().push_input(event)
+	print("[ui-art] 悬停控制: %s" % str(get_viewport().gui_get_hovered_control()))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
