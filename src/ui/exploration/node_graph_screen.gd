@@ -191,11 +191,14 @@ func _on_move_feedback(toast_text: String, node_id: int) -> void:
 ## [param map_data] 渲染快照（graph/nodes/visited/current_node/ap_remaining）。
 func _on_map_generated(_map_id: StringName, map_data: Dictionary) -> void:
 	_current_snapshot = map_data
+	# map_id 取自[b]快照[/b]而非信号参数：信号参数在 stub 降级路径下与快照可能不同源，
+	# 而地形插画与节点地名都按快照渲染（渲染只有一份输入）。
 	renderer().setup(
 			map_data.get("graph", {}),
 			map_data.get("nodes", {}),
 			map_data.get("visited", []),
-			int(map_data.get("current_node", -1)))
+			int(map_data.get("current_node", -1)),
+			StringName(str(map_data.get("map_id", _map_id))))
 	_refresh_ap_label(map_data)
 	_reveal().call(&"recompute_states", renderer(), map_data)
 	var nodes: Dictionary = map_data.get("nodes", {})
@@ -230,7 +233,8 @@ func _on_node_moved(_from_node: int, to_node: int, ap_remaining: int) -> void:
 			_current_snapshot.get("graph", {}),
 			_current_snapshot.get("nodes", {}),
 			visited,
-			to_node)
+			to_node,
+			StringName(str(_current_snapshot.get("map_id", ""))))
 	_refresh_ap_label(_current_snapshot)
 	_reveal().call(&"recompute_states", renderer(), _current_snapshot)
 	# S17-006：快照随移动重下发（理由见 [method NodeGraphComponentAssembly.push_snapshot]）。

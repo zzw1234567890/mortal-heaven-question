@@ -153,3 +153,56 @@ static func is_layer_revealed(p_nodes: Dictionary, p_reveal_max_layer: int,
 		return true
 	var layer: int = int(p_nodes.get(p_node_id, {}).get("layer", 0))
 	return layer <= p_reveal_max_layer
+
+
+## 迷雾覆盖区多边形——[b]内容矩形挖掉已揭示圆孔[/b]后的剩余面（可能多块）。[br]
+## [br][b]为什么不再「画一块矩形 + 用底色圆盖回去」[/b]：那套做法要求挖孔色等于
+## 画布底色，而画布现在是[b]地图插画[/b]——底色圆会在插画上糊出一圈纯色圆盘，
+## 每个已揭示节点都像贴了一块补丁（1920×1080 取证图里一眼可见）。真正的挖孔只能
+## 靠多边形裁剪：遮罩面本身不带孔，孔里露出的就是下面的地形。[br]
+## [br][b]为什么放纯函数模块[/b]：这是一次几何换算（同 [method compute_positions]），
+## 输入矩形 + 圆心列表、输出顶点表，不持状态；渲染器负责缓存与失效（见
+## [code]NodeGraphRenderer._fog_polygons[/code]）。[br]
+## [br][b]为什么缓存是必需的[/b]：[method Geometry2D.clip_polygons] 是 O(孔数 × 块数)
+## 的逐孔裁剪（实测 24 孔 × 20 边形 ≈ 1.2ms），每帧重算会吃掉帧预算的十分之一；
+## 而它只在「已揭示集合变了」时才需要重算。[br]
+## [br][param p_rect] 内容矩形（遮罩铺满的范围）。[br]
+## [param p_revealed] 已揭示节点位置列表（圆心）。[br]
+## [param p_radius] 挖孔半径。[br]
+## [param p_segments] 圆的边数（20 = 在 60px 半径下已看不出多边形状）。[br]
+## [br][b]返回[/b]：多边形数组（每块 ≥ 3 顶点）；[param p_revealed] 为空时是
+## 整块矩形本身。
+static func fog_polygons(p_rect: Rect2, p_revealed: Array, p_radius: float,
+		p_segments: int = 20) -> Array:
+	var pieces: Array = [rect_polygon(p_rect)]
+	for center: Vector2 in p_revealed:
+		var hole: PackedVector2Array = circle_polygon(center, p_radius, p_segments)
+		var next: Array = []
+		for piece: PackedVector2Array in pieces:
+			for remainder: PackedVector2Array in Geometry2D.clip_polygons(piece, hole):
+				if remainder.size() >= 3:
+					next.append(remainder)
+		pieces = next
+		if pieces.is_empty():
+			break  # 整张图都揭开了——后面没有可裁的东西
+	return pieces
+
+
+## 矩形的多边形顶点（顺时针，4 点）。
+static func rect_polygon(p_rect: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([
+		p_rect.position,
+		p_rect.position + Vector2(p_rect.size.x, 0.0),
+		p_rect.position + p_rect.size,
+		p_rect.position + Vector2(0.0, p_rect.size.y),
+	])
+
+
+## 圆的多边形近似顶点（[param p_segments] 边形）。
+static func circle_polygon(p_center: Vector2, p_radius: float,
+		p_segments: int = 20) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i: int in maxi(p_segments, 3):
+		var angle: float = TAU * float(i) / float(maxi(p_segments, 3))
+		points.append(p_center + Vector2(cos(angle), sin(angle)) * p_radius)
+	return points

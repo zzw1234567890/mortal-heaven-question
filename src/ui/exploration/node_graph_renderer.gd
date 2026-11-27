@@ -1,27 +1,29 @@
 class_name NodeGraphRenderer
-extends Control
-## NodeGraphRenderer —— 节点图渲染基座（exploration-ui Story 001 stub + S16-3 状态接入）。
+extends "res://src/ui/exploration/node_graph_renderer_decl.gd"
+## NodeGraphRenderer —— 节点图渲染基座[b]方法面[/b]（继承链尾段——声明面见
+## [code]node_graph_renderer_decl.gd[/code]）。
 ##
-## [b]职责[/b]：接收 DAG 数据（[code]setup(graph, nodes)[/code]），渲染节点 +
-## 连线 + 迷雾覆盖，作为缩放平移容器 [NodeGraphViewport] 的内容宿主。[br]
-## [br][b]S16-3 状态接入[/b]：新增 [method set_states]——六态样式经
-## [NodeStateLogic] 纯函数判定后由宿主（NodeGraphScreen）注入。注入后节点绘制
-## 走六态分支（边框/标记/暗化/斜线/发光）；未注入时保留 Story 001 legacy 分支
-## （[code]_is_fogged[/code]/visited/current 直判）——两者绘制路径互斥。[br]
-## [br][b]三块内容已拆出[/b]（本文件守 300 行软上限）：[br]
-##   - 视觉常量 → [code]node_graph_style.gd[/code]（本文件以 [code]const[/code]
-##     转发其中被外部读到的几个，引用点一字未改）；[br]
-##   - 几何换算（坐标/包围盒/迷雾集合）→ [code]node_graph_layout.gd[/code]；[br]
-##   - 单节点绘制 → [code]node_graph_node_painter.gd[/code]。[br]
+## [b]职责[/b]：接收 DAG 数据（[code]setup(graph, nodes)[/code]），渲染地形 + 小径 +
+## 节点 + 迷雾，作为缩放平移容器 [NodeGraphViewport] 的内容宿主。[br]
+## [br][b]S16-3 状态接入[/b]：[method set_states]——六态样式经 [NodeStateLogic] 纯函数
+## 判定后由宿主（NodeGraphScreen）注入。注入后节点绘制走六态分支（边框/标记/暗化/
+## 斜线/发光）；未注入时保留 Story 001 legacy 分支（[code]_is_fogged[/code]/
+## visited/current 直判）——两者绘制路径互斥。[br]
+## [br][b]绘制内容已分四块[/b]（本文件守 300 行软上限）：[br]
+##   - 视觉常量 + 信号 + 渲染输入字段 → [code]node_graph_renderer_decl.gd[/code]（链首）；[br]
+##   - 几何换算（坐标 / 包围盒 / 迷雾集合）→ [code]node_graph_layout.gd[/code]；[br]
+##   - 单节点绘制（地标 + 两行文字）→ [code]node_graph_node_painter.gd[/code]；[br]
+##   - 地形 + 迷雾挖孔 → [code]node_graph_ground_layer.gd[/code]；[br]
+##   - 小径 → [code]node_graph_edge_painter.gd[/code]。[br]
 ## 本文件剩下的是「什么时候画什么」——绘制编排、输入驱动、命中检测与外部契约。[br]
 ## [br][b]绘制策略[/b]（ADR-0031 §5 合批）：[br]
 ##   - **节点**：单一自绘 [code]_draw()[/code]——每节点 3-4 笔（图集 region + 边框 +
-## 文字 + 标记）；图标统一走 [NodeIconAtlas] 图集[br]
-##   - **连线**：同节点自绘 [code]draw_line[/code]（已访问金色实线 / 未访问亮灰虚线 /
-##     雾中暗灰虚线）[br]
-##   - **迷雾**：整体覆盖层（一块半透遮罩压在[b]连线之上、节点之下[/b]，
-## 已揭示区域挖孔）+ 迷雾节点个体暗纱 + ❓标记——ADR-0031「迷雾遮罩等大面积
-## 重复元素合批渲染」的直接验证（分层顺序的理由见 [method _draw]）[br]
+##     文字 + 标记）；图标统一走 [NodeIconAtlas] 图集[br]
+##   - **小径**：同一次 [code]_draw()[/code] 内自绘（已走过金色实线 / 未走过淡土灰
+##     虚线 / 雾中暗土灰虚线）[br]
+##   - **迷雾**：整块遮罩（多边形挖孔，压在[b]小径之上、节点之下[/b]）+ 迷雾节点
+##     个体暗纱 + ❓标记——ADR-0031「迷雾遮罩等大面积重复元素合批渲染」的直接验证
+##     （分层顺序的理由见 [method _draw]）[br]
 ## [br][b]零状态所有权[/b]（ADR-0031 §2）：不缓存游戏状态——数据为渲染输入快照；
 ## [code]states[/code] 为纯函数判定结果（渲染参数非游戏状态）。[br]
 ## [br][b]零轮询[/b]：无 [code]_process()[/code]——纯 [code]_draw()[/code] 响应
@@ -30,102 +32,41 @@ extends Control
 ## [br]来源: ADR-0031、design/gdd/exploration-ui-system.md §2、
 ## exploration-ui Story 001 / 003。
 
-## 视觉规格（常量唯一来源）。
-const Style := preload("res://src/ui/exploration/node_graph_style.gd")
-## 几何换算（坐标 / 包围盒 / 迷雾集合，纯函数）。
-const Layout := preload("res://src/ui/exploration/node_graph_layout.gd")
-## 单节点绘制（legacy + 六态）。
-const Painter := preload("res://src/ui/exploration/node_graph_node_painter.gd")
-## 六态样式查询（判定与绘制共用同一套枚举）。
-const NodeStateLogicScript := preload("res://src/ui/exploration/node_state_logic.gd")
-
-## === Visual 常量（转发 [NodeGraphStyle]——外部既有引用点不变）==================
-## [br][b]为什么留一层转发[/b]：这些常量被测试与相邻 UI 直接读
-## （[code]r.TRIBULATION_TYPE[/code] / [code]renderer.HOVER_SCALE_RATIO[/code]
-## 等），转发后「常量住在哪」可以继续演进而不牵动调用方。
-
-## 节点图标显示边长（px——GDD 调优参数「节点图标大小 48×48px」）。
-const NODE_SIZE: float = Style.NODE_SIZE
-## 层间距（px）——GDD 调优参数「节点间距（最小）80px」的纵向分量。
-const LAYER_GAP: float = Style.LAYER_GAP
-## 同层节点间距（px）——横向分量。
-const NODE_GAP: float = Style.NODE_GAP
-## 节点连线线宽（px）——GDD「节点连线线宽 2px」。
-const EDGE_WIDTH: float = Style.EDGE_WIDTH
-## 虚线段长（未访问路径——GDD「暗色虚线」）。
-const DASH_LENGTH: float = Style.DASH_LENGTH
-## 已访问路径连线色——金色实线（GDD 连线规则）。
-const EDGE_VISITED_COLOR: Color = Style.EDGE_VISITED_COLOR
-## 未访问路径连线色——亮灰（GDD 连线规则）。
-const EDGE_UNVISITED_COLOR: Color = Style.EDGE_UNVISITED_COLOR
-## 雾中路径连线色——两端未揭示的连线（压在遮罩语义下，见 [method _draw]）。
-const EDGE_FOGGED_COLOR: Color = Style.EDGE_FOGGED_COLOR
-## 已访问节点边框色——绿色（GDD 界面规则「已访问：绿色边框 + ✓」）。
-const NODE_VISITED_BORDER: Color = Style.NODE_VISITED_BORDER
-## 当前节点边框色——金色（GDD「当前节点：金色边框」）。
-const NODE_CURRENT_BORDER: Color = Style.NODE_CURRENT_BORDER
-## 未知类型边框色——中性暗（迷雾内节点不显示类型色）。
-const NODE_DEFAULT_BORDER: Color = Style.NODE_DEFAULT_BORDER
-## 迷雾节点图集 region——❓占位（stub：暗灰底白环，类型不暴露）。
-const FOG_GLYPH_REGION_COL: int = Style.FOG_GLYPH_REGION_COL
-## 渡劫台节点类型 ID——锚定 [code]ExplorationSystem.NodeType.TRIBULATION[/code]（=9）。
-const TRIBULATION_TYPE: int = Style.TRIBULATION_TYPE
-## 渡劫台金色脉冲外发光色（AC-11——类型恒常视觉）。
-const TRIBULATION_GLOW_COLOR: Color = Style.TRIBULATION_GLOW_COLOR
-## 悬停可达节点放大倍率（story-005 AC-5——UX 规格 110%）。[br]
-## [b]单一视觉来源[/b]：悬停放大归渲染层，交互组件不再叠加放大环。
-const HOVER_SCALE_RATIO: float = Style.HOVER_SCALE_RATIO
-
-## === 信号 ==================================================================
-
-## 悬停目标变化（[param node_id] = -1 表示无悬停）。交互层如需响应悬停可订阅；
-## 悬停视觉本身由本类绘制（单一来源）。
-signal hover_changed(node_id: int)
-
-## === 渲染输入（stub 数据——003 接真实源）=================================
-
-## 邻接表 {node_id: [child_id, ...]}——ExplorationSystem.generate_map().graph 同构。
-var graph: Dictionary = {}
-## 节点详情 {node_id: {type, layer, idx, ...}}——同构 node_details。
-var nodes: Dictionary = {}
-## 已访问节点集合（Array——含到达节点）。
-var visited: Array = []
-## 当前节点 ID（金色边框 + 迷雾豁免）。
-var current_node: int = -1
-## 六态样式映射 {node_id: NodeState 枚举值}——[method set_states] 注入
-## （S16-3；空字典走 legacy 分支）。
-var states: Dictionary = {}
-## 文字标签显隐——缩放联动（Viewport 在 50% 缩放时置 false——模式库「画布缩放平移」）。
-var show_labels: bool = true
-## 已揭示的最大层索引（-1 = 全部揭示）。逐层展开浮现动画（0.8s）由宿主 tween
-## 驱动本字段逐步递增——超过该层的节点不绘制（AC-1 逐层浮现；动画时序归手动证据）。
-var reveal_max_layer: int = -1
-## 当前悬停节点 ID（-1 = 无）——[method hit_test_node] 命中检测维护，
-## tooltip 与悬停放大据此绘制（AC-10；0.3s 浮出时序归手动证据）。[br]
-## [b]悬停放大[/b]（AC-5）：悬停视觉单一来源在本类（ADR-0031 §4 鼠标悬停态）。
-var hovered_node: int = -1
-## 键盘焦点节点 ID（-1 = 无）——[method set_focused_node] 注入（A3 键盘路径）。[br]
-## 焦点环为松石青 2px 外环（ADR-0031 §4 双焦点双视觉）。鼠标悬停优先显示。
-var focused_node: int = -1
-
-## === 内部 ===================================================================
-
-## 节点中心坐标缓存——setup 时布局计算（零轮询：不每帧重算）。
-var _positions: Dictionary = {}
-## 内容包围盒——Viewport 整图适配基准（复位/初始 fit 用）。
-var _content_rect: Rect2 = Rect2()
-
-
 ## 注入 DAG 数据并重布局。[br]
 ## [param graph]: 邻接表。[br][param nodes]: 节点详情（含 layer/idx）。[br]
-## [param visited]: 已访问节点 ID 列表。[br][param current_node]: 当前节点 ID。
-func setup(graph: Dictionary, nodes: Dictionary, visited: Array = [], current_node: int = -1) -> void:
+## [param visited]: 已访问节点 ID 列表。[br][param current_node]: 当前节点 ID。[br]
+## [param p_map_id]: 地图 ID（地形插画与节点地名用；缺省空 = 不覆盖已有值）。
+## [br][b]空值不覆盖[/b]：[method NodeGraphScreen._on_node_moved] 重下发快照时
+## 不一定带 map_id，把地形抹成空白等于「走一步地图就没了」。
+func setup(graph: Dictionary, nodes: Dictionary, visited: Array = [],
+		current_node: int = -1, p_map_id: StringName = &"") -> void:
 	self.graph = graph
 	self.nodes = nodes
 	self.visited = visited
 	self.current_node = current_node
+	if not str(p_map_id).is_empty():
+		self.map_id = p_map_id
 	_layout()
 	queue_redraw()
+
+
+## 注入地名覆盖表（[code]{node_id: 地名}[/code]）——空字典回到地名池。[br]
+## [br][b]为什么留这个口子[/b]：截图脚本与单测需要[b]确定性[/b]的地名（不随节点
+## 排布变化），而真实地图的地名由池 + 节点 ID 决定（见
+## [code]ExplorationPlaceCatalog.place_for[/code]）。覆盖表只影响绘制，不写任何状态。
+func set_place_overrides(overrides: Dictionary) -> void:
+	place_overrides = overrides
+	queue_redraw()
+
+
+## 节点地名（覆盖表优先，否则走地名池）——[b]绘制与断言共用的唯一入口[/b]。[br]
+## [br][b]返回[/b]：地名（未登记地图为「无名之地 %d」）。
+func place_name_of(node_id: int) -> String:
+	if place_overrides.has(node_id):
+		return str(place_overrides[node_id])
+	var detail: Dictionary = nodes.get(node_id, {})
+	return PlaceCatalogScript.place_for(map_id, node_id,
+			int(detail.get("place_seed", 0)))
 
 
 ## 注入六态样式映射（S16-3）——宿主经 [NodeStateLogic] 判定后传入。[br]
@@ -183,14 +124,19 @@ func _is_tribulation_unready(detail: Dictionary) -> bool:
 func _draw() -> void:
 	if nodes.is_empty():
 		return
-	# ★ 顺序即语义 ★：迷雾遮罩画在[b]连线之上、节点之下[/b]。[br]
-	# [br][b]为什么不能画在最后[/b]（本轮修的 bug）：原先 [code]_draw_fog()[/code] 排
-	# 在节点循环之后，而挖孔用的是近黑底色——1920×1080 取证图里每个已揭示节点都被
+	# ★ 顺序即语义 ★（本轮地图化后为五层，由下到上）：[br]
+	#   1. 地形底图（插画 + 压暗 + 暗角）——「这是一张地图」的底；[br]
+	#   2. 迷雾遮罩（挖掉已揭示区域）——压暗[b]连线[/b]，本轮起改为多边形挖孔（见
+	#      [code]NodeGraphLayout.fog_polygons[/code]），孔里露出的是地形而不是补丁；[br]
+	#   3. 连线（小径）——走在雾[b]上[/b]，于是雾里的路被遮罩压暗、雾外的路是亮的；[br]
+	#   4. 节点（地标）——浮在一切之上；[br]
+	#   5. 悬停 tooltip——最上。[br]
+	# [br][b]为什么不能把迷雾画在最后[/b]（更早一轮修的 bug）：原先 [code]_draw_fog()[/code]
+	# 排在节点循环之后，而挖孔用的是近黑底色——1920×1080 取证图里每个已揭示节点都被
 	# 那层近黑圆盘重涂了一遍，14 种类型色一个不剩，整幅平均亮度 10.75（几乎全黑）。
-	# [br][b]为什么也不能干脆不画[/b]：遮罩负责「雾里 / 雾外」的底色落差，且压在
-	# 连线上——本图的结构必须靠它挡住。分层后：遮罩压暗[b]连线[/b]（结构不泄露）、
-	# 节点浮在其上（亮）、迷雾节点自己叠个体暗纱（暗）——三件事各归各位。
-	_draw_fog()
+	# [br][b]为什么迷雾仍必须在连线之上[/b]：遮罩负责「雾里 / 雾外」的底色落差，压在
+	# 连线上才能让结构不泄露；节点浮在其上（亮）、迷雾节点自己叠个体暗纱（暗）。
+	_draw_ground()
 	_draw_edges()
 	for node_id: int in nodes.keys():
 		if not Layout.is_layer_revealed(nodes, reveal_max_layer, node_id):
@@ -226,32 +172,14 @@ func _on_mouse_exited() -> void:
 		hover_changed.emit(-1)
 
 
-## 绘制全部连线（已访问金色实线 / 未访问亮灰虚线 / 雾中暗灰虚线）。[br]
-## [br][b]为什么连线自己判一次「两端是否都在雾里」[/b]：迷雾遮罩画在连线之下
-## （见 [method _draw] 的顺序注记），连线不再被遮罩压暗——不补这一档，雾里雾外
-## 的线一样亮，整张图的拓扑一眼看穿。判定与迷雾集合同源
-## （[method NodeGraphLayout.fogged_positions] 用的是同一份六态）。
+## 绘制全部连线（小径）——转引 [NodeGraphEdgePainter]。[br]
+## [br][b]为什么留一层转发[/b]：宿主（本类）才是持有渲染输入快照的那一个，绘制
+## 模块只读不写；转发方法让「谁画线」可以继续演进而不牵动调用方。[br]
+## [br][b]迷雾位置列表在调用点现取[/b]（不缓存）：它的口径与挖孔同源
+## （[method NodeGraphLayout.fogged_positions] 用的是同一份六态），缓存出第二份
+## 就会分叉——那种分叉的表现是「线比雾亮一格」，肉眼几乎看不出来。
 func _draw_edges() -> void:
-	var fogged: Array = _fogged_positions()
-	for from_id: int in graph.keys():
-		var from_pos: Vector2 = get_node_position(from_id)
-		for to_id: int in graph[from_id]:
-			var to_pos: Vector2 = get_node_position(to_id)
-			if _is_edge_visited(from_id, to_id):
-				draw_line(from_pos, to_pos, EDGE_VISITED_COLOR, EDGE_WIDTH)
-			elif _is_edge_in_fog(fogged, from_id, to_id):
-				_draw_dashed_line(from_pos, to_pos, EDGE_FOGGED_COLOR)
-			else:
-				_draw_dashed_line(from_pos, to_pos, EDGE_UNVISITED_COLOR)
-
-
-## 一条连线是否整个埋在雾里——两端位置都在迷雾集合内。[br]
-## [br][b]按位置判而不是按 ID[/b]：迷雾集合由 [NodeGraphLayout] 以坐标列表给出
-## （它已经是渲染层的口径），渲染层再按 ID 重判一次等于把判定写两处。
-func _is_edge_in_fog(p_fogged: Array, p_from: int, p_to: int) -> bool:
-	var from_pos: Vector2 = get_node_position(p_from)
-	var to_pos: Vector2 = get_node_position(p_to)
-	return p_fogged.has(from_pos) and p_fogged.has(to_pos)
+	EdgePainter.draw_edges(self, _fogged_positions())
 
 
 ## 悬停 tooltip 绘制（AC-10）——内容组装与盒子绘制委托 [NodeGraphNodePainter]
@@ -293,9 +221,15 @@ func hit_test_any(point: Vector2) -> int:
 	return -1
 
 
-## 迷雾整体覆盖层——单节点绘制（AC-3 合批验证核心），委托 [NodeGraphNodePainter]。
-func _draw_fog() -> void:
-	Painter.draw_fog(self, _content_rect, _fogged_positions(), _revealed_positions())
+## 地面层绘制——整块地图插画 + 压暗 + 暗角 + 迷雾遮罩（见 [NodeGraphGroundLayer]）。[br]
+## [br][b]铺的矩形 = 内容包围盒外扩 [code]Style.FOG_MARGIN[/code][/b]：地形与遮罩
+## 同尺寸，遮罩[b]挖孔[/b]时孔里露出的才是地形；地形比遮罩小的话，雾外会露出一圈
+## 没被地图盖住的底色边。[br]
+## [br][b]顺序语义[/b]：地面在连线[b]之下[/b]——遮罩压暗的是它盖住的连线，而孔里
+## 露出的地形是亮的；节点再画在其上（见 [method _draw]）。
+func _draw_ground() -> void:
+	_ground.call(&"draw", self, _content_rect, map_id,
+			_fogged_positions().is_empty(), _revealed_positions())
 
 
 ## === 内部辅助 ===============================================================
@@ -329,7 +263,9 @@ func _revealed_positions() -> Array:
 			current_node)
 
 
-## 虚线绘制——Godot 4.6 内建 [method draw_dashed_line]（API 探测确认签名：
-## from, to, color, width=-1, dash=2.0, aligned=true——dash 为段长）。
-func _draw_dashed_line(from: Vector2, to: Vector2, color: Color) -> void:
-	draw_dashed_line(from, to, color, EDGE_WIDTH, DASH_LENGTH)
+## 迷雾覆盖多边形（带缓存——见 [member NodeGraphGroundLayer._fog_polygons]）。[br]
+## [br][b]为什么把这个口子留在渲染器上[/b]：单测要按「同一份输入只算一次」断言缓存
+## 生效（见 [code]test_fog_polygon_cache.gd[/code]）；实现体在 [NodeGraphGroundLayer]，
+## 本方法是纯转发。
+func fog_polygon_cache_size(p_area: Rect2) -> int:
+	return (_ground.call(&"polygons_for", p_area, _revealed_positions()) as Array).size()

@@ -24,6 +24,8 @@ const NodeGraphRendererScript := preload("res://src/ui/exploration/node_graph_re
 const NodeMoveAnimatorScript := preload("res://src/ui/exploration/node_move_animator.gd")
 const DATA_STUB := preload("res://src/ui/exploration/node_graph_data_stub.gd")
 const NODE_LOGIC := preload("res://src/ui/exploration/node_state_logic.gd")
+## 视觉规格（节点边长——命中检测边界按它推导，见 test_hit_test_node_grows_with_hover_scale）。
+const Style := preload("res://src/ui/exploration/node_graph_style.gd")
 
 ## 命中检测辅助——stub 节点 101 的中心坐标容差（px）。
 const HIT_TOLERANCE: float = 2.0
@@ -423,21 +425,28 @@ func test_mouse_exited_noop_when_no_hover() -> void:
 
 func test_hit_test_node_grows_with_hover_scale() -> void:
 	# 审查 M1：悬停放大的可达节点命中框同步放大（避免边缘高频振荡）
+	# [b]边界按 Style.NODE_SIZE 推导[/b]：命中框半径 = 节点边长 / 2（悬停时 × 倍率）。
+	# 原先这四个数是照着 48px 写死的，节点尺寸一改（本轮 48 → 56）就全都落到了框内，
+	# 断言失败但测的其实是「常量没同步」而不是「命中框没跟着放大」——改成推导，
+	# 这条测的就永远是它该测的那件事。
+	var half: float = Style.NODE_SIZE * 0.5
 	var center: Vector2 = renderer.get_node_position(101)
-	# 基准：未悬停时 48px 框内、外
-	assert_true(renderer.hit_test_node(101, center + Vector2(23.0, 0.0)),
-			"未悬停：24px 半径内应命中")
-	var outside_unhovered: Vector2 = center + Vector2(26.0, 0.0)
+	# 基准：未悬停时框内、框外各取一点
+	assert_true(renderer.hit_test_node(101, center + Vector2(half - 1.0, 0.0)),
+			"未悬停：%.1fpx 半径内应命中" % half)
+	var outside_unhovered: Vector2 = center + Vector2(half + 2.0, 0.0)
 	assert_false(renderer.hit_test_node(101, outside_unhovered),
-			"未悬停：26px 处（>24px 半径）不应命中")
-	# When: 悬停可达节点（110% → 半径 26.4px）
+			"未悬停：%.1fpx 处（>%.1fpx 半径）不应命中" % [half + 2.0, half])
+	# When: 悬停可达节点（110% → 半径 × 1.1）
 	renderer.hovered_node = 101
-	# Then: 原先的点现在命中（命中框与绘制同源）
+	var scaled_half: float = half * renderer.HOVER_SCALE_RATIO
+	# Then: 原先框外的那个点现在命中（命中框与绘制同源）
 	assert_true(renderer.hit_test_node(101, outside_unhovered),
-			"悬停放大后命中框应同步放大（26px 处应命中）")
+			"悬停放大后命中框应同步放大（%.1fpx 处应命中）" % outside_unhovered.distance_to(center))
 	# 边界：放大后仍不无限扩张
-	assert_false(renderer.hit_test_node(101, center + Vector2(28.0, 0.0)),
-			"悬停放大后 28px 处（>26.4px）仍不应命中")
+	assert_false(renderer.hit_test_node(101, center + Vector2(scaled_half + 1.5, 0.0)),
+			"悬停放大后 %.1fpx 处（>%.1fpx）仍不应命中"
+			% [scaled_half + 1.5, scaled_half])
 
 
 func test_set_focused_node_updates_and_is_idempotent() -> void:

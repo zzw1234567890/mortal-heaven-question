@@ -17,6 +17,8 @@ const NodeIconAtlasScript := preload("res://src/ui/exploration/node_icon_atlas.g
 const NodeStateLogicScript := preload("res://src/ui/exploration/node_state_logic.gd")
 ## 视觉规格（尺寸/配色常量）。
 const Style := preload("res://src/ui/exploration/node_graph_style.gd")
+## 地标造型与两行文字（地盘 + 地名/类型——从本文件拆出，见类文档）。
+const Landmark := preload("res://src/ui/exploration/node_graph_landmark.gd")
 
 
 ## 单节点绘制入口——按宿主是否注入六态分派。[br]
@@ -38,6 +40,9 @@ static func draw_legacy(p_host: Control, p_node_id: int) -> void:
 	var detail: Dictionary = p_host.nodes.get(p_node_id, {})
 	var type_id: int = int(detail.get("type", 1))
 	var fogged: bool = p_host.call(&"_is_fogged", p_node_id)
+
+	# 地标底盘（本轮地图化——投影 + 石台，画在图标[b]之下[/b]，见 [NodeGraphLandmark]）
+	Landmark.draw_plate(p_host, rect, pos)
 
 	# 图标：迷雾节点不显示类型——统一灰底（类型不暴露，GDD 界面规则）
 	if fogged:
@@ -62,9 +67,10 @@ static func draw_legacy(p_host: Control, p_node_id: int) -> void:
 		border_color = NodeIconAtlasScript.get_color(type_id).darkened(0.25)
 	p_host.draw_rect(rect, border_color, false, Style.BORDER_WIDTH)
 
-	# 文字标签（缩放联动——50% 隐藏）
-	if p_host.show_labels and not fogged:
-		draw_node_label(p_host, p_node_id, detail, type_id, pos, Style.NODE_SIZE)
+	# 两行文字（缩放联动——50% 隐藏）：地名恒显，类型行迷雾时不画
+	if p_host.show_labels:
+		Landmark.draw_labels(p_host, _place_of(p_host, p_node_id), detail, pos,
+				Style.NODE_SIZE, not fogged, type_id)
 
 
 ## 六态分支——样式经 [NodeStateLogic.node_state_style] 查询后逐项渲染。[br]
@@ -82,6 +88,9 @@ static func draw_stated(p_host: Control, p_node_id: int) -> void:
 	var detail: Dictionary = p_host.nodes.get(p_node_id, {})
 	var type_id: int = int(detail.get("type", 1))
 	var fogged: bool = bool(style.get("fogged", false))
+
+	# 地标底盘（本轮地图化——投影 + 石台，画在图标[b]之下[/b]，见 [NodeGraphLandmark]）
+	Landmark.draw_plate(p_host, rect, pos)
 
 	if fogged:
 		draw_fogged_glyph(p_host, rect, pos)
@@ -124,10 +133,11 @@ static func draw_stated(p_host: Control, p_node_id: int) -> void:
 		p_host.draw_arc(pos, node_size * 0.5 + Style.FOCUS_RING_MARGIN, 0.0, TAU,
 				Style.FOCUS_RING_SEGMENTS, Style.FOCUS_RING_COLOR, Style.BORDER_WIDTH)
 
-	# 文字标签（缩放联动——50% 隐藏；迷雾不显示类型标签）
+	# 两行文字（缩放联动——50% 隐藏）：地名恒显，类型行迷雾时不画
 	# 锚点跟随悬停缩放（终审 LOW）——放大时标签仍贴合图标下沿，不出现错位
-	if p_host.show_labels and not fogged:
-		draw_node_label(p_host, p_node_id, detail, type_id, pos, node_size)
+	if p_host.show_labels:
+		Landmark.draw_labels(p_host, _place_of(p_host, p_node_id), detail, pos,
+				node_size, not fogged, type_id)
 
 
 ## 迷雾节点图标——灰底方块 + ❓图集 region（类型不暴露）。
@@ -210,25 +220,16 @@ static func draw_state_marker(p_host: Control, marker: String, pos: Vector2,
 			pass
 
 
-## 节点文字标签——类型短标签（入口/战斗/事件/商店/营地/入口/Boss…），
-## 居中排在图标[b]正下方[/b]，锚点跟随悬停缩放（放大时仍贴合图标下沿）。[br]
-## [br][b]为什么带描边[/b]：标签一半压在图标下沿、一半落在深色画布上，两侧底色
-## 一深一亮，纯前景色在任一侧都会糊。先画一圈深色描边再画暖白字，两种底上都读得清。[br]
-## [br][b]为什么居中不左对齐[/b]：左对齐的标签从图标左沿起笔，两字标签（战斗）
-## 与三字标签（渡劫台）视觉重心各偏一边——居中让每个标签都以节点为轴。
-static func draw_node_label(p_host: Control, p_node_id: int, detail: Dictionary,
-		type_id: int, pos: Vector2, node_size: float) -> void:
-	var label: String = str(detail.get("label",
-			NodeIconAtlasScript.get_label(type_id)))
-	var box_width: float = node_size * Style.LABEL_BOX_RATIO
-	var anchor := Vector2(pos.x - box_width * 0.5,
-			pos.y + node_size * 0.5 + Style.LABEL_BASELINE_OFFSET)
-	var font: Font = label_font(p_host)
-	p_host.draw_string_outline(font, anchor, label, HORIZONTAL_ALIGNMENT_CENTER,
-			box_width, Style.LABEL_FONT_SIZE, Style.LABEL_OUTLINE_SIZE,
-			Style.LABEL_OUTLINE_COLOR)
-	p_host.draw_string(font, anchor, label, HORIZONTAL_ALIGNMENT_CENTER,
-			box_width, Style.LABEL_FONT_SIZE, Style.LABEL_COLOR)
+## 节点地名——转引宿主 [code]NodeGraphRenderer.place_name_of[/code]。[br]
+## [br][b]为什么不在绘制侧直取[/b]：地名的择优（覆盖表 > 地名池）是渲染器的一个
+## 公开读法，测试与截图脚本断言的是同一处；绘制侧再判一次会出现「测到的名字和
+## 画出来的名字不是一个」——而那种缺陷在截图上极难发现。[br]
+## [br][b]宿主没有这个方法时回落空串[/b]（桩宿主：只验绘制的单测会传入裸 Control）——
+## 空地名不画文字，不崩溃。
+static func _place_of(p_host: Control, p_node_id: int) -> String:
+	if not p_host.has_method(&"place_name_of"):
+		return ""
+	return str(p_host.call(&"place_name_of", p_node_id))
 
 
 ## 渡劫台「修为尚未圆满」判定（AC-8）——委托 [NodeStateLogic] 纯函数
@@ -272,29 +273,63 @@ static func tooltip_rect(text: String, anchor: Vector2) -> Rect2:
 	return Rect2(anchor, Vector2(width, Style.TOOLTIP_HEIGHT))
 
 
-## 迷雾整体覆盖层——单节点绘制（AC-3 合批验证核心）。[br]
-## [br][b]一块全画布遮罩 + 已揭示区域挖孔[/b]（[code]draw_rect[/code] 覆盖 +
-## 挖孔以画布底色圆近似——stub 实现；真实揭雾渐变动画归后续 story）。[br]
-## [br][b]★ 为什么本方法必须画在节点之下 ★[/b]（[method NodeGraphRenderer._draw]
-## 的调用顺序是本轮修的 bug 本体）：遮罩画在节点[b]之上[/b]时，挖孔用的是近黑
-## 底色 [code]Color(0.08,0.09,0.12)[/code]——每个已揭示节点都被这层近黑圆盘
-## 重涂了一遍，14 种类型色一个不剩。1920×1080 取证图里整幅只剩 1388 个金色
-## 边缘像素，平均亮度 10.75（几乎全黑），底就是这里打下的。[br]
-## [br]现在遮罩在节点之下：遮罩给出「雾里 / 雾外」的底色落差，节点画在其上，
-## 已揭示的节点保持自己的亮度，迷雾节点由 [method draw_fogged_glyph] 那条路
-## 自己叠一层个体暗纱（[constant Style.FOG_NODE_VEIL_COLOR]）。[br]
-## [br][b]挖孔仍然要挖[/b]：遮罩压在[b]连线[/b]上，不挖孔的话已揭示区域的连线
-## 会跟迷雾区域一样暗——走过的金色路径是玩家最该一眼看到的东西。
-static func draw_fog(p_host: Control, p_content_rect: Rect2,
-		p_fogged: Array, p_revealed: Array) -> void:
-	if p_fogged.is_empty():
+## 迷雾整体覆盖层（AC-3 合批验证核心）。[br]
+## [br][b]一块遮罩 + 已揭示区域[b]真挖孔[/b][/b]（本轮地图化改写）：遮罩面本身是
+## [param p_polygons]（内容矩形被逐孔裁掉之后剩下的块），孔里露出的是下面的
+## [b]地图地形[/b]。[br]
+## [br][b]为什么不能再用「画一块矩形 + 用底色圆盖回去」[/b]：那套做法要求挖孔色
+## 等于画布底色——而画布现在是一张地图插画，底色圆会在插画上糊出一圈纯色补丁，
+## 1920×1080 取证图里每个已揭示节点都像贴了块膏药。真正的挖孔只能靠多边形裁剪
+## （[method NodeGraphLayout.fog_polygons]），孔不带色，孔里就是地形。[br]
+## [br][b]★ 为什么本方法必须画在连线之上、节点之下 ★[/b]：遮罩负责「雾里 / 雾外」
+## 的底色落差，压在[b]连线[/b]上结构才不泄露；节点浮在其上（亮），迷雾节点由
+## [method draw_fogged_glyph] 那条路自己叠个体暗纱（暗）——三件事各归各位。
+## 画在节点之上会把 14 种类型色全糊掉（那一版实测整幅平均亮度 10.75，几乎全黑）。[br]
+## [br][param p_host] 绘制宿主。[br]
+## [param p_no_fog] 是否「无迷雾」——true 时整块遮罩都不画。[br]
+## [param p_polygons] 遮罩多边形（已挖孔；空 = 全揭示，同样不画）。[br]
+## [br][b]为什么没有「铺满的矩形」参数[/b]：遮罩的范围由 [param p_polygons] 自身
+## 界定（[method NodeGraphLayout.fog_polygons] 是「矩形减去孔」的结果，矩形信息
+## 已在其中）；早先版本多收一个 [code]Rect2[/code] 却从未读它——多一个参数就多一处
+## 「两个调用方对同一个矩形各算一次」的分叉点，而那个矩形在
+## [NodeGraphGroundLayer] 里恰好是必须与地形逐像素一致的那个。
+static func draw_fog(p_host: Control, p_no_fog: bool,
+		p_polygons: Array) -> void:
+	if p_no_fog or p_polygons.is_empty():
 		return  # 无迷雾——不产生任何绘制
-	var margin: Vector2 = Vector2(Style.FOG_MARGIN, Style.FOG_MARGIN)
-	p_host.draw_rect(Rect2(p_content_rect.position - margin,
-			p_content_rect.size + margin * 2.0), Style.FOG_COLOR)
-	# 挖孔：已揭示区域以画布底色圆盖回遮罩——「把雾拿掉」，不是「再盖一层近黑」
-	for hole_pos: Vector2 in p_revealed:
-		p_host.draw_circle(hole_pos, Style.FOG_HOLE_RADIUS, Style.FOG_HOLE_COLOR)
+	var points := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for piece: PackedVector2Array in p_polygons:
+		append_triangles(points, indices, piece)
+	if indices.is_empty():
+		return
+	# [b]一次[/b]画完整块遮罩：顶点表 + 索引表直接交给底层三角数组。[br]
+	# [br][b]为什么不用 [method CanvasItem.draw_polygon][/b]：它内部按[b]三角扇[/b]
+	# 连点（0,1,2 / 0,2,3 / …），只对凸多边形成立——挖孔后的块是凹的，用它会连出
+	# 一大堆跨孔的三角形，遮罩直接烂掉。[code]draw_colored_polygon[/code] 同样是凸的。
+	# 三角化后的索引表只能走这一条路；Godot 自己的 [code]draw_polygon[/code] 走的也是它
+	# （同一 RID、同一变换，绘制顺序不变）。[br]
+	# [br][b]单色用长度 1 的色表[/b]：底层接受「1 个色」或「每顶点一个色」，前者省一份
+	# 与顶点等长的数组。
+	RenderingServer.canvas_item_add_triangle_array(p_host.get_canvas_item(),
+			indices, points, PackedColorArray([Style.FOG_COLOR]))
+
+
+## 把一块多边形三角化后[b]追加[/b]进顶点表 / 索引表（两个表都就地增长）。[br]
+## [br][b]为什么是索引表而不是逐三角各画一笔[/b]：一个 24 孔的遮罩三角化后约四百个
+## 三角，逐笔 [code]draw_colored_polygon[/code] 就是四百次绘制调用（预算 200 整帧，
+## 见 R-05 基准）——拼成一张索引表后是[b]一次[/b]（ADR-0031 §5 合批口径）。[br]
+## [br][b]退化块跳过[/b]：[method Geometry2D.triangulate_polygon] 对自交 / 共线多边形
+## 返回空表——空表不追加顶点（免得留下永远连不到的孤立点）。
+static func append_triangles(p_points: PackedVector2Array, p_indices: PackedInt32Array,
+		p_piece: PackedVector2Array) -> void:
+	var triangles: PackedInt32Array = Geometry2D.triangulate_polygon(p_piece)
+	if triangles.is_empty():
+		return
+	var base: int = p_points.size()
+	p_points.append_array(p_piece)
+	for i: int in triangles:
+		p_indices.append(base + i)
 
 
 ## 图集 region 绘制——统一走 [NodeIconAtlas] 单图集（同纹理合批，R-02 §3 分组方案）。

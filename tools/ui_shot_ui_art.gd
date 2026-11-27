@@ -9,8 +9,12 @@ extends Node
 ## [br][b]运行[/b]（非 headless，否则无渲染）：[br]
 ## [code]Godot_v4.6.3-stable_win64.exe res://tools/ui_shot_ui_art.tscn[/code][br]
 ## [br]输出：[code]tools/ui_shot_identity.png[/code] /
-## [code]tools/ui_shot_identity_720.png[/code] / [code]tools/ui_shot_node_graph.png[/code]。[br]
-## [br]来源: 本轮任务书任务三、先前先例 [code]tools/ui_pass_shot.gd[/code]。
+## [code]tools/ui_shot_identity_720.png[/code] / [code]tools/ui_shot_node_graph.png[/code]
+## （1920×1080，节点图地图化总览）/ [code]tools/ui_shot_node_graph_720.png[/code]
+## （1280×720，小屏可读性）/ [code]tools/ui_shot_node_graph_closeup.png[/code]
+## （放大到 150% 的特写——节点地名的字面对比取证）。[br]
+## [br]来源: 本轮任务书任务三（地图化）/ 任务四（地名可读性取证）、先前先例
+## [code]tools/ui_pass_shot.gd[/code]。
 
 const OUT_DIR: String = "res://tools/"
 const OUT_W: int = 1920
@@ -39,8 +43,10 @@ func _run() -> void:
 	await _settle(10)
 	await _shot_identity(OUT_W, OUT_H, "ui_shot_identity")
 	await _shot_identity(OUT_W_720, OUT_H_720, "ui_shot_identity_720")
-	await _shot_node_graph()
-	print("[ui-art] 完成，三张图在 " + ProjectSettings.globalize_path(OUT_DIR))
+	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph", 1.0, false)
+	await _shot_node_graph(OUT_W_720, OUT_H_720, "ui_shot_node_graph_720", 1.0, false)
+	await _shot_node_graph(OUT_W, OUT_H, "ui_shot_node_graph_closeup", CLOSEUP_ZOOM, true)
+	print("[ui-art] 完成，五张图在 " + ProjectSettings.globalize_path(OUT_DIR))
 	get_tree().quit()
 
 
@@ -88,18 +94,69 @@ func _report_cards(p_screen: Control) -> void:
 # 二、节点图（真实生成）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 发「新开局」意图再挂探索容器——容器消费意图后直落第一张图并生成真实 DAG。
-func _shot_node_graph() -> void:
+## 节点图特写倍率——取视口缩放上限 [code]NodeGraphViewport.ZOOM_MAX[/code] 的同值，
+## 让地名的字面在同一张图里大到能直接判读（正投影放大，不改变任何绘制比例）。
+const CLOSEUP_ZOOM: float = 1.5
+
+
+## 发「新开局」意图再挂探索容器——容器消费意图后直落第一张图并生成真实 DAG。[br]
+## [br][param p_zoom] > 0 时在整图适配之后覆盖视口缩放（特写取证用；[code]1.0[/code]
+## = 保持自动适配的缩放）。[br]
+## [param p_verbose] 打印每个节点的地名与六态——特写图的字面与状态可被文本核对。
+func _shot_node_graph(p_w: int, p_h: int, p_name: String, p_zoom: float,
+		p_verbose: bool) -> void:
 	await _clear_holder()
 	IntentScript.clear()
 	ExplorationIntentScript.clear()
+	_force_window_size(p_w, p_h)
 	ExplorationIntentScript.request_new_run()
 	var scene: Control = ExplorationScene.instantiate() as Control
 	_mount(scene)
 	await _settle(150)
 	var screen: Variant = scene.get(&"node_graph_screen")
 	print("[ui-art] 节点图屏幕: %s" % ("已挂载" if screen != null else "未挂载"))
-	await _capture("ui_shot_node_graph")
+	if screen != null:
+		await _focus_node_graph(screen, p_zoom)
+		if p_verbose:
+			_report_places(screen)
+	await _capture(p_name)
+	_force_window_size(OUT_W, OUT_H)
+
+
+## 整图适配之后按 [param p_zoom] 覆盖视口缩放（特写取证）。[br]
+## [br][b]为什么要等一帧[/b]：[method NodeGraphScreen.trigger_map_load] 走
+## [code]call_deferred(fit_to_content)[/code]，立刻写 zoom 会被随后那次适配覆盖回去。
+func _focus_node_graph(p_screen: Variant, p_zoom: float) -> void:
+	if p_zoom <= 0.0 or is_equal_approx(p_zoom, 1.0):
+		return
+	await _settle(2)
+	var graph_viewport: Variant = p_screen.get(&"viewport")
+	if graph_viewport == null:
+		print("[ui-art] 视口缺失——无法设置特写缩放")
+		return
+	graph_viewport.call(&"fit_to_content", true)
+	await _settle(2)
+	graph_viewport.call(&"_apply_transform", p_zoom, graph_viewport.get(&"offset"), 0.0)
+	await _settle(2)
+	print("[ui-art] 特写缩放 %.2f（偏移 %s）" % [p_zoom, str(graph_viewport.get(&"offset"))])
+
+
+## 打印每个节点的「地名 = ？类型 / 六态」——截图之外的字面取证（地名的字面对比
+## 比对靠它，[code]ui_shot_node_graph_closeup.png[/code] 只作肉眼旁证）。
+func _report_places(p_screen: Variant) -> void:
+	var r: Variant = p_screen.call(&"renderer")
+	if r == null:
+		print("[ui-art] 渲染器缺失")
+		return
+	var detail: Dictionary = r.get(&"nodes") as Dictionary
+	var states: Dictionary = r.get(&"states") as Dictionary
+	var ids: Array = detail.keys()
+	ids.sort()
+	for node_id: int in ids:
+		print("[ui-art] 节点 %d 地名 '%s' 类型 %d 六态 %d" % [node_id,
+				str(r.call(&"place_name_of", node_id)),
+				int((detail[node_id] as Dictionary).get("type", -1)),
+				int(states.get(node_id, -1))])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
