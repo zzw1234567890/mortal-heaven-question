@@ -94,13 +94,16 @@ static func _template_of(p_card_system: Variant, p_card_id: int) -> Variant:
 
 ## 条目 → 模板 → 兜底 的字段读取（字符串）。
 static func _name_of(p_entry: Variant, p_template: Variant, p_card_id: int) -> String:
+	# 模板名优先：手牌条目里的 name 是**卡种 ID**（basic_attack 这类），直接用它
+	# 卡面就显示英文 ID（老板 2026-11-28 反馈「卡名还是英文」）。模板名是策划写的
+	# 中文名（煞气斩），才是玩家该看到的。
+	var from_template: Variant = _card_field(p_template, "name", "")
+	if not str(from_template).is_empty():
+		return str(from_template)
 	if p_entry is Dictionary:
 		var raw_name: Variant = (p_entry as Dictionary).get("name")
 		if raw_name != null and not str(raw_name).is_empty():
 			return str(raw_name)
-	var from_template: Variant = _card_field(p_template, "name", "")
-	if not str(from_template).is_empty():
-		return str(from_template)
 	return "卡 #%d" % p_card_id
 
 
