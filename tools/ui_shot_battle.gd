@@ -8,6 +8,8 @@ extends Node
 ##   3. 用真实鼠标事件点它，打印阶段是否推进（老板 2026-11-28 反馈「点了没反应」）；
 ##   4. 存一张全屏截图。
 
+const ArtScript: GDScript = preload("res://src/ui/combat/combat_battle_art.gd")
+
 const COMBAT_SCENE: String = "res://src/feature/combat/combat_scene.tscn"
 const OUT_PATH: String = "res://tools/ui_shot_battle.png"
 const SHOT_W: int = 1920
@@ -19,8 +21,21 @@ func _ready() -> void:
 	get_tree().quit(0)
 
 
+## 把当前地图钉到指定 ID（GSM 的 exploration.current_map）。
+func _set_map(p_map_id: StringName) -> void:
+	var gsm: Node = get_tree().root.get_node_or_null(NodePath("GameStateManager"))
+	if gsm == null:
+		print("[shot-battle] 取不到 GameStateManager，背景图不会出现")
+		return
+	var domain: Variant = gsm.get("exploration")
+	var dict: Dictionary = domain
+	dict["current_map"] = p_map_id
+
+
 func _run() -> void:
 	_force_window_size(SHOT_W, SHOT_H)
+	# 战斗背景取当前地图的舆图——截图里要有画，否则看不出「是不是加了背景图」。
+	_set_map(&"qing_yun_jian_zong")
 	var holder: Control = Control.new()
 	holder.name = "BattleShotHolder"
 	holder.size = Vector2(SHOT_W, SHOT_H)
@@ -34,6 +49,13 @@ func _run() -> void:
 	holder.add_child(scene)
 	await _settle(20)
 	await get_tree().create_timer(1.2).timeout
+
+	var art: Variant = scene.get_node_or_null(NodePath("BattleArt"))
+	if art != null:
+		print("[shot-battle] BattleArt visible=%s texture=%s size=%s" % [
+				str(art.get(&"visible")), str(art.get(&"texture")), str((art as Control).size)])
+		print("[shot-battle] current_map=%s" % str(ArtScript.current_map()))
+
 
 	var root_node: Variant = scene.get(&"combat_root")
 	var bar: Variant = root_node.get(&"combat_bottombar") if root_node != null else null
