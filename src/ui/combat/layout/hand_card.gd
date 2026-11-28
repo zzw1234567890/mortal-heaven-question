@@ -24,11 +24,28 @@ extends Control
 
 ## 共享字号纯函数（story 001 唯一落地处——禁止内联）。
 const UiFont := preload("res://src/ui/combat/shared/combat_ui_font.gd")
+## 手牌几何（尺寸/弧形/底栏让位）的唯一真源。
+const Rules := preload("res://src/ui/combat/shared/hand_arc_rules.gd")
+## 卡面插画解析（专属卡面 → 角色立绘 → 旧插画 → 无图）。
+const ArtResolver := preload("res://src/ui/combat/card_art_resolver.gd")
 
 ## === 尺寸常量（UX hud.md「手牌中宽度 100px → 高度 140px，宽高比 5:7」）=======
 
-const CARD_WIDTH: float = 100.0
-const CARD_HEIGHT: float = 140.0
+const CARD_WIDTH: float = Rules.DEFAULT_CARD_WIDTH
+const CARD_HEIGHT: float = Rules.DEFAULT_CARD_HEIGHT
+
+## 插画区高度占比（上部留 72% 给图，下部 28% 放卡名与类型）。
+const ART_HEIGHT_RATIO: float = 0.72
+## cover 裁切窗口的纵向偏置（0.5 = 居中；偏小则取更靠上的画面）。
+const COVER_BIAS: float = 0.35
+## 卡名与插画下沿的间距（px——太贴会读成「贴在图上」）。
+const NAME_GAP: float = 22.0
+## 费用徽章半径（px）。
+const COST_BADGE_RADIUS: float = 13.0
+## 费用徽章圆心到左上角的距离（px）。
+const COST_BADGE_MARGIN: float = 17.0
+## 费用徽章底色（深色半透明——压在任何插画上都读得清）。
+const COST_BADGE_BG: Color = Color(0.06, 0.07, 0.10, 0.82)
 
 ## === 视觉常量（集中定义——数据驱动条款）=======================================
 
@@ -115,6 +132,13 @@ var is_psychic: bool = false
 var is_selected: bool = false
 ## 是否持有键盘焦点（[method _draw] 据此画焦点环——焦点可见性）。
 var is_focused: bool = false
+## 卡种 ID（[code]basic_attack[/code] 这类模板 ID——卡面找图的键；实例 ID 每张不同，
+## 不能当美术键）。
+var card_kind: StringName = &""
+## 卡面插画（在 [method set_card_data] 里解析好，[method _draw] 只负责画）。[br]
+## [br][b]为什么不在 _draw() 里解析[/b]：绘制期间首次 [code]load()[/code] 的贴图要等
+## 本帧之后才上传，卡片会一直画成空白（要等下一次重绘才出现）。
+var _art: Texture2D = null
 
 
 func _init() -> void:
@@ -136,12 +160,14 @@ func _init() -> void:
 ## [param p_name]: 卡名。[param p_cost]: 灵力消耗。[param p_rarity]: 稀有度 1-5。
 ## [param p_type]: 卡牌类型 0-5。
 func set_card_data(p_instance_id: int, p_name: String, p_cost: int, p_rarity: int,
-		p_type: int) -> void:
+		p_type: int, p_kind: StringName = &"") -> void:
 	card_instance_id = p_instance_id
 	card_name = p_name
 	cost = maxi(p_cost, 0)
 	rarity = clampi(p_rarity, 1, 5)
 	card_type = clampi(p_type, 0, TYPE_LABELS.size() - 1)
+	card_kind = p_kind
+	_art = ArtResolver.texture_for(p_kind)
 	_apply()
 
 

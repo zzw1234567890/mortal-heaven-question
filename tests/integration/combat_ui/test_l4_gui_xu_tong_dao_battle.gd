@@ -54,6 +54,9 @@ var _chars: Array[StringName] = CHARS
 
 
 func before_each() -> void:
+	# 手牌放大到 180x252 后，1280x720 的宿主里 5 张卡会挤到敌对区与目标选择区，
+	# 真实点击容易落到错的对象上；端到端按玩家真实分辨率跑（其余用例仍走 720 覆盖低分辨率）。
+	host_size = Vector2(1920.0, 1080.0)
 	_player_realm = PLAYER_REALM
 	_chars = CHARS
 

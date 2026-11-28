@@ -19,13 +19,19 @@ extends RefCounted
 ## === 公式常量（GDD §1/§2 调优旋钮——集中定义，禁止内联硬编码）===============
 
 ## 默认卡宽（px——UX hud.md「手牌中宽度 100px，宽高比 5:7」）。
-const DEFAULT_CARD_WIDTH: float = 100.0
+const DEFAULT_CARD_WIDTH: float = 180.0
 ## 屏幕两侧边距（px——GDD 公式 1 两侧各 20px）。
 const EDGE_MARGIN: float = 20.0
 ## 标准间距加值（px——GDD「卡宽+10px」）。
 const SPACING_GAP: float = 10.0
 ## 手牌底缘基准（GDD——屏幕高度 × 86%，响应式）。
 const BASE_Y_RATIO: float = 0.86
+## 默认卡高（px——与 [constant DEFAULT_CARD_WIDTH] 守 5:7，UX hud.md）。
+const DEFAULT_CARD_HEIGHT: float = 252.0
+## 底栏高度占屏比（与 CombatLayoutZones.BOTTOMBAR_HEIGHT_RATIO 同源）。
+const BOTTOMBAR_HEIGHT_RATIO: float = 180.0 / 1080.0
+## 卡底与底栏顶之间留的空隙（px——太小会读成「贴在底栏上」）。
+const BOTTOMBAR_GAP: float = 8.0
 ## 弧形最大角度（度——GDD 最多 30°）。
 const MAX_ARC_ANGLE_DEG: float = 30.0
 ## 每张卡增加角度（度——GDD total_cards × 3°）。
@@ -63,20 +69,23 @@ static func hand_card_position(index: int, total_cards: int,
 	if total_cards <= 0:
 		return {}  # 守卫：空手牌不计算位置
 	var center: float = screen_width * 0.5
-	var base_y: float = screen_height * BASE_Y_RATIO
-	if total_cards == 1:
-		return {"x": center, "y": base_y, "rotation": 0.0}  # 单张卡无弧度
 	var available_width: float = screen_width - EDGE_MARGIN * 2.0
 	# 响应式卡宽：低分辨率 + 满手牌不溢出
 	var card_width: float = minf(DEFAULT_CARD_WIDTH,
 			available_width / float(total_cards))
+	# 底缘贴底栏上方 BOTTOMBAR_GAP：按卡高反推中心 y（不用 0.86H 硬口径——
+	# 卡放大到 180×252 后 0.86H 会把卡压到底栏上）。
+	var base_y: float = bottom_limit_y(screen_height) - card_height_of(card_width) * 0.5
+	if total_cards == 1:
+		return {"x": center, "y": base_y, "rotation": 0.0}  # 单张卡无弧度
 	if total_cards <= OVERLAP_THRESHOLD:
 		# GDD 半径法圆弧（radius×sin / radius×(1-cos)——端点 20px 边距守恒）
 		var arc_angle_deg: float = minf(MAX_ARC_ANGLE_DEG,
 				float(total_cards) * ARC_PER_CARD_DEG)
 		var arc_rad: float = deg_to_rad(arc_angle_deg)
 		var half_angle: float = arc_rad * 0.5
-		var radius: float = (available_width * 0.5) / sin(half_angle) \
+		var span: float = maxf(available_width - card_width, 0.0)
+		var radius: float = (span * 0.5) / sin(half_angle) \
 				if sin(half_angle) > 0.01 else 9999.0
 		var angle: float = -half_angle \
 				+ (float(index) / float(total_cards - 1)) * arc_rad
@@ -102,6 +111,36 @@ static func hand_card_position(index: int, total_cards: int,
 		"y": base_y - radius * (1.0 - cos(angle)),
 		"rotation": angle,
 	}
+
+
+## 卡高——由卡宽按 5:7 等比推导（宽高比是 GDD 硬约束，宽度响应式时高跟着走）。[br]
+## [param card_width]: 卡宽（px）。[br]
+## [b]返回[/b]: 卡高（px）。
+## 手牌实际卡宽——响应式：满手牌 + 窄视口时按可用宽等分，否则取默认宽。[br]
+## [param total_cards]: 手牌张数（≥1）。[param viewport_w]: 视口宽（px）。[br]
+## [b]返回[/b]: 卡宽（px）。
+static func card_width_of(total_cards: int, viewport_w: float) -> float:
+	var available_width: float = viewport_w - EDGE_MARGIN * 2.0
+	return minf(DEFAULT_CARD_WIDTH, available_width / float(maxi(total_cards, 1)))
+
+
+## 手牌实际卡尺寸——宽随视口响应，高按 5:7 等比。[br]
+## [param total_cards]: 手牌张数（≥1）。[param viewport_w]: 视口宽（px）。[br]
+## [b]返回[/b]: [code]Vector2(卡宽, 卡高)[/code]。
+static func card_size(total_cards: int, viewport_w: float) -> Vector2:
+	var w: float = card_width_of(total_cards, viewport_w)
+	return Vector2(w, card_height_of(w))
+
+
+static func card_height_of(card_width: float) -> float:
+	return card_width * (DEFAULT_CARD_HEIGHT / DEFAULT_CARD_WIDTH)
+
+
+## 手牌可用底边——底栏顶再往上让 [constant BOTTOMBAR_GAP]（px）。[br]
+## [param viewport_h]: 视口高（px）。[br]
+## [b]返回[/b]: 卡底允许到达的最低 y。
+static func bottom_limit_y(viewport_h: float) -> float:
+	return viewport_h * (1.0 - BOTTOMBAR_HEIGHT_RATIO) - BOTTOMBAR_GAP
 
 
 ## 手牌堆叠重叠量（GDD §2 公式——>7 张时相邻卡牌间距）。[br]

@@ -2,7 +2,7 @@ extends GutTest
 ## combat-ui-layout Story 006 单元测试：手牌弧形排位（AC-1）。
 ##
 ## QA 规格（GDD §1 公式 + AC 明文）：
-##   total=0 → 空字典；total=1 → (中心, 0.86H, 0)；total=7 index 0/6 x 关于
+##   total=0 → 空字典；total=1 → (中心, 可用底边−半卡高, 0)；total=7 index 0/6 x 关于
 ##   中心对称且 rotation 互为相反数；中心 index y 最小、rotation≈0；
 ##   index=0 x ≥ 20px。
 ## 边界：1280 宽 + total=10 响应式卡宽（所有 x ∈ [20, W-20]）；
@@ -25,10 +25,10 @@ func test_hand_card_position_zero_cards_returns_empty() -> void:
 
 
 func test_hand_card_position_single_card_centered_no_rotation() -> void:
-	# Then: total=1 → (屏幕中心, 0.86H, 0)（单张卡无弧度）
+	# Then: total=1 → (屏幕中心, 可用底边−半卡高, 0)（单张卡无弧度）
 	var pos: Dictionary = Rules.hand_card_position(0, 1, 1920.0, 1080.0)
 	assert_almost_eq(pos["x"], 960.0, 0.001, "单张卡 x = 屏幕中心 960")
-	assert_almost_eq(pos["y"], 1080.0 * 0.86, 0.001, "单张卡 y = 0.86H = 928.8")
+	assert_almost_eq(pos["y"], Rules.bottom_limit_y(1080.0) - Rules.card_height_of(Rules.card_size(1, 1920.0).x) * 0.5, 0.001, "单张卡 y（中心）= 可用底边 − 半卡高")
 	assert_almost_eq(pos["rotation"], 0.0, 0.0001, "单张卡 rotation = 0")
 
 
@@ -49,7 +49,7 @@ func test_hand_card_position_center_rotation_zero_and_arc_shape() -> void:
 	var center: Dictionary = Rules.hand_card_position(3, 7, 1280.0, 720.0)
 	var edge: Dictionary = Rules.hand_card_position(0, 7, 1280.0, 720.0)
 	assert_almost_eq(center["rotation"], 0.0, 0.0001, "中心卡 rotation=0")
-	assert_almost_eq(center["y"], 720.0 * 0.86, 0.001, "中心卡 y = base_y = 0.86H")
+	assert_almost_eq(center["y"], Rules.bottom_limit_y(720.0) - Rules.card_height_of(Rules.card_size(7, 1280.0).x) * 0.5, 0.001, "中心卡 y（中心）= 可用底边 − 半卡高")
 	assert_true(center["y"] > edge["y"], "GDD 半径法：中心最低、两端翘起（微笑弧）")
 
 
