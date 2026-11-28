@@ -37,9 +37,9 @@ const SPACING_RATIO: float = 2.0 / 3.0
 ## 手牌基准线：屏幕高度的这个比例（「屏幕中下」）。
 const HAND_BASE_Y_RATIO: float = 0.70
 ## 扇形单侧最大转角（度）——角度随索引线性张开。
-const FAN_HALF_ANGLE_DEG: float = 9.0
+const FAN_HALF_ANGLE_DEG: float = 7.0
 ## 扇形中心抬升量（卡高的比例）——中心最高、两端落回基准线。
-const FAN_LIFT_RATIO: float = 0.07
+const FAN_LIFT_RATIO: float = 0.16
 ## 弧形最大角度（度——GDD 最多 30°）。
 const MAX_ARC_ANGLE_DEG: float = 30.0
 ## 每张卡增加角度（度——GDD total_cards × 3°）。
