@@ -12,6 +12,12 @@ extends SceneTree
 
 const OUT := "res://theme/main.tres"
 
+## 控件族两册（进度条/滑杆/滚动条/输入框/弹出层/窗口 + 下拉框/勾选框/页签）。
+## 拆册的理由是行数预算（.claude/docs/coding-standards.md 的 300 行软上限），
+## 不是职责分离——两册共用同一套调色板 token，分册[code]只读[/code]主册写的 token。
+const WidgetsScript: GDScript = preload("res://tools/gen_theme_widgets.gd")
+const ChoicesScript: GDScript = preload("res://tools/gen_theme_choices.gd")
+
 ## art-bible §4.7.1 背景层级。
 const BG_0 := "#141414"  ## 最深层
 const BG_1 := "#1E1E1C"  ## 面板基底
@@ -159,6 +165,12 @@ func _initialize() -> void:
 	th.set_color("default_color", "RichTextLabel", th.get_color("text_secondary", "GamePalette"))
 	th.set_font_size("normal_font_size", "RichTextLabel", 16)
 
+	# ── 控件族（进度条 / 滑杆 / 滚动条 / 输入框 / 弹出层 / 窗口 / 下拉框 / 勾选框 / 页签）
+	#    全部委托给两册分册——这些控件的槽位多、注释重，塞进来会把这个文件推过 300 行软上限。
+	#    分册只读上面写好的 GamePalette token，不写 hex。
+	WidgetsScript.apply(th)
+	ChoicesScript.apply(th)
+
 	var err: int = ResourceSaver.save(th, OUT)
 	print("save err=", err, " → ", OUT)
 
@@ -184,6 +196,48 @@ func _initialize() -> void:
 		# 按钮最小尺寸与引擎默认一致（8,8）——主题只换颜色，不动几何。
 		["Button normal 最小尺寸 == (8,8)",
 				back.get_stylebox("normal", "Button").get_minimum_size() == Vector2(8, 8)],
+		# ── 控件族（分册 gen_theme_widgets.gd）：最小尺寸逐条对齐引擎默认，
+		#    同一条「只换颜色、不挪布局」的规矩。括号里是引擎默认值（探针实测）。
+		["ProgressBar/background 最小尺寸 == (4,4)",
+				back.get_stylebox("background", "ProgressBar").get_minimum_size() == Vector2(4, 4)],
+		["HSlider/slider 最小尺寸 == (8,8)",
+				back.get_stylebox("slider", "HSlider").get_minimum_size() == Vector2(8, 8)],
+		["HScrollBar/scroll 最小尺寸 == (0,8)",
+				back.get_stylebox("scroll", "HScrollBar").get_minimum_size() == Vector2(0, 8)],
+		["VScrollBar/scroll 最小尺寸 == (8,0)",
+				back.get_stylebox("scroll", "VScrollBar").get_minimum_size() == Vector2(8, 0)],
+		["LineEdit/normal 最小尺寸 == (8,8)",
+				back.get_stylebox("normal", "LineEdit").get_minimum_size() == Vector2(8, 8)],
+		["TextEdit/normal 最小尺寸 == (8,8)",
+				back.get_stylebox("normal", "TextEdit").get_minimum_size() == Vector2(8, 8)],
+		["PopupPanel/panel 最小尺寸 == (8,8)",
+				back.get_stylebox("panel", "PopupPanel").get_minimum_size() == Vector2(8, 8)],
+		["PopupMenu/panel 最小尺寸 == (8,8)",
+				back.get_stylebox("panel", "PopupMenu").get_minimum_size() == Vector2(8, 8)],
+		["TooltipPanel/panel 最小尺寸 == (16,4)",
+				back.get_stylebox("panel", "TooltipPanel").get_minimum_size() == Vector2(16, 4)],
+		["Window/embedded_border 最小尺寸 == (20,36)",
+				back.get_stylebox("embedded_border", "Window").get_minimum_size() == Vector2(20, 36)],
+		["OptionButton/normal 最小尺寸 == (16,8)",
+				back.get_stylebox("normal", "OptionButton").get_minimum_size() == Vector2(16, 8)],
+		["CheckBox/normal 最小尺寸 == (8,8)",
+				back.get_stylebox("normal", "CheckBox").get_minimum_size() == Vector2(8, 8)],
+		["CheckButton/normal 最小尺寸 == (12,8)",
+				back.get_stylebox("normal", "CheckButton").get_minimum_size() == Vector2(12, 8)],
+		["TabContainer/panel 最小尺寸 == (0,0)",
+				back.get_stylebox("panel", "TabContainer").get_minimum_size() == Vector2.ZERO],
+		["TabContainer/tab_selected 最小尺寸 == (20,8)",
+				back.get_stylebox("tab_selected", "TabContainer").get_minimum_size() == Vector2(20, 8)],
+		# 腔色语义：进度的槽是 BG-0、填充是松石青；下拉框箭头交给字色调（modulate_arrow）。
+		["ProgressBar/fill == 松石青",
+				(back.get_stylebox("fill", "ProgressBar") as StyleBoxFlat).bg_color == Color(TURQUOISE)],
+		["OptionButton modulate_arrow == 1",
+				back.get_constant("modulate_arrow", "OptionButton") == 1],
+		# 焦点政策在控件族同样成立：只查这三处（Button 那两处在上面）。
+		["HScrollBar 无 scroll_focus 槽", not back.has_stylebox("scroll_focus", "HScrollBar")],
+		["VScrollBar 无 scroll_focus 槽", not back.has_stylebox("scroll_focus", "VScrollBar")],
+		["OptionButton 无 focus 槽", not back.has_stylebox("focus", "OptionButton")],
+		["TabContainer 无 tab_focus 槽", not back.has_stylebox("tab_focus", "TabContainer")],
 	]
 	var bad: int = 0
 	for c: Array in checks:
