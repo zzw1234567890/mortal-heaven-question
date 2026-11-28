@@ -52,7 +52,8 @@ func sync(p_cards: Array, p_phase: int, p_selected_id: int) -> void:
 			data["node"] = node
 		node.set_card_data(int(data.get("card_instance_id", -1)),
 				str(data.get("name", "")), int(data.get("cost", 0)),
-				int(data.get("rarity", 1)), int(data.get("type", 0)))
+				int(data.get("rarity", 1)), int(data.get("type", 0)),
+				StringName(str(data.get("card_kind", ""))))
 		node.set_affordable(bool(data.get("affordable", true)))
 		node.set_psychic(p_phase != PLAY_PHASE)
 	apply_selection(p_cards, p_selected_id)

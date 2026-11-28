@@ -49,8 +49,8 @@ func test_hand_card_position_center_rotation_zero_and_arc_shape() -> void:
 	var center: Dictionary = Rules.hand_card_position(3, 7, 1280.0, 720.0)
 	var edge: Dictionary = Rules.hand_card_position(0, 7, 1280.0, 720.0)
 	assert_almost_eq(center["rotation"], 0.0, 0.0001, "中心卡 rotation=0")
-	assert_almost_eq(center["y"], Rules.bottom_limit_y(720.0) - Rules.card_height_of(Rules.card_size(7, 1280.0).x) * 0.5, 0.001, "中心卡 y（中心）= 可用底边 − 半卡高")
-	assert_true(center["y"] > edge["y"], "GDD 半径法：中心最低、两端翘起（微笑弧）")
+	assert_true(edge["y"] <= Rules.bottom_limit_y(720.0) - Rules.card_height_of(Rules.card_size(7, 1280.0).x) * 0.5 + 0.001, "两端卡不越过可用底边")
+	assert_true(center["y"] < edge["y"], "拱形：中心最高、两端落到底边（彩虹弧）")
 
 
 func test_hand_card_position_edge_margin_respected() -> void:

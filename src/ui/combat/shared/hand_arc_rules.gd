@@ -87,11 +87,13 @@ static func hand_card_position(index: int, total_cards: int,
 		var span: float = maxf(available_width - card_width, 0.0)
 		var radius: float = (span * 0.5) / sin(half_angle) \
 				if sin(half_angle) > 0.01 else 9999.0
+		# 拱形（虹弧）：中心最高、两端落到可用底边（`y` 越小越靠上）。
+		var lift: float = radius * (1.0 - cos(half_angle))
 		var angle: float = -half_angle \
 				+ (float(index) / float(total_cards - 1)) * arc_rad
 		return {
 			"x": center + radius * sin(angle),
-			"y": base_y - radius * (1.0 - cos(angle)),
+			"y": base_y - lift + radius * (1.0 - cos(angle)),
 			"rotation": angle,
 		}
 	# >7 张——间距优先、角度自适应（GDD 2026-09-07 裁决）：先 overlap 求有效间距，
@@ -104,11 +106,13 @@ static func hand_card_position(index: int, total_cards: int,
 	var chord: float = float(total_cards - 1) * spacing  # 弦长 = 水平总跨度
 	var radius: float = chord * 0.5 / sin(half_angle) \
 			if sin(half_angle) > 0.01 else 9999.0
+	var lift_wide: float = radius * (1.0 - cos(half_angle))
+	# 拱形：两端贴可用底边、中心抬到最高（与 ≤7 张同一形状，别再写成微笑弧）。
 	var t: float = (float(index) - half_index) / half_index  # 归一化 [-1, 1]
 	var angle: float = t * half_angle
 	return {
 		"x": center + (float(index) - half_index) * spacing,
-		"y": base_y - radius * (1.0 - cos(angle)),
+		"y": base_y - lift_wide + radius * (1.0 - cos(angle)),
 		"rotation": angle,
 	}
 

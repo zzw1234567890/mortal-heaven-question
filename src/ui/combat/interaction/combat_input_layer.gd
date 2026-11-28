@@ -29,6 +29,8 @@ const GestureScript := preload("res://src/ui/combat/interaction/combat_gesture_m
 const ProviderScript := preload("res://src/ui/combat/interaction/combat_play_provider.gd")
 ## 结果字典工具（判成功 / 取提示文本）。
 const PlayResultScript := preload("res://src/feature/combat/combat_play_result.gd")
+## 手牌弧形规则（借它算「可用底边」＝底栏上沿，用于底栏避让）。
+const ArcRules := preload("res://src/ui/combat/shared/hand_arc_rules.gd")
 ## 阶段常量（出牌阶段——手势准入判据）。
 const PLAY_PHASE: int = 2
 
@@ -290,3 +292,24 @@ func _autoload(p_node_name: StringName) -> Node:
 	if tree == null or tree.root == null:
 		return null
 	return tree.root.get_node_or_null(NodePath(String(p_node_name)))
+
+
+## 底栏避让——本层是全屏 [constant MOUSE_FILTER_STOP]，覆盖到哪就吃到哪。
+## [br][b]为什么必须让[/b]：「结束出牌 / 退却」按钮在底栏里，被这层盖住后
+## 玩家点了没反应（2026-11-28 玩家第二次反馈的正是这个）。GUI 拾取按
+## [method _has_point] 判定，返回 false 即穿透给下面的底栏。
+## [br]只让出底栏那一条横带，其余（手牌、角色卡、敌人）仍在层内。
+func _has_point(p_point: Vector2) -> bool:
+	var bar_top: float = _bottom_bar_top()
+	if bar_top <= 0.0:
+		return true
+	return p_point.y < bar_top
+
+
+## 底栏上沿（内容坐标；无树时返回 0 表示「整层都归我」）。
+func _bottom_bar_top() -> float:
+	# 用本层自己的高度，不用 [code]get_tree().root.size[/code]——headless 下窗口是
+	# 64×64，而战斗宿主是按 1280×720 撑的，取窗口尺寸会把整层都判成「底栏」。
+	if size.y <= 0.0:
+		return 0.0
+	return ArcRules.bottom_limit_y(size.y)

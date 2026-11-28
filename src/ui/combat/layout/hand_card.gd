@@ -268,31 +268,58 @@ func _screen_height() -> int:
 ## 卡面绘制（R-02 §3 合批——底色/头部/边框 + draw_string 三文字 + 锁，
 ## 单一 CanvasItem 零子节点）。
 func _draw() -> void:
-	var card_rect: Rect2 = Rect2(Vector2.ZERO, Vector2(CARD_WIDTH, CARD_HEIGHT))
+	# 以 [member size] 为唯一基准——卡的实际尺寸由手牌区按视口算，不再读常量。
+	var w: float = maxf(size.x, 1.0)
+	var hgt: float = maxf(size.y, 1.0)
+	var card_rect: Rect2 = Rect2(0.0, 0.0, w, hgt)
 	draw_rect(card_rect, CARD_BG)
-	# 顶部浅色头（近似卡面插画位置——stub 阶段占位）
-	draw_rect(Rect2(0.0, 0.0, CARD_WIDTH, 24.0), CARD_HEAD)
-	# 稀有度边框（描边——索引 clamp 防越界）
-	# 选中：替换边框色 + 加粗（不叠加第二圈——两圈描边在 100px 卡上糊成一团）
+	var art_h: float = hgt * ART_HEIGHT_RATIO
+	var art_rect: Rect2 = Rect2(0.0, 0.0, w, art_h)
+	if _art != null:
+		_draw_cover(_art, art_rect)
+	else:
+		# 缺图（法术/法宝暂无插画）：保留一条浅色头当占位，别空成一整块。
+		draw_rect(Rect2(0.0, 0.0, w, minf(24.0, art_h)), CARD_HEAD)
+	# 插画下沿分隔线
+	draw_rect(Rect2(0.0, art_h, w, 1.0), CARD_HEAD)
+	# 稀有度边框（选中：替换边框色 + 加粗）
 	draw_rect(card_rect, get_border_color(), false, get_border_width())
 	var font: Font = ThemeDB.fallback_font
-	var h: int = _screen_height()
-	# 卡名（顶部左）
-	draw_string(font, Vector2(6.0, 14.0), card_name, HORIZONTAL_ALIGNMENT_LEFT,
-			CARD_WIDTH - 12.0,
-			UiFont.font_size_responsive(NAME_FONT_SIZE, h), NAME_COLOR)
-	# 费用（左上角——费用数字色按可负担性）
-	draw_string(font, Vector2(6.0, 32.0), str(cost), HORIZONTAL_ALIGNMENT_LEFT,
-			22.0, UiFont.font_size_responsive(COST_FONT_SIZE, h),
-			get_cost_color())
+	var sh: int = _screen_height()
+	# 卡名（插画下方一行——太贴会读成贴在图上）
+	var name_size: int = UiFont.font_size_responsive(NAME_FONT_SIZE, sh)
+	var text_top: float = art_h + float(name_size) + NAME_GAP
+	draw_string(font, Vector2(6.0, text_top), card_name, HORIZONTAL_ALIGNMENT_LEFT,
+			w - 12.0, name_size, NAME_COLOR)
+	# 费用：左上圆形徽章（深底 + 可负担性配色）——数字压在图上也读得清
+	var badge_center: Vector2 = Vector2(COST_BADGE_MARGIN, COST_BADGE_MARGIN)
+	draw_circle(badge_center, COST_BADGE_RADIUS, COST_BADGE_BG)
+	draw_string(font, Vector2(badge_center.x - COST_BADGE_RADIUS, badge_center.y + 6.0),
+			str(cost), HORIZONTAL_ALIGNMENT_CENTER, COST_BADGE_RADIUS * 2.0,
+			UiFont.font_size_responsive(COST_FONT_SIZE, sh), get_cost_color())
 	# 类型标签（右下角）
-	draw_string(font, Vector2(6.0, CARD_HEIGHT - 6.0), TYPE_LABELS[card_type],
-			HORIZONTAL_ALIGNMENT_RIGHT, CARD_WIDTH - 12.0,
-			UiFont.font_size_responsive(TYPE_FONT_SIZE, h), NAME_COLOR)
-	# 锁标记（灵能预览——右上角）
+	draw_string(font, Vector2(6.0, hgt - 6.0), TYPE_LABELS[card_type],
+			HORIZONTAL_ALIGNMENT_RIGHT, w - 12.0,
+			UiFont.font_size_responsive(TYPE_FONT_SIZE, sh), NAME_COLOR)
+	# 锁标记（灵能预览——右上角，加圆底免得压在插画上看不见）
 	if is_psychic:
-		draw_string(font, Vector2(CARD_WIDTH - 20.0, 16.0), "🔒",
-				HORIZONTAL_ALIGNMENT_LEFT, 18.0, LOCK_FONT_SIZE, LOCK_COLOR)
+		var lock_center: Vector2 = Vector2(w - 16.0, 16.0)
+		draw_circle(lock_center, 9.0, COST_BADGE_BG)
+		draw_string(font, Vector2(lock_center.x - 9.0, lock_center.y + 5.0), "🔒",
+				HORIZONTAL_ALIGNMENT_CENTER, 18.0, LOCK_FONT_SIZE, LOCK_COLOR)
 	# 焦点环（键盘/手柄焦点可见——最后画，压在其余视觉之上）
 	if is_focused:
 		draw_rect(card_rect, FOCUS_RING_COLOR, false, FOCUS_RING_WIDTH)
+
+
+## 插画 cover 裁切——按比例铺满矩形，纵向按 [constant COVER_BIAS] 偏上（人物头在
+## 画面中上部，取正中会把脸裁掉半张）。不平铺、不拉伸。
+func _draw_cover(p_tex: Texture2D, p_rect: Rect2) -> void:
+	var src: Vector2 = p_tex.get_size()
+	if src.x <= 0.0 or src.y <= 0.0:
+		return
+	var fit: float = maxf(p_rect.size.x / src.x, p_rect.size.y / src.y)
+	var win: Vector2 = Vector2(p_rect.size.x / fit, p_rect.size.y / fit)
+	var region: Rect2 = Rect2((src.x - win.x) * 0.5, (src.y - win.y) * COVER_BIAS,
+			win.x, win.y)
+	draw_texture_rect_region(p_tex, p_rect, region)
