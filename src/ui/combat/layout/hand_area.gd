@@ -66,6 +66,8 @@ var _overflow_tween: Tween = null
 ## 排位与动画模块。
 ## 悬停抬起量（px）——只抬一点点，主要是靠 z 置顶露出整张。
 const HOVER_LIFT: float = 14.0
+## 悬停放大倍数（配合 HOVER_LIFT——抬起 + 放大才读得出「这张被选中了」）。
+const HOVER_SCALE: float = 1.18
 ## 悬停卡的 z_index（远高于 Rules.hand_card_z_index 的上限 9）。
 ## 当前悬停的卡实例 ID（-1 = 无）。
 var _hovered_id: int = -1
@@ -301,6 +303,7 @@ func set_hovered_card(p_instance_id: int) -> void:
 			continue
 		var hovered: bool = int(entry.get("card_instance_id", -1)) == p_instance_id
 		node.set(&"hover_extra", HOVER_LIFT if hovered else 0.0)
+		node.set(&"hover_scale", HOVER_SCALE if hovered else 1.0)
 	if _layout != null:
 		_layout.call(&"apply_positions", _cards)
 

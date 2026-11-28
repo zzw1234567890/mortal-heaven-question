@@ -30,6 +30,8 @@ const GONGFA: int = BindingSlot.GONGFA
 ## 公开方法快照——{方法名: [形参个数, [默认参数值...]]}。
 const EXPECTED_PUBLIC: Dictionary = {
 	"get_binding_ids_by_character": [1, []],
+	# 2026-11-28 新增：UI 画功法/法宝栏要一个跨层可调用的只读计数（原先只有下划线私有版）。
+	"count_bound_slots": [2, []],
 	"get_bindings_by_character": [1, []],
 	"get_character_by_card": [1, []],
 	"get_binding": [1, []],

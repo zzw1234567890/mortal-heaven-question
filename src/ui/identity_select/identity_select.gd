@@ -110,6 +110,8 @@ func _build_ui() -> void:
 	title_label.text = Rules.TEXT_TITLE
 	confirm_button.text = Rules.TEXT_CONFIRM_BUTTON
 	$LayoutAnchor/DetailPanel.visible = false
+	# 详情面板不空着：默认展示「初始焦点那张卡」的身份详情，玩家不用先点一下才知道有这块。
+	# 仍然等 refresh_cards 之后再填——entries 没落地时 _get_identity_preview 拿不到身份表。
 	var entries: Array = _get_available_identities()
 	_get_presenter().call(&"refresh_cards", entries,
 			Callable(self, &"_on_card_gui_input"))
@@ -123,6 +125,11 @@ func _build_ui() -> void:
 		var card: Control = grid.get_child(focus_index) as Control
 		if card != null:
 			card.grab_focus()
+		# 与焦点卡配对：右侧详情直接显示这张身份，避免开局就是一大片留白（老板 2026-11-28 反馈）。
+		# [b]只填信息、不进选中态[/b]——选中态归点击，未开放/未解锁的身份不得因默认焦点被选中（既有门禁用例钉住）。
+		var focus_id: StringName = StringName(str(entries[focus_index].get(&"identity_id", &"")))
+		if not focus_id.is_empty():
+			_get_presenter().call(&"show_detail", _get_identity_preview(focus_id))
 
 
 ## === 卡片交互 ==================================================================

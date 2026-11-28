@@ -19,7 +19,7 @@ extends RefCounted
 ## === 公式常量（GDD §1/§2 调优旋钮——集中定义，禁止内联硬编码）===============
 
 ## 默认卡宽（px——UX hud.md「手牌中宽度 100px，宽高比 5:7」）。
-const DEFAULT_CARD_WIDTH: float = 180.0
+const DEFAULT_CARD_WIDTH: float = 150.0
 ## 屏幕两侧边距（px——GDD 公式 1 两侧各 20px）。
 const EDGE_MARGIN: float = 20.0
 ## 标准间距加值（px——GDD「卡宽+10px」）。
@@ -27,7 +27,7 @@ const SPACING_GAP: float = 10.0
 ## 手牌底缘基准（GDD——屏幕高度 × 86%，响应式）。
 const BASE_Y_RATIO: float = 0.86
 ## 默认卡高（px——与 [constant DEFAULT_CARD_WIDTH] 守 5:7，UX hud.md）。
-const DEFAULT_CARD_HEIGHT: float = 252.0
+const DEFAULT_CARD_HEIGHT: float = 210.0
 ## 底栏高度占屏比（与 CombatLayoutZones.BOTTOMBAR_HEIGHT_RATIO 同源）。
 const BOTTOMBAR_HEIGHT_RATIO: float = 180.0 / 1080.0
 ## 卡底与底栏顶之间留的空隙（px——太小会读成「贴在底栏上」）。

@@ -167,6 +167,13 @@ func _has_native_binding(character_id: int, slot_type: int) -> bool:
 
 
 ## 统计角色某类型的已占用槽位数——薄委托到 _slot_ops 子模块。
+## 公开只读查询：某角色某槽类已占槽数（UI 画功法/法宝栏用）。[br]
+## [br]为什么不直接让 UI 调 [method _count_bound_slots]：下划线是模块内约定，
+## 跨层调用会把「哪个是公开面」搅浑（老板 2026-11-28 反馈装备后格子上没显示）。
+func count_bound_slots(character_id: int, slot_type: int) -> int:
+	return _count_bound_slots(character_id, slot_type)
+
+
 func _count_bound_slots(character_id: int, slot_type: int) -> int:
 	return _get_slot_ops().count_bound_slots(character_id, slot_type)
 

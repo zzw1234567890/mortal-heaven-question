@@ -142,6 +142,9 @@ var card_kind: StringName = &""
 ## [br][b]为什么不在 _draw() 里解析[/b]：绘制期间首次 [code]load()[/code] 的贴图要等
 ## 本帧之后才上传，卡片会一直画成空白（要等下一次重绘才出现）。
 var _art: Texture2D = null
+## 悬停放大倍数——老板 2026-11-28「鼠标悬停高亮放大」。
+## 只缩放不重排：手牌每张已被前排卡遮 1/3，放大是「看清这张」，不是改布局。
+var hover_scale: float = 1.0
 
 
 func _init() -> void:
@@ -272,6 +275,10 @@ func _screen_height() -> int:
 ## 卡面绘制（R-02 §3 合批——底色/头部/边框 + draw_string 三文字 + 锁，
 ## 单一 CanvasItem 零子节点）。
 func _draw() -> void:
+	# 悬停放大以卡中心为锚——直接改 scale 会以左上角为锚点往右下跑。
+	if not is_equal_approx(hover_scale, 1.0):
+		var s: Vector2 = Vector2(hover_scale, hover_scale)
+		draw_set_transform_matrix(Transform2D(0.0, s, 0.0, size * 0.5 * (Vector2.ONE - s)))
 	# 以 [member size] 为唯一基准——卡的实际尺寸由手牌区按视口算，不再读常量。
 	var w: float = maxf(size.x, 1.0)
 	var hgt: float = maxf(size.y, 1.0)

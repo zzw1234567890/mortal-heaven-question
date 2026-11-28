@@ -118,9 +118,15 @@ func advance_phase() -> bool:
 ## 设置 [_player_confirmed_end] 标志后调用 [method advance_phase]。
 func confirm_end_turn() -> bool:
 	var phase: int = int(_parent.get("_phase"))
+	# 玩家打完卡后系统停在攻击声明（3），底栏按钮此时仍可见——只认 2 会让按钮「点了没反应」。
+	# 阶段 3 的语义是「确认跳过攻击声明」，走的仍是同一个[code]确认[/code]动作。
+	if phase == PHASE_ATTACK_DECLARATION:
+		return confirm_attack_targets()
 	if phase != PHASE_PLAY:
 		push_warning("CombatSystem: confirm_end_turn() called outside PLAY phase (current=%d)" % phase)
 		return false
+	_parent.set("_player_confirmed_end", true)
+	return advance_phase()
 	_parent.set("_player_confirmed_end", true)
 	return advance_phase()
 
