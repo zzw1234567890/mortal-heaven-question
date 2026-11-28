@@ -27,6 +27,13 @@ const SAMPLE_KINDS: Array[StringName] = [
 	&"wan_hun_fan", &"shuang_po_jian_jue", &"artifact_shang_pin_fa_qi",
 ]
 
+## 假数据里的卡名——真实链路是 snapshot 从模板取中文名，这里照抄模版，
+## 免得截图里全是卡种 ID（老板 2026-11-28 会说「怎么还是英文」）。
+const SAMPLE_NAMES: Array[String] = [
+	"基础攻击", "煞气斩", "冰棱刺", "回春丹",
+	"万魂幡", "霜魄剑诀", "上品法器",
+]
+
 var _holder: Control = null
 var _area: Node = null
 
@@ -39,6 +46,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	await _shoot(1920, 1080, "ui_shot_hand_1920")
+	await _shoot_hover(1920, 1080)
 	await _shoot(1280, 720, "ui_shot_hand_720")
 	await _shoot_actors()
 	print("[shot-combat] 完成，两张图在 " + ProjectSettings.globalize_path(OUT_DIR))
@@ -107,12 +115,36 @@ func _shoot_actors() -> void:
 	await _capture("ui_shot_actor_cards")
 
 ## 造一手快照（结构与 CombatHandSnapshot.build 输出一致，多一个 card_kind）。
+## 悬停态截图：把中间那张卡抬起并置顶（手牌是每张遮 1/3，只有这样才能看全）。
+func _shoot_hover(p_w: int, p_h: int) -> void:
+	await _clear()
+	_force_window_size(p_w, p_h)
+	_holder = Control.new()
+	_holder.name = "HoverShotHolder"
+	_holder.size = Vector2(p_w, p_h)
+	add_child(_holder)
+	_area = HandAreaScript.new()
+	(_area as Control).name = "HandArea"
+	(_area as Control).set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_holder.add_child(_area)
+	await _settle(4)
+	var cards: Array = _cards()
+	_area.call(&"apply_hand", cards)
+	await _settle(6)
+	if cards.size() >= 4:
+		_area.call(&"set_hovered_card", int((cards[3] as Dictionary).get("card_instance_id", -1)))
+	await _settle(12)
+	print("[shot-combat] 悬停卡 = 第 4 张（应当抬起并压在邻居之上）")
+	await _capture("ui_shot_hand_hover")
+	_force_window_size(1920, 1080)
+
+
 func _cards() -> Array:
 	var out: Array = []
 	for i: int in range(SAMPLE_KINDS.size()):
 		out.append({
 			"card_instance_id": 100 + i,
-			"name": str(SAMPLE_KINDS[i]),
+			"name": SAMPLE_NAMES[i % SAMPLE_NAMES.size()],
 			"cost": i % 4,
 			"rarity": (i % 5) + 1,
 			"type": i % 3,

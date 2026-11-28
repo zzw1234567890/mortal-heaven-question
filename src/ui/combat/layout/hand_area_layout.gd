@@ -71,7 +71,7 @@ func relayout(p_cards: Array) -> void:
 		var target: Dictionary = _target_of(index, p_cards.size())
 		# rotation / z_index 瞬态直设（仅 position 走 tween——旋转与层序无需动画）
 		node.rotation = target["rotation"]
-		node.z_index = Rules.hand_card_z_index(index, p_cards.size())
+		node.z_index = _z_of(node, index, p_cards.size())
 		_rearrange_tween.tween_property(node, "position",
 				_lifted(_to_top_left(target, node), node),
 				REARRANGE_ANIM_SEC).set_ease(Tween.EASE_OUT)
@@ -86,7 +86,7 @@ func apply_positions(p_cards: Array) -> void:
 		var target: Dictionary = _target_of(i, p_cards.size())
 		node.position = _lifted(_to_top_left(target, node), node)
 		node.rotation = target["rotation"]
-		node.z_index = Rules.hand_card_z_index(i, p_cards.size())
+		node.z_index = _z_of(node, i, p_cards.size())
 
 
 ## 末卡抽牌飞入（0.3s；reduce_motion 直跳终位）。[br]
@@ -152,6 +152,16 @@ func _to_top_left(pos: Dictionary, node: Control) -> Vector2:
 ## 增量——取消选中时自然回到基准位，不需要另存一份原始坐标。
 func _lifted(base_pos: Vector2, node: Control) -> Vector2:
 	return base_pos - Vector2(0.0, float(node.call(&"get_lift_offset")))
+
+
+## 悬停卡的 z 层序（压过所有手牌；Godot 上限是 [constant RenderingServer.CANVAS_ITEM_Z_MAX] = 4096）。
+const HOVER_Z_INDEX: int = 4095
+
+## 卡牌 z 层序——悬停卡恒置顶（露出整张），其余按 [HandArcRules] 中心优先。
+func _z_of(p_node: Control, p_index: int, p_total: int) -> int:
+	if is_instance_valid(p_node) and float(p_node.get(&"hover_extra")) > 0.0:
+		return HOVER_Z_INDEX
+	return Rules.hand_card_z_index(p_index, p_total)
 
 
 func _kill_rearrange_tween() -> void:

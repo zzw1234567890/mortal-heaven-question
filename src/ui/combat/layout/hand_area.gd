@@ -64,6 +64,12 @@ var _reduce_motion: bool = false
 ## 溢出提示淡出 Tween 句柄（重入 kill）。
 var _overflow_tween: Tween = null
 ## 排位与动画模块。
+## 悬停抬起量（px）——只抬一点点，主要是靠 z 置顶露出整张。
+const HOVER_LIFT: float = 14.0
+## 悬停卡的 z_index（远高于 Rules.hand_card_z_index 的上限 9）。
+## 当前悬停的卡实例 ID（-1 = 无）。
+var _hovered_id: int = -1
+
 var _layout: RefCounted = null
 ## 节点池与三态视觉模块。
 var _card_nodes: RefCounted = null
@@ -280,6 +286,23 @@ func on_card_overflow(_card_id: int) -> void:
 ## 逐卡接线与去重都在 [HandAreaKeyboard]（本区只负责「什么时候接」）。
 func _connect_card_signals() -> void:
 	_keyboard.call(&"connect_cards", _cards)
+
+
+## 鼠标悬停在某张卡上（[param p_instance_id] < 0 表示没有悬停）。[br]
+## [br]抬起 + 置顶：手牌是「每张遮住前一张 1/3」，只有把悬停卡抬到最高 z 才能
+## 露出整张——这是老板 2026-11-28 要的「鼠标移上去高亮展示这张全部内容」。
+func set_hovered_card(p_instance_id: int) -> void:
+	if _hovered_id == p_instance_id:
+		return
+	_hovered_id = p_instance_id
+	for entry: Dictionary in _cards:
+		var node: Variant = entry.get("node")
+		if node == null or not is_instance_valid(node):
+			continue
+		var hovered: bool = int(entry.get("card_instance_id", -1)) == p_instance_id
+		node.set(&"hover_extra", HOVER_LIFT if hovered else 0.0)
+	if _layout != null:
+		_layout.call(&"apply_positions", _cards)
 
 
 ## 弧形重排（0.2s ease-out 动画；reduce_motion 直跳终态——委托排位模块）。

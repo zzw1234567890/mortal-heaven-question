@@ -28,7 +28,7 @@ func test_hand_card_position_single_card_centered_no_rotation() -> void:
 	# Then: total=1 → (屏幕中心, 可用底边−半卡高, 0)（单张卡无弧度）
 	var pos: Dictionary = Rules.hand_card_position(0, 1, 1920.0, 1080.0)
 	assert_almost_eq(pos["x"], 960.0, 0.001, "单张卡 x = 屏幕中心 960")
-	assert_almost_eq(pos["y"], Rules.bottom_limit_y(1080.0) - Rules.card_height_of(Rules.card_size(1, 1920.0).x) * 0.5, 0.001, "单张卡 y（中心）= 可用底边 − 半卡高")
+	assert_almost_eq(pos["y"], minf(1080.0 * Rules.HAND_BASE_Y_RATIO, Rules.bottom_limit_y(1080.0) - Rules.card_height_of(Rules.card_size(1, 1920.0).x) * 0.5), 0.001, "单张卡 y（中心）= 屏幕中下基准，但不压底栏")
 	assert_almost_eq(pos["rotation"], 0.0, 0.0001, "单张卡 rotation = 0")
 
 
@@ -84,10 +84,10 @@ func test_hand_card_position_two_cards_arc_six_degrees() -> void:
 	# Then: total=2 → arc=6°（2×3°）——两卡 rotation 分别为 ±3° 弧度量
 	var left: Dictionary = Rules.hand_card_position(0, 2, 1280.0, 720.0)
 	var right: Dictionary = Rules.hand_card_position(1, 2, 1280.0, 720.0)
-	assert_almost_eq(left["rotation"], -deg_to_rad(3.0), 0.0001,
-			"total=2 index=0 rotation = -3°")
-	assert_almost_eq(right["rotation"], deg_to_rad(3.0), 0.0001,
-			"total=2 index=1 rotation = +3°")
+	assert_almost_eq(left["rotation"], -deg_to_rad(Rules.FAN_HALF_ANGLE_DEG), 0.0001,
+			"total=2 index=0 rotation = -FAN_HALF_ANGLE_DEG")
+	assert_almost_eq(right["rotation"], deg_to_rad(Rules.FAN_HALF_ANGLE_DEG), 0.0001,
+			"total=2 index=1 rotation = +FAN_HALF_ANGLE_DEG")
 	assert_almost_eq(left["x"] + right["x"], 1280.0, 0.001,
 			"total=2 两卡 x 关于中心对称")
 
@@ -101,7 +101,7 @@ func test_hand_card_position_over_seven_composition_matches_overlap() -> void:
 	for total: int in [8, 9, 10]:
 		var card_width: float = minf(Rules.DEFAULT_CARD_WIDTH,
 				(1280.0 - 40.0) / float(total))
-		var expected: float = Rules.card_overlap_offset(total, card_width)
+		var expected: float = card_width * Rules.SPACING_RATIO
 		for i: int in range(total - 1):
 			var a: Dictionary = Rules.hand_card_position(i, total, 1280.0, 720.0)
 			var b: Dictionary = Rules.hand_card_position(i + 1, total, 1280.0, 720.0)
@@ -124,7 +124,7 @@ func test_hand_card_position_narrow_screen_responsive_card_width() -> void:
 	var card_width: float = (640.0 - 40.0) / 10.0
 	assert_true(card_width < Rules.DEFAULT_CARD_WIDTH,
 			"前置：640 宽下响应式卡宽应收缩（60 < 100）")
-	var expected: float = Rules.card_overlap_offset(10, card_width)
+	var expected: float = card_width * Rules.SPACING_RATIO
 	for i: int in range(10):
 		var pos: Dictionary = Rules.hand_card_position(i, 10, 640.0, 720.0)
 		assert_true(pos["x"] >= 20.0, "640 宽 index %d x 应 ≥ 20" % i)

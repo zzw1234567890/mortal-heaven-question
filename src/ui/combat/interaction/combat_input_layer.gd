@@ -149,9 +149,22 @@ func _handle_button(event: InputEventMouseButton) -> void:
 ## 鼠标移动——刚越过 8px 阈值时不做额外事（拖拽视觉归后续 story），
 ## 只把状态机推进到「拖拽中」，释放时据此区分点击/拖拽。
 func _handle_motion(event: InputEventMouseMotion) -> void:
-	if not bool(_gesture.call(&"is_pressed")):
+	if bool(_gesture.call(&"is_pressed")):
+		_gesture.call(&"move", event.global_position)
 		return
-	_gesture.call(&"move", event.global_position)
+	# 没按下时顺带维护悬停态：手牌是叠着排的，悬停卡要抬起来并置顶，
+	# 否则被邻居遮住 1/3 的卡永远看不全（老板 2026-11-28 的诉求）。
+	_set_hovered(_card_at(event.global_position))
+
+
+## 把悬停的卡实例 ID 交给手牌区（-1 = 没有悬停）。
+func _set_hovered(p_card_instance_id: int) -> void:
+	if _layout == null or not _layout.has_method(&"hand_area"):
+		return
+	var hand: Variant = _layout.call(&"hand_area")
+	if hand == null or not (hand as Object).has_method(&"set_hovered_card"):
+		return
+	(hand as Object).call(&"set_hovered_card", p_card_instance_id)
 
 
 ## 释放——按状态机结果分流为点击或拖拽。[br]

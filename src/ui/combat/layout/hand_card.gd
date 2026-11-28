@@ -127,6 +127,9 @@ var card_type: int = 0
 ## 费用是否充足（false → 灰显 + 费用红）。
 var is_affordable: bool = true
 ## 是否灵能预览（阶段 2 外——true 时 60% 饱和 + 🔒）。
+## 鼠标悬停追加的抬起量（px）——由 HandArea 统一设置，布局层叠加。
+var hover_extra: float = 0.0
+
 var is_psychic: bool = false
 ## 是否被选中（combat-ui-interaction 001——抬起 + 加粗描边）。
 var is_selected: bool = false
@@ -195,7 +198,8 @@ func set_selected(p_selected: bool) -> void:
 ## [br][b]为什么偏移量暴露而非组件自己动[/b]：位置所有权在 [code]HandArea[/code]
 ## 的弧形排布（重排动画会重写 position），组件自己动会被下一次排位覆盖。
 func get_lift_offset() -> float:
-	return SELECTED_LIFT if is_selected else 0.0
+	var base: float = SELECTED_LIFT if is_selected else 0.0
+	return base + hover_extra
 
 
 ## 获取当前 modulate（测试断言用——三态视觉可区分）。

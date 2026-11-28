@@ -41,6 +41,9 @@ static func build(p_hand: Array, p_card_system: Variant = null) -> Array:
 			"rarity": _int_field(entry, template, "rarity", 1),
 			"type": _int_field(entry, template, "type", 0),
 			"target_type": target_type_of(entry, template),
+			# 卡种 ID（basic_attack / sha_qi_zhan 这类模板 ID）——卡面按它找插画；
+			# 实例 ID 每张都不同，不能当美术键。
+			"card_kind": card_kind_of(entry, template),
 			"affordable": true,
 		})
 	return snapshot
@@ -105,6 +108,16 @@ static func _name_of(p_entry: Variant, p_template: Variant, p_card_id: int) -> S
 		if raw_name != null and not str(raw_name).is_empty():
 			return str(raw_name)
 	return "卡 #%d" % p_card_id
+
+
+## 条目 → 卡种 ID（模板 ID）。条目字典里的 [code]card_kind[/code] 优先，
+## 否则取模板的 [code]card_id[/code]；都没有返回空串。
+static func card_kind_of(p_entry: Variant, p_template: Variant = null) -> StringName:
+	if p_entry is Dictionary:
+		var raw: Variant = (p_entry as Dictionary).get("card_kind")
+		if raw != null and not str(raw).is_empty():
+			return StringName(str(raw))
+	return StringName(str(_card_field(p_template, "card_id", "")))
 
 
 ## 条目 → 模板 的整数字段（条目显式键优先，缺省落模板，再落默认）。

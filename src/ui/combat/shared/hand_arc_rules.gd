@@ -32,6 +32,14 @@ const DEFAULT_CARD_HEIGHT: float = 252.0
 const BOTTOMBAR_HEIGHT_RATIO: float = 180.0 / 1080.0
 ## 卡底与底栏顶之间留的空隙（px——太小会读成「贴在底栏上」）。
 const BOTTOMBAR_GAP: float = 8.0
+## 相邻卡水平间距 = 卡宽 × 该比例——0.667 即「每张遮住前一张 1/3」。
+const SPACING_RATIO: float = 2.0 / 3.0
+## 手牌基准线：屏幕高度的这个比例（「屏幕中下」）。
+const HAND_BASE_Y_RATIO: float = 0.70
+## 扇形单侧最大转角（度）——角度随索引线性张开。
+const FAN_HALF_ANGLE_DEG: float = 9.0
+## 扇形中心抬升量（卡高的比例）——中心最高、两端落回基准线。
+const FAN_LIFT_RATIO: float = 0.07
 ## 弧形最大角度（度——GDD 最多 30°）。
 const MAX_ARC_ANGLE_DEG: float = 30.0
 ## 每张卡增加角度（度——GDD total_cards × 3°）。
@@ -68,55 +76,23 @@ static func hand_card_position(index: int, total_cards: int,
 		screen_width: float, screen_height: float) -> Dictionary:
 	if total_cards <= 0:
 		return {}  # 守卫：空手牌不计算位置
-	var center: float = screen_width * 0.5
-	var available_width: float = screen_width - EDGE_MARGIN * 2.0
-	# 响应式卡宽：低分辨率 + 满手牌不溢出
-	var card_width: float = minf(DEFAULT_CARD_WIDTH,
-			available_width / float(total_cards))
-	# 底缘贴底栏上方 BOTTOMBAR_GAP：按卡高反推中心 y（不用 0.86H 硬口径——
-	# 卡放大到 180×252 后 0.86H 会把卡压到底栏上）。
-	var base_y: float = bottom_limit_y(screen_height) - card_height_of(card_width) * 0.5
-	if total_cards == 1:
-		return {"x": center, "y": base_y, "rotation": 0.0}  # 单张卡无弧度
-	if total_cards <= OVERLAP_THRESHOLD:
-		# GDD 半径法圆弧（radius×sin / radius×(1-cos)——端点 20px 边距守恒）
-		var arc_angle_deg: float = minf(MAX_ARC_ANGLE_DEG,
-				float(total_cards) * ARC_PER_CARD_DEG)
-		var arc_rad: float = deg_to_rad(arc_angle_deg)
-		var half_angle: float = arc_rad * 0.5
-		var span: float = maxf(available_width - card_width, 0.0)
-		var radius: float = (span * 0.5) / sin(half_angle) \
-				if sin(half_angle) > 0.01 else 9999.0
-		# 拱形（虹弧）：中心最高、两端落到可用底边（`y` 越小越靠上）。
-		var lift: float = radius * (1.0 - cos(half_angle))
-		var angle: float = -half_angle \
-				+ (float(index) / float(total_cards - 1)) * arc_rad
-		return {
-			"x": center + radius * sin(angle),
-			"y": base_y - lift + radius * (1.0 - cos(angle)),
-			"rotation": angle,
-		}
-	# >7 张——间距优先、角度自适应（GDD 2026-09-07 裁决）：先 overlap 求有效间距，
-	# 相邻卡水平间距恒等于 spacing；再压缩 arc_angle 使弦长匹配（角度随卡数收敛）
-	var spacing: float = card_overlap_offset(total_cards, card_width)
-	var half_index: float = float(total_cards - 1) * 0.5
-	var arc_angle_deg: float = float(OVERLAP_THRESHOLD) * ARC_PER_CARD_DEG \
-			* float(OVERLAP_THRESHOLD) / float(total_cards)  # 21°×7/total 收敛
-	var half_angle: float = deg_to_rad(arc_angle_deg) * 0.5
-	var chord: float = float(total_cards - 1) * spacing  # 弦长 = 水平总跨度
-	var radius: float = chord * 0.5 / sin(half_angle) \
-			if sin(half_angle) > 0.01 else 9999.0
-	var lift_wide: float = radius * (1.0 - cos(half_angle))
-	# 拱形：两端贴可用底边、中心抬到最高（与 ≤7 张同一形状，别再写成微笑弧）。
-	var t: float = (float(index) - half_index) / half_index  # 归一化 [-1, 1]
-	var angle: float = t * half_angle
-	return {
-		"x": center + (float(index) - half_index) * spacing,
-		"y": base_y - lift_wide + radius * (1.0 - cos(angle)),
-		"rotation": angle,
-	}
-
-
+	var card_width: float = card_width_of(total_cards, screen_width)
+	var card_h: float = card_height_of(card_width)
+	# 紧挨排布：相邻卡水平间距 = 卡宽 × SPACING_RATIO（即每张遮住前一张 1/3）。
+	var step: float = card_width * SPACING_RATIO
+	var span: float = step * float(maxi(total_cards - 1, 0))
+	var left: float = screen_width * 0.5 - span * 0.5
+	var x: float = left + step * float(index)
+	# 屏幕中下：基准 y 取 HAND_BASE_Y_RATIO，但不许压到底栏（取两者较小）。
+	var base_y: float = minf(screen_height * HAND_BASE_Y_RATIO,
+			bottom_limit_y(screen_height) - card_h * 0.5)
+	var half: float = float(total_cards - 1) * 0.5
+	var t: float = 0.0 if total_cards == 1 else (float(index) - half) / half
+	# 扇形：抛物线抬升（中心最高、两端落到基准线）+ 角度随 t 线性张开。
+	# 单张不抬（抬了就离开基准线，单卡没有弧）；多张按抛物线抬中心。
+	var lift: float = 0.0 if total_cards == 1 else card_h * FAN_LIFT_RATIO * (1.0 - t * t)
+	var angle: float = deg_to_rad(FAN_HALF_ANGLE_DEG) * t
+	return {"x": x, "y": base_y - lift, "rotation": angle}
 ## 卡高——由卡宽按 5:7 等比推导（宽高比是 GDD 硬约束，宽度响应式时高跟着走）。[br]
 ## [param card_width]: 卡宽（px）。[br]
 ## [b]返回[/b]: 卡高（px）。
