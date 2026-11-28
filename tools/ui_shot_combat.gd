@@ -15,6 +15,8 @@ const OUT_DIR: String = "res://tools/"
 
 const HandAreaScript := preload("res://src/ui/combat/layout/hand_area.gd")
 const ArtResolver := preload("res://src/ui/combat/card_art_resolver.gd")
+const CharacterCardScript := preload("res://src/ui/combat/layout/character_status_card.gd")
+const PortraitScript := preload("res://src/ui/identity_select/identity_portrait_resolver.gd")
 
 ## 底栏占视口高度的比例（与 HandArcRules / CombatLayoutZones 同源口径）。
 const BOTTOMBAR_HEIGHT_RATIO: float = 180.0 / 1080.0
@@ -38,6 +40,7 @@ func _ready() -> void:
 func _run() -> void:
 	await _shoot(1920, 1080, "ui_shot_hand_1920")
 	await _shoot(1280, 720, "ui_shot_hand_720")
+	await _shoot_actors()
 	print("[shot-combat] 完成，两张图在 " + ProjectSettings.globalize_path(OUT_DIR))
 	get_tree().quit()
 
@@ -61,6 +64,47 @@ func _shoot(p_w: int, p_h: int, p_name: String) -> void:
 	await _capture(p_name)
 	_force_window_size(1920, 1080)
 
+
+## 角色卡视觉取证（立绘 + 功法/法宝栏）。[br]
+## [br]直接建 [code]character_status_card[/code] 组件——战斗里它们由
+## [code]ActorStageRoster._spawn()[/code] 用同样的入口（portrait / set_bindings）装出来。
+func _shoot_actors() -> void:
+	await _clear()
+	_force_window_size(1920, 1080)
+	_holder = Control.new()
+	_holder.name = "ActorCardHolder"
+	_holder.size = Vector2(1920, 1080)
+	add_child(_holder)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 24)
+	row.position = Vector2(60.0, 120.0)
+	_holder.add_child(row)
+	var cases: Array = [
+		[&"lin_yuan", "林渊", 32, 45, 2, 1],
+		[&"su_jian_ming", "苏剑鸣", 26, 38, 1, 2],
+		[&"tu_ye", "屠野", 18, 52, 0, 3],
+		[&"yun_su_xin", "云素心", 21, 30, 3, 0],
+		[&"yin_ruo_han", "殷若寒", 15, 34, 1, 1],
+	]
+	for entry: Array in cases:
+		var card: Control = CharacterCardScript.new()
+		card.size = card.custom_minimum_size
+		row.add_child(card)
+		card.set(&"portrait", PortraitScript.portrait_for(str(entry[0])))
+		card.call(&"apply_name", str(entry[1]))
+		card.call(&"apply_hp", int(entry[2]), int(entry[3]))
+		card.call(&"apply_atk", 12)
+		card.call(&"set_front_row", true)
+		card.call(&"set_bindings", int(entry[4]), int(entry[5]))
+	await _settle(8)
+	for child: Node in row.get_children():
+		var c2: Control = child as Control
+		var has_portrait: bool = c2.get(&"portrait") != null
+		print("[shot-actor] %s rect=%s portrait=%s gongfa=%d fabao=%d"
+				% [str(c2.get(&"name")), str(c2.get_global_rect()),
+				"OK" if has_portrait else "MISSING",
+				int(c2.get(&"gongfa_count")), int(c2.get(&"fabao_count"))])
+	await _capture("ui_shot_actor_cards")
 
 ## 造一手快照（结构与 CombatHandSnapshot.build 输出一致，多一个 card_kind）。
 func _cards() -> Array:

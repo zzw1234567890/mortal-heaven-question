@@ -14,6 +14,8 @@ extends RefCounted
 
 ## 角色卡脚本（按需 new——同 CombatLayout 的组件装配先例）。
 const CardScript: GDScript = preload("res://src/ui/combat/layout/character_status_card.gd")
+## 立绘解析（同一套归一索引，身份页与战斗卡共用）。
+const PortraitScript: GDScript = preload("res://src/ui/identity_select/identity_portrait_resolver.gd")
 
 ## 角色 ID → 卡节点（UI 节点表）。
 var cards: Dictionary = {}
@@ -139,6 +141,18 @@ func _spawn(p_character_id: int, p_is_front: bool, p_container: Control) -> Cont
 	# 取数入口是旧版（无 display_name）时静默跳过——名牌留空，血量照常显示。
 	if _reader.has_method(&"display_name"):
 		card.call(&"apply_name", str(_reader.call(&"display_name", p_character_id)))
+	# 立绘：角色卡上阵后要看得见人（老板 2026-11-28 反馈「角色卡上阵后也要展示图片」）。
+	# 卡种 ID → 立绘走 IdentityPortraitResolver 的归一索引（资产名与 card_id 不逐字相等）；
+	# 查不到就保持 null，卡面画占位色块，不抛错。
+	if _reader.has_method(&"card_id"):
+		var portrait_card_id: String = str(_reader.call(&"card_id", p_character_id))
+		if not portrait_card_id.is_empty():
+			card.set(&"portrait", PortraitScript.portrait_for(portrait_card_id))
+	# 功法 / 法宝栏计数（L2 侧栏）。绑定系统缺失时是 0，卡面画空槽。
+	if _reader.has_method(&"binding_counts"):
+		var bindings: Dictionary = _reader.call(&"binding_counts", p_character_id)
+		card.call(&"set_bindings", int(bindings.get("gongfa", 0)),
+				int(bindings.get("fabao", 0)))
 	_register(p_character_id)
 	return card
 

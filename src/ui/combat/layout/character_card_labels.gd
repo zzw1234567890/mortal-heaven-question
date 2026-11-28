@@ -63,8 +63,11 @@ static func _responsive_font_size(p_host: Control) -> int:
 static func sync_stat(p_host: Control, p_label: Label, p_font_size: int) -> void:
 	if p_label == null:
 		return
-	p_label.text = "HP %d/%d  ATK %d" % [
+	# 120px 宽的卡上「HP 32/45  ATK 12」放不下（会溢出到卡外，老板 2026-11-28
+	# 反馈卡面文字乱）。改成紧凑写法：生命/上限 · 攻击。
+	p_label.text = "%d/%d · %d" % [
 			p_host.current_hp, p_host.max_hp, p_host.atk_value]
+	p_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	p_label.add_theme_font_size_override("font_size", p_font_size)
 	p_label.add_theme_color_override("font_color", Style.ATK_COLOR)
 	p_label.position = Vector2(Style.SIDE_BAR_WIDTH,

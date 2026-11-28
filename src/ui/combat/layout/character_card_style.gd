@@ -32,14 +32,16 @@ const HP_TRACK_HEIGHT: float = 8.0
 const STAT_LABEL_BASELINE: float = 22.0
 ## 文字 Label 高度（R-02 §3 单 Label 合并——名与数值共用同一行高）。
 const LABEL_HEIGHT: float = 18.0
-
-## L5 名牌位置（顶部横条内边距）与 L4 角标的外边距/间距。
-const NAME_LABEL_TOP: float = 26.0
+## L5 名牌位置：移到 HP 条正上方——放顶部会压住立绘的头（120×168 的卡上
+## 头顶只留得下 26px，人脸正好在那条带上）。
+const NAME_LABEL_TOP: float = 106.0
+## L4 角标外边距/间距（R-02 corner_badge）。
 const BADGE_INSET: float = 2.0
 const BADGE_GAP: float = 2.0
 const BADGE_BOTTOM_INSET: float = 4.0
 ## L2 图标区相对卡左上角的起点偏移（含背板外扩）。
 const ICON_ORIGIN: float = 4.0
+## L2 图标区相对卡顶的下移量（名牌已移到底部，图标回到贴近顶边）。
 const ICON_SLOT_TOP: float = 8.0
 const ICON_BACKING_INSET: float = 4.0
 
@@ -64,6 +66,15 @@ const HP_TRACK_COLOR: Color = Color(0.16, 0.16, 0.20, 0.9)
 const ATK_COLOR: Color = Color(0.96, 0.94, 0.88)
 ## 头像缺失时的占位块色（stub 阶段头像未入库）。
 const PORTRAIT_PLACEHOLDER: Color = Color(0.18, 0.20, 0.24)
+## 名牌底衬色（半透明深色横条——立绘上放浅色字要垫一层）。
+const NAME_PLATE_COLOR: Color = Color(0.05, 0.05, 0.08, 0.55)
+
+## 空槽描边（L2 侧栏在 0 件时仍要露出「功法 / 法宝栏」——老板 2026-11-28 反馈
+## 「角色卡还有法宝栏和功法栏，怎么没看到」：只有计数 > 0 才画，看着就像没有这两栏）。
+const EMPTY_SLOT_COLOR: Color = Color(0.42, 0.46, 0.55, 0.55)
+
+## 侧栏最少画几格（计数为 0 时画空槽，让玩家知道这两栏存在）。
+const SIDE_MIN_SLOTS: int = 2
 ## 已行动遮罩色（story 003 AC-2——GDD「已行动角色：灰色遮罩」）。
 const ACTED_OVERLAY_COLOR: Color = Color(0.5, 0.5, 0.52, 0.5)
 

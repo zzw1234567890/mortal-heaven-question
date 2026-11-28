@@ -86,6 +86,38 @@ func read_enemy_roster() -> Array:
 ## 三处各接一遍战斗系统与卡牌系统必然漂移；名与播报共用同一个解析器，玩家看到的
 ## 卡上名与播报里的名永远是同一个。[br]
 ## [br][b]返回[/b]：非空串——最差也是 [code]敌人 #100000[/code] 这样的可读编号。
+## 角色 → 卡种 ID（[code]lin_yuan[/code] 这类骨架名）。
+## [br]立绘按卡种 ID 找图：资产名 [code]char_<骨架名>_portrait_full.png[/code]，
+## 与卡种 ID 不逐字相等，交给 [code]IdentityPortraitResolver[/code] 归一后查。
+## 查不到返回空串（卡面走占位色块）。
+func card_id(p_character_id: int) -> String:
+	var template: Variant = _template(p_character_id)
+	if template == null:
+		return ""
+	return str(_entry_raw(template, "card_id"))
+
+
+## 角色卡 L2 侧栏的功法 / 法宝计数——[code]{gongfa, fabao}[/code]。
+## [br]绑定系统（Autoload [code]BindingManager[/code]）不可用 / 无记录时返回 0,0，
+## 卡面照常画空槽（不抛错、不阻塞建卡）。
+func binding_counts(p_character_id: int) -> Dictionary:
+	var counts: Dictionary = {"gongfa": 0, "fabao": 0}
+	var mgr: Node = _binding_manager()
+	if mgr == null or not mgr.has_method(&"count_bound_slots"):
+		return counts
+	counts["gongfa"] = int(mgr.call(&"count_bound_slots", p_character_id, 0))
+	counts["fabao"] = int(mgr.call(&"count_bound_slots", p_character_id, 1))
+	return counts
+
+
+## Autoload [code]BindingManager[/code]（无 SceneTree 的纯单元测试里返回 null）。
+func _binding_manager() -> Node:
+	var loop: MainLoop = Engine.get_main_loop()
+	if not (loop is SceneTree):
+		return null
+	return (loop as SceneTree).root.get_node_or_null(^"BindingManager")
+
+
 func display_name(character_id: int) -> String:
 	return NameText.name_of(character_id, _combat, _card_system)
 

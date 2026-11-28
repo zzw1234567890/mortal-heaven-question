@@ -26,6 +26,7 @@ static func draw_all(p_host: Control) -> void:
 	if card_size.x <= 0.0 or card_size.y <= 0.0:
 		return
 	draw_portrait(p_host, card_size)
+	draw_name_plate(p_host, card_size)
 	draw_bottom_bar(p_host, card_size)
 	draw_badges(p_host)
 	draw_standby_badge(p_host)
@@ -44,15 +45,43 @@ static func draw_all(p_host: Control) -> void:
 ## 同走 [CombatIconAtlas] 单图集（同纹理 [code]draw_texture_rect_region[/code] 合批）。
 static func draw_portrait(p_host: Control, card_size: Vector2) -> void:
 	if p_host.portrait != null:
-		p_host.draw_texture_rect(p_host.portrait,
-				Rect2(Vector2.ZERO, card_size), true)
+		# 立绘按 cover 裁切铺满卡片——[code]draw_texture_rect(..., true)[/code] 是平铺，
+		# 竖构图立绘在 120×168 的卡上会被切成重复的小块（老板 2026-11-28 反馈
+		# 「角色卡上阵后也要展示图片」——图片要真看得出来是人，不是小瓷砖）。
+		_item_cover(p_host, p_host.portrait, Rect2(Vector2.ZERO, card_size), PORTRAIT_COVER_BIAS)
 	else:
 		p_host.draw_rect(Rect2(Vector2.ZERO, card_size), Style.PORTRAIT_PLACEHOLDER)
+		p_host.draw_rect(Rect2(Vector2.ZERO, card_size), Style.PORTRAIT_PLACEHOLDER)
 	# L1 底部渐变遮罩（透明 → 黑 60%——L3 文字可读性）
-	p_host.draw_texture_rect(Icons.get_mask(), Rect2(Vector2.ZERO, card_size), true)
+	p_host.draw_texture_rect(Icons.get_mask(), Rect2(Vector2.ZERO, card_size), false)
 	# L2 左右功法/法宝竖排（同一图集批次）
 	draw_side_icons(p_host, true)
 	draw_side_icons(p_host, false)
+
+
+## 名牌底衬：名字是子节点 Label，直接压在立绘上会读不清（浅色水墨底 + 浅色字）。
+## 画一层半透明深色横条当底——不遮人（只占顶部一行），但字立得住。
+static func draw_name_plate(p_host: Control, card_size: Vector2) -> void:
+	if p_host.display_name.is_empty():
+		return
+	p_host.draw_rect(Rect2(0.0, Style.NAME_LABEL_TOP - 2.0, card_size.x,
+			Style.LABEL_HEIGHT + 4.0), Style.NAME_PLATE_COLOR)
+
+
+## 立绘 cover 裁切：按比例取一块覆盖矩形区域的源区域，纵向偏上（[param p_bias]）
+## 让头肩落在中间，而不是把脚裁掉一半。
+const PORTRAIT_COVER_BIAS: float = 0.30
+
+
+static func _item_cover(p_host: Control, p_tex: Texture2D, p_rect: Rect2,
+		p_bias: float) -> void:
+	var src: Vector2 = p_tex.get_size()
+	if src.x <= 0.0 or src.y <= 0.0 or p_rect.size.x <= 0.0 or p_rect.size.y <= 0.0:
+		return
+	var fit: float = maxf(p_rect.size.x / src.x, p_rect.size.y / src.y)
+	var win: Vector2 = Vector2(p_rect.size.x / fit, p_rect.size.y / fit)
+	var region: Rect2 = Rect2((src.x - win.x) * 0.5, (src.y - win.y) * p_bias, win.x, win.y)
+	p_host.draw_texture_rect_region(p_tex, p_rect, region)
 
 
 ## L3 底部条：不透明背板 + HP 条（[code]draw_rect[/code] 纯色）+ ATK 文字。[br]
@@ -164,15 +193,22 @@ static func draw_side_icons(p_host: Control, left_side: bool) -> void:
 	var atlas: Texture2D = Icons.get_atlas()
 	var backing_region: Rect2 = Icons.get_region(Icons.IconId.BACKING)
 	var icon_region: Rect2 = Icons.get_region(icon_id)
+	# 0 件时也留出 SIDE_MIN_SLOTS 格空槽：以前只有 count>0 才画，玩家
+	# 看到的是一张没有功法/法宝栏的卡（老板 2026-11-28 的反馈）。
+	var slot_count: int = maxi(count, Style.SIDE_MIN_SLOTS)
 	var x: float = Style.ICON_ORIGIN if left_side \
 			else p_host.size.x - Style.SIDE_BAR_WIDTH + Style.ICON_ORIGIN
 	var backing: Rect2 = Rect2(x - Style.ICON_BACKING_INSET, Style.ICON_ORIGIN,
 			Style.SIDE_BAR_WIDTH,
-			float(count) * (Style.ICON_SIZE + Style.ICON_GAP)
+			float(slot_count) * (Style.ICON_SIZE + Style.ICON_GAP)
 			+ Style.ICON_BACKING_INSET)
 	p_host.draw_texture_rect_region(atlas, backing, backing_region)
-	for i: int in count:
+	for i: int in slot_count:
 		var y: float = Style.ICON_SLOT_TOP \
 				+ float(i) * (Style.ICON_SIZE + Style.ICON_GAP)
-		p_host.draw_texture_rect_region(atlas,
-				Rect2(x, y, Style.ICON_SIZE, Style.ICON_SIZE), icon_region)
+		var slot: Rect2 = Rect2(x, y, Style.ICON_SIZE, Style.ICON_SIZE)
+		if i < count:
+			p_host.draw_texture_rect_region(atlas, slot, icon_region)
+		else:
+			p_host.draw_rect(slot, Style.EMPTY_SLOT_COLOR, false, 1.0)
+

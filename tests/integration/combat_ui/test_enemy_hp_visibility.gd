@@ -54,7 +54,7 @@ func test_enemy_card_shows_hp_number_and_bar_from_roster() -> void:
 	# Assert —— 数字
 	var stat: Label = card.get_node_or_null("StatLabel")
 	assert_not_null(stat, "敌方卡应有 StatLabel（HP 数字）")
-	assert_true(stat.text.contains("HP 12/20"),
+	assert_true(stat.text.contains("12/20"),
 			"敌方卡应显示名册的 current/max，实际：%s" % stat.text)
 	# Assert —— 血条比例（受伤前满比例之外的比例判定在下一用例）
 	assert_eq(card.current_hp, 12, "卡上 HP 快照应等于名册当前值")
@@ -79,7 +79,7 @@ func test_enemy_cards_keep_their_own_name_and_hp() -> void:
 	assert_not_null(name_b, "第二只敌人也应有名牌")
 	assert_eq(name_a.text, "黑风寨匪徒", "第一只敌人的名牌")
 	assert_eq(name_b.text, "巡山小妖", "第二只敌人的名牌（不串味）")
-	assert_true(card_b.get_node("StatLabel").text.contains("HP 3/8"),
+	assert_true(card_b.get_node("StatLabel").text.contains("3/8"),
 			"第二只敌人的血量应各算各的，实际：%s"
 			% card_b.get_node("StatLabel").text)
 
@@ -97,7 +97,7 @@ func test_enemy_card_refreshes_after_damage() -> void:
 	reader.hp_map[ENEMY_A] = {"current": 5, "max": 20}
 	card.apply_hp(5, 20)
 	# Assert
-	assert_true(card.get_node("StatLabel").text.contains("HP 5/20"),
+	assert_true(card.get_node("StatLabel").text.contains("5/20"),
 			"受伤后数字应刷新，实际：%s" % card.get_node("StatLabel").text)
 	assert_almost_eq(card.get_hp_display_ratio_for_test(), 0.25, 0.001,
 			"受伤后血条应降到 5/20=0.25")
@@ -115,7 +115,7 @@ func test_ally_card_shows_name_and_hp_too() -> void:
 	var card: Control = roster.get_card(ALLY_A)
 	# Assert
 	assert_eq(card.get_node("NameLabel").text, "青云弟子", "我方卡也应有名牌")
-	assert_true(card.get_node("StatLabel").text.contains("HP 30/40"),
+	assert_true(card.get_node("StatLabel").text.contains("30/40"),
 			"我方卡也应有 HP 数字，实际：%s" % card.get_node("StatLabel").text)
 
 
