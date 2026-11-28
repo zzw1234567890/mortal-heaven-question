@@ -63,6 +63,7 @@ func test_hand_area_arc_center_card_arc_shape() -> void:
 	var rules: GDScript = load("res://src/ui/combat/shared/hand_arc_rules.gd")
 	var card: Vector2 = rules.card_size(7, hand_area.size.x)
 	assert_almost_eq(left.position.y, rules.bottom_limit_y(720.0) - card.y * 0.5, 0.5,
+			"两端卡落在可用底边（拱形最低点）")
 	assert_true(center.position.y < left.position.y, "中心卡 y 应小于左边缘（拱形最高点）")
 	assert_almost_eq(left.position.x + right.position.x,
 			hand_area.size.x - left.size.x, 0.5,

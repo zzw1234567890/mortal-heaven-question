@@ -19,6 +19,8 @@ extends Control
 
 const Rules := preload("res://src/ui/combat/shared/deploy_panel_rules.gd")
 const UiFont := preload("res://src/ui/combat/shared/combat_ui_font.gd")
+## 立绘解析（与身份页/上阵卡同一套：按卡种 ID 找 `char_<骨架>_portrait_full.png`）。
+const PortraitScript: GDScript = preload("res://src/ui/identity_select/identity_portrait_resolver.gd")
 
 ## === 尺寸常量（缩略卡——GDD §8 角色选择网格）=================================
 
@@ -54,6 +56,10 @@ const REPLACEABLE_BORDER_COLOR: Color = Color("#B8A060")
 const NORMAL_BORDER_COLOR: Color = Color(0.55, 0.55, 0.58)
 ## 不可用边框色（灰）。
 const UNAVAILABLE_BORDER_COLOR: Color = Color(0.35, 0.35, 0.38)
+## 立绘纵向取景偏置（0 = 顶对齐取，1 = 底对齐；0.30 大致落在头肩）。
+const PORTRAIT_COVER_BIAS: float = 0.30
+## 阵亡时压在立绘上的灰罩（保住人形仍可辨）。
+const AVATAR_DEAD_TINT: Color = Color(0.06, 0.06, 0.08, 0.62)
 ## 头像底色（占位——真实立绘走资产管线）。
 const AVATAR_COLOR: Color = Color(0.20, 0.26, 0.34)
 ## 不可用头像底色（灰化）。
@@ -88,6 +94,8 @@ var character_id: int = -1
 signal card_pressed
 
 
+## 立绘缓存（在 [method apply_data] 里解析好——_draw 里首次 load 会晚一帧才上传，卡面会空白）。
+var _portrait_tex: Texture2D = null
 ## 渲染快照（由 [method apply_data] 下发）。
 var data: Dictionary = {}
 ## 当前 4 态（[DeployPanelRules] 常量之一）。
@@ -112,11 +120,28 @@ func _init() -> void:
 	draw.connect(_draw_card)
 
 
+## 立绘：按卡种 ID 解析（空 ID 或查无图返回 null，交给占位底色）。
+func _portrait() -> Texture2D:
+	return _portrait_tex
+
+
+## cover 裁切绘制：按比例取一块覆盖目标矩形的源区域（不拉伸、不留边）。
+func _draw_cover(p_tex: Texture2D, p_rect: Rect2) -> void:
+	var src: Vector2 = p_tex.get_size()
+	if src.x <= 0.0 or src.y <= 0.0:
+		return
+	var fit: float = maxf(p_rect.size.x / src.x, p_rect.size.y / src.y)
+	var win := Vector2(p_rect.size.x / fit, p_rect.size.y / fit)
+	var region := Rect2((src.x - win.x) * 0.5, (src.y - win.y) * PORTRAIT_COVER_BIAS, win.x, win.y)
+	draw_texture_rect_region(p_tex, p_rect, region)
+
+
 ## 应用角色数据快照。[br]
 ## [param p_character_id]: 角色实例 ID。[br]
 ## [param p_data]: [code]{display_name, hp, attack, binding_count, faction_tags, is_dead}[/code]。
 func apply_data(p_character_id: int, p_data: Dictionary) -> void:
 	character_id = p_character_id
+	_portrait_tex = PortraitScript.portrait_for(str(p_data.get("card_id", "")))
 	data = p_data
 	queue_redraw()
 
@@ -162,9 +187,16 @@ func _draw_card() -> void:
 	if size.x <= 0.0 or size.y <= 0.0:
 		return
 	var dead: bool = selection_state == Rules.STATE_UNAVAILABLE
-	# 头像块（占位底色——真实立绘走资产管线）
-	var avatar_color: Color = AVATAR_DEAD_COLOR if dead else AVATAR_COLOR
-	draw_rect(Rect2(0, 0, size.x, AVATAR_HEIGHT), avatar_color)
+	# 头像块：有立绘就 cover 铺满（竖构图全身图居中裁切会把脸裁掉，纵向偏上取），
+	# 没有立绘才退回占位底色——老板 2026-11-28「选角色出战页面，角色卡牌也要展示图片」。
+	var avatar_rect := Rect2(0, 0, size.x, AVATAR_HEIGHT)
+	var art: Texture2D = _portrait()
+	if art != null:
+		_draw_cover(art, avatar_rect)
+		if dead:
+			draw_rect(avatar_rect, AVATAR_DEAD_TINT)
+	else:
+		draw_rect(avatar_rect, AVATAR_DEAD_COLOR if dead else AVATAR_COLOR)
 	# 边框（状态色 + 已选加粗）
 	var border_color: Color = _border_color_for(selection_state)
 	var border_width: float = 2.5 if selection_state == Rules.STATE_SELECTED else 1.5

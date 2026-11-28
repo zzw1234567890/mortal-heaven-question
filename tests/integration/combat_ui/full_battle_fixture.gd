@@ -30,6 +30,8 @@ const CHAR_TEMPLATES: Array[StringName] = [&"lin_yuan", &"su_jian_ming"]
 
 var cs: Node = null
 var scene: Control = null
+## 宿主尺寸——1280×720 覆盖低分辨率；需要 1920×1080 的用例在 before_each 里覆写。
+var host_size: Vector2 = Vector2(1280.0, 720.0)
 var _host: Control = null
 var sm: Variant = null
 var char_ids: Array = []
@@ -245,7 +247,7 @@ func _mount_scene(p_defeat: bool) -> void:
 	# 用尺寸确定的宿主 Control 承载全屏锚点的战斗场景——由父级给尺寸，
 	# 避免「_ready 后直接改 size」触发引擎覆写告警。
 	_host = Control.new()
-	_host.size = Vector2(1280.0, 720.0)
+	_host.size = host_size
 	add_child(_host)
 	_host.add_child(scene)
 

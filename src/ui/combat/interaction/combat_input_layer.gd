@@ -123,6 +123,11 @@ func _gui_input(event: InputEvent) -> void:
 ## 鼠标按下 / 释放。
 func _handle_button(event: InputEventMouseButton) -> void:
 	var button: InputEventMouseButton = event
+	# 底栏那一条横带不属于本层（「结束出牌 / 退却」在底栏里）。GUI 拾取虽然已由
+	# [method _has_point] 让出，但事件仍可能经父级链路落到这里——落到就静默返回，
+	# 绝不给「当前阶段不能出牌」的提示：玩家点的是按钮，不是手牌。
+	if not _has_point(button.position):
+		return
 	if button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
 			if not _input_allowed():

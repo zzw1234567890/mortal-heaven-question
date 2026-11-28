@@ -51,6 +51,7 @@ static func read(gsm: Node, card_system: Node, deployment_system: Node,
 		roster.append({
 			"character_id": instance_id,
 			"display_name": str(template.get("name")),
+			"card_id": str(template.get("card_id")),
 			"hp": int(template.get("base_hp")),
 			"attack": int(template.get("base_attack")),
 			"binding_count": _read_binding_count(binding_manager, instance_id),

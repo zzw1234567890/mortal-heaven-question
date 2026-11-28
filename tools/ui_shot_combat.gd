@@ -16,6 +16,7 @@ const OUT_DIR: String = "res://tools/"
 const HandAreaScript := preload("res://src/ui/combat/layout/hand_area.gd")
 const ArtResolver := preload("res://src/ui/combat/card_art_resolver.gd")
 const CharacterCardScript := preload("res://src/ui/combat/layout/character_status_card.gd")
+const DeployCardScript := preload("res://src/ui/combat/deploy/deploy_character_card.gd")
 const PortraitScript := preload("res://src/ui/identity_select/identity_portrait_resolver.gd")
 
 ## 底栏占视口高度的比例（与 HandArcRules / CombatLayoutZones 同源口径）。
@@ -47,6 +48,7 @@ func _ready() -> void:
 func _run() -> void:
 	await _shoot(1920, 1080, "ui_shot_hand_1920")
 	await _shoot_hover(1920, 1080)
+	await _shoot_deploy()
 	await _shoot(1280, 720, "ui_shot_hand_720")
 	await _shoot_actors()
 	print("[shot-combat] 完成，两张图在 " + ProjectSettings.globalize_path(OUT_DIR))
@@ -136,6 +138,44 @@ func _shoot_hover(p_w: int, p_h: int) -> void:
 	await _settle(12)
 	print("[shot-combat] 悬停卡 = 第 4 张（应当抬起并压在邻居之上）")
 	await _capture("ui_shot_hand_hover")
+	_force_window_size(1920, 1080)
+
+
+## 备战面板角色卡：立绘 cover 铺满 + 名字/HP/ATK/绑定角标。
+func _shoot_deploy() -> void:
+	await _clear()
+	_force_window_size(1920, 1080)
+	_holder = Control.new()
+	_holder.name = "DeployShotHolder"
+	_holder.size = Vector2(1920, 1080)
+	add_child(_holder)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 24)
+	row.position = Vector2(60, 120)
+	_holder.add_child(row)
+	var cases: Array = [
+		["lin_yuan", "林渊", 32, 45, 3, 0],
+		["su_jian_ming", "苏剑鸣", 26, 38, 2, 1],
+		["tu_ye", "屠野", 18, 52, 7, 2],
+		["yun_su_xin", "云素心", 21, 30, 0, 3],
+		["yin_ruo_han", "殷若寒", 0, 34, 1, 4],
+	]
+	for row_data: Array in cases:
+		var card: Control = DeployCardScript.new()
+		row.add_child(card)
+		card.call(&"apply_data", int(row_data[5]) + 1, {
+			"card_id": str(row_data[0]),
+			"display_name": str(row_data[1]),
+			"hp": int(row_data[2]),
+			"attack": int(row_data[3]),
+			"binding_count": int(row_data[4]),
+			"faction_tags": [],
+			"is_dead": false,
+		})
+		card.call(&"set_selection_state", ["selected", "selectable", "replaceable", "selectable", "unavailable"][int(row_data[5])])
+	await _settle(6)
+	print("[shot-combat] 备战卡 5 张：立绘应为 cover 铺满，最后一张阵亡态盖灰罩")
+	await _capture("ui_shot_deploy_cards")
 	_force_window_size(1920, 1080)
 
 
